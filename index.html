@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveScroll — Mirá, subí, ganá</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Live<span>Scroll</span></div>
+  <div class="nav-links" id="navLinks"></div>
+  <div id="navRight"></div>
+</nav>
+
+<!-- ================= LANDING (logged out) ================= -->
+<div id="landingView">
+  <div class="hero">
+    <div class="odometer-wrap">
+      <div class="odometer mono" id="landingOdometer">0</div>
+      <div class="odometer-label"><strong>puntos</strong>ganados hoy por la comunidad</div>
+    </div>
+    <h1>Subí tus clips.<br>Mirá los de otros.<br>Ganá plata real.</h1>
+    <p class="sub">LiveScroll convierte cada minuto que subís o mirás contenido de Kick, Twitch, YouTube y TikTok en puntos canjeables por dinero vía MercadoPago.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="num">01</div>
+        <h3>Subís tu video</h3>
+        <p>Compartí el link de tu clip o stream desde cualquier red.</p>
+        <div class="pts">+25 pts al instante</div>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <h3>Mirás contenido</h3>
+        <p>Cada minuto que mirás un video de otro usuario suma puntos.</p>
+        <div class="pts">+5 pts / minuto</div>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <h3>Te miran a vos</h3>
+        <p>Cuando alguien mira tu video, ganás también por su tiempo de visualización.</p>
+        <div class="pts">+5 pts / minuto</div>
+      </div>
+    </div>
+
+    <div class="cta-row">
+      <button class="btn" onclick="showAuth('signup')">Crear cuenta</button>
+      <button class="btn-outline" onclick="showAuth('login')">Ya tengo cuenta</button>
+    </div>
+  </div>
+
+  <div id="authWrap" class="hidden"></div>
+</div>
+
+<!-- ================= APP (logged in) ================= -->
+<div id="boostBannerWrap"></div>
+<div id="blockedBannerWrap"></div>
+<main class="app-view hidden" id="appView"></main>
+
+<div id="toastWrap"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>

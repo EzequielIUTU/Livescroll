@@ -933,6 +933,13 @@ async function renderProfile() {
   const likesByVideo = {};
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
+  const { data: referralConfig } = await sb
+    .from("app_config")
+    .select("key, value")
+    .in("key", ["referral_referrer_pts", "referral_referred_pts"]);
+  const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
+  const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
+
   main.innerHTML = `
     <h1 class="page-title">Mi Perfil</h1>
     <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
@@ -941,9 +948,9 @@ async function renderProfile() {
     <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
-      <h3 style="margin-top:0;">🎁 Invitá y ganá 375 pts</h3>
+      <h3 style="margin-top:0;">🎁 Invitá y ganá ${referrerPts} pts</h3>
       <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px;">
-        Compartí tu link. Cuando la persona invitada suba o mire algo por primera vez, ganás 375 pts y ella gana 350 pts.
+        Compartí tu link. Cuando la persona invitada suba o mire algo por primera vez, ganás ${referrerPts} pts y ella gana ${referredPts} pts.
         Tope: 3 invitaciones premiadas por mes.
       </p>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">

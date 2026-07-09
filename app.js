@@ -34,6 +34,10 @@ let feedObserverInstance = null;
 // ARRANQUE
 // ============================================================
 document.addEventListener("DOMContentLoaded", async () => {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+
   const params = new URLSearchParams(window.location.search);
   window.referralCode = params.get("ref");
 
@@ -286,6 +290,7 @@ async function renderApp() {
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
     <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
     <button id="tab-plans" onclick="switchTab('plans')">Planes</button>
+    <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;
 
   const plans = await loadPlans();
@@ -293,8 +298,13 @@ async function renderApp() {
 
   document.getElementById("navRight").innerHTML = `
     <span style="font-size:12px; color:var(--gold-dim); margin-right:8px;">${currentPlan.name}</span>
+    <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-right:8px;">
+      🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
+    </button>
     <span class="nav-balance mono" id="navBalance">${currentProfile.points_balance} pts</span>
     <button class="btn-outline" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
+
+  loadNotifications();
 
   checkBoostStatus();
   checkBlockedStatus();
@@ -345,6 +355,7 @@ function switchTab(tab) {
   if (tab === "profile") renderProfile();
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
+  if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
 }
 
@@ -925,7 +936,8 @@ async function renderProfile() {
 
   main.innerHTML = `
     <h1 class="page-title">Mi Perfil</h1>
-    <p class="page-sub">@${escapeHtml(currentProfile.username)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
+    <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
+    <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
       <h3 style="margin-top:0;">🎁 Invitá y ganá 375 pts</h3>
@@ -1160,6 +1172,48 @@ async function submitReport(videoId, reason) {
   showToast("Reportado. Gracias por avisarnos.");
 }
 
+let notifCache = [];
+
+async function loadNotifications() {
+  const { data } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  notifCache = data || [];
+  const unread = notifCache.filter(n => !n.read).length;
+  const badge = document.getElementById("notifBadge");
+  if (badge) {
+    if (unread > 0) { badge.textContent = unread; badge.classList.remove("hidden"); }
+    else { badge.classList.add("hidden"); }
+  }
+}
+
+function toggleNotifPanel() {
+  const existing = document.getElementById("notifPanel");
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement("div");
+  panel.id = "notifPanel";
+  panel.style.cssText = "position:absolute; top:60px; right:20px; width:300px; max-height:400px; overflow-y:auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,0.5);";
+  panel.innerHTML = notifCache.length
+    ? notifCache.map(n => `
+        <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px; ${n.read ? "opacity:0.5;" : ""}">
+          <div>${escapeHtml(n.message)}</div>
+          <div style="color:var(--text-dim); font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString("es-AR")}</div>
+        </div>`).join("")
+    : `<p style="color:var(--text-dim); font-size:13px; padding:10px;">Sin notificaciones todavía.</p>`;
+
+  document.body.appendChild(panel);
+
+  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
+    document.getElementById("notifBadge")?.classList.add("hidden");
+  });
+}
+
+
 function copyReferralLink() {
   const input = document.getElementById("referralLinkInput");
   input.select();
@@ -1170,9 +1224,69 @@ function copyReferralLink() {
   });
 }
 
-// ============================================================
-// ADMIN — aprobar / rechazar canjes
-// ============================================================
+function openEditProfile() {
+  const emojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
+  const wrap = document.getElementById("commentsModalWrap") || document.body;
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+      <div style="background:var(--panel); width:100%; max-width:360px; border-radius:16px; padding:22px;">
+        <h3 style="margin-top:0;">Editar perfil</h3>
+        <div class="field">
+          <label>Avatar</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${emojis.map(e => `<button onclick="selectAvatarEmoji('${e}')" id="emoji-${e}" style="font-size:20px; padding:8px; background:${e === currentProfile.avatar_emoji ? "var(--panel-2)" : "transparent"}; border:1px solid var(--border); border-radius:8px; cursor:pointer;">${e}</button>`).join("")}
+          </div>
+        </div>
+        <div class="field">
+          <label>Nombre de usuario</label>
+          <input type="text" id="editUsername" value="${escapeHtml(currentProfile.username)}">
+        </div>
+        <div class="field">
+          <label>Bio (opcional)</label>
+          <input type="text" id="editBio" value="${escapeHtml(currentProfile.bio || "")}" placeholder="Contá algo sobre vos" maxlength="120">
+        </div>
+        <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
+        <div id="editProfileError" class="error-msg"></div>
+      </div>
+    </div>`;
+  window.selectedAvatarEmoji = currentProfile.avatar_emoji || "🎬";
+}
+
+function selectAvatarEmoji(emoji) {
+  window.selectedAvatarEmoji = emoji;
+  document.querySelectorAll("[id^='emoji-']").forEach(b => b.style.background = "transparent");
+  document.getElementById(`emoji-${emoji}`).style.background = "var(--panel-2)";
+}
+
+async function saveProfileEdits() {
+  const newUsername = document.getElementById("editUsername").value.trim();
+  const bio = document.getElementById("editBio").value.trim();
+  const errEl = document.getElementById("editProfileError");
+
+  if (newUsername !== currentProfile.username) {
+    const { data, error } = await sb.rpc("update_username", { p_user_id: currentUser.id, p_new_username: newUsername });
+    if (error || !data.ok) {
+      errEl.textContent = data?.error === "nombre_ocupado" ? "Ese nombre de usuario ya está en uso." : "El nombre tiene que tener al menos 3 caracteres.";
+      return;
+    }
+    currentProfile.username = newUsername;
+  }
+
+  const { error: updateError } = await sb.from("profiles").update({
+    bio,
+    avatar_emoji: window.selectedAvatarEmoji
+  }).eq("id", currentUser.id);
+
+  if (updateError) { errEl.textContent = "No se pudo guardar."; return; }
+
+  currentProfile.bio = bio;
+  currentProfile.avatar_emoji = window.selectedAvatarEmoji;
+  document.getElementById("commentsModalWrap").innerHTML = "";
+  showToast("Perfil actualizado");
+  renderProfile();
+}
+
+
 async function renderAdmin() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando canjes...</p>`;
@@ -1357,6 +1471,31 @@ async function handleRejectRedemption(id) {
   if (error || !data.ok) { showToast("No se pudo rechazar"); return; }
   showToast("Canje rechazado, puntos devueltos");
   renderAdmin();
+}
+
+// ============================================================
+// RANKING SEMANAL
+// ============================================================
+async function renderRanking() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando ranking...</p>`;
+
+  const { data: leaderboard, error } = await sb.rpc("get_weekly_leaderboard");
+  if (error) { main.innerHTML = `<p class="error-msg">${error.message}</p>`; return; }
+
+  const medals = ["🥇", "🥈", "🥉"];
+
+  main.innerHTML = `
+    <h1 class="page-title">🏆 Ranking semanal</h1>
+    <p class="page-sub">Los que más puntos generaron en los últimos 7 días.</p>
+    <div>
+      ${(leaderboard || []).map((u, i) => `
+        <div class="ledger-row" style="${u.username === currentProfile.username ? 'background:var(--panel-2); border-radius:8px; padding:10px;' : ''}">
+          <span>${medals[i] || `#${i + 1}`} ${u.avatar_emoji || "🎬"} @${escapeHtml(u.username)}</span>
+          <span class="mono" style="color:var(--gold)">${u.total_points} pts</span>
+        </div>
+      `).join("") || `<p style="color:var(--text-dim)">Todavía no hay actividad esta semana.</p>`}
+    </div>`;
 }
 
 let plansCache = null;

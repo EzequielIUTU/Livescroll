@@ -430,8 +430,7 @@ async function renderFeed() {
           </div>
         </div>`;
       }).join("")}
-    </div>
-    <div id="commentsModalWrap"></div>`;
+    </div>`;
 
   setupFeedObserver(videos);
 }
@@ -937,6 +936,8 @@ async function renderProfile() {
   main.innerHTML = `
     <h1 class="page-title">Mi Perfil</h1>
     <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
+    ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
+    ${renderSocialIcons(currentProfile)}
     <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
@@ -1006,7 +1007,7 @@ async function handleShare(videoId, url) {
 }
 
 async function openComments(videoId) {
-  const wrap = document.getElementById("commentsModalWrap");
+  const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
       <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; border-radius:20px 20px 0 0; padding:20px; display:flex; flex-direction:column;">
@@ -1059,7 +1060,22 @@ async function submitComment(videoId) {
 }
 
 function closeComments() {
-  document.getElementById("commentsModalWrap").innerHTML = "";
+  document.getElementById("globalModalWrap").innerHTML = "";
+}
+
+function renderSocialIcons(profile) {
+  const socials = [
+    { key: "social_kick", icon: "🟢", label: "Kick" },
+    { key: "social_twitch", icon: "🟣", label: "Twitch" },
+    { key: "social_youtube", icon: "🔴", label: "YouTube" },
+    { key: "social_tiktok", icon: "⚫", label: "TikTok" },
+    { key: "social_instagram", icon: "🩷", label: "Instagram" }
+  ];
+  const active = socials.filter(s => profile[s.key]);
+  if (!active.length) return "";
+  return `<div style="display:flex; gap:10px; margin-bottom:16px;">
+    ${active.map(s => `<a href="${profile[s.key]}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;">${s.icon}</a>`).join("")}
+  </div>`;
 }
 
 // ============================================================
@@ -1078,7 +1094,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -1109,9 +1125,11 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <h1 class="page-title" style="margin-bottom:0;">@${escapeHtml(profile.username)}</h1>
+      <h1 class="page-title" style="margin-bottom:0;">${profile.avatar_emoji || "🎬"} @${escapeHtml(profile.username)}</h1>
       <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
     </div>
+    ${profile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:0;">${escapeHtml(profile.bio)}</p>` : ""}
+    ${renderSocialIcons(profile)}
     <p class="page-sub">${videos?.length || 0} videos · ${(followers || []).length} seguidores</p>
 
     <div id="publicVideosList">
@@ -1148,7 +1166,7 @@ async function handleToggleFollow(followedId) {
 }
 
 function openReportModal(videoId) {
-  const wrap = document.getElementById("commentsModalWrap") || document.body;
+  const wrap = document.getElementById("globalModalWrap");
   const reasons = ["Contenido violento", "Spam o engañoso", "Derechos de autor", "Contenido sexual", "Otro"];
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
@@ -1164,7 +1182,7 @@ function openReportModal(videoId) {
 
 async function submitReport(videoId, reason) {
   const { data, error } = await sb.rpc("report_video", { p_video_id: videoId, p_reporter_id: currentUser.id, p_reason: reason });
-  document.getElementById("commentsModalWrap").innerHTML = "";
+  document.getElementById("globalModalWrap").innerHTML = "";
   if (error || !data.ok) {
     showToast(data?.error === "ya_reportado" ? "Ya habías reportado este video" : "No se pudo reportar");
     return;
@@ -1226,7 +1244,7 @@ function copyReferralLink() {
 
 function openEditProfile() {
   const emojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
-  const wrap = document.getElementById("commentsModalWrap") || document.body;
+  const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
       <div style="background:var(--panel); width:100%; max-width:360px; border-radius:16px; padding:22px;">
@@ -1244,6 +1262,16 @@ function openEditProfile() {
         <div class="field">
           <label>Bio (opcional)</label>
           <input type="text" id="editBio" value="${escapeHtml(currentProfile.bio || "")}" placeholder="Contá algo sobre vos" maxlength="120">
+        </div>
+        <div class="field">
+          <label>Mis redes (opcional)</label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
+            <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
+          </div>
         </div>
         <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
         <div id="editProfileError" class="error-msg"></div>
@@ -1274,14 +1302,24 @@ async function saveProfileEdits() {
 
   const { error: updateError } = await sb.from("profiles").update({
     bio,
-    avatar_emoji: window.selectedAvatarEmoji
+    avatar_emoji: window.selectedAvatarEmoji,
+    social_kick: document.getElementById("socialKick").value.trim() || null,
+    social_twitch: document.getElementById("socialTwitch").value.trim() || null,
+    social_youtube: document.getElementById("socialYoutube").value.trim() || null,
+    social_tiktok: document.getElementById("socialTiktok").value.trim() || null,
+    social_instagram: document.getElementById("socialInstagram").value.trim() || null
   }).eq("id", currentUser.id);
 
   if (updateError) { errEl.textContent = "No se pudo guardar."; return; }
 
   currentProfile.bio = bio;
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
-  document.getElementById("commentsModalWrap").innerHTML = "";
+  currentProfile.social_kick = document.getElementById("socialKick").value.trim();
+  currentProfile.social_twitch = document.getElementById("socialTwitch").value.trim();
+  currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
+  currentProfile.social_tiktok = document.getElementById("socialTiktok").value.trim();
+  currentProfile.social_instagram = document.getElementById("socialInstagram").value.trim();
+  document.getElementById("globalModalWrap").innerHTML = "";
   showToast("Perfil actualizado");
   renderProfile();
 }
@@ -1599,7 +1637,7 @@ async function openSubscriptionForm(planId, amount) {
 }
 
 function showPaymentCodeModal(code, amount) {
-  const wrap = document.getElementById("commentsModalWrap") || document.body;
+  const wrap = document.getElementById("globalModalWrap");
   const modal = document.createElement("div");
   modal.style.cssText = "position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;";
   modal.innerHTML = `

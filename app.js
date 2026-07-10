@@ -315,8 +315,8 @@ function checkBlockedStatus() {
   const wrap = document.getElementById("blockedBannerWrap");
   if (currentProfile.is_blocked) {
     wrap.innerHTML = `
-      <div style="max-width:920px;margin:14px auto 0;padding:10px 18px;background:rgba(248,113,113,0.1);border:1px solid var(--red);border-radius:10px;color:var(--red);font-size:13px;text-align:center;">
-        ⚠️ Tu cuenta está bloqueada para ganar puntos (detectamos otra cuenta registrada desde la misma red). Podés seguir navegando, pero no vas a sumar puntos hasta que se revise.
+      <div style="max-width:920px;margin:14px auto 0;padding:10px 18px;background:rgba(34,197,94,0.08);border:1px solid var(--gold-dim);border-radius:10px;color:var(--text);font-size:13px;text-align:center;">
+        🕒 Tu cuenta está pendiente de verificación por el equipo. Podés navegar tranquilo, pero todavía no vas a sumar puntos hasta que te habilitemos (normalmente es rápido).
       </div>`;
   } else {
     wrap.innerHTML = "";
@@ -1356,7 +1356,8 @@ async function renderAdmin() {
   const pending = (redemptions || []).filter(r => r.status === "pending");
   const resolved = (redemptions || []).filter(r => r.status !== "pending").slice(0, 15);
 
-  const blockedUsers = (profilesOverview || []).filter(p => p.is_blocked);
+  const { data: pendingUsersFull } = await sb.rpc("admin_get_pending_users");
+  const blockedUsers = pendingUsersFull || (profilesOverview || []).filter(p => p.is_blocked);
 
   const { data: subRequests } = await sb
     .from("subscription_requests")
@@ -1445,12 +1446,12 @@ async function renderAdmin() {
     </div>
 
     ${blockedUsers && blockedUsers.length ? `
-      <h3 style="margin-top:32px;">🚫 Cuentas bloqueadas por IP duplicada (${blockedUsers.length})</h3>
-      <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Si es un falso positivo (ej: familia en la misma casa), desbloqueala acá.</p>
+      <h3 style="margin-top:32px;">🆕 Cuentas nuevas pendientes de verificar (${blockedUsers.length})</h3>
+      <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Toda cuenta nueva arranca así hasta que la verifiques. Revisá que el email tenga sentido y verificala.</p>
       ${blockedUsers.map(u => `
         <div class="ledger-row">
-          <span>@${escapeHtml(u.username)} · IP: ${escapeHtml(u.signup_ip || "desconocida")} · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
-          <button class="btn-outline" style="padding:4px 12px; font-size:12px;" onclick="handleUnblockUser('${u.id}')">Desbloquear</button>
+          <span>@${escapeHtml(u.username)} · ${escapeHtml(u.email || "")} · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
+          <button class="btn-outline" style="padding:4px 12px; font-size:12px;" onclick="handleUnblockUser('${u.id}')">✓ Verificar</button>
         </div>
       `).join("")}` : ""}
 

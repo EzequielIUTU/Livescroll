@@ -1357,7 +1357,7 @@ async function renderAdmin() {
   const resolved = (redemptions || []).filter(r => r.status !== "pending").slice(0, 15);
 
   const { data: pendingUsersFull } = await sb.rpc("admin_get_pending_users");
-  const blockedUsers = pendingUsersFull || (profilesOverview || []).filter(p => p.is_blocked);
+  let blockedUsers = (pendingUsersFull && pendingUsersFull.length) ? pendingUsersFull : (profilesOverview || []).filter(p => p.is_blocked);
 
   const { data: subRequests } = await sb
     .from("subscription_requests")

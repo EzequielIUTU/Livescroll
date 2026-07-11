@@ -453,26 +453,38 @@ function setupFeedObserver(videos) {
   feedObserverInstance = observer;
 }
 
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+}
+
 function getEmbedHtml(video) {
   const url = video.video_url;
+  if (!isSafeUrl(url)) {
+    return `<div class="feed-fallback"><p>Link de video inválido.</p></div>`;
+  }
   if (video.platform === "upload") {
-    return `<video src="${url}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>`;
+    return `<video src="${escapeHtml(url)}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>`;
   }
   if (video.platform === "youtube") {
     const id = extractYoutubeId(url);
-    if (id) return `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    if (id) return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
   }
   if (video.platform === "twitch") {
     return `<iframe src="https://player.twitch.tv/?video=${encodeURIComponent(url)}&parent=${location.hostname}&autoplay=true&muted=true" allowfullscreen></iframe>`;
   }
   if (video.platform === "kick") {
-    return `<iframe src="${url}" allowfullscreen></iframe>`;
+    return `<iframe src="${escapeHtml(url)}" allowfullscreen></iframe>`;
   }
   const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣" };
   return `<div class="feed-fallback">
     <div class="platform-icon">${icons[video.platform] || "▶️"}</div>
-    <p>Este video se ve mejor en ${video.platform}</p>
-    <a class="btn" href="${url}" target="_blank" rel="noopener">Abrir y mirar ahí</a>
+    <p>Este video se ve mejor en ${escapeHtml(video.platform)}</p>
+    <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir y mirar ahí</a>
   </div>`;
 }
 
@@ -972,7 +984,7 @@ async function renderProfile() {
               </div>
               <div class="platform">${v.platform}</div>
             </div>
-            <a href="${v.video_url}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${v.video_url}</a>
+            <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
           </div>
         </div>
       `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
@@ -1151,7 +1163,7 @@ async function viewPublicProfile(username) {
               </div>
               <div class="platform">${v.platform}</div>
             </div>
-            <a href="${v.video_url}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${v.video_url}</a>
+            <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
           </div>
         </div>
       `).join("") : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}

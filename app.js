@@ -1372,8 +1372,22 @@ async function renderAdmin() {
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 
+  const { data: stats } = await sb.rpc("admin_get_stats");
+
   main.innerHTML = `
     <h1 class="page-title">🛠 Panel de Admin</h1>
+
+    ${stats && !stats.error ? `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:24px;">
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Usuarios totales</div><div class="mono" style="font-size:20px;">${stats.total_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Verificados</div><div class="mono" style="font-size:20px;color:var(--green);">${stats.verified_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Pendientes</div><div class="mono" style="font-size:20px;color:var(--gold);">${stats.pending_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Activos (7 días)</div><div class="mono" style="font-size:20px;">${stats.active_last_7d}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Videos subidos</div><div class="mono" style="font-size:20px;">${stats.total_videos}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Puntos totales (deuda)</div><div class="mono" style="font-size:20px;color:var(--red);">$${Number(stats.total_points_balance).toLocaleString("es-AR")}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Ya pagado</div><div class="mono" style="font-size:20px;">$${Number(stats.total_paid_ars).toLocaleString("es-AR")}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Por pagar (pendiente)</div><div class="mono" style="font-size:20px;color:var(--gold);">$${Number(stats.total_pending_ars).toLocaleString("es-AR")}</div></div>
+    </div>` : ""}
     <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${(reports || []).length} reporte${(reports || []).length === 1 ? "" : "s"} pendiente${(reports || []).length === 1 ? "" : "s"}</p>
 
     ${reports && reports.length ? `
@@ -1455,6 +1469,15 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
+    <h3 style="margin-top:32px;">🔍 Buscar y gestionar cualquier cuenta</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="userSearchInput" placeholder="Nombre de usuario o email..." style="flex:1; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
+        <button class="btn" onclick="handleUserSearch()">Buscar</button>
+      </div>
+      <div id="userSearchResults" style="margin-top:14px;"></div>
+    </div>
+
     ${resolved.length ? `
       <h3 style="margin-top:32px;">Historial reciente</h3>
       <div>
@@ -1495,6 +1518,76 @@ async function handleRejectSubscription(id) {
   if (error || !data.ok) { showToast("No se pudo rechazar"); return; }
   showToast("Pago rechazado");
   renderAdmin();
+}
+
+async function handleUserSearch() {
+  const query = document.getElementById("userSearchInput").value.trim();
+  const resultsEl = document.getElementById("userSearchResults");
+  if (!query) { resultsEl.innerHTML = ""; return; }
+
+  resultsEl.innerHTML = "Buscando...";
+  const { data, error } = await sb.rpc("admin_search_users", { p_query: query });
+
+  if (error || !data || !data.length) {
+    resultsEl.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Sin resultados.</p>`;
+    return;
+  }
+
+  resultsEl.innerHTML = data.map(u => `
+    <div class="form-card" style="margin-bottom:10px;">
+      <div style="font-weight:600;">@${escapeHtml(u.username)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
+      <div style="color:var(--text-dim); font-size:12px;">${escapeHtml(u.email || "")} · ${u.points_balance} pts · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+        <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleAdjustPoints('${u.id}', '${escapeHtml(u.username)}')">± Ajustar puntos</button>
+        ${u.ban_reason
+          ? `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleUnbanUser('${u.id}')">Levantar ban</button>`
+          : `<button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleBanUser('${u.id}', '${escapeHtml(u.username)}')">🚫 Banear</button>`}
+        <button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleDeleteAccount('${u.id}', '${escapeHtml(u.username)}')">🗑 Eliminar cuenta</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleAdjustPoints(userId, username) {
+  const amountStr = prompt(`Ajustar puntos de @${username}.\n\nPoné un número negativo para descontar (ej: -100), o positivo para sumar (ej: 50):`);
+  if (amountStr === null || amountStr.trim() === "") return;
+  const amount = parseInt(amountStr, 10);
+  if (isNaN(amount)) { showToast("Eso no es un número válido"); return; }
+
+  const reason = prompt("Motivo (para el registro interno):") || "";
+
+  const { data, error } = await sb.rpc("admin_adjust_points", { p_user_id: userId, p_amount: amount, p_reason: reason });
+  if (error || !data.ok) { showToast("No se pudo ajustar"); return; }
+  showToast(`Puntos ajustados: ${amount > 0 ? "+" : ""}${amount}`);
+  handleUserSearch();
+}
+
+async function handleBanUser(userId, username) {
+  const reason = prompt(`¿Por qué baneás a @${username}? (esto queda registrado)`);
+  if (!reason || !reason.trim()) { showToast("Necesitás poner un motivo"); return; }
+  if (!confirm(`¿Seguro que querés banear a @${username}? No va a poder ganar puntos ni canjear.`)) return;
+
+  const { data, error } = await sb.rpc("admin_ban_user", { p_user_id: userId, p_reason: reason.trim() });
+  if (error || !data.ok) { showToast("No se pudo banear"); return; }
+  showToast("Cuenta baneada");
+  handleUserSearch();
+}
+
+async function handleUnbanUser(userId) {
+  const { data, error } = await sb.rpc("admin_unban_user", { p_user_id: userId });
+  if (error || !data.ok) { showToast("No se pudo levantar el ban"); return; }
+  showToast("Ban levantado");
+  handleUserSearch();
+}
+
+async function handleDeleteAccount(userId, username) {
+  const confirmText = prompt(`Esto borra TODO de @${username} para siempre (videos, puntos, comentarios, todo). No se puede deshacer.\n\nEscribí "ELIMINAR" para confirmar:`);
+  if (confirmText !== "ELIMINAR") { showToast("Cancelado"); return; }
+
+  const { data, error } = await sb.rpc("admin_delete_account", { p_user_id: userId });
+  if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
+  showToast("Cuenta eliminada por completo");
+  handleUserSearch();
 }
 
 async function handleUnblockUser(userId) {

@@ -279,14 +279,20 @@ function renderLanding() {
     <button class="btn-outline" onclick="showAuth('login')">Iniciar sesión</button>`;
 }
 
-function animateLandingOdometer() {
-  // Puramente decorativo: un contador ambiente para transmitir "esto vive y crece"
+async function animateLandingOdometer() {
   const el = document.getElementById("landingOdometer");
-  let n = 128340;
-  setInterval(() => {
-    n += Math.floor(Math.random() * 8) + 1;
-    el.textContent = n.toLocaleString("es-AR");
-  }, 1800);
+  const { data, error } = await sb.rpc("get_todays_total_points");
+  if (!error && data !== null) {
+    el.textContent = data.toLocaleString("es-AR");
+  } else {
+    el.textContent = "0";
+  }
+
+  // Refresca cada 60s para que se sienta viva, siempre con el dato real
+  setInterval(async () => {
+    const { data: fresh } = await sb.rpc("get_todays_total_points");
+    if (fresh !== null && fresh !== undefined) el.textContent = fresh.toLocaleString("es-AR");
+  }, 60000);
 }
 
 // ============================================================

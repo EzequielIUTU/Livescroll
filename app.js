@@ -56,6 +56,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
     if (event === "SIGNED_IN") {
+      if (currentUser && currentUser.id === session.user.id) {
+        // Ya estábamos logueados con esta cuenta: Supabase solo está
+        // revalidando el token en segundo plano (pasa al volver a la
+        // pestaña). No reiniciamos la pantalla en la que estaba el usuario.
+        return;
+      }
       currentUser = session.user;
       await loadProfile();
       renderApp();
@@ -1486,6 +1492,7 @@ async function renderAdmin() {
       <div style="display:flex; gap:8px;">
         <input type="text" id="userSearchInput" placeholder="Nombre de usuario o email..." style="flex:1; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
         <button class="btn" onclick="handleUserSearch()">Buscar</button>
+        <button class="btn-outline" onclick="handleListAllUsers()">📋 Ver todos</button>
       </div>
       <div id="userSearchResults" style="margin-top:14px;"></div>
     </div>
@@ -1539,18 +1546,31 @@ async function handleUserSearch() {
 
   resultsEl.innerHTML = "Buscando...";
   const { data, error } = await sb.rpc("admin_search_users", { p_query: query });
+  renderUserCards(data, error, resultsEl);
+}
 
+async function handleListAllUsers() {
+  const resultsEl = document.getElementById("userSearchResults");
+  resultsEl.innerHTML = "Cargando todos los usuarios...";
+  const { data, error } = await sb.rpc("admin_list_all_users");
+  renderUserCards(data, error, resultsEl, true);
+}
+
+async function renderUserCards(data, error, resultsEl, showAll) {
   if (error || !data || !data.length) {
     resultsEl.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Sin resultados.</p>`;
     return;
   }
 
-  resultsEl.innerHTML = data.map(u => `
+  const plans = await loadPlans();
+
+  resultsEl.innerHTML = (showAll ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">${data.length} usuario${data.length === 1 ? "" : "s"} en total</p>` : "") + data.map(u => `
     <div class="form-card" style="margin-bottom:10px;">
       <div style="font-weight:600;">@${escapeHtml(u.username)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
-      <div style="color:var(--text-dim); font-size:12px;">${escapeHtml(u.email || "")} · ${u.points_balance} pts · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
+      <div style="color:var(--text-dim); font-size:12px;">${escapeHtml(u.email || "")} · ${u.points_balance} pts${u.plan_id ? ` · plan ${escapeHtml(plans.find(p => p.id === u.plan_id)?.name || u.plan_id)}` : ""} · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
         <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleAdjustPoints('${u.id}', '${escapeHtml(u.username)}')">± Ajustar puntos</button>
+        <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleSetPlan('${u.id}', '${escapeHtml(u.username)}')">📦 Activar plan</button>
         ${u.ban_reason
           ? `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleUnbanUser('${u.id}')">Levantar ban</button>`
           : `<button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleBanUser('${u.id}', '${escapeHtml(u.username)}')">🚫 Banear</button>`}
@@ -1558,6 +1578,20 @@ async function handleUserSearch() {
       </div>
     </div>
   `).join("");
+}
+
+async function handleSetPlan(userId, username) {
+  const plans = await loadPlans();
+  const options = plans.map(p => p.name).join(" / ");
+  const chosen = prompt(`Activar plan para @${username}.\n\nEscribí exactamente uno de estos: ${options}`);
+  if (!chosen) return;
+  const plan = plans.find(p => p.name.toLowerCase() === chosen.trim().toLowerCase());
+  if (!plan) { showToast("Ese plan no existe, escribilo exacto"); return; }
+
+  const { data, error } = await sb.rpc("admin_set_plan", { p_user_id: userId, p_plan_id: plan.id });
+  if (error || !data.ok) { showToast("No se pudo activar el plan"); return; }
+  showToast(`Plan ${plan.name} activado`);
+  handleUserSearch();
 }
 
 async function handleAdjustPoints(userId, username) {

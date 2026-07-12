@@ -80,49 +80,53 @@ document.addEventListener("DOMContentLoaded", async () => {
 // AUTH
 // ============================================================
 function showAuth(mode) {
-  document.getElementById("authWrap").classList.remove("hidden");
-  document.querySelector(".hero").scrollIntoView({ behavior: "smooth" });
   renderAuthForm(mode);
 }
 
 function renderAuthForm(mode) {
-  const wrap = document.getElementById("authWrap");
+  const wrap = document.getElementById("globalModalWrap");
   const isSignup = mode === "signup";
   wrap.innerHTML = `
-    <div class="auth-box">
-      <h2>${isSignup ? "Crear cuenta" : "Iniciar sesión"}</h2>
-      ${isSignup && window.referralCode ? `<p style="font-size:12px; color:var(--gold); margin-top:-8px; margin-bottom:14px;">🎉 Te invitó @${escapeHtml(window.referralCode)}</p>` : ""}
-      ${isSignup ? `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.15s ease;" onclick="if(event.target===this) closeAuthModal()">
+      <div class="auth-box" style="margin:0; animation:scaleIn 0.15s ease;">
+        <button onclick="closeAuthModal()" style="position:absolute; top:16px; right:20px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer;">✕</button>
+        <div style="display:flex; gap:6px; margin-bottom:18px;">
+          <button onclick="renderAuthForm('login')" class="${!isSignup ? "btn" : "btn-outline"}" style="flex:1; padding:8px; font-size:13px;">Iniciar sesión</button>
+          <button onclick="renderAuthForm('signup')" class="${isSignup ? "btn" : "btn-outline"}" style="flex:1; padding:8px; font-size:13px;">Crear cuenta</button>
+        </div>
+        <h2>${isSignup ? "Crear cuenta" : "Iniciar sesión"}</h2>
+        ${isSignup && window.referralCode ? `<p style="font-size:12px; color:var(--gold); margin-top:-8px; margin-bottom:14px;">🎉 Te invitó @${escapeHtml(window.referralCode)}</p>` : ""}
+        ${isSignup ? `
+          <div class="field">
+            <label>Nombre de usuario</label>
+            <input type="text" id="authUsername" placeholder="ej: ezequieliutu">
+          </div>` : ""}
         <div class="field">
-          <label>Nombre de usuario</label>
-          <input type="text" id="authUsername" placeholder="ej: ezequieliutu">
-        </div>` : ""}
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="authEmail" placeholder="tu@email.com">
-      </div>
-      <div class="field">
-        <label>Contraseña</label>
-        <input type="password" id="authPassword" placeholder="••••••••">
-      </div>
-      ${isSignup ? `
-        <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
-          <input type="checkbox" id="authAcceptTerms" style="margin-top:3px;">
-          <label for="authAcceptTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">
-            Soy mayor de 18 años y acepto los <a href="terminos.html" target="_blank">Términos y Condiciones</a>.
-          </label>
-        </div>` : ""}
-      <button class="btn" style="width:100%" onclick="${isSignup ? "handleSignup()" : "handleLogin()"}">
-        ${isSignup ? "Crear cuenta" : "Entrar"}
-      </button>
-      ${!isSignup ? `<div style="text-align:center; margin-top:10px;"><button onclick="handleForgotPassword()" style="background:none;border:none;color:var(--text-dim);font-size:12px;cursor:pointer;text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>` : ""}
-      <div id="authError" class="error-msg"></div>
-      <div class="auth-toggle">
-        ${isSignup
-          ? `¿Ya tenés cuenta? <button onclick="renderAuthForm('login')">Iniciar sesión</button>`
-          : `¿No tenés cuenta? <button onclick="renderAuthForm('signup')">Crear una</button>`}
+          <label>Email</label>
+          <input type="email" id="authEmail" placeholder="tu@email.com">
+        </div>
+        <div class="field">
+          <label>Contraseña</label>
+          <input type="password" id="authPassword" placeholder="••••••••">
+        </div>
+        ${isSignup ? `
+          <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
+            <input type="checkbox" id="authAcceptTerms" style="margin-top:3px;">
+            <label for="authAcceptTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">
+              Soy mayor de 18 años y acepto los <a href="terminos.html" target="_blank">Términos y Condiciones</a>.
+            </label>
+          </div>` : ""}
+        <button class="btn" style="width:100%" onclick="${isSignup ? "handleSignup()" : "handleLogin()"}">
+          ${isSignup ? "Crear cuenta" : "Entrar"}
+        </button>
+        ${!isSignup ? `<div style="text-align:center; margin-top:10px;"><button onclick="handleForgotPassword()" style="background:none;border:none;color:var(--text-dim);font-size:12px;cursor:pointer;text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>` : ""}
+        <div id="authError" class="error-msg"></div>
       </div>
     </div>`;
+}
+
+function closeAuthModal() {
+  document.getElementById("globalModalWrap").innerHTML = "";
 }
 
 async function handleSignup() {
@@ -174,23 +178,23 @@ async function handleSignup() {
     return;
   }
 
+  closeAuthModal();
   renderApp();
 }
 
 function showNewPasswordForm() {
-  document.getElementById("landingView").classList.remove("hidden");
-  document.getElementById("appView").classList.add("hidden");
-  document.getElementById("authWrap").classList.remove("hidden");
-  const wrap = document.getElementById("authWrap");
+  const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="auth-box">
-      <h2>Elegí tu nueva contraseña</h2>
-      <div class="field">
-        <label>Nueva contraseña</label>
-        <input type="password" id="newPasswordInput" placeholder="••••••••">
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div class="auth-box" style="margin:0;">
+        <h2>Elegí tu nueva contraseña</h2>
+        <div class="field">
+          <label>Nueva contraseña</label>
+          <input type="password" id="newPasswordInput" placeholder="••••••••">
+        </div>
+        <button class="btn" style="width:100%" onclick="submitNewPassword()">Guardar contraseña</button>
+        <div id="newPasswordError" class="error-msg"></div>
       </div>
-      <button class="btn" style="width:100%" onclick="submitNewPassword()">Guardar contraseña</button>
-      <div id="newPasswordError" class="error-msg"></div>
     </div>`;
 }
 
@@ -205,6 +209,7 @@ async function submitNewPassword() {
   const { error } = await sb.auth.updateUser({ password });
   if (error) { errEl.textContent = error.message; return; }
 
+  document.getElementById("globalModalWrap").innerHTML = "";
   showToast("¡Contraseña actualizada! Ya podés usarla.");
   currentUser = (await sb.auth.getUser()).data.user;
   await loadProfile();
@@ -243,6 +248,7 @@ async function handleLogin() {
 
   currentUser = data.user;
   await loadProfile();
+  closeAuthModal();
   renderApp();
 }
 
@@ -544,6 +550,9 @@ function startWatching(video) {
       } else if (data.error === "video_repetido") {
         stopWatching(video.id);
         showToast("Ya sumaste el máximo por este video hoy — mirá otro para seguir ganando");
+      } else if (data.error === "saldo_maximo") {
+        stopWatching(video.id);
+        showToast("Llegaste al tope de saldo de tu plan — canjeá para seguir ganando 💰");
       }
     }
   }, 5000);
@@ -1300,9 +1309,43 @@ function openEditProfile() {
         </div>
         <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
         <div id="editProfileError" class="error-msg"></div>
+        <div style="border-top:1px solid var(--border); margin-top:16px; padding-top:16px;">
+          <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
+        </div>
       </div>
     </div>`;
   window.selectedAvatarEmoji = currentProfile.avatar_emoji || "🎬";
+}
+
+function openChangePassword() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:110; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+      <div class="auth-box" style="margin:0;">
+        <h2>Cambiar contraseña</h2>
+        <div class="field">
+          <label>Nueva contraseña</label>
+          <input type="password" id="changePasswordInput" placeholder="••••••••">
+        </div>
+        <button class="btn" style="width:100%" onclick="submitChangePassword()">Guardar</button>
+        <div id="changePasswordError" class="error-msg"></div>
+      </div>
+    </div>`;
+}
+
+async function submitChangePassword() {
+  const password = document.getElementById("changePasswordInput").value;
+  const errEl = document.getElementById("changePasswordError");
+  if (!password || password.length < 6) {
+    errEl.textContent = "La contraseña tiene que tener al menos 6 caracteres.";
+    return;
+  }
+
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) { errEl.textContent = error.message; return; }
+
+  openEditProfile();
+  showToast("Contraseña actualizada");
 }
 
 function selectAvatarEmoji(emoji) {
@@ -1761,6 +1804,7 @@ function renderPlanCard(plan) {
         <div>📅 Tope diario normal: <span style="color:var(--text)">${plan.daily_cap_normal} pts</span></div>
         ${plan.daily_cap_boosted ? `<div>🚀 Tope diario boosteado: <span style="color:var(--text)">${plan.daily_cap_boosted} pts</span></div>` : ""}
         <div>💰 Tope de canje semanal: <span style="color:var(--text)">$${plan.weekly_redemption_cap.toLocaleString("es-AR")}</span></div>
+        ${plan.max_balance ? `<div>🏦 Saldo máximo acumulable: <span style="color:var(--text)">${plan.max_balance.toLocaleString("es-AR")} pts</span></div>` : ""}
         <div>💸 Comisión por retiro: <span style="color:var(--text)">${(plan.commission_pct * 100).toFixed(0)}%</span></div>
       </div>
       ${isCurrent

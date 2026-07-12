@@ -79,6 +79,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ============================================================
 // AUTH
 // ============================================================
+function togglePasswordVisibility(inputId, btnEl) {
+  const input = document.getElementById(inputId);
+  if (input.type === "password") {
+    input.type = "text";
+    btnEl.textContent = "🙈";
+  } else {
+    input.type = "password";
+    btnEl.textContent = "👁";
+  }
+}
+
 function showAuth(mode) {
   renderAuthForm(mode);
 }
@@ -107,7 +118,10 @@ function renderAuthForm(mode) {
         </div>
         <div class="field">
           <label>Contraseña</label>
-          <input type="password" id="authPassword" placeholder="••••••••">
+          <div class="password-field-wrap">
+            <input type="password" id="authPassword" placeholder="••••••••">
+            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('authPassword', this)">👁</button>
+          </div>
         </div>
         ${isSignup ? `
           <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
@@ -190,7 +204,10 @@ function showNewPasswordForm() {
         <h2>Elegí tu nueva contraseña</h2>
         <div class="field">
           <label>Nueva contraseña</label>
-          <input type="password" id="newPasswordInput" placeholder="••••••••">
+          <div class="password-field-wrap">
+            <input type="password" id="newPasswordInput" placeholder="••••••••">
+            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('newPasswordInput', this)">👁</button>
+          </div>
         </div>
         <button class="btn" style="width:100%" onclick="submitNewPassword()">Guardar contraseña</button>
         <div id="newPasswordError" class="error-msg"></div>
@@ -1364,7 +1381,10 @@ function openChangePassword() {
         <h2>Cambiar contraseña</h2>
         <div class="field">
           <label>Nueva contraseña</label>
-          <input type="password" id="changePasswordInput" placeholder="••••••••">
+          <div class="password-field-wrap">
+            <input type="password" id="changePasswordInput" placeholder="••••••••">
+            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('changePasswordInput', this)">👁</button>
+          </div>
         </div>
         <button class="btn" style="width:100%" onclick="submitChangePassword()">Guardar</button>
         <div id="changePasswordError" class="error-msg"></div>
@@ -1564,7 +1584,7 @@ async function renderAdmin() {
       <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Toda cuenta nueva arranca así hasta que la verifiques. Revisá que el email tenga sentido y verificala.</p>
       ${blockedUsers.map(u => `
         <div class="ledger-row">
-          <span>@${escapeHtml(u.username)} · ${escapeHtml(u.email || "")} · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
+          <span>@${escapeHtml(u.username)} · <span id="email-pending-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-pending-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
           <button class="btn-outline" style="padding:4px 12px; font-size:12px;" onclick="handleUnblockUser('${u.id}')">✓ Verificar</button>
         </div>
       `).join("")}` : ""}
@@ -1638,6 +1658,21 @@ async function handleListAllUsers() {
   renderUserCards(data, error, resultsEl, true);
 }
 
+function maskEmail(email) {
+  if (!email) return "";
+  const [user, domain] = email.split("@");
+  if (!domain) return email;
+  const visible = user.slice(0, 2);
+  return `${visible}${"•".repeat(Math.max(3, user.length - 2))}@${domain}`;
+}
+
+function toggleEmailVisibility(spanId, realEmail) {
+  const el = document.getElementById(spanId);
+  const isMasked = el.dataset.masked !== "false";
+  el.textContent = isMasked ? realEmail : maskEmail(realEmail);
+  el.dataset.masked = isMasked ? "false" : "true";
+}
+
 async function renderUserCards(data, error, resultsEl, showAll) {
   if (error || !data || !data.length) {
     resultsEl.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Sin resultados.</p>`;
@@ -1649,7 +1684,7 @@ async function renderUserCards(data, error, resultsEl, showAll) {
   resultsEl.innerHTML = (showAll ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">${data.length} usuario${data.length === 1 ? "" : "s"} en total</p>` : "") + data.map(u => `
     <div class="form-card" style="margin-bottom:10px;">
       <div style="font-weight:600;">@${escapeHtml(u.username)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
-      <div style="color:var(--text-dim); font-size:12px;">${escapeHtml(u.email || "")} · ${u.points_balance} pts${u.plan_id ? ` · plan ${escapeHtml(plans.find(p => p.id === u.plan_id)?.name || u.plan_id)}` : ""} · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
+      <div style="color:var(--text-dim); font-size:12px;"><span id="email-card-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-card-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${u.points_balance} pts${u.plan_id ? ` · plan ${escapeHtml(plans.find(p => p.id === u.plan_id)?.name || u.plan_id)}` : ""} · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
         <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleAdjustPoints('${u.id}', '${escapeHtml(u.username)}')">± Ajustar puntos</button>
         <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleSetPlan('${u.id}', '${escapeHtml(u.username)}')">📦 Activar plan</button>
@@ -1709,8 +1744,8 @@ async function handleUnbanUser(userId) {
 }
 
 async function handleDeleteAccount(userId, username) {
-  const confirmText = prompt(`Esto borra TODO de @${username} para siempre (videos, puntos, comentarios, todo). No se puede deshacer.\n\nEscribí "ELIMINAR" para confirmar:`);
-  if (confirmText !== "ELIMINAR") { showToast("Cancelado"); return; }
+  const confirmText = prompt(`Esto borra TODO de @${username} para siempre (videos, puntos, comentarios, todo). No se puede deshacer.\n\nEscribí "eliminar" para confirmar:`);
+  if (confirmText?.trim().toLowerCase() !== "eliminar") { showToast("Cancelado"); return; }
 
   const { data, error } = await sb.rpc("admin_delete_account", { p_user_id: userId });
   if (error || !data.ok) { showToast("No se pudo eliminar"); return; }

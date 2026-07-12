@@ -218,6 +218,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .auth-box h2 { margin-top: 0; }
 .field { margin-bottom: 14px; }
 .field label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
+.password-field-wrap { position: relative; }
+.password-field-wrap input { padding-right: 40px !important; }
+.password-toggle-btn {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; cursor: pointer; font-size: 16px;
+  padding: 4px; line-height: 1;
+}
+
 .field input {
   width: 100%; padding: 11px 12px; background: var(--ink);
   border: 1px solid var(--border); border-radius: 8px; color: var(--text);

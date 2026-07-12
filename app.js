@@ -1864,6 +1864,25 @@ async function openSubscriptionForm(planId, amount) {
   if (error || !data.ok) { showToast("No se pudo generar el código de pago"); return; }
 
   showPaymentCodeModal(data.code, data.amount);
+  notifyAdminByEmail(currentProfile.username, planId, amount, data.code);
+}
+
+// ============================================================
+// EMAILJS — aviso automático a tu correo dedicado de pagos
+// ============================================================
+// Completá estos 3 datos después de armar tu cuenta en emailjs.com
+const EMAILJS_PUBLIC_KEY = "TU-PUBLIC-KEY";
+const EMAILJS_SERVICE_ID = "TU-SERVICE-ID";
+const EMAILJS_TEMPLATE_ID = "TU-TEMPLATE-ID";
+
+function notifyAdminByEmail(username, planId, amount, code) {
+  if (EMAILJS_PUBLIC_KEY === "TU-PUBLIC-KEY") return; // todavía no se configuró, no hacemos nada
+
+  try {
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      username, plan: planId, amount, code
+    }, EMAILJS_PUBLIC_KEY).catch(() => {});
+  } catch (e) { /* si falla el aviso, no rompemos el flujo del usuario */ }
 }
 
 function showPaymentCodeModal(code, amount) {

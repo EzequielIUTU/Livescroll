@@ -29,7 +29,13 @@
       <div class="odometer-label"><strong>puntos</strong>ganados hoy por la comunidad</div>
     </div>
     <h1>Subí tus clips.<br>Mirá los de otros.<br>Ganá plata real.</h1>
-    <p class="sub">LiveScroll convierte cada minuto que subís o mirás contenido de Kick, Twitch, YouTube y TikTok en puntos canjeables por dinero vía MercadoPago.</p>
+    <p class="sub">LiveScroll convierte cada minuto que subís o mirás contenido de Kick, Twitch, YouTube y TikTok en puntos canjeables por dinero, vía transferencia bancaria.</p>
+
+    <div class="trust-chips">
+      <span>🔒 Canjes revisados a mano, no automáticos</span>
+      <span>✅ Sin costos ocultos</span>
+      <span>🇦🇷 Hecho en Argentina</span>
+    </div>
 
     <div class="steps">
       <div class="step">
@@ -56,8 +62,33 @@
       <button class="btn" onclick="showAuth('signup')">Crear cuenta</button>
       <button class="btn-outline" onclick="showAuth('login')">Ya tengo cuenta</button>
     </div>
+
+    <div class="faq-section">
+      <h2>Preguntas frecuentes</h2>
+      <div class="faq-item">
+        <h3>¿Es gratis?</h3>
+        <p>Sí, crear cuenta y usar la plataforma no cuesta nada. Existen planes pagos opcionales (Plus y Diamante) que dan beneficios extra, pero no son obligatorios.</p>
+      </div>
+      <div class="faq-item">
+        <h3>¿Cómo cobro de verdad?</h3>
+        <p>Cuando juntás suficientes puntos, pedís el canje desde la app y ponés tu alias o CVU. Un admin revisa y te transfiere manualmente — no es instantáneo, pero es real.</p>
+      </div>
+      <div class="faq-item">
+        <h3>¿Hay algún límite de edad?</h3>
+        <p>Sí, tenés que ser mayor de 18 años para crear una cuenta, ya que se maneja dinero real.</p>
+      </div>
+      <div class="faq-item">
+        <h3>¿Puedo perder puntos?</h3>
+        <p>Los puntos ganados de forma genuina son tuyos. Cuentas que intenten hacer trampa (bots, cuentas falsas) pueden ser suspendidas.</p>
+      </div>
+    </div>
   </div>
 </div>
+
+<footer class="landing-footer">
+  <span>© LiveScroll 2026</span>
+  <a href="terminos.html">Términos y Condiciones</a>
+</footer>
 
 <!-- ================= APP (logged in) ================= -->
 <div id="boostBannerWrap"></div>
@@ -67,6 +98,7 @@
 
 <div id="toastWrap"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
 </body>

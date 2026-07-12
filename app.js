@@ -298,6 +298,39 @@ async function animateLandingOdometer() {
 // ============================================================
 // APP SHELL
 // ============================================================
+function toggleMobileMenu() {
+  const existing = document.getElementById("mobileMenuPanel");
+  if (existing) { closeMobileMenu(); return; }
+
+  const overlay = document.createElement("div");
+  overlay.className = "mobile-menu-overlay";
+  overlay.id = "mobileMenuOverlay";
+  overlay.onclick = closeMobileMenu;
+
+  const panel = document.createElement("div");
+  panel.className = "mobile-menu-panel";
+  panel.id = "mobileMenuPanel";
+  panel.innerHTML = `
+    <button onclick="switchTab('feed'); closeMobileMenu();">Mirar</button>
+    <button onclick="switchTab('upload'); closeMobileMenu();">Subir video</button>
+    <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
+    <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
+    <button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>
+    <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
+    ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
+    <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
+      <button onclick="handleLogout(); closeMobileMenu();" style="color:var(--red);">Salir</button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  document.body.appendChild(panel);
+}
+
+function closeMobileMenu() {
+  document.getElementById("mobileMenuOverlay")?.remove();
+  document.getElementById("mobileMenuPanel")?.remove();
+}
+
 async function renderApp() {
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");

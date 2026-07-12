@@ -64,6 +64,7 @@ nav {
   align-items: center;
   justify-content: space-between;
   padding: 18px 28px;
+  padding-top: max(18px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
@@ -80,10 +81,43 @@ nav {
   border-radius: 8px; cursor: pointer;
 }
 .nav-links button.active { color: var(--gold); background: var(--panel-2); }
+
 .nav-balance {
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
   background: var(--panel-2); border: 1px solid var(--gold-dim);
   color: var(--gold); padding: 6px 14px; border-radius: 20px; font-size: 14px;
+}
+
+.nav-hamburger {
+  display: none;
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-size: 18px; padding: 6px 12px; cursor: pointer;
+}
+
+.mobile-menu-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 78%; max-width: 300px;
+  background: var(--panel); z-index: 90; padding: 24px 20px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+  display: flex; flex-direction: column; gap: 6px;
+  animation: slideInRight 0.2s ease;
+}
+.mobile-menu-panel button {
+  background: none; border: none; color: var(--text); text-align: left;
+  padding: 14px 10px; font-size: 15px; font-family: inherit; cursor: pointer;
+  border-radius: 8px; border-bottom: 1px solid var(--border);
+}
+.mobile-menu-panel button.active { color: var(--gold); }
+.mobile-menu-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 89;
+}
+@keyframes slideInRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+@media (max-width: 780px) {
+  .nav-links { display: none; }
+  .nav-hamburger { display: block; }
+  main.app-view { padding-left: 16px; padding-right: 16px; }
+  main.app-view { padding-bottom: max(40px, env(safe-area-inset-bottom)); }
 }
 
 /* ---------- HERO / LANDING ---------- */
@@ -254,6 +288,7 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 .feed-overlay {
   position: absolute; bottom: 0; left: 0; right: 0;
   padding: 18px 16px;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
   background: linear-gradient(transparent, rgba(0,0,0,0.9));
   display: flex; justify-content: space-between; align-items: flex-end;
   color: #fff;

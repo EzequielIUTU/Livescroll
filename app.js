@@ -258,7 +258,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");

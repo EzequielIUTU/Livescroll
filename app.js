@@ -275,7 +275,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -376,8 +376,48 @@ async function renderApp() {
 
   checkBoostStatus();
   checkBlockedStatus();
+  claimDailyStreak();
   switchTab("feed");
 }
+
+async function claimDailyStreak() {
+  if (currentProfile.is_blocked) return; // cuentas pendientes de verificar no acumulan racha todavía
+
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) return; // ya reclamado hoy, o sin configurar: no molestamos
+
+  currentProfile.points_balance += data.points;
+  currentProfile.streak_current_day = data.day;
+  updateBalanceUI();
+  showStreakModal(data);
+}
+
+function showStreakModal(data) {
+  const wrap = document.getElementById("globalModalWrap");
+  const wasCompleted = data.completed_week;
+
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:120; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div class="auth-box" style="margin:0; text-align:center;">
+        ${wasCompleted ? `
+          <div style="font-size:44px; margin-bottom:8px;">🎉</div>
+          <h2>¡Racha completa!</h2>
+          <p style="color:var(--text-dim); font-size:14px;">Completaste los 7 días. ¡Hasta la próxima semana!</p>
+        ` : `
+          <div style="font-size:44px; margin-bottom:8px;">🔥</div>
+          <h2>Día ${data.day} de 7</h2>
+        `}
+        <div class="mono" style="font-size:28px; color:var(--gold); margin:14px 0;">+${data.points} pts</div>
+        ${data.badge_name ? `
+          <div style="background:var(--panel-2); border:1px solid var(--gold-dim); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:32px;">${data.badge_icon || "🏅"}</div>
+            <div style="font-size:13px; color:var(--gold); margin-top:6px;">¡Ganaste la medalla "${escapeHtml(data.badge_name)}"!</div>
+          </div>` : ""}
+        <button class="btn" style="width:100%;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Genial</button>
+      </div>
+    </div>`;
+}
+
 
 function checkBlockedStatus() {
   const wrap = document.getElementById("blockedBannerWrap");
@@ -1003,6 +1043,8 @@ async function renderProfile() {
 
   const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
 
+  const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
+
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
     videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
@@ -1029,6 +1071,18 @@ async function renderProfile() {
     ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
     ${renderSocialIcons(currentProfile)}
     <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
+
+    <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
+      <h3 style="margin-top:0;">🔥 Racha diaria: Día ${currentProfile.streak_current_day || 0}/7</h3>
+      <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden; margin-bottom:12px;">
+        <div style="width:${((currentProfile.streak_current_day || 0) / 7) * 100}%; height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width 0.4s ease;"></div>
+      </div>
+      ${badges && badges.length ? `
+        <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Tus medallas:</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          ${badges.map(b => `<div title="${escapeHtml(b.badge_name)}" style="font-size:26px;">${b.badge_icon || "🏅"}</div>`).join("")}
+        </div>` : `<p style="color:var(--text-dim); font-size:12px;">Entrá todos los días para ganar medallas.</p>`}
+    </div>
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
       <h3 style="margin-top:0;">🎁 Invitá y ganá ${referrerPts} pts</h3>
@@ -1589,6 +1643,21 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
+    <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
+        Elegí el lunes de la semana que querés configurar, y completá los 7 días. Se puede cargar con anticipación.
+      </p>
+      <div class="field">
+        <label>Semana que empieza el (fecha del lunes)</label>
+        <input type="date" id="streakWeekStart" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
+      </div>
+      <div id="streakDaysForm"></div>
+      <button class="btn" onclick="loadStreakDaysForm()" style="margin-bottom:10px;">Cargar formulario de esa semana</button>
+      <div id="streakSaveResult"></div>
+    </div>
+    <div id="streakWeeksOverview" style="margin-bottom:14px;"></div>
+
     <h3 style="margin-top:32px;">🔍 Buscar y gestionar cualquier cuenta</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <div style="display:flex; gap:8px;">
@@ -1609,6 +1678,8 @@ async function renderAdmin() {
           </div>
         `).join("")}
       </div>` : ""}`;
+
+  loadStreakWeeksOverview();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -1639,6 +1710,65 @@ async function handleRejectSubscription(id) {
   if (error || !data.ok) { showToast("No se pudo rechazar"); return; }
   showToast("Pago rechazado");
   renderAdmin();
+}
+
+function loadStreakDaysForm() {
+  const weekStart = document.getElementById("streakWeekStart").value;
+  if (!weekStart) { showToast("Elegí primero una fecha"); return; }
+
+  const formEl = document.getElementById("streakDaysForm");
+  formEl.innerHTML = Array.from({ length: 7 }, (_, i) => i + 1).map(day => `
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+      <span style="width:50px; font-size:13px; color:var(--text-dim);">Día ${day}</span>
+      <input type="number" id="streakPts${day}" placeholder="puntos" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" style="flex:1; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+    </div>
+  `).join("") + `<button class="btn" style="width:100%; margin-top:10px;" onclick="saveStreakWeek()">Guardar toda la semana</button>`;
+}
+
+async function saveStreakWeek() {
+  const weekStart = document.getElementById("streakWeekStart").value;
+  const resultEl = document.getElementById("streakSaveResult");
+  resultEl.textContent = "Guardando...";
+
+  for (let day = 1; day <= 7; day++) {
+    const points = parseInt(document.getElementById(`streakPts${day}`).value, 10) || 0;
+    const badgeName = document.getElementById(`streakBadgeName${day}`).value.trim();
+    const badgeIcon = document.getElementById(`streakBadgeIcon${day}`).value.trim();
+
+    await sb.rpc("admin_set_streak_reward", {
+      p_week_start: weekStart,
+      p_day: day,
+      p_points: points,
+      p_badge_name: badgeName,
+      p_badge_icon: badgeIcon
+    });
+  }
+
+  resultEl.textContent = "";
+  showToast("Semana guardada");
+  loadStreakWeeksOverview();
+}
+
+async function loadStreakWeeksOverview() {
+  const el = document.getElementById("streakWeeksOverview");
+  if (!el) return;
+  const { data } = await sb.rpc("admin_get_streak_rewards");
+  if (!data || !data.length) { el.innerHTML = ""; return; }
+
+  const byWeek = {};
+  data.forEach(r => {
+    byWeek[r.week_start] = byWeek[r.week_start] || [];
+    byWeek[r.week_start].push(r);
+  });
+
+  el.innerHTML = `<h4 style="font-size:14px; color:var(--text-dim); margin-bottom:8px;">Semanas ya cargadas:</h4>` +
+    Object.keys(byWeek).sort().reverse().map(week => `
+      <div class="ledger-row">
+        <span>Semana del ${new Date(week + "T00:00:00").toLocaleDateString("es-AR")} — ${byWeek[week].length}/7 días cargados</span>
+      </div>
+    `).join("");
 }
 
 async function handleUserSearch() {

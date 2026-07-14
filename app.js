@@ -1045,6 +1045,11 @@ async function renderProfile() {
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
 
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: allWeeks } = await sb.from("streak_rewards").select("*").lte("week_start", today).order("week_start", { ascending: false });
+  const currentWeekStart = allWeeks && allWeeks.length ? allWeeks[0].week_start : null;
+  const currentWeekDays = (allWeeks || []).filter(r => r.week_start === currentWeekStart).sort((a, b) => a.day_number - b.day_number);
+
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
     videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
@@ -1074,6 +1079,19 @@ async function renderProfile() {
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
       <h3 style="margin-top:0;">🔥 Racha diaria: Día ${currentProfile.streak_current_day || 0}/7</h3>
+      ${currentWeekDays.length ? `
+        <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px;">
+          ${currentWeekDays.map(d => {
+            const isDone = d.day_number <= (currentProfile.streak_current_day || 0);
+            const isToday = d.day_number === (currentProfile.streak_current_day || 0);
+            return `
+            <div style="flex:0 0 auto; width:74px; text-align:center; background:${isToday ? "var(--panel-2)" : "transparent"}; border:1px solid ${isToday ? "var(--gold)" : "var(--border)"}; border-radius:10px; padding:8px 4px; ${isDone && !isToday ? "opacity:0.55;" : ""}">
+              <div style="font-size:10px; color:var(--text-dim);">Día ${d.day_number}</div>
+              <div style="font-size:18px; margin:4px 0;">${isDone ? "✅" : (d.badge_icon || "⭐")}</div>
+              <div class="mono" style="font-size:11px; color:var(--gold);">+${d.points}</div>
+            </div>`;
+          }).join("")}
+        </div>` : `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`}
       <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden; margin-bottom:12px;">
         <div style="width:${((currentProfile.streak_current_day || 0) / 7) * 100}%; height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width 0.4s ease;"></div>
       </div>
@@ -1712,17 +1730,22 @@ async function handleRejectSubscription(id) {
   renderAdmin();
 }
 
-function loadStreakDaysForm() {
+async function loadStreakDaysForm() {
   const weekStart = document.getElementById("streakWeekStart").value;
   if (!weekStart) { showToast("Elegí primero una fecha"); return; }
+
+  const { data: existing } = await sb.rpc("admin_get_streak_rewards");
+  const existingForWeek = (existing || []).filter(r => r.week_start === weekStart);
+  const byDay = {};
+  existingForWeek.forEach(r => { byDay[r.day_number] = r; });
 
   const formEl = document.getElementById("streakDaysForm");
   formEl.innerHTML = Array.from({ length: 7 }, (_, i) => i + 1).map(day => `
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
       <span style="width:50px; font-size:13px; color:var(--text-dim);">Día ${day}</span>
-      <input type="number" id="streakPts${day}" placeholder="puntos" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" style="flex:1; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-      <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+      <input type="number" id="streakPts${day}" placeholder="puntos" value="${byDay[day]?.points ?? ""}" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" value="${escapeHtml(byDay[day]?.badge_icon || "")}" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
     </div>
   `).join("") + `<button class="btn" style="width:100%; margin-top:10px;" onclick="saveStreakWeek()">Guardar toda la semana</button>`;
 }

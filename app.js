@@ -1065,6 +1065,20 @@ async function renderProfile() {
   const canPin = myPlan && myPlan.max_pinned_videos > 0;
   const pinsUsed = pinnedIds.size;
 
+  let socialClicksHtml = "";
+  if (myPlan && myPlan.id !== "standard") {
+    const { data: clicks } = await sb.rpc("get_my_social_clicks", { p_user_id: currentUser.id });
+    if (clicks && clicks.length) {
+      socialClicksHtml = `
+        <div class="form-card" style="margin-bottom:24px;">
+          <h3 style="margin-top:0;">📊 Clics a tus redes (beneficio ${escapeHtml(myPlan.name)})</h3>
+          <div style="display:flex; gap:16px; flex-wrap:wrap;">
+            ${clicks.map(c => `<div style="text-align:center;"><div class="mono" style="font-size:20px; color:var(--gold);">${c.total}</div><div style="font-size:11px; color:var(--text-dim);">${escapeHtml(c.platform)}</div></div>`).join("")}
+          </div>
+        </div>`;
+    }
+  }
+
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -1097,6 +1111,7 @@ async function renderProfile() {
     <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
     ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
     ${renderSocialIcons(currentProfile)}
+    ${socialClicksHtml}
     <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
@@ -1271,8 +1286,13 @@ function renderSocialIcons(profile) {
   const active = socials.filter(s => profile[s.key]);
   if (!active.length) return "";
   return `<div style="display:flex; gap:10px; margin-bottom:16px;">
-    ${active.map(s => `<a href="${profile[s.key]}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;">${s.icon}</a>`).join("")}
+    ${active.map(s => `<a href="${profile[s.key]}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;" onclick="logSocialClick('${profile.id}', '${s.label}')">${s.icon}</a>`).join("")}
   </div>`;
+}
+
+function logSocialClick(ownerId, platform) {
+  if (!ownerId || ownerId === currentUser?.id) return; // no contamos clics a tus propias redes
+  sb.rpc("log_social_click", { p_owner_id: ownerId, p_platform: platform }).catch(() => {});
 }
 
 // ============================================================
@@ -2088,6 +2108,16 @@ async function renderPlans() {
 
     <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:24px;">
       ${plans.map(p => renderPlanCard(p)).join("")}
+    </div>
+
+    <div class="form-card" style="margin-bottom:24px; opacity:0.7; border-style:dashed;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:22px;">🔒</span>
+        <div>
+          <div style="font-weight:600; font-size:14px;">Próximamente (en revisión)</div>
+          <div style="color:var(--text-dim); font-size:12px; margin-top:2px;">Nuevas funciones para ****** y ***********, todavía en pruebas.</div>
+        </div>
+      </div>
     </div>
 
     ${myRequests && myRequests.length ? `

@@ -1919,6 +1919,19 @@ async function handleListAllUsers() {
   renderUserCards(data, error, resultsEl, true);
 }
 
+function maskPaymentInfo(value) {
+  if (!value) return "";
+  return "•".repeat(Math.min(value.length, 14));
+}
+
+function togglePaymentInfo(elId) {
+  const el = document.getElementById(elId);
+  const isMasked = el.dataset.masked !== "false";
+  const realValue = el.dataset.real;
+  el.textContent = isMasked ? realValue : (elId === "payEmail" ? maskEmail(realValue) : maskPaymentInfo(realValue));
+  el.dataset.masked = isMasked ? "false" : "true";
+}
+
 function maskEmail(email) {
   if (!email) return "";
   const [user, domain] = email.split("@");
@@ -2097,11 +2110,11 @@ async function renderPlans() {
         Confirmamos manualmente y te activamos el plan (puede demorar unas horas).
       </p>
       <div style="font-size:13px; line-height:1.8;">
-        <div>CVU: <strong class="mono">${escapeHtml(cvu)}</strong></div>
-        <div>Alias: <strong class="mono">${escapeHtml(alias)}</strong></div>
+        <div>CVU: <strong class="mono" id="payCvu" data-real="${escapeHtml(cvu)}" data-masked="true">${maskPaymentInfo(cvu)}</strong> <button onclick="togglePaymentInfo('payCvu')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button></div>
+        <div>Alias: <strong class="mono" id="payAlias" data-real="${escapeHtml(alias)}" data-masked="true">${maskPaymentInfo(alias)}</strong> <button onclick="togglePaymentInfo('payAlias')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button></div>
       </div>
       <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); font-size:13px;">
-        📧 Mandá el comprobante de la transferencia a <strong class="mono" style="color:var(--gold)">ezequielmarcosrodriguez@gmail.com</strong>
+        📧 Mandá el comprobante de la transferencia a <strong class="mono" style="color:var(--gold)" id="payEmail" data-real="ezequielmarcosrodriguez@gmail.com" data-masked="true">${maskEmail("ezequielmarcosrodriguez@gmail.com")}</strong> <button onclick="togglePaymentInfo('payEmail')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button>
         <div style="color:var(--text-dim); font-size:12px; margin-top:4px;">Tiempo de respuesta estimado: 5 a 10 minutos, según el tránsito. 🚦</div>
       </div>
     </div>

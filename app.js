@@ -2123,16 +2123,6 @@ async function renderPlans() {
       ${plans.map(p => renderPlanCard(p)).join("")}
     </div>
 
-    <div class="form-card" style="margin-bottom:24px; opacity:0.7; border-style:dashed;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:22px;">🔒</span>
-        <div>
-          <div style="font-weight:600; font-size:14px;">Próximamente (en revisión)</div>
-          <div style="color:var(--text-dim); font-size:12px; margin-top:2px;">Nuevas funciones para ****** y ***********, todavía en pruebas.</div>
-        </div>
-      </div>
-    </div>
-
     ${myRequests && myRequests.length ? `
       <h3>Tus pagos reportados</h3>
       <div>

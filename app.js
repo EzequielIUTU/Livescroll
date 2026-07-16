@@ -329,6 +329,7 @@ function toggleMobileMenu() {
   panel.id = "mobileMenuPanel";
   panel.innerHTML = `
     <button onclick="switchTab('feed'); closeMobileMenu();">Mirar</button>
+    <button onclick="switchTab('foryou'); closeMobileMenu();">✨ Para Ti</button>
     <button onclick="switchTab('upload'); closeMobileMenu();">Subir video</button>
     <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
     <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
@@ -354,6 +355,7 @@ async function renderApp() {
 
   document.getElementById("navLinks").innerHTML = `
     <button id="tab-feed" onclick="switchTab('feed')">Mirar</button>
+    <button id="tab-foryou" onclick="switchTab('foryou')">✨ Para Ti</button>
     <button id="tab-upload" onclick="switchTab('upload')">Subir video</button>
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
     <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
@@ -419,6 +421,18 @@ function showStreakModal(data) {
 }
 
 
+async function handlePinVideo(videoId) {
+  const { data, error } = await sb.rpc("pin_video", { p_video_id: videoId, p_user_id: currentUser.id });
+  if (error || !data.ok) {
+    const messages = { limite_alcanzado: "Ya usaste todos tus cupos de anclado por ahora.", plan_sin_anclado: "Tu plan no incluye anclar videos." };
+    showToast(messages[data?.error] || "No se pudo anclar");
+    return;
+  }
+  showToast("¡Video anclado en Para Ti por 24hs!");
+  renderProfile();
+}
+
+
 function checkBlockedStatus() {
   const wrap = document.getElementById("blockedBannerWrap");
   if (currentProfile.is_blocked) {
@@ -459,6 +473,7 @@ function switchTab(tab) {
   if (activeBtn) activeBtn.classList.add("active");
 
   if (tab === "feed") renderFeed();
+  if (tab === "foryou") renderForYou();
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
   if (tab === "wallet") renderWallet();
@@ -491,7 +506,7 @@ async function renderFeed() {
 
   const { data: videos, error } = await sb
     .from("videos")
-    .select("*, profiles!videos_user_id_fkey(username)")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
     .order("created_at", { ascending: false })
     .limit(20);
 
@@ -530,7 +545,7 @@ async function renderFeed() {
             <div class="feed-overlay">
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
-                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')">@${escapeHtml(v.profiles?.username || "usuario")} · ${v.platform}</div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')">@${escapeHtml(v.profiles?.username || "usuario")} ${getPlanBadgeHtml(v.profiles?.plan_id)} · ${v.platform}</div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
             </div>
@@ -1043,6 +1058,13 @@ async function renderProfile() {
 
   const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
 
+  const { data: myPins } = await sb.rpc("get_my_pinned_videos", { p_user_id: currentUser.id });
+  const pinnedIds = new Set((myPins || []).map(p => p.video_id));
+  const plans = await loadPlans();
+  const myPlan = plans.find(p => p.id === currentProfile.plan_id);
+  const canPin = myPlan && myPlan.max_pinned_videos > 0;
+  const pinsUsed = pinnedIds.size;
+
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
 
   const today = new Date().toISOString().slice(0, 10);
@@ -1072,7 +1094,7 @@ async function renderProfile() {
 
   main.innerHTML = `
     <h1 class="page-title">Mi Perfil</h1>
-    <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
+    <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
     ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
     ${renderSocialIcons(currentProfile)}
     <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
@@ -1116,6 +1138,7 @@ async function renderProfile() {
     </div>
 
     <div id="myVideosList">
+      ${canPin ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">📌 Anclados: ${pinsUsed}/${myPlan.max_pinned_videos} (duran 24hs)</p>` : ""}
       ${videos.length ? videos.map(v => `
         <div class="video-card with-thumb">
           <div class="video-thumb">${getThumbnailHtml(v)}</div>
@@ -1128,6 +1151,12 @@ async function renderProfile() {
               <div class="platform">${v.platform}</div>
             </div>
             <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
+            ${canPin ? `
+              <div style="margin-top:8px;">
+                ${pinnedIds.has(v.id)
+                  ? `<span style="font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</span>`
+                  : `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`}
+              </div>` : ""}
           </div>
         </div>
       `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
@@ -1191,7 +1220,7 @@ async function openComments(videoId) {
 async function loadComments(videoId) {
   const { data: comments } = await sb
     .from("video_comments")
-    .select("*, profiles!video_comments_user_id_fkey(username)")
+    .select("*, profiles!video_comments_user_id_fkey(username, plan_id)")
     .eq("video_id", videoId)
     .order("created_at", { ascending: false });
 
@@ -1200,7 +1229,7 @@ async function loadComments(videoId) {
   list.innerHTML = comments && comments.length
     ? comments.map(c => `
         <div style="margin-bottom:12px; font-size:13px;">
-          <strong style="color:var(--gold);">@${escapeHtml(c.profiles?.username || "usuario")}</strong>
+          <strong style="color:var(--gold);">@${escapeHtml(c.profiles?.username || "usuario")}</strong> ${getPlanBadgeHtml(c.profiles?.plan_id)}
           <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
           <div>${escapeHtml(c.content)}</div>
         </div>`).join("")
@@ -1225,6 +1254,12 @@ function closeComments() {
   document.getElementById("globalModalWrap").innerHTML = "";
 }
 
+function getPlanBadgeHtml(planId) {
+  if (planId === "plus") return `<span style="color:var(--gold); font-size:11px;">⭐ Plus</span>`;
+  if (planId === "diamante") return `<span style="color:#7dd3fc; font-size:11px;">💎 Diamante</span>`;
+  return "";
+}
+
 function renderSocialIcons(profile) {
   const socials = [
     { key: "social_kick", icon: "🟢", label: "Kick" },
@@ -1241,8 +1276,61 @@ function renderSocialIcons(profile) {
 }
 
 // ============================================================
-// PERFIL PÚBLICO (de otro usuario)
+// PARA TI — videos destacados/anclados por Plus y Diamante
 // ============================================================
+async function renderForYou() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<div id="foryouList">Cargando destacados...</div>`;
+
+  const { data: featured, error } = await sb.rpc("get_featured_videos");
+  const list = document.getElementById("foryouList");
+
+  if (error) { list.textContent = "Error cargando destacados: " + error.message; return; }
+  if (!featured || !featured.length) {
+    list.innerHTML = `<div style="padding:40px 0; text-align:center;">
+      <h1 class="page-title">✨ Para Ti</h1>
+      <p style="color:var(--text-dim)">Todavía no hay videos destacados. Los usuarios Plus y Diamante pueden anclar los suyos acá desde Mi Perfil.</p>
+    </div>`;
+    return;
+  }
+
+  const videos = featured.map(f => ({
+    id: f.video_id, title: f.title, video_url: f.video_url, platform: f.platform,
+    user_id: f.owner_id, profiles: { username: f.username, plan_id: f.plan_id }
+  }));
+
+  const { data: myLikes } = await sb.from("video_likes").select("video_id").eq("user_id", currentUser.id).in("video_id", videos.map(v => v.id));
+  const likedSet = new Set((myLikes || []).map(l => l.video_id));
+
+  list.innerHTML = `
+    <div class="feed-vertical" id="feedVertical">
+      ${videos.map((v, i) => `
+        <div class="feed-item" data-video-id="${v.id}">
+          <div class="feed-phone">
+            <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
+            <div class="feed-embed-frame">${getEmbedHtml(v)}</div>
+            <div class="feed-actions">
+              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
+              <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
+              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${v.video_url.replace(/'/g, "\\'")}')">🔗</button>
+            </div>
+            <div class="feed-overlay">
+              <div>
+                <div class="title">${escapeHtml(v.title)}</div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')">@${escapeHtml(v.profiles.username)} ${getPlanBadgeHtml(v.profiles.plan_id)} · ${v.platform}</div>
+              </div>
+              <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
+            </div>
+            ${i === 0 ? `<div class="feed-nudge">Deslizá hacia arriba para el siguiente ↑</div>` : ""}
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
+
+  setupFeedObserver(videos);
+}
+
+
 let previousTabBeforeProfile = "feed";
 
 async function viewPublicProfile(username) {
@@ -1256,7 +1344,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -1287,7 +1375,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <h1 class="page-title" style="margin-bottom:0;">${profile.avatar_emoji || "🎬"} @${escapeHtml(profile.username)}</h1>
+      <h1 class="page-title" style="margin-bottom:0;">${profile.avatar_emoji || "🎬"} @${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
       <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
     </div>
     ${profile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:0;">${escapeHtml(profile.bio)}</p>` : ""}

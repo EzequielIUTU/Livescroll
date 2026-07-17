@@ -1769,6 +1769,15 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
+    <h3 style="margin-top:32px;">🔒 Candado de Planes</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Controla si el resto de los usuarios puede ver la pestaña de Planes.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre ves todo, esto no te afecta.</div>
+      </div>
+      <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
+    </div>
+
     <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
@@ -1806,6 +1815,7 @@ async function renderAdmin() {
       </div>` : ""}`;
 
   loadStreakWeeksOverview();
+  loadPlansLockStatus();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -1901,6 +1911,26 @@ async function loadStreakWeeksOverview() {
       </div>
     `).join("");
 }
+
+async function loadPlansLockStatus() {
+  const btn = document.getElementById("plansLockBtn");
+  if (!btn) return;
+  const { data } = await sb.from("app_text_config").select("*").eq("key", "plans_visibility").single();
+  const status = data?.value || "open";
+  btn.textContent = status === "open" ? "🟢 Abierto — cerrar ahora" : "🔴 Cerrado — abrir ahora";
+  btn.className = status === "open" ? "btn" : "btn-outline";
+  btn.dataset.current = status;
+}
+
+async function handleTogglePlansLock() {
+  const btn = document.getElementById("plansLockBtn");
+  const newStatus = btn.dataset.current === "open" ? "closed" : "open";
+  const { data, error } = await sb.rpc("admin_set_plans_visibility", { p_status: newStatus });
+  if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
+  showToast(newStatus === "closed" ? "Planes cerrado para los demás" : "Planes abierto de nuevo");
+  loadPlansLockStatus();
+}
+
 
 async function handleUserSearch() {
   const query = document.getElementById("userSearchInput").value.trim();
@@ -2086,9 +2116,21 @@ async function loadPlans() {
 async function renderPlans() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando planes...</p>`;
-  const plans = await loadPlans();
 
   const { data: paymentInfo } = await sb.from("app_text_config").select("*");
+  const plansVisibility = paymentInfo?.find(c => c.key === "plans_visibility")?.value || "open";
+
+  if (plansVisibility === "closed" && !currentProfile.is_admin) {
+    main.innerHTML = `
+      <div style="text-align:center; padding:60px 20px;">
+        <div style="font-size:44px; margin-bottom:10px;">🔧</div>
+        <h1 class="page-title">Estamos ajustando los planes</h1>
+        <p style="color:var(--text-dim);">Volvé pronto, ya casi está.</p>
+      </div>`;
+    return;
+  }
+
+  const plans = await loadPlans();
   const cvu = paymentInfo?.find(c => c.key === "payment_cvu")?.value || "—";
   const alias = paymentInfo?.find(c => c.key === "payment_alias")?.value || "—";
 
@@ -2102,6 +2144,7 @@ async function renderPlans() {
   main.innerHTML = `
     <h1 class="page-title">Planes</h1>
     <p class="page-sub">Más plan, más boost, menos comisión al retirar.</p>
+    ${plansVisibility === "closed" && currentProfile.is_admin ? `<div style="background:rgba(248,113,113,0.1); border:1px solid var(--red); color:var(--red); font-size:12px; padding:10px 14px; border-radius:8px; margin-bottom:16px;">🔒 Esta sección está CERRADA para el resto de los usuarios ahora mismo. Solo vos la ves completa. Cambialo desde el panel de Admin.</div>` : ""}
 
     <div class="form-card" style="margin-bottom:20px; border-color:var(--gold-dim);">
       <h3 style="margin-top:0;">💳 Cómo pagar un plan</h3>

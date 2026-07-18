@@ -537,7 +537,7 @@ async function renderFeed() {
         <div class="feed-item" data-video-id="${v.id}">
           <div class="feed-phone">
             <div class="feed-embed-frame">${getEmbedHtml(v)}</div>
-            ${isMine ? `<div style="position:absolute; top:14px; right:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
+            ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
             <div class="feed-actions">
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
               <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
@@ -1797,10 +1797,10 @@ async function renderAdmin() {
 
     <h3 style="margin-top:32px;">🔍 Buscar y gestionar cualquier cuenta</h3>
     <div class="form-card" style="margin-bottom:14px;">
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="userSearchInput" placeholder="Nombre de usuario o email..." style="flex:1; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
-        <button class="btn" onclick="handleUserSearch()">Buscar</button>
-        <button class="btn-outline" onclick="handleListAllUsers()">📋 Ver todos</button>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <input type="text" id="userSearchInput" placeholder="Nombre de usuario o email..." style="flex:1; min-width:180px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
+        <button class="btn" onclick="handleUserSearch()" style="flex:1; min-width:100px;">Buscar</button>
+        <button class="btn-outline" onclick="handleListAllUsers()" style="flex:1; min-width:100px;">📋 Ver todos</button>
       </div>
       <div id="userSearchResults" style="margin-top:14px;"></div>
     </div>

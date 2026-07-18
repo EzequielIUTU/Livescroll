@@ -50,6 +50,8 @@ button.btn-outline:hover {
   box-shadow: 0 0 40px rgba(34,197,94,0.08);
 }
 
+html, body { overflow-x: hidden; max-width: 100%; }
+
 body {
   margin: 0;
   background: var(--ink);

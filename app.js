@@ -384,6 +384,8 @@ async function renderApp() {
 
 async function claimDailyStreak() {
   if (currentProfile.is_blocked) return; // cuentas pendientes de verificar no acumulan racha todavía
+  if (window.streakClaimAttempted) return; // seguro: nunca reclamar más de una vez por sesión
+  window.streakClaimAttempted = true;
 
   const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
   if (error || !data.ok) return; // ya reclamado hoy, o sin configurar: no molestamos

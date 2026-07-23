@@ -275,7 +275,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -378,8 +378,20 @@ async function renderApp() {
 
   checkBoostStatus();
   checkBlockedStatus();
-  claimDailyStreak();
+  // La racha ahora se reclama a mano desde Mi Perfil, no automático al entrar
   switchTab("feed");
+}
+
+async function handleClaimStreak() {
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
+
+  currentProfile.points_balance += data.points;
+  currentProfile.streak_current_day = data.day;
+  currentProfile.streak_last_login_date = new Date().toISOString().slice(0, 10);
+  updateBalanceUI();
+  showStreakModal(data);
+  renderProfile();
 }
 
 async function claimDailyStreak() {
@@ -1126,19 +1138,34 @@ async function renderProfile() {
 
     <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
       <h3 style="margin-top:0;">🔥 Racha diaria: Día ${currentProfile.streak_current_day || 0}/7</h3>
-      ${currentWeekDays.length ? `
+      ${currentWeekDays.length ? (() => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const claimedToday = currentProfile.streak_last_login_date === todayStr;
+        let claimableDay = null;
+        if (!claimedToday) {
+          const lastLogin = currentProfile.streak_last_login_date;
+          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+          if (lastLogin === yesterday && (currentProfile.streak_current_day || 0) < 7) {
+            claimableDay = (currentProfile.streak_current_day || 0) + 1;
+          } else {
+            claimableDay = 1;
+          }
+        }
+        return `
         <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px;">
           ${currentWeekDays.map(d => {
-            const isDone = d.day_number <= (currentProfile.streak_current_day || 0);
-            const isToday = d.day_number === (currentProfile.streak_current_day || 0);
+            const isDone = d.day_number <= (currentProfile.streak_current_day || 0) && (claimedToday || d.day_number !== claimableDay);
+            const isClaimable = d.day_number === claimableDay;
             return `
-            <div style="flex:0 0 auto; width:74px; text-align:center; background:${isToday ? "var(--panel-2)" : "transparent"}; border:1px solid ${isToday ? "var(--gold)" : "var(--border)"}; border-radius:10px; padding:8px 4px; ${isDone && !isToday ? "opacity:0.55;" : ""}">
+            <div style="flex:0 0 auto; width:80px; text-align:center; background:${isClaimable ? "var(--panel-2)" : "transparent"}; border:1px solid ${isClaimable ? "var(--gold)" : "var(--border)"}; border-radius:10px; padding:8px 4px; ${isDone ? "opacity:0.55;" : ""}">
               <div style="font-size:10px; color:var(--text-dim);">Día ${d.day_number}</div>
               <div style="font-size:18px; margin:4px 0;">${isDone ? "✅" : (d.badge_icon || "⭐")}</div>
-              <div class="mono" style="font-size:11px; color:var(--gold);">+${d.points}</div>
+              <div class="mono" style="font-size:11px; color:var(--gold); margin-bottom:4px;">+${d.points}</div>
+              ${isClaimable ? `<button class="btn" style="padding:3px 8px; font-size:10px; width:100%;" onclick="handleClaimStreak()">Reclamar</button>` : ""}
             </div>`;
           }).join("")}
-        </div>` : `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`}
+        </div>`;
+      })() : `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`}
       <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden; margin-bottom:12px;">
         <div style="width:${((currentProfile.streak_current_day || 0) / 7) * 100}%; height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width 0.4s ease;"></div>
       </div>
@@ -1928,8 +1955,17 @@ async function loadStreakWeeksOverview() {
     Object.keys(byWeek).sort().reverse().map(week => `
       <div class="ledger-row">
         <span>Semana del ${new Date(week + "T00:00:00").toLocaleDateString("es-AR")} — ${byWeek[week].length}/7 días cargados</span>
+        <button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleDeleteStreakWeek('${week}')">🗑 Eliminar</button>
       </div>
     `).join("");
+}
+
+async function handleDeleteStreakWeek(weekStart) {
+  if (!confirm(`¿Eliminar toda la configuración de la semana del ${new Date(weekStart + "T00:00:00").toLocaleDateString("es-AR")}?`)) return;
+  const { data, error } = await sb.rpc("admin_delete_streak_week", { p_week_start: weekStart });
+  if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
+  showToast("Semana eliminada");
+  loadStreakWeeksOverview();
 }
 
 async function loadPlansLockStatus() {

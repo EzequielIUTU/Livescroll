@@ -882,6 +882,8 @@ async function renderWallet() {
     .limit(30);
 
   const { data: boostStatus } = await sb.rpc("get_boost_status", { p_user_id: currentUser.id });
+  const { data: walletConfig } = await sb.from("app_text_config").select("*").eq("key", "wallet_visibility").single();
+  const walletClosed = walletConfig?.value === "closed" && !currentProfile.is_admin;
 
   const MIN_REDEEM = 1500;
   const progressPct = Math.min(100, (currentProfile.points_balance / MIN_REDEEM) * 100);
@@ -918,6 +920,12 @@ async function renderWallet() {
       </div>
     </div>
 
+    ${walletClosed ? `
+    <div class="form-card" style="margin-bottom:28px; text-align:center; border-color:var(--red);">
+      <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+      <h3 style="margin-top:0;">Retiros pausados</h3>
+      <p style="color:var(--text-dim); font-size:13px;">Estamos ajustando el sistema de canjes. Tus puntos siguen a salvo, volvé a intentar más tarde.</p>
+    </div>` : `
     <div class="form-card" style="margin-bottom:28px">
       <h3 style="margin-top:0">Solicitar canje</h3>
       <div class="field">
@@ -937,7 +945,7 @@ async function renderWallet() {
         Los canjes se revisan manualmente antes de acreditarse. El saldo se descuenta al solicitar.
         Tope de canje semanal en tu plan: $${plan.weekly_redemption_cap.toLocaleString("es-AR")}.
       </p>
-    </div>
+    </div>`}
 
     <h3>Historial de movimientos</h3>
     <div id="ledgerList">
@@ -1780,6 +1788,15 @@ async function renderAdmin() {
       <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
+    <h3 style="margin-top:32px;">🔒 Candado de Billetera</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Pausa que cualquiera pueda pedir un canje, sin tocar los puntos de nadie.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre podés retirar igual, esto no te afecta.</div>
+      </div>
+      <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
+    </div>
+
     <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
@@ -1818,6 +1835,7 @@ async function renderAdmin() {
 
   loadStreakWeeksOverview();
   loadPlansLockStatus();
+  loadWalletLockStatus();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -1931,6 +1949,25 @@ async function handleTogglePlansLock() {
   if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
   showToast(newStatus === "closed" ? "Planes cerrado para los demás" : "Planes abierto de nuevo");
   loadPlansLockStatus();
+}
+
+async function loadWalletLockStatus() {
+  const btn = document.getElementById("walletLockBtn");
+  if (!btn) return;
+  const { data } = await sb.from("app_text_config").select("*").eq("key", "wallet_visibility").single();
+  const status = data?.value || "open";
+  btn.textContent = status === "open" ? "🟢 Abierto — cerrar ahora" : "🔴 Cerrado — abrir ahora";
+  btn.className = status === "open" ? "btn" : "btn-outline";
+  btn.dataset.current = status;
+}
+
+async function handleToggleWalletLock() {
+  const btn = document.getElementById("walletLockBtn");
+  const newStatus = btn.dataset.current === "open" ? "closed" : "open";
+  const { data, error } = await sb.rpc("admin_set_wallet_visibility", { p_status: newStatus });
+  if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
+  showToast(newStatus === "closed" ? "Billetera cerrada para los demás" : "Billetera abierta de nuevo");
+  loadWalletLockStatus();
 }
 
 

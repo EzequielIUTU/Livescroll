@@ -334,6 +334,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
     <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
     <button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>
+    <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
@@ -360,6 +361,7 @@ async function renderApp() {
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
     <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
     <button id="tab-plans" onclick="switchTab('plans')">Planes</button>
+    <button id="tab-store" onclick="switchTab('store')">🛍️ Tienda</button>
     <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;
 
@@ -492,6 +494,7 @@ function switchTab(tab) {
   if (tab === "profile") renderProfile();
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
+  if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
 }
@@ -1550,8 +1553,11 @@ function copyReferralLink() {
   });
 }
 
-function openEditProfile() {
-  const emojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
+async function openEditProfile() {
+  const baseEmojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
+  const { data: unlocked } = await sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id);
+  const emojis = [...baseEmojis, ...(unlocked || []).map(u => u.emoji).filter(e => !baseEmojis.includes(e))];
+
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
@@ -2178,6 +2184,100 @@ async function renderRanking() {
         </div>
       `).join("") || `<p style="color:var(--text-dim)">Todavía no hay actividad esta semana.</p>`}
     </div>`;
+}
+
+// ============================================================
+// TIENDA DE PUNTOS
+// ============================================================
+async function renderStore() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando tienda...</p>`;
+
+  const [{ data: emojis }, { data: myEmojis }, plans] = await Promise.all([
+    sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
+    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+    loadPlans()
+  ]);
+  const myEmojiSet = new Set((myEmojis || []).map(e => e.emoji));
+  const myPlan = plans.find(p => p.id === currentProfile.plan_id);
+  const canBoost = myPlan && myPlan.id !== "standard";
+  const boostPrice = myPlan?.id === "diamante" ? 13500 : 3500;
+  const higherPlans = plans.filter(p => p.id !== "standard" && p.id !== currentProfile.plan_id);
+
+  main.innerHTML = `
+    <h1 class="page-title">🛍️ Tienda de puntos</h1>
+    <p class="page-sub">Balance: <strong class="mono" style="color:var(--gold)">${currentProfile.points_balance} pts</strong></p>
+
+    <h3 style="margin-top:24px;">😎 Emojis exclusivos</h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
+      ${(emojis || []).map(e => `
+        <div class="form-card" style="text-align:center;">
+          <div style="font-size:30px;">${e.emoji}</div>
+          <div style="font-size:12px; margin:4px 0;">${escapeHtml(e.name)}</div>
+          ${myEmojiSet.has(e.emoji)
+            ? `<span style="font-size:11px; color:var(--green);">✓ Tenés este</span>`
+            : `<button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleBuyEmoji('${e.id}')">${e.price_points} pts</button>`}
+        </div>
+      `).join("")}
+    </div>
+
+    <h3 style="margin-top:24px;">⚡ Boost extra</h3>
+    <div class="form-card" style="margin-bottom:24px;">
+      ${canBoost ? `
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:10px;">Activá un boost x${myPlan.boost_multiplier} por 24hs ahora mismo, aparte del gratis de tu plan.</p>
+        <button class="btn" onclick="handleBuyBoost()">Comprar boost — ${boostPrice} pts</button>
+      ` : `<p style="font-size:13px; color:var(--text-dim);">Este beneficio es solo para planes Plus o Diamante.</p>`}
+    </div>
+
+    <h3 style="margin-top:24px;">💎 Cambiar de plan con puntos</h3>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;">
+      ${higherPlans.map(p => `
+        <div class="form-card" style="flex:1; min-width:180px;">
+          <div style="font-weight:600;">${p.name}</div>
+          <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Boost x${p.boost_multiplier}, tope semanal $${p.weekly_redemption_cap.toLocaleString("es-AR")}</div>
+          <button class="btn-outline" onclick="handleBuyPlan('${p.id}')">${p.id === "plus" ? "2.999" : "6.999"} pts</button>
+        </div>
+      `).join("") || `<p style="color:var(--text-dim); font-size:13px;">Ya tenés el plan más alto.</p>`}
+    </div>`;
+}
+
+async function handleBuyEmoji(emojiId) {
+  const { data, error } = await sb.rpc("buy_emoji", { p_user_id: currentUser.id, p_emoji_id: emojiId });
+  if (error || !data.ok) {
+    const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", ya_lo_tenes: "Ya tenés este emoji." };
+    showToast(msgs[data?.error] || "No se pudo comprar");
+    return;
+  }
+  await loadProfile();
+  updateBalanceUI();
+  showToast(`¡Desbloqueaste ${data.emoji}!`);
+  renderStore();
+}
+
+async function handleBuyBoost() {
+  const { data, error } = await sb.rpc("buy_extra_boost", { p_user_id: currentUser.id });
+  if (error || !data.ok) {
+    const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", boost_ya_activo: "Ya tenés un boost activo." };
+    showToast(msgs[data?.error] || "No se pudo comprar");
+    return;
+  }
+  await loadProfile();
+  updateBalanceUI();
+  showToast("¡Boost activado por 24hs!");
+  renderStore();
+}
+
+async function handleBuyPlan(planId) {
+  if (!confirm(`¿Cambiar tu plan usando puntos? Esto te va a descontar el saldo correspondiente.`)) return;
+  const { data, error } = await sb.rpc("buy_plan_with_points", { p_user_id: currentUser.id, p_plan_id: planId });
+  if (error || !data.ok) {
+    showToast(data?.error === "saldo_insuficiente" ? "No tenés suficientes puntos." : "No se pudo cambiar");
+    return;
+  }
+  await loadProfile();
+  updateBalanceUI();
+  showToast("¡Plan actualizado!");
+  renderStore();
 }
 
 let plansCache = null;

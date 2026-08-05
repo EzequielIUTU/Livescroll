@@ -573,6 +573,32 @@ async function renderFeed() {
     </div>`;
 
   setupFeedObserver(videos);
+  setupSwipeNavigation("feed", { left: "foryou" });
+}
+
+function setupSwipeNavigation(fromTab, targets) {
+  const container = document.getElementById("feedVertical");
+  if (!container) return;
+
+  let startX = 0, startY = 0, tracking = false;
+
+  container.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  container.addEventListener("touchend", (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const deltaY = e.changedTouches[0].clientY - startY;
+
+    if (Math.abs(deltaX) < 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return; // no fue un swipe lateral claro
+
+    if (deltaX < 0 && targets.left) { switchTab(targets.left); }
+    else if (deltaX > 0 && targets.right) { switchTab(targets.right); }
+  }, { passive: true });
 }
 
 function setupFeedObserver(videos) {
@@ -1389,6 +1415,7 @@ async function renderForYou() {
     </div>`;
 
   setupFeedObserver(videos);
+  setupSwipeNavigation("foryou", { right: "feed" });
 }
 
 

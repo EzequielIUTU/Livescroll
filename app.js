@@ -2012,6 +2012,7 @@ async function renderAdmin() {
     <div class="form-card" style="margin-bottom:14px;">
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
         <input type="text" id="newEmojiChar" placeholder="🐐" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+        <button type="button" class="btn-outline" onclick="openEmojiPicker('newEmojiChar', FACE_EMOJIS)">Elegir</button>
         <input type="text" id="newEmojiName" placeholder="Nombre (ej: GOAT)" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
         <input type="number" id="newEmojiPrice" placeholder="Precio en pts" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
         <button class="btn" onclick="handleAddStoreEmoji()">Agregar</button>
@@ -2111,6 +2112,29 @@ async function handleRejectSubscription(id) {
   renderAdmin();
 }
 
+async function openEmojiPicker(targetInputId, list) {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:140; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+      <div class="auth-box" style="margin:0; max-width:360px;">
+        <h2 style="font-size:16px;">Elegí uno</h2>
+        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; max-height:300px; overflow-y:auto;">
+          ${list.map(e => `<button onclick="pickEmoji('${targetInputId}','${e}')" style="font-size:22px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer;">${e}</button>`).join("")}
+        </div>
+        <button class="btn-outline" style="width:100%; margin-top:14px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+      </div>
+    </div>`;
+}
+
+function pickEmoji(targetInputId, emoji) {
+  const input = document.getElementById(targetInputId);
+  if (input) input.value = emoji;
+  document.getElementById("globalModalWrap").innerHTML = "";
+}
+
+const MEDAL_EMOJIS = ["🥇","🥈","🥉","🏅","🎖️","🏆","🌟","⭐","✨","🔥","💪","👑","🎗️","🔰","💠","🛡️","⚡","🎯"];
+const FACE_EMOJIS = ["😀","😎","🤩","🥳","😇","🤠","🥷","🤖","👽","🐐","🐉","🦁","🐯","🦊","🦄","🐺","🦅","🦉","🐸","🐢","🦈","🐙","🦖","🦕","👻","💀","🎃","🤡","👑","💎","🔥","⚡","🌈","🍀","🎮","🎧","🚀","🛸","🌙","☀️"];
+
 async function loadStreakDaysForm() {
   const weekStart = document.getElementById("streakWeekStart").value;
   if (!weekStart) { showToast("Elegí primero una fecha"); return; }
@@ -2128,10 +2152,12 @@ async function loadStreakDaysForm() {
         <input type="number" id="streakPts${day}" placeholder="puntos" value="${byDay[day]?.points ?? ""}" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
         <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; min-width:120px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
         <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" value="${escapeHtml(byDay[day]?.badge_icon || "")}" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+        <button type="button" class="btn-outline" style="padding:8px 10px; font-size:12px;" onclick="openEmojiPicker('streakBadgeIcon${day}', MEDAL_EMOJIS)">Elegir</button>
       </div>
       <div style="display:flex; gap:8px; align-items:center; background:var(--panel-2); border:1px solid var(--gold-dim); border-radius:8px; padding:8px;">
         <span style="font-size:11px; color:var(--gold); white-space:nowrap;">🎁 Emoji que se gana gratis ese día:</span>
         <input type="text" id="streakEmojiReward${day}" placeholder="ej: 🐉" maxlength="4" value="${escapeHtml(byDay[day]?.emoji_reward || "")}" style="width:60px; padding:6px; background:var(--ink); border:1px solid var(--border); border-radius:6px; color:var(--text); text-align:center;">
+        <button type="button" class="btn-outline" style="padding:6px 10px; font-size:12px;" onclick="openEmojiPicker('streakEmojiReward${day}', FACE_EMOJIS)">Elegir</button>
       </div>
     </div>
   `).join("") + `

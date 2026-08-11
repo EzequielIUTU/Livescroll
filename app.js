@@ -512,6 +512,11 @@ function showStreakModal(data) {
             <div style="font-size:32px;">${data.badge_icon || "🏅"}</div>
             <div style="font-size:13px; color:var(--gold); margin-top:6px;">¡Ganaste la medalla "${escapeHtml(data.badge_name)}"!</div>
           </div>` : ""}
+        ${data.emoji_reward ? `
+          <div style="background:var(--panel-2); border:1px solid var(--green); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:32px;">${data.emoji_reward}</div>
+            <div style="font-size:13px; color:var(--green); margin-top:6px;">¡Nuevo emoji de avatar desbloqueado!</div>
+          </div>` : ""}
         <button class="btn" style="width:100%;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Genial</button>
       </div>
     </div>`;
@@ -2117,13 +2122,14 @@ async function loadStreakDaysForm() {
 
   const formEl = document.getElementById("streakDaysForm");
   formEl.innerHTML = Array.from({ length: 7 }, (_, i) => i + 1).map(day => `
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
       <span style="width:50px; font-size:13px; color:var(--text-dim);">Día ${day}</span>
       <input type="number" id="streakPts${day}" placeholder="puntos" value="${byDay[day]?.points ?? ""}" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; min-width:120px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
       <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" value="${escapeHtml(byDay[day]?.badge_icon || "")}" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+      <input type="text" id="streakEmojiReward${day}" placeholder="🎁 emoji avatar" maxlength="4" value="${escapeHtml(byDay[day]?.emoji_reward || "")}" style="width:80px; padding:8px; background:var(--ink); border:1px solid var(--gold-dim); border-radius:8px; color:var(--text); text-align:center;">
     </div>
-  `).join("") + `<button class="btn" style="width:100%; margin-top:10px;" onclick="saveStreakWeek()">Guardar toda la semana</button>`;
+  `).join("") + `<p style="font-size:11px; color:var(--text-dim); margin:6px 0;">🏅 = medalla de logro (se ve en el perfil) · 🎁 = emoji que se puede usar de avatar</p><button class="btn" style="width:100%; margin-top:10px;" onclick="saveStreakWeek()">Guardar toda la semana</button>`;
 }
 
 async function saveStreakWeek() {
@@ -2135,13 +2141,15 @@ async function saveStreakWeek() {
     const points = parseInt(document.getElementById(`streakPts${day}`).value, 10) || 0;
     const badgeName = document.getElementById(`streakBadgeName${day}`).value.trim();
     const badgeIcon = document.getElementById(`streakBadgeIcon${day}`).value.trim();
+    const emojiReward = document.getElementById(`streakEmojiReward${day}`).value.trim();
 
     await sb.rpc("admin_set_streak_reward", {
       p_week_start: weekStart,
       p_day: day,
       p_points: points,
       p_badge_name: badgeName,
-      p_badge_icon: badgeIcon
+      p_badge_icon: badgeIcon,
+      p_emoji_reward: emojiReward
     });
   }
 
@@ -2230,7 +2238,14 @@ async function handleDeleteStoreEmoji(id) {
 async function handleBumpVersion(key) {
   if (!confirm(`¿Subir la versión de "${key}"? Esto hace que le vuelva a aparecer a TODOS los usuarios.`)) return;
   const { data, error } = await sb.rpc("admin_bump_content_version", { p_content_key: key });
-  if (error || !data.ok) { showToast("No se pudo actualizar"); return; }
+  if (error || !data.ok) {
+    if (data?.error === "sin_contenido_cargado") {
+      showToast(`Cargá primero las novedades de la versión ${data.version_esperada} en la tabla changelog_entries`);
+    } else {
+      showToast("No se pudo actualizar");
+    }
+    return;
+  }
   showToast("Versión actualizada");
 }
 

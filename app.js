@@ -275,7 +275,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -1317,7 +1317,7 @@ async function renderProfile() {
 
   main.innerHTML = `
     <h1 class="page-title">Mi Perfil</h1>
-    <p class="page-sub">${currentProfile.avatar_emoji || "🎬"} @${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
+    <p class="page-sub">${renderAvatarHtml(currentProfile, 28)} @${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
     ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
     ${renderSocialIcons(currentProfile)}
     ${socialClicksHtml}
@@ -1493,6 +1493,14 @@ function closeComments() {
   document.getElementById("globalModalWrap").innerHTML = "";
 }
 
+function renderAvatarHtml(profile, size) {
+  size = size || 32;
+  if (profile.avatar_url) {
+    return `<img src="${escapeHtml(profile.avatar_url)}" alt="avatar" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle;">`;
+  }
+  return `<span style="font-size:${Math.round(size * 0.85)}px; vertical-align:middle;">${profile.avatar_emoji || "🎬"}</span>`;
+}
+
 function getPlanBadgeHtml(planId) {
   if (planId === "plus") return `<span style="color:var(--gold); font-size:11px;">⭐ Plus</span>`;
   if (planId === "diamante") return `<span style="color:#7dd3fc; font-size:11px;">💎 Diamante</span>`;
@@ -1591,7 +1599,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -1622,7 +1630,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <h1 class="page-title" style="margin-bottom:0;">${profile.avatar_emoji || "🎬"} @${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+      <h1 class="page-title" style="margin-bottom:0;">${renderAvatarHtml(profile, 30)} @${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
       <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
     </div>
     ${profile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:0;">${escapeHtml(profile.bio)}</p>` : ""}
@@ -1749,8 +1757,19 @@ async function openEditProfile() {
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
       <div style="background:var(--panel); width:100%; max-width:360px; border-radius:16px; padding:22px;">
         <h3 style="margin-top:0;">Editar perfil</h3>
+        <div class="field" style="text-align:center;">
+          <label>Foto de perfil</label>
+          <div style="margin-bottom:10px;">
+            ${currentProfile.avatar_url
+              ? `<img src="${escapeHtml(currentProfile.avatar_url)}" alt="avatar" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim);">`
+              : `<div style="width:80px; height:80px; border-radius:50%; background:var(--panel-2); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto;">${currentProfile.avatar_emoji || "🎬"}</div>`}
+          </div>
+          <input type="file" id="avatarPhotoInput" accept="image/*" onchange="handleAvatarPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
+          <div id="avatarUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 3MB. Si subís una foto, tapa al emoji.</div>
+          ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:8px; padding:4px 10px; font-size:12px;" onclick="handleRemoveAvatarPhoto()">Quitar foto y volver al emoji</button>` : ""}
+        </div>
         <div class="field">
-          <label>Avatar</label>
+          <label>Avatar (si no tenés foto)</label>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             ${emojis.map(e => `<button onclick="selectAvatarEmoji('${e}')" id="emoji-${e}" style="font-size:20px; padding:8px; background:${e === currentProfile.avatar_emoji ? "var(--panel-2)" : "transparent"}; border:1px solid var(--border); border-radius:8px; cursor:pointer;">${e}</button>`).join("")}
           </div>
@@ -1815,6 +1834,43 @@ async function submitChangePassword() {
 
   openEditProfile();
   showToast("Contraseña actualizada");
+}
+
+async function handleAvatarPhotoUpload() {
+  const fileInput = document.getElementById("avatarPhotoInput");
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById("avatarUploadStatus");
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
+  if (file.size > 3 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 3MB."; statusEl.style.color = "var(--red)"; return; }
+
+  statusEl.textContent = "Subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "");
+  const path = `${currentUser.id}/avatar.${ext}`;
+
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: true });
+  if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now(); // evita que quede una versión vieja en caché
+
+  const { error: updateError } = await sb.from("profiles").update({ avatar_url: freshUrl }).eq("id", currentUser.id);
+  if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
+
+  currentProfile.avatar_url = freshUrl;
+  showToast("¡Foto de perfil actualizada!");
+  openEditProfile();
+}
+
+async function handleRemoveAvatarPhoto() {
+  const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("id", currentUser.id);
+  if (error) { showToast("No se pudo quitar la foto"); return; }
+  currentProfile.avatar_url = null;
+  showToast("Foto quitada, volviste al emoji");
+  openEditProfile();
 }
 
 function selectAvatarEmoji(emoji) {

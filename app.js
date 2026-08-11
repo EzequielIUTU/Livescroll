@@ -2003,6 +2003,17 @@ async function renderAdmin() {
       <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
+    <h3 style="margin-top:32px;">🎨 Emojis de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <input type="text" id="newEmojiChar" placeholder="🐐" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+        <input type="text" id="newEmojiName" placeholder="Nombre (ej: GOAT)" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="number" id="newEmojiPrice" placeholder="Precio en pts" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <button class="btn" onclick="handleAddStoreEmoji()">Agregar</button>
+      </div>
+      <div id="storeEmojisList">Cargando...</div>
+    </div>
+
     <h3 style="margin-top:32px;">📢 Novedades y Términos</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
@@ -2062,6 +2073,7 @@ async function renderAdmin() {
   loadStreakWeeksOverview();
   loadPlansLockStatus();
   loadWalletLockStatus();
+  loadStoreEmojisList();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -2165,6 +2177,54 @@ async function handleDeleteStreakWeek(weekStart) {
   if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
   showToast("Semana eliminada");
   loadStreakWeeksOverview();
+}
+
+async function loadStoreEmojisList() {
+  const el = document.getElementById("storeEmojisList");
+  if (!el) return;
+  const { data } = await sb.rpc("admin_get_store_emojis");
+  if (!data || !data.length) { el.innerHTML = `<p style="color:var(--text-dim); font-size:12px;">Todavía no cargaste ningún emoji.</p>`; return; }
+
+  el.innerHTML = data.map(e => `
+    <div class="ledger-row">
+      <span>${e.emoji} ${escapeHtml(e.name)} · <span class="mono">${e.price_points} pts</span> ${!e.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleToggleStoreEmoji('${e.id}', ${!e.active})">${e.active ? "Desactivar" : "Activar"}</button>
+        <button class="btn-outline" style="padding:4px 8px; font-size:11px; color:var(--red);" onclick="handleDeleteStoreEmoji('${e.id}')">🗑</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleAddStoreEmoji() {
+  const emoji = document.getElementById("newEmojiChar").value.trim();
+  const name = document.getElementById("newEmojiName").value.trim();
+  const price = parseInt(document.getElementById("newEmojiPrice").value, 10);
+
+  if (!emoji || !name || !price) { showToast("Completá los 3 campos"); return; }
+
+  const { data, error } = await sb.rpc("admin_add_store_emoji", { p_emoji: emoji, p_name: name, p_price: price });
+  if (error || !data.ok) { showToast("No se pudo agregar"); return; }
+
+  document.getElementById("newEmojiChar").value = "";
+  document.getElementById("newEmojiName").value = "";
+  document.getElementById("newEmojiPrice").value = "";
+  showToast("Emoji agregado");
+  loadStoreEmojisList();
+}
+
+async function handleToggleStoreEmoji(id, newActive) {
+  const { data, error } = await sb.rpc("admin_toggle_store_emoji", { p_id: id, p_active: newActive });
+  if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
+  loadStoreEmojisList();
+}
+
+async function handleDeleteStoreEmoji(id) {
+  if (!confirm("¿Eliminar este emoji del catálogo? Quien ya lo compró lo conserva igual.")) return;
+  const { data, error } = await sb.rpc("admin_delete_store_emoji", { p_id: id });
+  if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
+  showToast("Emoji eliminado");
+  loadStoreEmojisList();
 }
 
 async function handleBumpVersion(key) {

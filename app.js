@@ -574,7 +574,51 @@ async function renderFeed() {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
+  setupPullToRefresh(renderFeed);
   setupSwipeNavigation("feed", { left: "foryou" });
+}
+
+function setupPullToRefresh(refreshFn) {
+  const container = document.getElementById("feedVertical");
+  if (!container) return;
+
+  let startY = 0, pulling = false, indicator = null;
+
+  container.addEventListener("touchstart", (e) => {
+    pulling = container.scrollTop <= 0;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!pulling || container.scrollTop > 0) return;
+    const deltaY = e.touches[0].clientY - startY;
+    if (deltaY <= 0) return;
+
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.id = "pullRefreshIndicator";
+      indicator.style.cssText = "position:absolute; top:0; left:0; right:0; text-align:center; padding:14px; color:var(--gold); font-size:13px; z-index:15;";
+      container.style.position = "relative";
+      container.prepend(indicator);
+    }
+    const pull = Math.min(deltaY, 100);
+    indicator.style.transform = `translateY(${pull}px)`;
+    indicator.textContent = pull > 70 ? "🔄 Soltá para actualizar" : "⬇️ Deslizá para actualizar";
+    indicator.dataset.pull = pull;
+  }, { passive: true });
+
+  container.addEventListener("touchend", () => {
+    if (!pulling) return;
+    pulling = false;
+    if (!indicator) return;
+    const pullAmount = parseInt(indicator.dataset.pull || 0, 10);
+    indicator.remove();
+    indicator = null;
+    if (pullAmount > 70) {
+      showToast("Actualizando...");
+      refreshFn();
+    }
+  }, { passive: true });
 }
 
 function setupDoubleTapLike() {
@@ -1443,6 +1487,7 @@ async function renderForYou() {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
+  setupPullToRefresh(renderForYou);
   setupSwipeNavigation("foryou", { right: "feed" });
 }
 

@@ -380,8 +380,89 @@ async function renderApp() {
 
   checkBoostStatus();
   checkBlockedStatus();
+  checkPendingContent();
   // La racha ahora se reclama a mano desde Mi Perfil, no automático al entrar
   switchTab("feed");
+}
+
+async function checkPendingContent() {
+  const { data } = await sb.rpc("get_pending_content", { p_user_id: currentUser.id });
+  if (!data) return;
+
+  if (data.terms_pending) {
+    showTermsUpdateModal();
+  } else if (data.changelog_pending) {
+    showChangelogModal(data.changelog_entries || []);
+  }
+}
+
+function showTermsUpdateModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:130; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div class="auth-box" style="margin:0;">
+        <h2>📋 Actualizamos los Términos</h2>
+        <p style="color:var(--text-dim); font-size:13px;">Cambiamos nuestros Términos y Condiciones. Por favor, revisalos antes de seguir usando LiveScroll.</p>
+        <a href="terminos.html" target="_blank" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
+        <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
+          <input type="checkbox" id="acceptNewTerms" style="margin-top:3px;">
+          <label for="acceptNewTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">Leí y acepto los Términos y Condiciones actualizados.</label>
+        </div>
+        <button class="btn" style="width:100%;" onclick="handleAcceptNewTerms()">Continuar</button>
+        <div id="acceptTermsError" class="error-msg"></div>
+      </div>
+    </div>`;
+}
+
+async function handleAcceptNewTerms() {
+  const errEl = document.getElementById("acceptTermsError");
+  if (!document.getElementById("acceptNewTerms").checked) {
+    errEl.textContent = "Tenés que tildar el casillero para continuar.";
+    return;
+  }
+  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "terms" });
+  document.getElementById("globalModalWrap").innerHTML = "";
+  checkPendingContent(); // por si también hay changelog pendiente, se muestra después
+}
+
+function showChangelogModal(entries) {
+  const labels = {
+    nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
+    actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
+    proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
+  };
+  const byCategory = {};
+  entries.forEach(e => { byCategory[e.category] = byCategory[e.category] || []; byCategory[e.category].push(e.content); });
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div id="changelogOverlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:130; display:flex; align-items:center; justify-content:center; padding:20px; transition:opacity 0.35s ease;">
+      <div id="changelogBox" class="auth-box" style="margin:0; max-width:420px; max-height:75vh; overflow-y:auto; transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
+        <h2>✨ Novedades</h2>
+        ${["nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
+          <div style="margin-bottom:14px;">
+            <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
+            ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+          </div>` : "").join("")}
+        <button class="btn" style="width:100%; margin-top:10px;" onclick="handleAcceptChangelog()">Aceptar</button>
+      </div>
+    </div>`;
+}
+
+async function handleAcceptChangelog() {
+  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "changelog" });
+
+  const box = document.getElementById("changelogBox");
+  const overlay = document.getElementById("changelogOverlay");
+  if (box && overlay) {
+    box.style.transform = "translate(140%, 140%) scale(0.15)";
+    box.style.opacity = "0";
+    overlay.style.opacity = "0";
+    setTimeout(() => { document.getElementById("globalModalWrap").innerHTML = ""; }, 350);
+  } else {
+    document.getElementById("globalModalWrap").innerHTML = "";
+  }
 }
 
 async function handleClaimStreak() {
@@ -1922,6 +2003,17 @@ async function renderAdmin() {
       <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
+    <h3 style="margin-top:32px;">📢 Novedades y Términos</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">
+        Para publicar novedades nuevas: cargá filas en la tabla <code>changelog_entries</code> con el número de versión siguiente, y después subí la versión acá. Para términos: actualizá <code>terminos.html</code> y subí la versión de "Términos" — a todos les va a volver a aparecer para aceptar.
+      </p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn-outline" onclick="handleBumpVersion('changelog')">📣 Subir versión de Novedades</button>
+        <button class="btn-outline" onclick="handleBumpVersion('terms')">📋 Subir versión de Términos</button>
+      </div>
+    </div>
+
     <h3 style="margin-top:32px;">🔒 Candado de Billetera</h3>
     <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
       <div>
@@ -2073,6 +2165,13 @@ async function handleDeleteStreakWeek(weekStart) {
   if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
   showToast("Semana eliminada");
   loadStreakWeeksOverview();
+}
+
+async function handleBumpVersion(key) {
+  if (!confirm(`¿Subir la versión de "${key}"? Esto hace que le vuelva a aparecer a TODOS los usuarios.`)) return;
+  const { data, error } = await sb.rpc("admin_bump_content_version", { p_content_key: key });
+  if (error || !data.ok) { showToast("No se pudo actualizar"); return; }
+  showToast("Versión actualizada");
 }
 
 async function loadPlansLockStatus() {

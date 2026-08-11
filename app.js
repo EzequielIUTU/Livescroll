@@ -573,7 +573,32 @@ async function renderFeed() {
     </div>`;
 
   setupFeedObserver(videos);
+  setupDoubleTapLike();
   setupSwipeNavigation("feed", { left: "foryou" });
+}
+
+function setupDoubleTapLike() {
+  document.querySelectorAll(".dbltap-like-zone").forEach(zone => {
+    let lastTap = 0;
+    zone.addEventListener("touchend", () => {
+      const now = Date.now();
+      if (now - lastTap < 350) {
+        const videoId = zone.dataset.videoId;
+        handleLike(videoId);
+        showHeartPop(zone);
+      }
+      lastTap = now;
+    });
+  });
+}
+
+function showHeartPop(container) {
+  const heart = document.createElement("div");
+  heart.textContent = "❤️";
+  heart.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:70px; z-index:20; pointer-events:none; animation:heartPop 0.6s ease forwards;";
+  container.style.position = "relative";
+  container.appendChild(heart);
+  setTimeout(() => heart.remove(), 600);
 }
 
 function setupSwipeNavigation(fromTab, targets) {
@@ -634,7 +659,9 @@ function getEmbedHtml(video) {
     return `<div class="feed-fallback"><p>Link de video inválido.</p></div>`;
   }
   if (video.platform === "upload") {
-    return `<video src="${escapeHtml(url)}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>`;
+    return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%;">
+      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+    </div>`;
   }
   if (video.platform === "youtube") {
     const id = extractYoutubeId(url);
@@ -1415,6 +1442,7 @@ async function renderForYou() {
     </div>`;
 
   setupFeedObserver(videos);
+  setupDoubleTapLike();
   setupSwipeNavigation("foryou", { right: "feed" });
 }
 

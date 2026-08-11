@@ -2122,14 +2122,28 @@ async function loadStreakDaysForm() {
 
   const formEl = document.getElementById("streakDaysForm");
   formEl.innerHTML = Array.from({ length: 7 }, (_, i) => i + 1).map(day => `
-    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
-      <span style="width:50px; font-size:13px; color:var(--text-dim);">Día ${day}</span>
-      <input type="number" id="streakPts${day}" placeholder="puntos" value="${byDay[day]?.points ?? ""}" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-      <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; min-width:120px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-      <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" value="${escapeHtml(byDay[day]?.badge_icon || "")}" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
-      <input type="text" id="streakEmojiReward${day}" placeholder="🎁 emoji avatar" maxlength="4" value="${escapeHtml(byDay[day]?.emoji_reward || "")}" style="width:80px; padding:8px; background:var(--ink); border:1px solid var(--gold-dim); border-radius:8px; color:var(--text); text-align:center;">
+    <div class="form-card" style="margin-bottom:10px; padding:12px;">
+      <div style="font-size:13px; color:var(--gold); font-weight:600; margin-bottom:8px;">Día ${day}</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;">
+        <input type="number" id="streakPts${day}" placeholder="puntos" value="${byDay[day]?.points ?? ""}" style="width:90px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="text" id="streakBadgeName${day}" placeholder="nombre medalla (opcional)" value="${escapeHtml(byDay[day]?.badge_name || "")}" style="flex:1; min-width:120px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="text" id="streakBadgeIcon${day}" placeholder="🏅" maxlength="4" value="${escapeHtml(byDay[day]?.badge_icon || "")}" style="width:50px; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+      </div>
+      <div style="display:flex; gap:8px; align-items:center; background:var(--panel-2); border:1px solid var(--gold-dim); border-radius:8px; padding:8px;">
+        <span style="font-size:11px; color:var(--gold); white-space:nowrap;">🎁 Emoji que se gana gratis ese día:</span>
+        <input type="text" id="streakEmojiReward${day}" placeholder="ej: 🐉" maxlength="4" value="${escapeHtml(byDay[day]?.emoji_reward || "")}" style="width:60px; padding:6px; background:var(--ink); border:1px solid var(--border); border-radius:6px; color:var(--text); text-align:center;">
+      </div>
     </div>
-  `).join("") + `<p style="font-size:11px; color:var(--text-dim); margin:6px 0;">🏅 = medalla de logro (se ve en el perfil) · 🎁 = emoji que se puede usar de avatar</p><button class="btn" style="width:100%; margin-top:10px;" onclick="saveStreakWeek()">Guardar toda la semana</button>`;
+  `).join("") + `
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button class="btn" style="flex:1;" onclick="saveStreakWeek()">Guardar toda la semana</button>
+      <button class="btn-outline" onclick="cancelStreakForm()">Cancelar</button>
+    </div>`;
+}
+
+function cancelStreakForm() {
+  document.getElementById("streakDaysForm").innerHTML = "";
+  document.getElementById("streakWeekStart").value = "";
 }
 
 async function saveStreakWeek() {

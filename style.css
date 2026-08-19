@@ -52,6 +52,7 @@ button.btn-outline:hover {
 }
 
 html, body { overflow-x: hidden; max-width: 100%; }
+:root { color-scheme: dark; }
 
 body {
   margin: 0;
@@ -289,16 +290,19 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 /* ---------- FEED VERTICAL (estilo TikTok) ---------- */
 .feed-vertical {
   height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
   margin: 0 -28px;
   scrollbar-width: none;
+  overscroll-behavior-y: contain;
 }
 .feed-vertical::-webkit-scrollbar { display: none; }
 
 .feed-item {
   height: calc(100vh - 64px);
+  height: calc(100dvh - 64px);
   scroll-snap-align: start;
   display: flex;
   align-items: center;
@@ -464,6 +468,36 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
   .profile-hero-top { align-items: flex-start; }
   .profile-avatar-ring { width: 60px; height: 60px; }
   .profile-avatar-ring img { width: 50px; height: 50px; }
+}
+
+/* ---------- MODALES (header fijo + body con scroll + footer fijo) ---------- */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+  z-index: 130; display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  padding-top: max(20px, env(safe-area-inset-top));
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+.modal-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+  width: 100%; max-width: 420px;
+  max-height: 75vh;
+  max-height: 75dvh; /* se ajusta bien aunque el navegador muestre/oculte su barra */
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.modal-box-header {
+  padding: 22px 24px 10px; flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-box-header h2 { margin: 0; font-size: 19px; }
+.modal-box-body {
+  padding: 4px 24px 20px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1 1 auto; min-height: 0;
+}
+.modal-box-footer {
+  padding: 14px 24px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  flex-shrink: 0; border-top: 1px solid var(--border);
 }
 
 @media (max-width: 640px) {

@@ -437,15 +437,19 @@ function showChangelogModal(entries) {
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div id="changelogOverlay" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:130; display:flex; align-items:center; justify-content:center; padding:20px; transition:opacity 0.35s ease;">
-      <div id="changelogBox" class="auth-box" style="margin:0; max-width:420px; max-height:75vh; overflow-y:auto; transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
-        <h2>✨ Novedades</h2>
-        ${["nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
-          <div style="margin-bottom:14px;">
-            <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
-            ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
-          </div>` : "").join("")}
-        <button class="btn" style="width:100%; margin-top:10px;" onclick="handleAcceptChangelog()">Aceptar</button>
+    <div id="changelogOverlay" class="modal-overlay" style="transition:opacity 0.35s ease;">
+      <div id="changelogBox" class="modal-box" style="transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
+        <div class="modal-box-header"><h2>✨ Novedades</h2></div>
+        <div class="modal-box-body">
+          ${["nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
+            <div style="margin-bottom:14px;">
+              <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
+              ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+            </div>` : "").join("")}
+        </div>
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">Aceptar</button>
+        </div>
       </div>
     </div>`;
 }
@@ -453,14 +457,16 @@ function showChangelogModal(entries) {
 async function openChangelogHistory() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closeChangelogHistory()">
-      <div class="auth-box" style="margin:0; max-width:440px; max-height:78vh; overflow-y:auto;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-          <h2 style="margin:0;">📢 Novedades</h2>
+    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">
+      <div class="modal-box" style="max-width:440px;">
+        <div class="modal-box-header">
+          <h2>📢 Novedades</h2>
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Todo lo que fuimos sumando y mejorando en LiveScroll.</p>
-        <div id="changelogHistoryList">Cargando...</div>
+        <div class="modal-box-body">
+          <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Todo lo que fuimos sumando y mejorando en LiveScroll.</p>
+          <div id="changelogHistoryList">Cargando...</div>
+        </div>
       </div>
     </div>`;
 
@@ -703,7 +709,7 @@ async function renderFeed() {
             <div class="feed-actions">
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
               <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
-              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${v.video_url.replace(/'/g, "\\'")}')">🔗</button>
+              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
               ${!isMine ? `<button class="feed-action-btn" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
             </div>
             <div class="feed-overlay">
@@ -1538,6 +1544,7 @@ async function handleLike(videoId) {
 }
 
 async function handleShare(videoId, url) {
+  url = decodeURIComponent(url);
   if (navigator.share) {
     try { await navigator.share({ title: "Mirá este clip", url }); } catch (e) { /* cancelado, seguimos igual */ }
   } else {
@@ -1558,13 +1565,13 @@ async function openComments(videoId) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
-      <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; border-radius:20px 20px 0 0; padding:20px; display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; max-height:70dvh; border-radius:20px 20px 0 0; padding:20px; padding-bottom:max(20px, env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
           <h3 style="margin:0;">Comentarios</h3>
           <button onclick="closeComments()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <div id="commentsList" style="overflow-y:auto; flex:1; margin-bottom:14px;">Cargando...</div>
-        <div style="display:flex; gap:8px;">
+        <div id="commentsList" style="overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto; min-height:0; margin-bottom:14px;">Cargando...</div>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
           <input id="newCommentInput" placeholder="Escribí un comentario..." style="flex:1; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
           <button class="btn" onclick="submitComment('${videoId}')">Enviar</button>
         </div>
@@ -1639,10 +1646,10 @@ function renderSocialIcons(profile) {
     { key: "social_tiktok", icon: "⚫", label: "TikTok" },
     { key: "social_instagram", icon: "🩷", label: "Instagram" }
   ];
-  const active = socials.filter(s => profile[s.key]);
+  const active = socials.filter(s => profile[s.key] && isSafeUrl(profile[s.key]));
   if (!active.length) return "";
   return `<div style="display:flex; gap:10px; margin-bottom:16px;">
-    ${active.map(s => `<a href="${profile[s.key]}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;" onclick="logSocialClick('${profile.id}', '${s.label}')">${s.icon}</a>`).join("")}
+    ${active.map(s => `<a href="${escapeHtml(profile[s.key])}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;" onclick="logSocialClick('${profile.id}', '${s.label}')">${s.icon}</a>`).join("")}
   </div>`;
 }
 
@@ -1688,7 +1695,7 @@ async function renderForYou() {
             <div class="feed-actions">
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
               <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
-              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${v.video_url.replace(/'/g, "\\'")}')">🔗</button>
+              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
             </div>
             <div class="feed-overlay">
               <div>
@@ -2128,7 +2135,7 @@ async function renderAdmin() {
               <div style="font-weight:600;">${escapeHtml(r.videos?.title || "video eliminado")}</div>
               <div style="color:var(--text-dim); font-size:12px;">Reportado por @${escapeHtml(r.profiles?.username || "usuario")} · ${new Date(r.created_at).toLocaleString("es-AR")}</div>
               <div style="margin-top:6px; font-size:13px; color:var(--gold);">Motivo: ${escapeHtml(r.reason)}</div>
-              ${r.videos?.video_url ? `<a href="${r.videos.video_url}" target="_blank" rel="noopener" style="font-size:12px; color:var(--text-dim);">Ver video →</a>` : ""}
+              ${r.videos?.video_url ? (isSafeUrl(r.videos.video_url) ? `<a href="${escapeHtml(r.videos.video_url)}" target="_blank" rel="noopener" style="font-size:12px; color:var(--text-dim);">Ver video →</a>` : `<span style="font-size:12px; color:var(--red);">⚠️ Link sospechoso, no se abre</span>`) : ""}
             </div>
             <div style="display:flex; gap:8px;">
               <button class="btn" style="background:var(--red); color:#fff;" onclick="handleDeleteVideo('${r.video_id}')">🗑 Eliminar video</button>

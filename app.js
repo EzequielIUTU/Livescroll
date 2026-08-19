@@ -369,12 +369,15 @@ async function renderApp() {
   const currentPlan = plans.find(p => p.id === currentProfile.plan_id) || plans[0];
 
   document.getElementById("navRight").innerHTML = `
-    <span style="font-size:12px; color:var(--gold-dim); margin-right:8px;">${currentPlan.name}</span>
-    <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-right:8px;">
+    <div class="nav-plan-chip">
+      <span class="plan-name">${currentPlan.name}</span>
+      <span class="divider"></span>
+      <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
+    </div>
+    <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:8px;">
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>
-    <span class="nav-balance mono" id="navBalance">${currentProfile.points_balance} pts</span>
-    <button class="btn-outline" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
+    <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
   loadNotifications();
 

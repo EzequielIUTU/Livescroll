@@ -482,21 +482,29 @@ async function openChangelogHistory() {
 
   const byVersion = {};
   entries.forEach(e => {
-    byVersion[e.version] = byVersion[e.version] || {};
-    byVersion[e.version][e.category] = byVersion[e.version][e.category] || [];
-    byVersion[e.version][e.category].push(e.content);
+    byVersion[e.version] = byVersion[e.version] || { display: null, cats: {} };
+    if (e.display_version && !byVersion[e.version].display) byVersion[e.version].display = e.display_version;
+    byVersion[e.version].cats[e.category] = byVersion[e.version].cats[e.category] || [];
+    byVersion[e.version].cats[e.category].push(e.content);
   });
   const versions = Object.keys(byVersion).map(Number).sort((a, b) => b - a);
+  const currentVersion = versions[0];
 
-  list.innerHTML = versions.map(v => `
+  list.innerHTML = versions.map(v => {
+    const label = byVersion[v].display || `${v}.0.0`;
+    return `
     <div style="margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border);">
-      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim); margin-bottom:8px;">VERSIÓN ${v}</div>
-      ${["nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v][cat] ? `
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);">v${escapeHtml(label)}</div>
+        ${v === currentVersion ? `<span style="font-size:10px; font-weight:700; color:#12130f; background:var(--gold); padding:2px 8px; border-radius:20px; letter-spacing:0.04em;">ACTUAL</span>` : ""}
+      </div>
+      ${["nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v].cats[cat] ? `
         <div style="margin-bottom:10px;">
           <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
-          ${byVersion[v][cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+          ${byVersion[v].cats[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
         </div>` : "").join("")}
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 function closeChangelogHistory() {

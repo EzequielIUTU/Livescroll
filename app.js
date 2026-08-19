@@ -450,6 +450,59 @@ function showChangelogModal(entries) {
     </div>`;
 }
 
+async function openChangelogHistory() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) closeChangelogHistory()">
+      <div class="auth-box" style="margin:0; max-width:440px; max-height:78vh; overflow-y:auto;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <h2 style="margin:0;">📢 Novedades</h2>
+          <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Todo lo que fuimos sumando y mejorando en LiveScroll.</p>
+        <div id="changelogHistoryList">Cargando...</div>
+      </div>
+    </div>`;
+
+  const labels = {
+    nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
+    actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
+    proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
+  };
+
+  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 30 });
+  const list = document.getElementById("changelogHistoryList");
+  if (!list) return;
+
+  if (error || !entries || !entries.length) {
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Todavía no hay novedades publicadas.</p>`;
+    return;
+  }
+
+  const byVersion = {};
+  entries.forEach(e => {
+    byVersion[e.version] = byVersion[e.version] || {};
+    byVersion[e.version][e.category] = byVersion[e.version][e.category] || [];
+    byVersion[e.version][e.category].push(e.content);
+  });
+  const versions = Object.keys(byVersion).map(Number).sort((a, b) => b - a);
+
+  list.innerHTML = versions.map(v => `
+    <div style="margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+      <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim); margin-bottom:8px;">VERSIÓN ${v}</div>
+      ${["nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v][cat] ? `
+        <div style="margin-bottom:10px;">
+          <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
+          ${byVersion[v][cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+        </div>` : "").join("")}
+    </div>`).join("");
+}
+
+function closeChangelogHistory() {
+  document.getElementById("globalModalWrap").innerHTML = "";
+}
+
 async function handleAcceptChangelog() {
   await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "changelog" });
 
@@ -1449,6 +1502,7 @@ async function renderProfile() {
       </div>
       <div class="profile-hero-actions">
         <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+        <button class="btn-outline" onclick="openChangelogHistory()">📢 Novedades</button>
       </div>
     </div>
 

@@ -1279,14 +1279,25 @@ async function renderProfile() {
     const { data: clicks } = await sb.rpc("get_my_social_clicks", { p_user_id: currentUser.id });
     if (clicks && clicks.length) {
       socialClicksHtml = `
-        <div class="form-card" style="margin-bottom:24px;">
-          <h3 style="margin-top:0;">📊 Clics a tus redes (beneficio ${escapeHtml(myPlan.name)})</h3>
-          <div style="display:flex; gap:16px; flex-wrap:wrap;">
-            ${clicks.map(c => `<div style="text-align:center;"><div class="mono" style="font-size:20px; color:var(--gold);">${c.total}</div><div style="font-size:11px; color:var(--text-dim);">${escapeHtml(c.platform)}</div></div>`).join("")}
+        <div class="profile-section">
+          <div class="profile-section-head">
+            <div class="ico">📊</div>
+            <h3>Clics a tus redes</h3>
+            <div class="sub">Beneficio ${escapeHtml(myPlan.name)}</div>
+          </div>
+          <div class="form-card">
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              ${clicks.map(c => `<div style="text-align:center;"><div class="mono" style="font-size:20px; color:var(--gold);">${c.total}</div><div style="font-size:11px; color:var(--text-dim);">${escapeHtml(c.platform)}</div></div>`).join("")}
+            </div>
           </div>
         </div>`;
     }
   }
+
+  const { count: followersCount } = await sb
+    .from("follows")
+    .select("follower_id", { count: "exact", head: true })
+    .eq("followed_id", currentUser.id);
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
 
@@ -1315,91 +1326,136 @@ async function renderProfile() {
   const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
   const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
 
-  main.innerHTML = `
-    <h1 class="page-title">Mi Perfil</h1>
-    <p class="page-sub">${renderAvatarHtml(currentProfile, 28)} @${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} · ${videos.length} video${videos.length === 1 ? "" : "s"} subido${videos.length === 1 ? "" : "s"} · ${totalFromViews} pts generados por vistas</p>
-    ${currentProfile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:-10px; margin-bottom:14px;">${escapeHtml(currentProfile.bio)}</p>` : ""}
-    ${renderSocialIcons(currentProfile)}
-    ${socialClicksHtml}
-    <button class="btn-outline" style="margin-bottom:20px;" onclick="openEditProfile()">✏️ Editar perfil</button>
-
-    <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
-      <h3 style="margin-top:0;">🔥 Racha diaria: Día ${currentProfile.streak_current_day || 0}/7</h3>
-      ${currentWeekDays.length ? (() => {
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const claimedToday = currentProfile.streak_last_login_date === todayStr;
-        let claimableDay = null;
-        if (!claimedToday) {
-          const lastLogin = currentProfile.streak_last_login_date;
-          const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-          if (lastLogin === yesterday && (currentProfile.streak_current_day || 0) < 7) {
-            claimableDay = (currentProfile.streak_current_day || 0) + 1;
-          } else {
-            claimableDay = 1;
-          }
+  const streakSectionHtml = (() => {
+    let daysHtml, progressPct;
+    if (currentWeekDays.length) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const claimedToday = currentProfile.streak_last_login_date === todayStr;
+      let claimableDay = null;
+      if (!claimedToday) {
+        const lastLogin = currentProfile.streak_last_login_date;
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        if (lastLogin === yesterday && (currentProfile.streak_current_day || 0) < 7) {
+          claimableDay = (currentProfile.streak_current_day || 0) + 1;
+        } else {
+          claimableDay = 1;
         }
-        return `
-        <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px;">
+      }
+      daysHtml = `
+        <div class="streak-track">
           ${currentWeekDays.map(d => {
             const isDone = d.day_number <= (currentProfile.streak_current_day || 0) && (claimedToday || d.day_number !== claimableDay);
             const isClaimable = d.day_number === claimableDay;
             return `
-            <div style="flex:0 0 auto; width:80px; text-align:center; background:${isClaimable ? "var(--panel-2)" : "transparent"}; border:1px solid ${isClaimable ? "var(--gold)" : "var(--border)"}; border-radius:10px; padding:8px 4px; ${isDone ? "opacity:0.55;" : ""}">
-              <div style="font-size:10px; color:var(--text-dim);">Día ${d.day_number}</div>
-              <div style="font-size:18px; margin:4px 0;">${isDone ? "✅" : (d.badge_icon || "⭐")}</div>
-              <div class="mono" style="font-size:11px; color:var(--gold); margin-bottom:4px;">+${d.points}</div>
+            <div class="streak-day ${isClaimable ? "claimable" : ""} ${isDone ? "done" : ""}">
+              <div class="d">Día ${d.day_number}</div>
+              <div class="ic">${isDone ? "✅" : (d.badge_icon || "⭐")}</div>
+              <div class="p mono">+${d.points}</div>
               ${isClaimable ? `<button class="btn" style="padding:3px 8px; font-size:10px; width:100%;" onclick="handleClaimStreak()">Reclamar</button>` : ""}
             </div>`;
           }).join("")}
         </div>`;
-      })() : `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`}
-      <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden; margin-bottom:12px;">
-        <div style="width:${((currentProfile.streak_current_day || 0) / 7) * 100}%; height:100%; background:linear-gradient(90deg, var(--gold-dim), var(--gold)); transition:width 0.4s ease;"></div>
-      </div>
-      ${badges && badges.length ? `
-        <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Tus medallas:</div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          ${badges.map(b => `<div title="${escapeHtml(b.badge_name)}" style="font-size:26px;">${b.badge_icon || "🏅"}</div>`).join("")}
-        </div>` : `<p style="color:var(--text-dim); font-size:12px;">Entrá todos los días para ganar medallas.</p>`}
-    </div>
+    } else {
+      daysHtml = `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`;
+    }
+    progressPct = ((currentProfile.streak_current_day || 0) / 7) * 100;
 
-    <div class="form-card" style="margin-bottom:24px; border-color:var(--gold-dim);">
-      <h3 style="margin-top:0;">🎁 Invitá y ganá ${referrerPts} pts</h3>
-      <p style="font-size:13px; color:var(--text-dim); margin-bottom:12px;">
-        Compartí tu link. Cuando la persona invitada suba o mire algo por primera vez, ganás ${referrerPts} pts y ella gana ${referredPts} pts.
-        Tope: 3 invitaciones premiadas por mes.
-      </p>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        <input readonly id="referralLinkInput" value="${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(currentProfile.username)}"
-          style="flex:1; min-width:200px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono', monospace; font-size:12px;">
-        <button class="btn" onclick="copyReferralLink()">Copiar link</button>
+    return `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🔥</div>
+        <h3>Racha diaria</h3>
+        <div class="sub">Día ${currentProfile.streak_current_day || 0}/7</div>
       </div>
-    </div>
-
-    <div id="myVideosList">
-      ${canPin ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">📌 Anclados: ${pinsUsed}/${myPlan.max_pinned_videos} (duran 24hs)</p>` : ""}
-      ${videos.length ? videos.map(v => `
-        <div class="video-card with-thumb">
-          <div class="video-thumb">${getThumbnailHtml(v)}</div>
-          <div class="card-body">
-            <div class="meta">
-              <div>
-                <div class="title">${escapeHtml(v.title)}</div>
-                <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
-              </div>
-              <div class="platform">${v.platform}</div>
-            </div>
-            <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
-            ${canPin ? `
-              <div style="margin-top:8px;">
-                ${pinnedIds.has(v.id)
-                  ? `<span style="font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</span>`
-                  : `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`}
-              </div>` : ""}
-          </div>
-        </div>
-      `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
+      <div class="form-card">
+        ${daysHtml}
+        <div class="streak-progress-track"><div class="streak-progress-fill" style="width:${progressPct}%;"></div></div>
+        ${badges && badges.length ? `
+          <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Tus medallas:</div>
+          <div class="streak-badges">
+            ${badges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
+          </div>` : `<p style="color:var(--text-dim); font-size:12px;">Entrá todos los días para ganar medallas.</p>`}
+      </div>
     </div>`;
+  })();
+
+  const referralSectionHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎁</div>
+        <h3>Invitá y ganá</h3>
+        <div class="sub">+${referrerPts} pts por invitado</div>
+      </div>
+      <div class="form-card">
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0; margin-bottom:12px;">
+          Compartí tu link. Cuando la persona invitada suba o mire algo por primera vez, ganás ${referrerPts} pts y ella gana ${referredPts} pts.
+          Tope: 3 invitaciones premiadas por mes.
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input readonly id="referralLinkInput" value="${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(currentProfile.username)}"
+            style="flex:1; min-width:200px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono', monospace; font-size:12px;">
+          <button class="btn" onclick="copyReferralLink()">Copiar link</button>
+        </div>
+      </div>
+    </div>`;
+
+  const videosSectionHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎬</div>
+        <h3>Mis videos</h3>
+        <div class="sub">${videos.length} en total${canPin ? ` · 📌 ${pinsUsed}/${myPlan.max_pinned_videos} anclados` : ""}</div>
+      </div>
+      <div id="myVideosList">
+        ${videos.length ? videos.map(v => `
+          <div class="video-card with-thumb">
+            <div class="video-thumb">${getThumbnailHtml(v)}</div>
+            <div class="card-body">
+              <div class="meta">
+                <div>
+                  <div class="title">${escapeHtml(v.title)}</div>
+                  <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
+                </div>
+                <div class="platform">${v.platform}</div>
+              </div>
+              <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
+              ${canPin ? `
+                <div style="margin-top:8px;">
+                  ${pinnedIds.has(v.id)
+                    ? `<span style="font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</span>`
+                    : `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`}
+                </div>` : ""}
+            </div>
+          </div>
+        `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
+      </div>
+    </div>`;
+
+  main.innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-hero-top">
+        <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}">${renderAvatarHtml(currentProfile, 60)}</div>
+        <div class="profile-name-block">
+          <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
+          <div class="handle">Tu perfil en LiveScroll</div>
+        </div>
+      </div>
+      ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
+      ${renderSocialIcons(currentProfile)}
+      <div class="profile-stats-row">
+        <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
+        <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
+        <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
+      </div>
+      <div class="profile-hero-actions">
+        <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+      </div>
+    </div>
+
+    ${socialClicksHtml}
+    ${streakSectionHtml}
+    ${referralSectionHtml}
+    ${videosSectionHtml}`;
 }
 
 async function handleLike(videoId) {
@@ -1504,6 +1560,12 @@ function renderAvatarHtml(profile, size) {
 function getPlanBadgeHtml(planId) {
   if (planId === "plus") return `<span style="color:var(--gold); font-size:11px;">⭐ Plus</span>`;
   if (planId === "diamante") return `<span style="color:#7dd3fc; font-size:11px;">💎 Diamante</span>`;
+  return "";
+}
+
+function getAvatarRingClass(planId) {
+  if (planId === "plus") return "plan-plus";
+  if (planId === "diamante") return "plan-diamante";
   return "";
 }
 
@@ -1629,30 +1691,49 @@ async function viewPublicProfile(username) {
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-      <h1 class="page-title" style="margin-bottom:0;">${renderAvatarHtml(profile, 30)} @${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-      <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
-    </div>
-    ${profile.bio ? `<p style="color:var(--text-dim); font-size:13px; margin-top:0;">${escapeHtml(profile.bio)}</p>` : ""}
-    ${renderSocialIcons(profile)}
-    <p class="page-sub">${videos?.length || 0} videos · ${(followers || []).length} seguidores</p>
 
-    <div id="publicVideosList">
-      ${videos && videos.length ? videos.map(v => `
-        <div class="video-card with-thumb">
-          <div class="video-thumb">${getThumbnailHtml(v)}</div>
-          <div class="card-body">
-            <div class="meta">
-              <div>
-                <div class="title">${escapeHtml(v.title)}</div>
-                <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleDateString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
-              </div>
-              <div class="platform">${v.platform}</div>
-            </div>
-            <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
-          </div>
+    <div class="profile-hero">
+      <div class="profile-hero-top">
+        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}">${renderAvatarHtml(profile, 60)}</div>
+        <div class="profile-name-block">
+          <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+          <div class="handle">Perfil público</div>
         </div>
-      `).join("") : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
+      </div>
+      ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
+      ${renderSocialIcons(profile)}
+      <div class="profile-stats-row">
+        <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
+        <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
+      </div>
+      <div class="profile-hero-actions">
+        <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+      </div>
+    </div>
+
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎬</div>
+        <h3>Videos</h3>
+        <div class="sub">${videos?.length || 0} en total</div>
+      </div>
+      <div id="publicVideosList">
+        ${videos && videos.length ? videos.map(v => `
+          <div class="video-card with-thumb">
+            <div class="video-thumb">${getThumbnailHtml(v)}</div>
+            <div class="card-body">
+              <div class="meta">
+                <div>
+                  <div class="title">${escapeHtml(v.title)}</div>
+                  <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleDateString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
+                </div>
+                <div class="platform">${v.platform}</div>
+              </div>
+              <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
+            </div>
+          </div>
+        `).join("") : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
+      </div>
     </div>`;
 }
 

@@ -340,6 +340,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
+    <button onclick="showTutorialModal(); closeMobileMenu();">❓ Cómo funciona</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
       <button onclick="handleLogout(); closeMobileMenu();" style="color:var(--red);">Salir</button>
@@ -401,9 +402,72 @@ async function checkPendingContent() {
 
   if (data.terms_pending) {
     showTermsUpdateModal();
+  } else if (data.tutorial_pending) {
+    showTutorialModal();
   } else if (data.changelog_pending) {
     showChangelogModal(data.changelog_entries || []);
   }
+}
+
+const tutorialSteps = [
+  { icon: "👋", title: "¡Bienvenido a LiveScroll!", text: "Acá subís y mirás clips de Kick, Twitch, YouTube y TikTok, y ganás puntos por cada cosa que hacés." },
+  { icon: "🎬", title: "Subí tus clips", text: "Compartí el link de tu video favorito o subí tu propio archivo. Ganás puntos al instante." },
+  { icon: "👀", title: "Mirá y ganá", text: "Cada minuto que mirás contenido de otros usuarios suma puntos — y si ellos miran el tuyo, también ganás vos." },
+  { icon: "🔴", title: "Directos", text: "Fijate quién de la comunidad está transmitiendo ahora mismo en Kick o Twitch, en el apartado Directos." },
+  { icon: "🛍️", title: "Tienda y racha diaria", text: "Entrá todos los días para sumar tu racha, y usá tus puntos en la Tienda para desbloquear emojis y beneficios." },
+  { icon: "🚀", title: "¡Listo, a explorar!", text: "Eso es todo lo básico. El resto lo vas descubriendo scrolleando. ¡Que lo disfrutes!" },
+];
+let tutorialStepIndex = 0;
+
+function showTutorialModal() {
+  tutorialStepIndex = 0;
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:135;">
+      <div class="modal-box" id="tutorialBox" style="max-width:380px;">
+        <div class="modal-box-header"><h2 id="tutorialStepTitle"></h2></div>
+        <div class="modal-box-body" id="tutorialStepBody" style="text-align:center;"></div>
+        <div class="modal-box-footer">
+          <div style="display:flex; justify-content:center; gap:6px; margin-bottom:12px;" id="tutorialDots"></div>
+          <div style="display:flex; gap:10px;">
+            <button class="btn-outline" id="tutorialSkipBtn" onclick="handleAcceptTutorial()" style="flex:1;">Saltear</button>
+            <button class="btn" id="tutorialNextBtn" onclick="tutorialNextStep()" style="flex:1;">Siguiente</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  renderTutorialStep();
+}
+
+function renderTutorialStep() {
+  const step = tutorialSteps[tutorialStepIndex];
+  const isLast = tutorialStepIndex === tutorialSteps.length - 1;
+
+  document.getElementById("tutorialStepTitle").textContent = step.title;
+  document.getElementById("tutorialStepBody").innerHTML = `
+    <div style="font-size:56px; margin:10px 0 18px;">${step.icon}</div>
+    <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin:0 0 8px;">${escapeHtml(step.text)}</p>`;
+  document.getElementById("tutorialDots").innerHTML = tutorialSteps.map((_, i) =>
+    `<div style="width:${i === tutorialStepIndex ? 18 : 6}px; height:6px; border-radius:4px; background:${i === tutorialStepIndex ? "var(--gold)" : "var(--border)"}; transition:width 0.2s ease;"></div>`
+  ).join("");
+  document.getElementById("tutorialSkipBtn").classList.toggle("hidden", isLast);
+  document.getElementById("tutorialNextBtn").textContent = isLast ? "¡Empezar!" : "Siguiente";
+  document.getElementById("tutorialNextBtn").style.flex = isLast ? "1 1 100%" : "1";
+}
+
+function tutorialNextStep() {
+  if (tutorialStepIndex < tutorialSteps.length - 1) {
+    tutorialStepIndex++;
+    renderTutorialStep();
+  } else {
+    handleAcceptTutorial();
+  }
+}
+
+async function handleAcceptTutorial() {
+  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "tutorial" });
+  document.getElementById("globalModalWrap").innerHTML = "";
+  checkPendingContent(); // por si también hay changelog pendiente, se muestra después
 }
 
 function showTermsUpdateModal() {
@@ -432,7 +496,7 @@ async function handleAcceptNewTerms() {
   }
   await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "terms" });
   document.getElementById("globalModalWrap").innerHTML = "";
-  checkPendingContent(); // por si también hay changelog pendiente, se muestra después
+  checkPendingContent(); // por si también hay tutorial o changelog pendiente, se muestra después
 }
 
 function showChangelogModal(entries) {

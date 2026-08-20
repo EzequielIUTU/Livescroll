@@ -275,7 +275,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -333,6 +333,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('upload'); closeMobileMenu();">Subir video</button>
     <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
     <button onclick="switchTab('users'); closeMobileMenu();">👥 Usuarios</button>
+    <button onclick="switchTab('directos'); closeMobileMenu();" style="color:var(--red)">🔴 Directos</button>
     <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
     <button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
@@ -362,6 +363,7 @@ async function renderApp() {
     <button id="tab-upload" onclick="switchTab('upload')">Subir video</button>
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
     <button id="tab-users" onclick="switchTab('users')">👥 Usuarios</button>
+    <button id="tab-directos" onclick="switchTab('directos')" style="color:var(--red)">🔴 Directos</button>
     <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
     <button id="tab-plans" onclick="switchTab('plans')">Planes</button>
     <button id="tab-store" onclick="switchTab('store')">🛍️ Tienda</button>
@@ -653,6 +655,7 @@ function switchTab(tab) {
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
   if (tab === "users") renderUsersDirectory();
+  if (tab === "directos") renderDirectos();
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
   if (tab === "store") renderStore();
@@ -1509,7 +1512,7 @@ async function renderProfile() {
   main.innerHTML = `
     <div class="profile-hero">
       <div class="profile-hero-top">
-        <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}">${renderAvatarHtml(currentProfile, 60)}</div>
+        <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
         <div class="profile-name-block">
           <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
           <div class="handle">Tu perfil en LiveScroll</div>
@@ -1731,6 +1734,47 @@ let previousTabBeforeProfile = "feed";
 // ============================================================
 let usersDirectorySearchTimeout = null;
 
+// ============================================================
+// DIRECTOS (usuarios en vivo ahora)
+// ============================================================
+async function renderDirectos() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `
+    <h1 class="page-title">🔴 Directos</h1>
+    <p class="page-sub">Creadores de LiveScroll transmitiendo en vivo ahora mismo.</p>
+    <div id="directosList">Cargando...</div>`;
+
+  const { data: liveUsers, error } = await sb
+    .from("profiles")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, live_platform, live_started_at, social_kick, social_twitch")
+    .eq("is_live", true)
+    .is("ban_reason", null)
+    .order("live_started_at", { ascending: false });
+
+  const list = document.getElementById("directosList");
+  if (!list) return;
+
+  if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar quién está en vivo.</p>`; return; }
+  if (!liveUsers || !liveUsers.length) {
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
+    return;
+  }
+
+  list.innerHTML = liveUsers.map(u => {
+    const channelUrl = u.live_platform === "kick" ? u.social_kick : u.social_twitch;
+    const platformLabel = u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+    return `
+    <div class="directo-card">
+      <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u, 52)}</div>
+      <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
+        <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="plat">${platformLabel} · en vivo</div>
+      </div>
+      ${channelUrl && isSafeUrl(channelUrl) ? `<a href="${escapeHtml(channelUrl)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver directo</a>` : ""}
+    </div>`;
+  }).join("");
+}
+
 async function renderUsersDirectory() {
   const main = document.getElementById("appView");
   main.innerHTML = `
@@ -1756,9 +1800,10 @@ async function loadUsersDirectory(term) {
   list.innerHTML = "Buscando...";
 
   let query = sb.from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform")
     .is("ban_reason", null)
     .neq("id", currentUser.id)
+    .order("is_live", { ascending: false })
     .order("username")
     .limit(40);
 
@@ -1774,9 +1819,9 @@ async function loadUsersDirectory(term) {
 
   list.innerHTML = users.map(u => `
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
-      <div class="avatar-sm">${renderAvatarHtml(u, 40)}</div>
+      <div class="avatar-sm${u.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
     </div>`).join("");
@@ -1793,7 +1838,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -1826,7 +1871,7 @@ async function viewPublicProfile(username) {
 
     <div class="profile-hero">
       <div class="profile-hero-top">
-        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}">${renderAvatarHtml(profile, 60)}</div>
+        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
         <div class="profile-name-block">
           <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
           <div class="handle">Perfil público</div>

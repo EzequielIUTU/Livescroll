@@ -1984,15 +1984,31 @@ function toggleNotifPanel() {
   const panel = document.createElement("div");
   panel.id = "notifPanel";
   panel.style.cssText = "position:absolute; top:60px; right:20px; width:300px; max-height:400px; overflow-y:auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,0.5);";
-  panel.innerHTML = notifCache.length
-    ? notifCache.map(n => `
-        <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px; ${n.read ? "opacity:0.5;" : ""}">
-          <div>${escapeHtml(n.message)}</div>
-          <div style="color:var(--text-dim); font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString("es-AR")}</div>
-        </div>`).join("")
-    : `<p style="color:var(--text-dim); font-size:13px; padding:10px;">Sin notificaciones todavía.</p>`;
+  panel.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 2px;">
+      <strong style="font-size:14px;">Notificaciones</strong>
+      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; line-height:1; padding:2px 4px;">✕</button>
+    </div>
+    ${notifCache.length
+      ? notifCache.map(n => `
+          <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px; ${n.read ? "opacity:0.5;" : ""}">
+            <div>${escapeHtml(n.message)}</div>
+            <div style="color:var(--text-dim); font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString("es-AR")}</div>
+          </div>`).join("")
+      : `<p style="color:var(--text-dim); font-size:13px; padding:10px;">Sin notificaciones todavía.</p>`}`;
 
   document.body.appendChild(panel);
+
+  setTimeout(() => {
+    document.addEventListener("click", function closeOnOutsideClick(e) {
+      const panelEl = document.getElementById("notifPanel");
+      if (!panelEl) { document.removeEventListener("click", closeOnOutsideClick); return; }
+      if (!panelEl.contains(e.target) && e.target.id !== "notifBell" && !e.target.closest("#notifBell")) {
+        panelEl.remove();
+        document.removeEventListener("click", closeOnOutsideClick);
+      }
+    });
+  }, 0);
 
   sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
     document.getElementById("notifBadge")?.classList.add("hidden");

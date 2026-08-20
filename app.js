@@ -29,6 +29,7 @@ let currentTab = "feed";
 let watchIntervals = {}; // video_id -> intervalId
 let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
+let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
 // ============================================================
 // ARRANQUE
@@ -715,7 +716,7 @@ async function renderFeed() {
         return `
         <div class="feed-item" data-video-id="${v.id}">
           <div class="feed-phone">
-            <div class="feed-embed-frame">${getEmbedHtml(v)}</div>
+            <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
             <div class="feed-actions">
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
@@ -836,20 +837,26 @@ function setupSwipeNavigation(fromTab, targets) {
 
 function setupFeedObserver(videos) {
   const videoMap = Object.fromEntries(videos.map(v => [v.id, v]));
+  loadedEmbeds.clear();
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       const videoId = entry.target.dataset.videoId;
       if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+        loadEmbed(videoMap[videoId]);
         startWatching(videoMap[videoId]);
       } else {
         stopWatching(videoId);
+        unloadEmbed(videoId, videoMap[videoId]);
       }
     });
   }, { threshold: [0, 0.6, 1] });
 
   document.querySelectorAll(".feed-item").forEach(el => observer.observe(el));
   feedObserverInstance = observer;
+
+  // Cargamos el primero de una, sin esperar a que el observer dispare
+  if (videos[0]) loadEmbed(videos[0]);
 }
 
 function isSafeUrl(url) {
@@ -859,6 +866,31 @@ function isSafeUrl(url) {
   } catch (e) {
     return false;
   }
+}
+
+function getEmbedPlaceholderHtml(video) {
+  const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣", youtube: "🔴", upload: "🎬" };
+  const thumb = video.platform === "youtube" ? getThumbnailHtml(video) : "";
+  return `<div class="feed-fallback">
+    ${thumb && thumb.startsWith("<img") ? thumb.replace('alt="miniatura"', 'alt="miniatura" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.5;"') : ""}
+    <div class="platform-icon" style="position:relative;">${icons[video.platform] || "▶️"}</div>
+  </div>`;
+}
+
+function loadEmbed(video) {
+  if (!video || loadedEmbeds.has(video.id)) return;
+  const el = document.getElementById(`embed-${video.id}`);
+  if (!el) return;
+  el.innerHTML = getEmbedHtml(video);
+  loadedEmbeds.add(video.id);
+}
+
+function unloadEmbed(videoId, video) {
+  if (!loadedEmbeds.has(videoId)) return;
+  const el = document.getElementById(`embed-${videoId}`);
+  if (!el) return;
+  el.innerHTML = video ? getEmbedPlaceholderHtml(video) : "";
+  loadedEmbeds.delete(videoId);
 }
 
 function getEmbedHtml(video) {
@@ -960,6 +992,7 @@ function clearAllWatchIntervals() {
   Object.values(watchIntervals).forEach(clearInterval);
   watchIntervals = {};
   watchSeconds = {};
+  loadedEmbeds.clear();
   if (feedObserverInstance) {
     feedObserverInstance.disconnect();
     feedObserverInstance = null;
@@ -1701,7 +1734,7 @@ async function renderForYou() {
         <div class="feed-item" data-video-id="${v.id}">
           <div class="feed-phone">
             <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
-            <div class="feed-embed-frame">${getEmbedHtml(v)}</div>
+            <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             <div class="feed-actions">
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
               <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>

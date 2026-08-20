@@ -276,7 +276,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -1608,6 +1608,9 @@ async function renderProfile() {
 
   main.innerHTML = `
     <div class="profile-hero">
+      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner" style="${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}');` : ""}">
+        <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
+      </div>
       <div class="profile-hero-top">
         <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
         <div class="profile-name-block">
@@ -1940,7 +1943,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -1972,6 +1975,7 @@ async function viewPublicProfile(username) {
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
     <div class="profile-hero">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
       <div class="profile-hero-top">
         <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
         <div class="profile-name-block">
@@ -2145,6 +2149,13 @@ async function openEditProfile() {
           ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:8px; padding:4px 10px; font-size:12px;" onclick="handleRemoveAvatarPhoto()">Quitar foto y volver al emoji</button>` : ""}
         </div>
         <div class="field">
+          <label>Portada del perfil</label>
+          <div style="border-radius:10px; overflow:hidden; height:70px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
+          <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
+          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Se ve mejor en formato horizontal (ancha).</div>
+          ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:8px; padding:4px 10px; font-size:12px;" onclick="handleRemoveCoverPhoto()">Quitar portada</button>` : ""}
+        </div>
+        <div class="field">
           <label>Avatar (si no tenés foto)</label>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             ${emojis.map(e => `<button onclick="selectAvatarEmoji('${e}')" id="emoji-${e}" style="font-size:20px; padding:8px; background:${e === currentProfile.avatar_emoji ? "var(--panel-2)" : "transparent"}; border:1px solid var(--border); border-radius:8px; cursor:pointer;">${e}</button>`).join("")}
@@ -2246,6 +2257,43 @@ async function handleRemoveAvatarPhoto() {
   if (error) { showToast("No se pudo quitar la foto"); return; }
   currentProfile.avatar_url = null;
   showToast("Foto quitada, volviste al emoji");
+  openEditProfile();
+}
+
+async function handleCoverPhotoUpload() {
+  const fileInput = document.getElementById("coverPhotoInput");
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById("coverUploadStatus");
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
+  if (file.size > 5 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 5MB."; statusEl.style.color = "var(--red)"; return; }
+
+  statusEl.textContent = "Subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "");
+  const path = `${currentUser.id}/cover.${ext}`;
+
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: true });
+  if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
+
+  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl }).eq("id", currentUser.id);
+  if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
+
+  currentProfile.cover_url = freshUrl;
+  showToast("¡Portada actualizada!");
+  openEditProfile();
+}
+
+async function handleRemoveCoverPhoto() {
+  const { error } = await sb.from("profiles").update({ cover_url: null }).eq("id", currentUser.id);
+  if (error) { showToast("No se pudo quitar la portada"); return; }
+  currentProfile.cover_url = null;
+  showToast("Portada quitada");
   openEditProfile();
 }
 

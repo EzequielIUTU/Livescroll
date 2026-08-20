@@ -332,10 +332,12 @@ function toggleMobileMenu() {
     <button onclick="switchTab('foryou'); closeMobileMenu();">✨ Para Ti</button>
     <button onclick="switchTab('upload'); closeMobileMenu();">Subir video</button>
     <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
+    <button onclick="switchTab('users'); closeMobileMenu();">👥 Usuarios</button>
     <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
     <button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
+    <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
       <button onclick="handleLogout(); closeMobileMenu();" style="color:var(--red);">Salir</button>
@@ -359,6 +361,7 @@ async function renderApp() {
     <button id="tab-foryou" onclick="switchTab('foryou')">✨ Para Ti</button>
     <button id="tab-upload" onclick="switchTab('upload')">Subir video</button>
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
+    <button id="tab-users" onclick="switchTab('users')">👥 Usuarios</button>
     <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
     <button id="tab-plans" onclick="switchTab('plans')">Planes</button>
     <button id="tab-store" onclick="switchTab('store')">🛍️ Tienda</button>
@@ -374,7 +377,8 @@ async function renderApp() {
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
-    <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:8px;">
+    <button onclick="openChangelogHistory()" title="Novedades" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
+    <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
@@ -648,6 +652,7 @@ function switchTab(tab) {
   if (tab === "foryou") renderForYou();
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
+  if (tab === "users") renderUsersDirectory();
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
   if (tab === "store") renderStore();
@@ -1519,7 +1524,6 @@ async function renderProfile() {
       </div>
       <div class="profile-hero-actions">
         <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
-        <button class="btn-outline" onclick="openChangelogHistory()">📢 Novedades</button>
       </div>
     </div>
 
@@ -1721,6 +1725,62 @@ async function renderForYou() {
 
 
 let previousTabBeforeProfile = "feed";
+
+// ============================================================
+// DIRECTORIO DE USUARIOS
+// ============================================================
+let usersDirectorySearchTimeout = null;
+
+async function renderUsersDirectory() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `
+    <h1 class="page-title">👥 Usuarios</h1>
+    <p class="page-sub">Buscá y descubrí a otros creadores de LiveScroll.</p>
+    <input type="text" id="userSearchInput" class="user-directory-search" placeholder="Buscar por nombre de usuario..." oninput="handleUserSearchInput()">
+    <div id="usersDirectoryList">Cargando...</div>`;
+
+  await loadUsersDirectory("");
+}
+
+function handleUserSearchInput() {
+  clearTimeout(usersDirectorySearchTimeout);
+  const input = document.getElementById("userSearchInput");
+  if (!input) return;
+  const term = input.value.trim();
+  usersDirectorySearchTimeout = setTimeout(() => loadUsersDirectory(term), 350);
+}
+
+async function loadUsersDirectory(term) {
+  const list = document.getElementById("usersDirectoryList");
+  if (!list) return;
+  list.innerHTML = "Buscando...";
+
+  let query = sb.from("profiles")
+    .select("id, username, avatar_emoji, avatar_url, plan_id")
+    .is("ban_reason", null)
+    .neq("id", currentUser.id)
+    .order("username")
+    .limit(40);
+
+  if (term) query = query.ilike("username", `%${term}%`);
+
+  const { data: users, error } = await query;
+  if (!document.getElementById("usersDirectoryList")) return; // el usuario ya cambió de pestaña
+  if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar la lista de usuarios.</p>`; return; }
+  if (!users || !users.length) {
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">No encontramos usuarios${term ? ` para "${escapeHtml(term)}"` : ""}.</p>`;
+    return;
+  }
+
+  list.innerHTML = users.map(u => `
+    <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
+      <div class="avatar-sm">${renderAvatarHtml(u, 40)}</div>
+      <div class="info">
+        <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+      </div>
+      <div style="color:var(--text-dim); font-size:16px;">›</div>
+    </div>`).join("");
+}
 
 async function viewPublicProfile(username) {
   if (!username) return;

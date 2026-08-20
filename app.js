@@ -379,7 +379,7 @@ async function renderApp() {
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
-    <button onclick="openChangelogHistory()" title="Novedades" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
+    <button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
     <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>
@@ -1761,8 +1761,13 @@ async function renderDirectos() {
   }
 
   list.innerHTML = liveUsers.map(u => {
-    const channelUrl = u.live_platform === "kick" ? u.social_kick : u.social_twitch;
-    const platformLabel = u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+    const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+    const watchButtons = [
+      (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
+        ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
+      (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
+        ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : "",
+    ].join("");
     return `
     <div class="directo-card">
       <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u, 52)}</div>
@@ -1770,7 +1775,7 @@ async function renderDirectos() {
         <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
         <div class="plat">${platformLabel} · en vivo</div>
       </div>
-      ${channelUrl && isSafeUrl(channelUrl) ? `<a href="${escapeHtml(channelUrl)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver directo</a>` : ""}
+      <div style="display:flex; flex-direction:column; gap:6px;">${watchButtons}</div>
     </div>`;
   }).join("");
 }

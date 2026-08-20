@@ -147,6 +147,7 @@ nav {
   .nav-links { display: none; }
   .nav-hamburger { display: block; }
   .nav-logout-btn { display: none; }
+  .nav-changelog-btn { display: none; }
   main.app-view { padding-left: 16px; padding-right: 16px; }
   main.app-view { padding-bottom: max(40px, env(safe-area-inset-bottom)); }
 }

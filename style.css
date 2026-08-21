@@ -577,6 +577,60 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
   flex-shrink: 0; border-top: 1px solid var(--border);
 }
 
+/* ---------- INTRO ANIMADA ---------- */
+#introOverlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: radial-gradient(circle at center, #16110d 0%, #0B0D10 75%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease;
+  cursor: pointer;
+}
+#introOverlay.fade-out { opacity: 0; pointer-events: none; }
+
+.intro-ring {
+  transform-origin: 200px 200px;
+  transform: scale(0) rotate(-90deg);
+  opacity: 0;
+  animation: introRingIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.intro-ring.r1 { animation-delay: 0.05s; }
+.intro-ring.r2 { animation-delay: 0.15s; }
+.intro-ring.r3 { animation-delay: 0.25s; }
+.intro-ring.r4 { animation-delay: 0.35s; }
+@keyframes introRingIn {
+  to { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.intro-core {
+  transform-origin: 200px 200px;
+  transform: scale(0);
+  opacity: 0;
+  animation: introCoreIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation-delay: 0.5s;
+}
+@keyframes introCoreIn {
+  to { transform: scale(1); opacity: 1; }
+}
+
+.intro-word {
+  margin-top: 22px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 32px;
+  color: #fff;
+  letter-spacing: -0.02em;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: introWordIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 0.75s;
+}
+.intro-word span {
+  background: linear-gradient(90deg, #fde047, #f97316, #ef4444);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 /* ---------- DIRECTORIO DE USUARIOS ---------- */
 .user-directory-search {
   width: 100%; padding: 12px 14px; margin-bottom: 16px;

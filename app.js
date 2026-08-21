@@ -675,6 +675,14 @@ async function handlePinVideo(videoId) {
   renderProfile();
 }
 
+async function handleDeleteOwnVideo(videoId) {
+  if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y vistas. No se puede deshacer.")) return;
+  const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
+  if (error || !data.ok) { showToast("No se pudo eliminar el video"); return; }
+  showToast("Video eliminado");
+  renderProfile();
+}
+
 
 function checkBlockedStatus() {
   const wrap = document.getElementById("blockedBannerWrap");

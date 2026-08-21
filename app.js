@@ -3307,14 +3307,31 @@ async function renderStore() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tienda...</p>`;
 
-  const [{ data: emojis }, { data: myEmojis }, plans, { data: storeItems }, { data: myItems }, { data: pricesData }] = await Promise.all([
-    sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
-    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
-    loadPlans(),
-    sb.from("store_items").select("*").eq("active", true).order("category").order("sort_order"),
-    sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
-    sb.rpc("get_store_prices").catch(() => ({ data: null }))
-  ]);
+  let emojis, myEmojis, plans, storeItems, myItems, pricesData;
+  try {
+    const results = await Promise.allSettled([
+      sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
+      sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+      loadPlans(),
+      sb.from("store_items").select("*").eq("active", true).order("category").order("sort_order"),
+      sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
+      sb.rpc("get_store_prices")
+    ]);
+
+    emojis = results[0].status === "fulfilled" ? results[0].value?.data : null;
+    myEmojis = results[1].status === "fulfilled" ? results[1].value?.data : null;
+    plans = results[2].status === "fulfilled" ? results[2].value : [];
+    storeItems = results[3].status === "fulfilled" ? results[3].value?.data : null;
+    myItems = results[4].status === "fulfilled" ? results[4].value?.data : null;
+    pricesData = results[5].status === "fulfilled" ? results[5].value?.data : null;
+
+    results.forEach((r, i) => { if (r.status === "rejected") console.log("Tienda: falló la consulta #" + i, r.reason); });
+  } catch (e) {
+    console.log("Error cargando la tienda:", e);
+    main.innerHTML = `<p class="error-msg">No se pudo cargar la tienda. Probá recargar la página.</p>`;
+    return;
+  }
+
   const myEmojiSet = new Set((myEmojis || []).map(e => e.emoji));
   const myItemSet = new Set((myItems || []).map(i => i.item_id));
   const myPlan = plans.find(p => p.id === currentProfile.plan_id);

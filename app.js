@@ -1600,6 +1600,9 @@ async function renderProfile() {
                     ? `<span style="font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</span>`
                     : `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`}
                 </div>` : ""}
+              <div style="margin-top:8px;">
+                <button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red); border-color:var(--red);" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
+              </div>
             </div>
           </div>
         `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}

@@ -2499,6 +2499,30 @@ async function renderAdmin() {
       <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
+    <h3 style="margin-top:32px;">💵 Precios de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-dim); margin-top:0;">Estos precios se aplican al toque, no hace falta publicar ninguna versión.</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Boost extra — plan Plus</label>
+          <input type="number" id="priceBoostPlus" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Boost extra — plan Diamante</label>
+          <input type="number" id="priceBoostDiamante" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Cambiar a Plus con puntos</label>
+          <input type="number" id="pricePlanPlus" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Cambiar a Diamante con puntos</label>
+          <input type="number" id="pricePlanDiamante" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+      </div>
+      <button class="btn" onclick="handleSaveStorePrices()">Guardar precios</button>
+    </div>
+
     <h3 style="margin-top:32px;">🎨 Emojis de la tienda</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
@@ -2509,6 +2533,20 @@ async function renderAdmin() {
         <button class="btn" onclick="handleAddStoreEmoji()">Agregar</button>
       </div>
       <div id="storeEmojisList">Cargando...</div>
+    </div>
+
+    <h3 style="margin-top:32px;">✨ Otros artículos de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-dim); margin-top:0;">Cualquier cosa nueva que quieras vender: insignias, marcos, lo que se te ocurra. Vos elegís la categoría (el texto), el ícono, el nombre y el precio.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <input type="text" id="newItemCategory" placeholder="Categoría (ej: Insignia)" style="width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="text" id="newItemIcon" placeholder="🏅" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+        <button type="button" class="btn-outline" onclick="openEmojiPicker('newItemIcon', FACE_EMOJIS)">Elegir</button>
+        <input type="text" id="newItemName" placeholder="Nombre" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="number" id="newItemPrice" placeholder="Precio en pts" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <button class="btn" onclick="handleAddStoreItem()">Agregar</button>
+      </div>
+      <div id="storeItemsList">Cargando...</div>
     </div>
 
     <h3 style="margin-top:32px;">📢 Novedades y Términos</h3>
@@ -2571,6 +2609,8 @@ async function renderAdmin() {
   loadPlansLockStatus();
   loadWalletLockStatus();
   loadStoreEmojisList();
+  loadStorePrices();
+  loadStoreItemsList();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -2764,6 +2804,87 @@ async function handleDeleteStoreEmoji(id) {
   if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
   showToast("Emoji eliminado");
   loadStoreEmojisList();
+}
+
+async function loadStorePrices() {
+  const { data } = await sb.rpc("admin_get_store_prices");
+  if (!data || !data.ok || !data.prices) return;
+  const p = data.prices;
+  if (document.getElementById("priceBoostPlus")) document.getElementById("priceBoostPlus").value = p.boost_price_plus || "";
+  if (document.getElementById("priceBoostDiamante")) document.getElementById("priceBoostDiamante").value = p.boost_price_diamante || "";
+  if (document.getElementById("pricePlanPlus")) document.getElementById("pricePlanPlus").value = p.plan_upgrade_price_plus || "";
+  if (document.getElementById("pricePlanDiamante")) document.getElementById("pricePlanDiamante").value = p.plan_upgrade_price_diamante || "";
+}
+
+async function handleSaveStorePrices() {
+  const boostPlus = parseInt(document.getElementById("priceBoostPlus").value, 10);
+  const boostDiamante = parseInt(document.getElementById("priceBoostDiamante").value, 10);
+  const planPlus = parseInt(document.getElementById("pricePlanPlus").value, 10);
+  const planDiamante = parseInt(document.getElementById("pricePlanDiamante").value, 10);
+
+  if ([boostPlus, boostDiamante, planPlus, planDiamante].some(n => isNaN(n) || n < 0)) {
+    showToast("Revisá que los 4 precios sean números válidos");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_set_store_prices", {
+    p_boost_price_plus: boostPlus,
+    p_boost_price_diamante: boostDiamante,
+    p_plan_price_plus: planPlus,
+    p_plan_price_diamante: planDiamante,
+  });
+  if (error || !data.ok) { showToast("No se pudieron guardar los precios"); return; }
+  showToast("Precios actualizados");
+}
+
+async function loadStoreItemsList() {
+  const el = document.getElementById("storeItemsList");
+  if (!el) return;
+  const { data } = await sb.rpc("admin_get_store_items");
+  if (!data || !data.length) { el.innerHTML = `<p style="color:var(--text-dim); font-size:12px;">Todavía no cargaste ningún artículo nuevo.</p>`; return; }
+
+  el.innerHTML = data.map(it => `
+    <div class="ledger-row">
+      <span>${it.icon} ${escapeHtml(it.name)} <span style="color:var(--text-dim); font-size:11px;">(${escapeHtml(it.category)})</span> · <span class="mono">${it.price_points} pts</span> ${!it.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}</span>
+      <div style="display:flex; gap:6px;">
+        <button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleToggleStoreItem('${it.id}', ${!it.active})">${it.active ? "Desactivar" : "Activar"}</button>
+        <button class="btn-outline" style="padding:4px 8px; font-size:11px; color:var(--red);" onclick="handleDeleteStoreItem('${it.id}')">🗑</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleAddStoreItem() {
+  const category = document.getElementById("newItemCategory").value.trim();
+  const icon = document.getElementById("newItemIcon").value.trim();
+  const name = document.getElementById("newItemName").value.trim();
+  const price = parseInt(document.getElementById("newItemPrice").value, 10);
+
+  if (!category || !icon || !name || !price) { showToast("Completá los 4 campos"); return; }
+
+  const { data, error } = await sb.rpc("admin_add_store_item", { p_category: category, p_icon: icon, p_name: name, p_price: price });
+  if (error || !data.ok) { showToast("No se pudo agregar"); return; }
+
+  document.getElementById("newItemCategory").value = "";
+  document.getElementById("newItemIcon").value = "";
+  document.getElementById("newItemName").value = "";
+  document.getElementById("newItemPrice").value = "";
+  showToast("Artículo agregado");
+  loadStoreItemsList();
+}
+
+async function handleToggleStoreItem(id, newActive) {
+  const { data, error } = await sb.rpc("admin_toggle_store_item", { p_id: id, p_active: newActive });
+  if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
+  loadStoreItemsList();
+}
+
+async function handleDeleteStoreItem(id) {
+  if (!confirm("¿Eliminar este artículo? Quien ya lo compró lo conserva igual.")) return;
+  const { data, error } = await sb.rpc("admin_delete_store_item", { p_id: id });
+  if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
+  showToast("Artículo eliminado");
+  loadStoreItemsList();
 }
 
 async function handleBumpVersion(key) {
@@ -2998,16 +3119,28 @@ async function renderStore() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tienda...</p>`;
 
-  const [{ data: emojis }, { data: myEmojis }, plans] = await Promise.all([
+  const [{ data: emojis }, { data: myEmojis }, plans, { data: storeItems }, { data: myItems }, { data: pricesData }] = await Promise.all([
     sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
     sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
-    loadPlans()
+    loadPlans(),
+    sb.from("store_items").select("*").eq("active", true).order("category").order("sort_order"),
+    sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
+    sb.rpc("get_store_prices").catch(() => ({ data: null }))
   ]);
   const myEmojiSet = new Set((myEmojis || []).map(e => e.emoji));
+  const myItemSet = new Set((myItems || []).map(i => i.item_id));
   const myPlan = plans.find(p => p.id === currentProfile.plan_id);
   const canBoost = myPlan && myPlan.id !== "standard";
-  const boostPrice = myPlan?.id === "diamante" ? 13500 : 3500;
+  const planPrices = (pricesData && pricesData.ok && pricesData.prices) ? pricesData.prices : {};
+  const boostPrice = myPlan?.id === "diamante" ? (planPrices.boost_price_diamante ?? 13500) : (planPrices.boost_price_plus ?? 3500);
   const higherPlans = plans.filter(p => p.id !== "standard" && p.id !== currentProfile.plan_id);
+
+  const itemsByCategoryMap = {};
+  (storeItems || []).forEach(it => {
+    itemsByCategoryMap[it.category] = itemsByCategoryMap[it.category] || [];
+    itemsByCategoryMap[it.category].push(it);
+  });
+  const itemsByCategory = Object.entries(itemsByCategoryMap);
 
   main.innerHTML = `
     <h1 class="page-title">🛍️ Tienda de puntos</h1>
@@ -3040,10 +3173,25 @@ async function renderStore() {
         <div class="form-card" style="flex:1; min-width:180px;">
           <div style="font-weight:600;">${p.name}</div>
           <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Boost x${p.boost_multiplier}, tope semanal $${p.weekly_redemption_cap.toLocaleString("es-AR")}</div>
-          <button class="btn-outline" onclick="handleBuyPlan('${p.id}')">${p.id === "plus" ? "2.999" : "6.999"} pts</button>
+          <button class="btn-outline" onclick="handleBuyPlan('${p.id}')">${planPrices[p.id === "plus" ? "plan_upgrade_price_plus" : "plan_upgrade_price_diamante"] ?? (p.id === "plus" ? "2.999" : "6.999")} pts</button>
         </div>
       `).join("") || `<p style="color:var(--text-dim); font-size:13px;">Ya tenés el plan más alto.</p>`}
-    </div>`;
+    </div>
+
+    ${itemsByCategory.length ? itemsByCategory.map(([category, items]) => `
+      <h3 style="margin-top:24px;">✨ ${escapeHtml(category)}</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
+        ${items.map(it => `
+          <div class="form-card" style="text-align:center;">
+            <div style="font-size:30px;">${it.icon}</div>
+            <div style="font-size:12px; margin:4px 0;">${escapeHtml(it.name)}</div>
+            ${myItemSet.has(it.id)
+              ? `<span style="font-size:11px; color:var(--green);">✓ Tenés este</span>`
+              : `<button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleBuyStoreItem('${it.id}')">${it.price_points} pts</button>`}
+          </div>
+        `).join("")}
+      </div>
+    `).join("") : ""}`;
 }
 
 async function handleBuyEmoji(emojiId) {
@@ -3069,6 +3217,19 @@ async function handleBuyBoost() {
   await loadProfile();
   updateBalanceUI();
   showToast("¡Boost activado por 24hs!");
+  renderStore();
+}
+
+async function handleBuyStoreItem(itemId) {
+  const { data, error } = await sb.rpc("buy_store_item", { p_item_id: itemId });
+  if (error || !data.ok) {
+    const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", ya_lo_tenes: "Ya tenés este artículo.", no_disponible: "Este artículo ya no está disponible." };
+    showToast(msgs[data?.error] || "No se pudo comprar");
+    return;
+  }
+  await loadProfile();
+  updateBalanceUI();
+  showToast("¡Compra realizada!");
   renderStore();
 }
 

@@ -1075,6 +1075,8 @@ function clearAllWatchIntervals() {
 // SUBIR VIDEO
 // ============================================================
 function renderUpload() {
+  rawSelectedFile = null;
+  trimmedFile = null;
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">Subir video</h1>
@@ -1106,10 +1108,9 @@ function renderUpload() {
         <div class="field">
           <label>Archivo de video (MP4 o MKV, máx. 50MB)</label>
           <p style="font-size:12px; color:var(--text-dim); margin:-6px 0 10px;">
-            💡 Pensado para <strong style="color:var(--text)">clips cortos (30s a 1 min)</strong>, no streams completos.
-            Si tu contenido es más largo, subilo a Kick/YouTube y compartí el link en la pestaña "🔗 Link".
+            💡 Si tu video es más largo o pesa de más, elegilo igual — te va a aparecer la opción de recortarlo acá mismo antes de subirlo.
           </p>
-          <input type="file" id="uploadFile" accept=".mp4,.mkv,video/mp4,video/x-matroska"
+          <input type="file" id="uploadFile" accept=".mp4,.mkv,video/mp4,video/x-matroska,video/webm"
             onchange="previewFileSize()"
             style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
           <div id="fileSizeInfo" style="font-size:12px;margin-top:6px;"></div>
@@ -1134,22 +1135,210 @@ function renderUpload() {
 }
 
 const MAX_FILE_MB = 50;
+let rawSelectedFile = null;
+let trimmedFile = null;
 
 function previewFileSize() {
-  const file = document.getElementById("uploadFile").files[0];
-  const info = document.getElementById("fileSizeInfo");
-  if (!file) { info.textContent = ""; return; }
+  rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
+  trimmedFile = null;
+  refreshFileSizeUI();
+}
 
-  const mb = (file.size / (1024 * 1024)).toFixed(1);
-  if (file.size > MAX_FILE_MB * 1024 * 1024) {
-    info.innerHTML = `<span style="color:var(--red)">${mb}MB — supera el máximo de ${MAX_FILE_MB}MB, elegí un archivo más liviano</span>`;
-  } else {
-    info.innerHTML = `<span style="color:var(--green)">${mb}MB — perfecto, entra sin problema</span>`;
+function refreshFileSizeUI() {
+  const info = document.getElementById("fileSizeInfo");
+  document.getElementById("trimActionsWrap")?.remove();
+  if (!info) return;
+
+  const effectiveFile = trimmedFile || rawSelectedFile;
+  if (!effectiveFile) { info.textContent = ""; return; }
+
+  const mb = (effectiveFile.size / (1024 * 1024)).toFixed(1);
+  const overLimit = effectiveFile.size > MAX_FILE_MB * 1024 * 1024;
+
+  info.innerHTML = trimmedFile
+    ? `<span style="color:${overLimit ? "var(--red)" : "var(--green)"}">✂️ Recortado: ${mb}MB${overLimit ? ` — todavía supera los ${MAX_FILE_MB}MB, recortá un poco más` : " — perfecto"}</span>`
+    : (overLimit
+        ? `<span style="color:var(--red)">${mb}MB — supera el máximo de ${MAX_FILE_MB}MB</span>`
+        : `<span style="color:var(--green)">${mb}MB — perfecto, entra sin problema</span>`);
+
+  const actionsWrap = document.createElement("div");
+  actionsWrap.id = "trimActionsWrap";
+  actionsWrap.style.cssText = "margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;";
+  actionsWrap.innerHTML = `
+    <button type="button" class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="openVideoTrimmer()">✂️ ${trimmedFile ? "Recortar de nuevo" : "Recortar este video"}</button>
+    ${trimmedFile ? `<button type="button" class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="discardTrim()">Usar el original</button>` : ""}`;
+  info.insertAdjacentElement("afterend", actionsWrap);
+}
+
+function discardTrim() {
+  trimmedFile = null;
+  refreshFileSizeUI();
+}
+
+function formatTrimSeconds(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function openVideoTrimmer() {
+  if (!rawSelectedFile) return;
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Tu navegador no permite recortar acá. Probá con Chrome o Firefox actualizados.");
+    return;
   }
+
+  const wrap = document.getElementById("globalModalWrap");
+  const objectUrl = URL.createObjectURL(rawSelectedFile);
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:140;">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-box-header"><h2>✂️ Recortar video</h2></div>
+        <div class="modal-box-body">
+          <video id="trimPreviewVideo" src="${objectUrl}" controls muted style="width:100%; border-radius:10px; margin-bottom:14px; background:#000;"></video>
+          <div id="trimLoadingMsg" style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Cargando video...</div>
+          <div id="trimControls" class="hidden">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-bottom:4px;">
+              <span>Inicio: <span id="trimStartLabel" class="mono">0:00</span></span>
+              <span>Fin: <span id="trimEndLabel" class="mono">0:00</span></span>
+            </div>
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde empieza:</label>
+            <input type="range" id="trimStartRange" min="0" max="1" step="0.1" value="0" style="width:100%;">
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde termina:</label>
+            <input type="range" id="trimEndRange" min="0" max="1" step="0.1" value="1" style="width:100%;">
+            <div style="font-size:12px; color:var(--text-dim); margin-top:8px;">Duración elegida: <strong id="trimDurationLabel" class="mono" style="color:var(--gold);">0s</strong></div>
+          </div>
+          <div id="trimProgressWrap" class="hidden" style="margin-top:14px;">
+            <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden;">
+              <div id="trimProgressBar" style="width:0%; height:100%; background:var(--gold); transition:width 0.15s;"></div>
+            </div>
+            <div style="font-size:12px; color:var(--text-dim); margin-top:6px; text-align:center;">Procesando, no cierres esta ventana...</div>
+          </div>
+        </div>
+        <div class="modal-box-footer">
+          <div style="display:flex; gap:10px;">
+            <button class="btn-outline" style="flex:1;" onclick="closeVideoTrimmer()">Cancelar</button>
+            <button class="btn" id="trimConfirmBtn" style="flex:1;" onclick="confirmVideoTrim()" disabled>Recortar y usar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const video = document.getElementById("trimPreviewVideo");
+  video.addEventListener("loadedmetadata", () => {
+    const dur = video.duration;
+    document.getElementById("trimLoadingMsg").classList.add("hidden");
+    document.getElementById("trimControls").classList.remove("hidden");
+    document.getElementById("trimConfirmBtn").disabled = false;
+
+    const startRange = document.getElementById("trimStartRange");
+    const endRange = document.getElementById("trimEndRange");
+    startRange.max = dur; endRange.max = dur;
+    startRange.value = 0; endRange.value = dur;
+    updateTrimLabels();
+
+    startRange.addEventListener("input", () => {
+      if (parseFloat(startRange.value) >= parseFloat(endRange.value)) startRange.value = Math.max(0, parseFloat(endRange.value) - 1);
+      video.currentTime = parseFloat(startRange.value);
+      updateTrimLabels();
+    });
+    endRange.addEventListener("input", () => {
+      if (parseFloat(endRange.value) <= parseFloat(startRange.value)) endRange.value = Math.min(dur, parseFloat(startRange.value) + 1);
+      video.currentTime = parseFloat(endRange.value);
+      updateTrimLabels();
+    });
+  });
+}
+
+function updateTrimLabels() {
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  if (!startRange || !endRange) return;
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+  document.getElementById("trimStartLabel").textContent = formatTrimSeconds(start);
+  document.getElementById("trimEndLabel").textContent = formatTrimSeconds(end);
+  document.getElementById("trimDurationLabel").textContent = formatTrimSeconds(end - start);
+}
+
+function closeVideoTrimmer() {
+  document.getElementById("globalModalWrap").innerHTML = "";
+}
+
+async function confirmVideoTrim() {
+  const video = document.getElementById("trimPreviewVideo");
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+
+  if (end - start < 1) { showToast("Elegí al menos 1 segundo de duración"); return; }
+
+  document.getElementById("trimControls").classList.add("hidden");
+  document.getElementById("trimProgressWrap").classList.remove("hidden");
+  document.getElementById("trimConfirmBtn").disabled = true;
+  document.getElementById("trimConfirmBtn").textContent = "Procesando...";
+
+  try {
+    const result = await trimVideoClientSide(video, start, end, (pct) => {
+      const bar = document.getElementById("trimProgressBar");
+      if (bar) bar.style.width = `${Math.round(pct * 100)}%`;
+    });
+
+    const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
+    const baseName = rawSelectedFile.name.replace(/\.[^.]+$/, "");
+    trimmedFile = new File([result.blob], `${baseName}-recorte.${ext}`, { type: result.mimeType });
+
+    closeVideoTrimmer();
+    refreshFileSizeUI();
+    showToast("¡Video recortado!");
+  } catch (e) {
+    showToast("No se pudo recortar. Probá con otro navegador o un archivo distinto.");
+    closeVideoTrimmer();
+  }
+}
+
+function trimVideoClientSide(video, startSec, endSec, onProgress) {
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+      const mimeCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+      const mimeType = mimeCandidates.find(m => window.MediaRecorder.isTypeSupported(m)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onerror = (e) => reject(e.error || new Error("Error al grabar"));
+      recorder.onstop = () => {
+        resolve({ blob: new Blob(chunks, { type: mimeType || "video/webm" }), mimeType: mimeType || "video/webm" });
+      };
+
+      video.currentTime = startSec;
+      video.onseeked = () => {
+        video.onseeked = null;
+        recorder.start();
+        video.play();
+
+        const step = () => {
+          if (video.currentTime >= endSec || video.ended) {
+            video.pause();
+            recorder.stop();
+            return;
+          }
+          if (onProgress) onProgress(Math.min(1, (video.currentTime - startSec) / (endSec - startSec)));
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 async function setUploadMode(mode) {
   window.currentUploadMode = mode;
+  rawSelectedFile = null;
+  trimmedFile = null;
   document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
   document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
   document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
@@ -1194,14 +1383,13 @@ async function handleUploadLink() {
 
 async function handleUploadFile() {
   const title = document.getElementById("uploadTitle").value.trim();
-  const fileInput = document.getElementById("uploadFile");
-  const file = fileInput.files[0];
+  const file = trimmedFile || rawSelectedFile;
   const errEl = document.getElementById("uploadError");
   const btn = document.getElementById("uploadSubmitBtn");
   errEl.textContent = "";
 
   if (!title || !file) { errEl.textContent = "Completá el título y elegí un archivo."; return; }
-  if (file.size > MAX_FILE_MB * 1024 * 1024) { errEl.textContent = `El archivo supera los ${MAX_FILE_MB}MB permitidos.`; return; }
+  if (file.size > MAX_FILE_MB * 1024 * 1024) { errEl.textContent = `El archivo supera los ${MAX_FILE_MB}MB permitidos. Probá recortarlo un poco más.`; return; }
 
   btn.disabled = true;
   btn.textContent = "Subiendo...";

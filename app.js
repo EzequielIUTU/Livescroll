@@ -2272,11 +2272,12 @@ async function viewPublicProfile(username) {
 
   const videoIds = (videos || []).map(v => v.id);
 
-  const [{ data: sessions }, { data: likes }, { data: followers }, { data: amIFollowing }] = await Promise.all([
+  const [{ data: sessions }, { data: likes }, { data: followers }, { data: amIFollowing }, { data: theirBadges }] = await Promise.all([
     videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
     videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : { data: [] },
     sb.from("follows").select("follower_id").eq("followed_id", profile.id),
-    sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle()
+    sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle(),
+    sb.from("user_badges").select("*").eq("user_id", profile.id).order("earned_at", { ascending: false })
   ]);
 
   const viewsByVideo = {};
@@ -2311,6 +2312,20 @@ async function viewPublicProfile(username) {
         <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
       </div>
     </div>
+
+    ${theirBadges && theirBadges.length ? `
+      <div class="profile-section">
+        <div class="profile-section-head">
+          <div class="ico">🏅</div>
+          <h3>Medallas</h3>
+          <div class="sub">${theirBadges.length}</div>
+        </div>
+        <div class="form-card">
+          <div class="streak-badges">
+            ${theirBadges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
+          </div>
+        </div>
+      </div>` : ""}
 
     <div class="profile-section">
       <div class="profile-section-head">
@@ -2467,14 +2482,14 @@ async function openEditProfile() {
           </div>
           <input type="file" id="avatarPhotoInput" accept="image/*" onchange="handleAvatarPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
           <div id="avatarUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 3MB. Si subís una foto, tapa al emoji.</div>
-          ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:8px; padding:4px 10px; font-size:12px;" onclick="handleRemoveAvatarPhoto()">Quitar foto y volver al emoji</button>` : ""}
+          ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveAvatarPhoto()">🗑️ Quitar foto y volver al emoji</button>` : ""}
         </div>
         <div class="field">
           <label>Portada del perfil</label>
           <div style="border-radius:10px; overflow:hidden; height:70px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
           <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
           <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Se ve mejor en formato horizontal (ancha).</div>
-          ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:8px; padding:4px 10px; font-size:12px;" onclick="handleRemoveCoverPhoto()">Quitar portada</button>` : ""}
+          ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
         </div>
         <div class="field">
           <label>Avatar (si no tenés foto)</label>
@@ -2505,8 +2520,9 @@ async function openEditProfile() {
           <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
         </div>
         </div>
-        <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
+        <div class="modal-box-footer" style="display:flex; gap:10px;">
+          <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="saveProfileEdits()">Guardar</button>
         </div>
       </div>
     </div>`;

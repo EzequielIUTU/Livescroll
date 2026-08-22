@@ -993,6 +993,27 @@ function getEmbedHtml(video) {
   </div>`;
 }
 
+function getGridCoverHtml(video) {
+  const thumb = getThumbnailHtml(video);
+  if (thumb.startsWith("<img")) {
+    return thumb.replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;" `);
+  }
+  return `<div class="grid-fallback">${thumb}</div>`;
+}
+
+function toggleVideoTileMenu(videoId) {
+  document.querySelectorAll(".video-grid-menu").forEach(el => {
+    if (el.id !== `menu-${videoId}`) el.classList.add("hidden");
+  });
+  document.getElementById(`menu-${videoId}`)?.classList.toggle("hidden");
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".grid-menu-btn") && !e.target.closest(".video-grid-menu")) {
+    document.querySelectorAll(".video-grid-menu").forEach(el => el.classList.add("hidden"));
+  }
+});
+
 function getThumbnailHtml(video) {
   if (video.platform === "youtube") {
     const id = extractYoutubeId(video.video_url);
@@ -1777,31 +1798,31 @@ async function renderProfile() {
         <h3>Mis videos</h3>
         <div class="sub">${videos.length} en total${canPin ? ` · 📌 ${pinsUsed}/${myPlan.max_pinned_videos} anclados` : ""}</div>
       </div>
-      <div id="myVideosList">
-        ${videos.length ? videos.map(v => `
-          <div class="video-card with-thumb">
-            <div class="video-thumb">${getThumbnailHtml(v)}</div>
-            <div class="card-body">
-              <div class="meta">
-                <div>
-                  <div class="title">${escapeHtml(v.title)}</div>
-                  <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
+      ${videos.length ? `
+        <div class="video-grid">
+          ${videos.map(v => `
+            <div class="video-grid-tile" id="tile-${v.id}">
+              ${getGridCoverHtml(v)}
+              ${pinnedIds.has(v.id) ? `<div class="pinned-badge">📌</div>` : ""}
+              <button class="grid-menu-btn" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
+              <div class="grid-overlay" onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">
+                <div class="grid-stats">
+                  <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
+                  <span>❤️ ${likesByVideo[v.id] || 0}</span>
                 </div>
-                <div class="platform">${v.platform}</div>
               </div>
-              <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
-              ${canPin ? `
-                <div style="margin-top:8px;">
-                  ${pinnedIds.has(v.id)
-                    ? `<span style="font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</span>`
-                    : `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`}
-                </div>` : ""}
-              <div style="margin-top:8px;">
-                <button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red); border-color:var(--red);" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
+              <div class="video-grid-menu hidden" id="menu-${v.id}">
+                <div style="padding:6px 10px 4px; font-size:11px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(v.title)}</div>
+                ${canPin ? (pinnedIds.has(v.id)
+                    ? `<div style="padding:8px 10px; font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</div>`
+                    : `<button ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`) : ""}
+                <button onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">🔗 Abrir link</button>
+                <button class="danger" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
               </div>
             </div>
-          </div>
-        `).join("") : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
+          `).join("")}
+        </div>
+      ` : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
       </div>
     </div>`;
 
@@ -2199,23 +2220,21 @@ async function viewPublicProfile(username) {
         <h3>Videos</h3>
         <div class="sub">${videos?.length || 0} en total</div>
       </div>
-      <div id="publicVideosList">
-        ${videos && videos.length ? videos.map(v => `
-          <div class="video-card with-thumb">
-            <div class="video-thumb">${getThumbnailHtml(v)}</div>
-            <div class="card-body">
-              <div class="meta">
-                <div>
-                  <div class="title">${escapeHtml(v.title)}</div>
-                  <div style="color:var(--text-dim); font-size:12px;">${new Date(v.created_at).toLocaleDateString("es-AR")} · 👁 ${(viewsByVideo[v.id]?.size || 0)} vistas · ❤️ ${likesByVideo[v.id] || 0}</div>
+      ${videos && videos.length ? `
+        <div class="video-grid">
+          ${videos.map(v => `
+            <div class="video-grid-tile" onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">
+              ${getGridCoverHtml(v)}
+              <div class="grid-overlay">
+                <div class="grid-stats">
+                  <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
+                  <span>❤️ ${likesByVideo[v.id] || 0}</span>
                 </div>
-                <div class="platform">${v.platform}</div>
               </div>
-              <a href="${escapeHtml(v.video_url)}" target="_blank" rel="noopener" style="font-size:13px; color:var(--gold);">${escapeHtml(v.video_url)}</a>
             </div>
-          </div>
-        `).join("") : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
-      </div>
+          `).join("")}
+        </div>
+      ` : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
     </div>`;
 }
 

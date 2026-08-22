@@ -654,6 +654,45 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 .user-directory-row .info .uname { font-weight: 600; font-size: 14px; }
 .user-directory-row .avatar-sm.avatar-live-ring::after { display: none; }
 
+/* ---------- GRILLA DE VIDEOS (estilo Instagram) ---------- */
+.video-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
+}
+.video-grid-tile {
+  position: relative; aspect-ratio: 1; overflow: hidden; border-radius: 4px;
+  background: var(--panel-2); cursor: pointer;
+}
+.video-grid-tile .grid-fallback {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: 32px; background: linear-gradient(160deg, var(--panel-2), #0d0f12);
+}
+.video-grid-tile .grid-overlay {
+  position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.75), transparent 45%);
+  opacity: 0; transition: opacity 0.15s ease;
+  display: flex; flex-direction: column; justify-content: flex-end; padding: 6px;
+}
+.video-grid-tile:hover .grid-overlay { opacity: 1; }
+.video-grid-tile .grid-stats { color: #fff; font-size: 10px; display: flex; gap: 8px; }
+.video-grid-tile .grid-menu-btn {
+  position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.55); border: none;
+  color: #fff; width: 22px; height: 22px; border-radius: 50%; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; z-index: 2;
+}
+.video-grid-tile .pinned-badge {
+  position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,0.6); color: var(--green);
+  font-size: 12px; padding: 2px 5px; border-radius: 4px; z-index: 2;
+}
+.video-grid-menu {
+  position: absolute; top: 28px; right: 4px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px; z-index: 5; min-width: 140px; box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+.video-grid-menu button {
+  display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text);
+  padding: 8px 10px; font-size: 12px; cursor: pointer; border-radius: 6px; font-family: inherit;
+}
+.video-grid-menu button:hover { background: var(--panel-2); }
+.video-grid-menu button.danger { color: var(--red); }
+
 /* ---------- EN VIVO (aura roja) ---------- */
 @keyframes liveAura {
   0% { box-shadow: 0 0 0 0 rgba(248,113,113,0.55); }

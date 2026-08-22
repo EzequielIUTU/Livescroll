@@ -97,6 +97,10 @@ nav {
 }
 .nav-links button.active { color: var(--gold); background: var(--panel-2); }
 
+#navRight {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+
 .nav-balance {
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
   background: var(--panel-2); border: 1px solid var(--gold-dim);
@@ -104,7 +108,7 @@ nav {
 }
 
 .nav-plan-chip {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
   background: var(--panel-2); border: 1px solid var(--gold-dim);
   border-radius: 20px; padding: 5px 6px 5px 14px;
 }
@@ -115,7 +119,13 @@ nav {
 .nav-plan-chip .pts {
   font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums;
   color: var(--gold); font-size: 13px; padding: 4px 10px;
-  background: var(--ink); border-radius: 16px;
+  background: var(--ink); border-radius: 16px; white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  .nav-plan-chip .plan-name { display: none; }
+  .nav-plan-chip { padding: 5px 6px 5px 10px; gap: 4px; }
+  .nav-brand { font-size: 17px; }
 }
 
 .nav-hamburger {
@@ -414,8 +424,9 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 .feed-overlay .live-pts { color: var(--green); font-family: 'JetBrains Mono', monospace; font-size: 13px; white-space: nowrap; }
 
 .feed-nudge {
-  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
   font-size: 11px; color: rgba(255,255,255,0.5); text-align: center;
+  background: rgba(0,0,0,0.35); padding: 3px 10px; border-radius: 20px;
 }
 
 .feed-fallback {

@@ -473,17 +473,21 @@ async function handleAcceptTutorial() {
 function showTermsUpdateModal() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:130; display:flex; align-items:center; justify-content:center; padding:20px;">
-      <div class="auth-box" style="margin:0;">
-        <h2>📋 Actualizamos los Términos</h2>
+    <div class="modal-overlay" style="z-index:130;">
+      <div class="modal-box">
+        <div class="modal-box-header"><h2>📋 Actualizamos los Términos</h2></div>
+        <div class="modal-box-body">
         <p style="color:var(--text-dim); font-size:13px;">Cambiamos nuestros Términos y Condiciones. Por favor, revisalos antes de seguir usando LiveScroll.</p>
         <a href="terminos.html" target="_blank" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
         <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
           <input type="checkbox" id="acceptNewTerms" style="margin-top:3px;">
           <label for="acceptNewTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">Leí y acepto los Términos y Condiciones actualizados.</label>
         </div>
-        <button class="btn" style="width:100%;" onclick="handleAcceptNewTerms()">Continuar</button>
         <div id="acceptTermsError" class="error-msg"></div>
+        </div>
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="handleAcceptNewTerms()">Continuar</button>
+        </div>
       </div>
     </div>`;
 }
@@ -991,6 +995,58 @@ function getEmbedHtml(video) {
     <p>Este video se ve mejor en ${escapeHtml(video.platform)}</p>
     <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir y mirar ahí</a>
   </div>`;
+}
+
+async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
+  const { data: myLikes } = await sb
+    .from("video_likes")
+    .select("video_id")
+    .eq("user_id", currentUser.id)
+    .in("video_id", videos.map(v => v.id));
+  const likedSet = new Set((myLikes || []).map(l => l.video_id));
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div id="profileFeedOverlay" style="position:fixed; inset:0; background:var(--ink); z-index:150;">
+      <button onclick="closeProfileVideoFeed()" style="position:absolute; top:max(14px, env(safe-area-inset-top)); right:14px; z-index:20; background:rgba(0,0,0,0.55); border:none; color:#fff; width:36px; height:36px; border-radius:50%; font-size:18px; cursor:pointer;">✕</button>
+      <div class="feed-vertical" id="profileFeedVertical" style="height:100dvh; margin:0;">
+        ${videos.map((v) => {
+          const isMine = v.user_id === currentUser.id;
+          return `
+          <div class="feed-item" data-video-id="${v.id}">
+            <div class="feed-phone">
+              <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
+              ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
+              <div class="feed-actions">
+                <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
+                <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
+                <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+                ${!isMine ? `<button class="feed-action-btn" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
+              </div>
+              <div class="feed-overlay">
+                <div>
+                  <div class="title">${escapeHtml(v.title)}</div>
+                  <div class="author">@${escapeHtml(authorInfo.username)} ${getPlanBadgeHtml(authorInfo.plan_id)} · ${v.platform}</div>
+                </div>
+                <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+
+  setupFeedObserver(videos);
+  setupDoubleTapLike();
+
+  const container = document.getElementById("profileFeedVertical");
+  const startEl = document.querySelector(`#profileFeedVertical [data-video-id="${startVideoId}"]`);
+  if (container && startEl) container.scrollTop = startEl.offsetTop;
+}
+
+function closeProfileVideoFeed() {
+  clearAllWatchIntervals();
+  document.getElementById("globalModalWrap").innerHTML = "";
 }
 
 function getGridCoverHtml(video) {
@@ -1791,6 +1847,9 @@ async function renderProfile() {
       </div>
     </div>`;
 
+  window.__profileFeedVideos = videos;
+  window.__profileFeedAuthor = { username: currentProfile.username, plan_id: currentProfile.plan_id };
+
   const videosSectionHtml = `
     <div class="profile-section">
       <div class="profile-section-head">
@@ -1805,7 +1864,7 @@ async function renderProfile() {
               ${getGridCoverHtml(v)}
               ${pinnedIds.has(v.id) ? `<div class="pinned-badge">📌</div>` : ""}
               <button class="grid-menu-btn" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
-              <div class="grid-overlay" onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">
+              <div class="grid-overlay" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
                 <div class="grid-stats">
                   <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
                   <span>❤️ ${likesByVideo[v.id] || 0}</span>
@@ -2220,10 +2279,13 @@ async function viewPublicProfile(username) {
         <h3>Videos</h3>
         <div class="sub">${videos?.length || 0} en total</div>
       </div>
-      ${videos && videos.length ? `
+      ${videos && videos.length ? (() => {
+        window.__profileFeedVideos = videos;
+        window.__profileFeedAuthor = { username: profile.username, plan_id: profile.plan_id };
+        return `
         <div class="video-grid">
           ${videos.map(v => `
-            <div class="video-grid-tile" onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">
+            <div class="video-grid-tile" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
               ${getGridCoverHtml(v)}
               <div class="grid-overlay">
                 <div class="grid-stats">
@@ -2234,7 +2296,8 @@ async function viewPublicProfile(username) {
             </div>
           `).join("")}
         </div>
-      ` : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
+      `;
+      })() : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
     </div>`;
 }
 
@@ -2352,9 +2415,10 @@ async function openEditProfile() {
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
-      <div style="background:var(--panel); width:100%; max-width:360px; border-radius:16px; padding:22px;">
-        <h3 style="margin-top:0;">Editar perfil</h3>
+    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) this.remove()">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-header"><h2 style="font-size:19px;">Editar perfil</h2></div>
+        <div class="modal-box-body">
         <div class="field" style="text-align:center;">
           <label>Foto de perfil</label>
           <div style="margin-bottom:10px;">
@@ -2397,10 +2461,13 @@ async function openEditProfile() {
             <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
           </div>
         </div>
-        <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
         <div id="editProfileError" class="error-msg"></div>
         <div style="border-top:1px solid var(--border); margin-top:16px; padding-top:16px;">
           <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
+        </div>
+        </div>
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="saveProfileEdits()">Guardar</button>
         </div>
       </div>
     </div>`;
@@ -2853,13 +2920,17 @@ async function handleRejectSubscription(id) {
 async function openEmojiPicker(targetInputId, list) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:140; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
-      <div class="auth-box" style="margin:0; max-width:360px;">
-        <h2 style="font-size:16px;">Elegí uno</h2>
-        <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px; max-height:300px; overflow-y:auto;">
-          ${list.map(e => `<button onclick="pickEmoji('${targetInputId}','${e}')" style="font-size:22px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer;">${e}</button>`).join("")}
+    <div class="modal-overlay" style="z-index:140;" onclick="if(event.target===this) this.remove()">
+      <div class="modal-box" style="max-width:360px;">
+        <div class="modal-box-header"><h2 style="font-size:16px;">Elegí uno</h2></div>
+        <div class="modal-box-body">
+          <div style="display:grid; grid-template-columns:repeat(6,1fr); gap:8px;">
+            ${list.map(e => `<button onclick="pickEmoji('${targetInputId}','${e}')" style="font-size:22px; background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer;">${e}</button>`).join("")}
+          </div>
         </div>
-        <button class="btn-outline" style="width:100%; margin-top:14px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        <div class="modal-box-footer">
+          <button class="btn-outline" style="width:100%;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        </div>
       </div>
     </div>`;
 }

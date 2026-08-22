@@ -610,6 +610,87 @@ async function handleAcceptChangelog() {
   }
 }
 
+async function checkAndShowLoginStreak() {
+  const { data } = await sb.rpc("get_login_streak_status", { p_user_id: currentUser.id });
+  const banner = document.getElementById("loginStreakBannerWrap");
+  if (!data || !data.ok || !data.rewards || !data.rewards.length) { if (banner) banner.innerHTML = ""; return; }
+
+  window.__loginStreakData = data;
+  const claimableDay = data.current_day >= 7 ? 1 : data.current_day + 1;
+
+  if (banner) {
+    banner.innerHTML = data.claimed_today ? "" : `
+      <div class="form-card" style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; border-color:var(--gold-dim);" onclick="showLoginStreakModal()">
+        <div><strong>🔥 Inicio de Sesión</strong><div style="font-size:12px; color:var(--text-dim);">Día ${claimableDay} de 7 · tocá para reclamar</div></div>
+        <div class="btn" style="pointer-events:none; padding:6px 14px; font-size:13px;">Ver</div>
+      </div>`;
+  }
+
+  if (!data.claimed_today && !window.__loginStreakShownThisSession) {
+    window.__loginStreakShownThisSession = true;
+    showLoginStreakModal();
+  }
+}
+
+function showLoginStreakModal() {
+  const data = window.__loginStreakData;
+  if (!data) return;
+  const claimedToday = data.claimed_today;
+  const currentDay = data.current_day || 0;
+  const claimableDay = claimedToday ? null : (currentDay >= 7 ? 1 : currentDay + 1);
+  const rewards = data.rewards || [];
+  const days1to6 = rewards.filter(r => r.day_number !== 7);
+  const day7 = rewards.find(r => r.day_number === 7);
+
+  const isDayDone = (dayNum) => claimedToday ? dayNum <= currentDay : dayNum < claimableDay;
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:125;">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-header">
+          <h2>📅 Inicio de Sesión</h2>
+          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-box-body">
+          <p style="color:var(--text-dim); font-size:12px; margin-top:0;">Entrá todos los días que puedas — si faltás uno, no se rompe nada, seguís de donde quedaste.</p>
+          <div class="login-streak-grid">
+            ${days1to6.map(r => `
+              <div class="login-streak-day ${isDayDone(r.day_number) ? "done" : ""} ${r.day_number === claimableDay ? "claimable" : ""}">
+                <div class="d">Día ${r.day_number}</div>
+                <div class="ic">${r.emoji_reward || r.badge_icon || "⭐"}</div>
+                <div class="p">+${r.points}</div>
+              </div>`).join("")}
+          </div>
+          ${day7 ? `
+            <div class="login-streak-bigday ${isDayDone(7) ? "done" : ""}">
+              <div class="tag">GRAN PREMIO · DÍA 7</div>
+              <div class="ic">${day7.emoji_reward || day7.badge_icon || "🎁"}</div>
+              <div class="p">+${day7.points} pts${day7.badge_name ? ` · 🏅 ${escapeHtml(day7.badge_name)}` : ""}</div>
+            </div>` : ""}
+        </div>
+        <div class="modal-box-footer">
+          ${claimedToday
+            ? `<button class="btn-outline" style="width:100%;" disabled>Ya reclamaste hoy ✓</button>`
+            : `<button class="btn" style="width:100%;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function handleClaimLoginStreak() {
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
+
+  currentProfile.points_balance += data.points;
+  currentProfile.streak_current_day = data.day;
+  updateBalanceUI();
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showStreakModal(data);
+  const banner = document.getElementById("loginStreakBannerWrap");
+  if (banner) banner.innerHTML = "";
+}
+
 async function handleClaimStreak() {
   const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
   if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
@@ -760,7 +841,9 @@ function showToast(msg) {
 async function renderFeed() {
   const main = document.getElementById("appView");
   main.innerHTML = `
+    <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
     <div id="feedList">Cargando videos...</div>`;
+  checkAndShowLoginStreak();
 
   const { data: videos, error } = await sb
     .from("videos")
@@ -1749,11 +1832,6 @@ async function renderProfile() {
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const { data: allWeeks } = await sb.from("streak_rewards").select("*").lte("week_start", today).order("week_start", { ascending: false });
-  const currentWeekStart = allWeeks && allWeeks.length ? allWeeks[0].week_start : null;
-  const currentWeekDays = (allWeeks || []).filter(r => r.week_start === currentWeekStart).sort((a, b) => a.day_number - b.day_number);
-
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
     videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
@@ -1774,58 +1852,19 @@ async function renderProfile() {
   const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
   const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
 
-  const streakSectionHtml = (() => {
-    let daysHtml, progressPct;
-    if (currentWeekDays.length) {
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const claimedToday = currentProfile.streak_last_login_date === todayStr;
-      let claimableDay = null;
-      if (!claimedToday) {
-        const lastLogin = currentProfile.streak_last_login_date;
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        if (lastLogin === yesterday && (currentProfile.streak_current_day || 0) < 7) {
-          claimableDay = (currentProfile.streak_current_day || 0) + 1;
-        } else {
-          claimableDay = 1;
-        }
-      }
-      daysHtml = `
-        <div class="streak-track">
-          ${currentWeekDays.map(d => {
-            const isDone = d.day_number <= (currentProfile.streak_current_day || 0) && (claimedToday || d.day_number !== claimableDay);
-            const isClaimable = d.day_number === claimableDay;
-            return `
-            <div class="streak-day ${isClaimable ? "claimable" : ""} ${isDone ? "done" : ""}">
-              <div class="d">Día ${d.day_number}</div>
-              <div class="ic">${isDone ? "✅" : (d.badge_icon || "⭐")}</div>
-              <div class="p mono">+${d.points}</div>
-              ${isClaimable ? `<button class="btn" style="padding:3px 8px; font-size:10px; width:100%;" onclick="handleClaimStreak()">Reclamar</button>` : ""}
-            </div>`;
-          }).join("")}
-        </div>`;
-    } else {
-      daysHtml = `<p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Todavía no hay premios cargados para esta semana.</p>`;
-    }
-    progressPct = ((currentProfile.streak_current_day || 0) / 7) * 100;
-
-    return `
+  const streakSectionHtml = badges && badges.length ? `
     <div class="profile-section">
       <div class="profile-section-head">
-        <div class="ico">🔥</div>
-        <h3>Racha diaria</h3>
-        <div class="sub">Día ${currentProfile.streak_current_day || 0}/7</div>
+        <div class="ico">🏅</div>
+        <h3>Medallas</h3>
+        <div class="sub"><button onclick="switchTab('feed')" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver Inicio de Sesión →</button></div>
       </div>
       <div class="form-card">
-        ${daysHtml}
-        <div class="streak-progress-track"><div class="streak-progress-fill" style="width:${progressPct}%;"></div></div>
-        ${badges && badges.length ? `
-          <div style="font-size:12px; color:var(--text-dim); margin-bottom:8px;">Tus medallas:</div>
-          <div class="streak-badges">
-            ${badges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
-          </div>` : `<p style="color:var(--text-dim); font-size:12px;">Entrá todos los días para ganar medallas.</p>`}
+        <div class="streak-badges">
+          ${badges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
+        </div>
       </div>
-    </div>`;
-  })();
+    </div>` : "";
 
   const referralSectionHtml = `
     <div class="profile-section">

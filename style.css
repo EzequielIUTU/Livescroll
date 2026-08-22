@@ -370,6 +370,11 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 }
 .feed-vertical::-webkit-scrollbar { display: none; }
 
+.login-streak-banner-float {
+  position: fixed; top: 76px; left: 16px; right: 16px; z-index: 15;
+  max-width: 864px; margin: 0 auto;
+}
+
 .feed-item {
   height: calc(100vh - 64px);
   height: calc(100dvh - 64px);
@@ -703,6 +708,32 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 }
 .video-grid-menu button:hover { background: var(--panel-2); }
 .video-grid-menu button.danger { color: var(--red); }
+
+/* ---------- INICIO DE SESIÓN (calendario de recompensas) ---------- */
+.login-streak-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px;
+}
+.login-streak-day {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 6px; text-align: center; position: relative;
+}
+.login-streak-day .d { font-size: 11px; color: var(--text-dim); margin-bottom: 6px; }
+.login-streak-day .ic { font-size: 24px; margin-bottom: 4px; }
+.login-streak-day .p { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--gold); }
+.login-streak-day.done { border-color: var(--green); opacity: 0.75; }
+.login-streak-day.done::after { content: "✓"; position: absolute; top: 6px; right: 8px; color: var(--green); font-weight: 700; font-size: 13px; }
+.login-streak-day.claimable { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold); background: var(--panel); }
+.login-streak-bigday {
+  background: linear-gradient(135deg, #fde047, #f97316); border-radius: 14px;
+  padding: 16px; text-align: center; color: #1a1200; margin-bottom: 14px; position: relative;
+}
+.login-streak-bigday.done { opacity: 0.6; }
+.login-streak-bigday .tag {
+  display: inline-block; background: rgba(0,0,0,0.2); color: #fff; font-size: 10px;
+  font-weight: 700; padding: 3px 10px; border-radius: 10px; margin-bottom: 8px; letter-spacing: 0.05em;
+}
+.login-streak-bigday .ic { font-size: 32px; }
+.login-streak-bigday .p { font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
 
 /* ---------- EN VIVO (aura roja) ---------- */
 @keyframes liveAura {

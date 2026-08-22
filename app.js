@@ -41,12 +41,14 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const params = new URLSearchParams(window.location.search);
   window.referralCode = params.get("ref");
+  window.sharedVideoId = params.get("video");
 
   const { data: { session } } = await sb.auth.getSession();
   if (session) {
     currentUser = session.user;
     await loadProfile();
     renderApp();
+    if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
   } else {
     renderLanding();
   }
@@ -268,6 +270,7 @@ async function handleLogin() {
   await loadProfile();
   closeAuthModal();
   renderApp();
+  if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
 }
 
 async function handleLogout() {
@@ -295,6 +298,18 @@ function renderLanding() {
   document.getElementById("navLinks").innerHTML = "";
   document.getElementById("navRight").innerHTML = `
     <button class="btn-outline" onclick="showAuth('login')">Iniciar sesión</button>`;
+
+  if (window.sharedVideoId) {
+    const hero = document.querySelector(".hero");
+    if (hero && !document.getElementById("sharedVideoTeaser")) {
+      const teaser = document.createElement("div");
+      teaser.id = "sharedVideoTeaser";
+      teaser.className = "form-card";
+      teaser.style.cssText = "max-width:460px; margin:0 auto 24px; border-color:var(--gold-dim); text-align:center;";
+      teaser.innerHTML = `<p style="margin:0; font-size:14px;">👀 Te compartieron un clip en LiveScroll. <strong style="color:var(--gold);">Creá tu cuenta o iniciá sesión</strong> para verlo.</p>`;
+      hero.insertBefore(teaser, hero.firstChild);
+    }
+  }
 }
 
 async function animateLandingOdometer() {
@@ -1078,6 +1093,17 @@ function getEmbedHtml(video) {
     <p>Este video se ve mejor en ${escapeHtml(video.platform)}</p>
     <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir y mirar ahí</a>
   </div>`;
+}
+
+async function openSharedVideo(videoId) {
+  const { data: video } = await sb
+    .from("videos")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+    .eq("id", videoId)
+    .single();
+  if (!video) return;
+
+  openProfileVideoFeed([video], video.id, { username: video.profiles?.username || "usuario", plan_id: video.profiles?.plan_id });
 }
 
 async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
@@ -1972,12 +1998,12 @@ async function handleLike(videoId) {
 }
 
 async function handleShare(videoId, url) {
-  url = decodeURIComponent(url);
+  const shareUrl = `${window.location.origin}${window.location.pathname}?video=${videoId}`;
   if (navigator.share) {
-    try { await navigator.share({ title: "Mirá este clip", url }); } catch (e) { /* cancelado, seguimos igual */ }
+    try { await navigator.share({ title: "Mirá este clip en LiveScroll", url: shareUrl }); } catch (e) { /* cancelado, seguimos igual */ }
   } else {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(shareUrl);
       showToast("Link copiado para compartir");
     } catch (e) { /* nada */ }
   }
@@ -3649,7 +3675,7 @@ async function renderPlans() {
         <div>Alias: <strong class="mono" id="payAlias" data-real="${escapeHtml(alias)}" data-masked="true">${maskPaymentInfo(alias)}</strong> <button onclick="togglePaymentInfo('payAlias')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button></div>
       </div>
       <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border); font-size:13px;">
-        📧 Mandá el comprobante de la transferencia a <strong class="mono" style="color:var(--gold)" id="payEmail" data-real="ezequielmarcosrodriguez@gmail.com" data-masked="true">${maskEmail("ezequielmarcosrodriguez@gmail.com")}</strong> <button onclick="togglePaymentInfo('payEmail')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button>
+        📧 Mandá el comprobante de la transferencia a <strong class="mono" style="color:var(--gold)" id="payEmail" data-real="livescroll.oficial@gmail.com" data-masked="true">${maskEmail("livescroll.oficial@gmail.com")}</strong> <button onclick="togglePaymentInfo('payEmail')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button>
         <div style="color:var(--text-dim); font-size:12px; margin-top:4px;">Tiempo de respuesta estimado: 5 a 10 minutos, según el tránsito. 🚦</div>
       </div>
     </div>

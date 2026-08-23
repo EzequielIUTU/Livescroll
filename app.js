@@ -5801,7 +5801,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   main.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
       <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
-      <button class="btn" onclick="openObsStreamingSetup()">🎥 Configurar OBS</button>
+      <button class="btn" onclick="window.openObsStreamingSetup && window.openObsStreamingSetup()">🎥 Configurar OBS</button>
     </div>
     <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
     <div id="directosList">Cargando...</div>`;

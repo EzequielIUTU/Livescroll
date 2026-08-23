@@ -3083,6 +3083,42 @@ function ensureModernMobileStyles() {
       text-transform:uppercase;
     }
 
+
+    .ls-limited-urgency {
+      position:relative;
+      z-index:1;
+      margin-top:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      font-weight:900;
+      letter-spacing:.06em;
+      border:1px solid rgba(251,146,60,.28);
+      background:rgba(251,146,60,.06);
+      color:#fdba74;
+      animation:lsLimitedUrgency 1.8s ease-in-out infinite;
+    }
+
+    .ls-limited-last {
+      border-color:rgba(248,113,113,.34);
+      background:rgba(248,113,113,.07);
+      color:#fca5a5;
+      animation:lsLimitedUrgency .95s ease-in-out infinite;
+    }
+
+    @keyframes lsLimitedUrgency {
+      0%,100% { transform:scale(1); opacity:.86; }
+      50% { transform:scale(1.035); opacity:1; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-limited-urgency,
+      .ls-limited-last {
+        animation:none !important;
+      }
+    }
+
     .ls-store-badge-desc {
       position:relative;
       z-index:1;
@@ -7060,6 +7096,19 @@ async function handleSaveStorePrices() {
 }
 
 
+function getLimitedStockStatus(badge) {
+  if (!badge?.is_limited) return "";
+
+  const total = Math.max(0, Number(badge.stock_total || 0));
+  const sold = Math.max(0, Number(badge.stock_sold || 0));
+  const left = Math.max(0, total - sold);
+
+  if (left === 0) return "soldout";
+  if (left === 1) return "last";
+  if (left <= 5) return "low";
+  return "";
+}
+
 function getStoreBadgeRarityLabel(rarity) {
   return ({
     comun:"Común",
@@ -7645,7 +7694,12 @@ async function renderStore() {
           ${b.is_limited ? `
             <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:900;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(250,204,21,.22);background:rgba(250,204,21,.05);padding:3px 7px;border-radius:999px;">
               LIMITED · ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}/${b.stock_total}
-            </div>` : ""}
+            </div>
+            ${getLimitedStockStatus(b) === "last"
+              ? `<div class="ls-limited-urgency ls-limited-last">⚠ ÚLTIMA UNIDAD</div>`
+              : getLimitedStockStatus(b) === "low"
+                ? `<div class="ls-limited-urgency">🔥 ÚLTIMAS ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}</div>`
+                : ""}` : ""}
           <div class="ls-store-badge-desc">${escapeHtml(b.description || "Medalla exclusiva de LiveScroll.")}</div>
           ${myBadgeSet.has(b.badge_name)
             ? `<div style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</div>`

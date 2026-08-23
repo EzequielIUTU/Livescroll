@@ -28,6 +28,107 @@ let currentProfile = null;
 let currentTab = "feed";
 let watchIntervals = {}; // video_id -> intervalId
 let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
+
+const LIVESCROLL_CODE_VERSION = "5.3.5";
+let liveScrollReleaseTimer = null;
+let liveScrollPreviewEnabled = false;
+
+function compareLiveScrollVersions(a, b) {
+  const pa = String(a || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
+  const pb = String(b || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const av = pa[i] || 0, bv = pb[i] || 0;
+    if (av > bv) return 1;
+    if (av < bv) return -1;
+  }
+  return 0;
+}
+
+async function getLiveScrollReleaseConfig() {
+  const { data, error } = await sb.from("app_config")
+    .select("key,value")
+    .in("key", ["stable_version","preview_version","release_message"]);
+  if (error) return null;
+  const map = {};
+  (data || []).forEach(r => { map[r.key] = r.value; });
+  return map;
+}
+
+async function checkLiveScrollRelease() {
+  if (!currentUser) return;
+  const cfg = await getLiveScrollReleaseConfig();
+  if (!cfg?.stable_version) return;
+  const dismissed = sessionStorage.getItem("ls_update_dismissed_version");
+  if (compareLiveScrollVersions(cfg.stable_version, LIVESCROLL_CODE_VERSION) > 0 && dismissed !== cfg.stable_version) {
+    showLiveScrollUpdatePrompt(cfg.stable_version, cfg.release_message || "");
+  }
+}
+
+function startLiveScrollReleaseWatcher() {
+  if (liveScrollReleaseTimer) clearInterval(liveScrollReleaseTimer);
+  checkLiveScrollRelease();
+  liveScrollReleaseTimer = setInterval(checkLiveScrollRelease, 12000);
+}
+
+function stopLiveScrollReleaseWatcher() {
+  if (liveScrollReleaseTimer) clearInterval(liveScrollReleaseTimer);
+  liveScrollReleaseTimer = null;
+}
+
+function showLiveScrollUpdatePrompt(version, message) {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap || document.getElementById("lsUpdatePrompt")) return;
+  wrap.innerHTML = `
+    <div class="modal-overlay" id="lsUpdatePrompt" style="z-index:500;">
+      <div class="modal-box" style="max-width:390px;">
+        <div class="modal-box-body" style="text-align:center;padding:24px;">
+          <div style="font-size:42px;margin-bottom:8px;">✨</div>
+          <h2 style="margin:0 0 8px;">Nueva actualización</h2>
+          <div class="mono" style="color:var(--green);font-size:12px;margin-bottom:12px;">LiveScroll v${escapeHtml(version)}</div>
+          <p style="color:var(--text-dim);font-size:13px;line-height:1.5;">${message ? escapeHtml(message) : "Hay nuevos detalles, mejoras y correcciones disponibles."}</p>
+          <div style="display:flex;gap:10px;margin-top:18px;">
+            <button class="btn-outline" style="flex:1;" onclick="declineLiveScrollUpdate('${escapeHtml(version)}')">Ahora no</button>
+            <button class="btn" style="flex:1;" onclick="acceptLiveScrollUpdate()">Actualizar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function declineLiveScrollUpdate(version) {
+  sessionStorage.setItem("ls_update_dismissed_version", version);
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:500;">
+      <div class="modal-box" style="max-width:390px;">
+        <div class="modal-box-body" style="text-align:center;padding:24px;">
+          <div style="font-size:38px;margin-bottom:8px;">⚠️</div>
+          <h2 style="margin:0 0 8px;">Actualización necesaria</h2>
+          <p style="color:var(--text-dim);font-size:13px;line-height:1.5;">Podés posponerla por ahora, pero para continuar con la versión más reciente de LiveScroll vas a necesitar actualizar.</p>
+          <button class="btn" style="width:100%;margin-top:14px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Entendido</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function acceptLiveScrollUpdate() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:500;">
+      <div class="modal-box" style="max-width:390px;">
+        <div class="modal-box-body" style="text-align:center;padding:28px;">
+          <div style="font-size:40px;margin-bottom:10px;">🔄</div>
+          <h2>Aplicando actualización</h2>
+          <p style="color:var(--text-dim);font-size:13px;">LiveScroll se reiniciará para aplicar los nuevos detalles y mejoras.</p>
+        </div>
+      </div>
+    </div>`;
+  sessionStorage.removeItem("ls_update_dismissed_version");
+  setTimeout(() => window.location.reload(), 1300);
+}
+
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
@@ -48,6 +149,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     currentUser = session.user;
     await loadProfile();
     renderApp();
+    startLiveScrollReleaseWatcher();
     if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
   } else {
     renderLanding();
@@ -68,10 +170,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentUser = session.user;
       await loadProfile();
       renderApp();
+      startLiveScrollReleaseWatcher();
     } else if (event === "SIGNED_OUT") {
       currentUser = null;
       currentProfile = null;
       clearAllWatchIntervals();
+      stopLiveScrollReleaseWatcher();
       renderLanding();
     }
   });
@@ -4522,6 +4626,72 @@ async function saveProfileEdits() {
 }
 
 
+
+async function loadVersionLab() {
+  const cfg = await getLiveScrollReleaseConfig();
+  if (!cfg) return;
+  const stable = document.getElementById("lsStableVersion");
+  const preview = document.getElementById("lsPreviewVersion");
+  const msg = document.getElementById("lsReleaseMessage");
+  if (stable) stable.textContent = `v${cfg.stable_version || LIVESCROLL_CODE_VERSION}`;
+  if (preview) preview.value = cfg.preview_version || "";
+  if (msg) msg.value = cfg.release_message || "";
+}
+
+function toggleAdminPreview() {
+  liveScrollPreviewEnabled = !liveScrollPreviewEnabled;
+  document.body.classList.toggle("ls-admin-preview", liveScrollPreviewEnabled);
+  const btn = document.getElementById("lsPreviewToggleBtn");
+  if (btn) btn.textContent = liveScrollPreviewEnabled ? "✓ Modo prueba activo" : "🧪 Probar versión";
+  showToast(liveScrollPreviewEnabled ? "Modo de prueba activado solo para vos" : "Modo de prueba desactivado");
+}
+
+async function savePreviewVersion() {
+  const version = document.getElementById("lsPreviewVersion")?.value.trim().replace(/^v/i, "");
+  const message = document.getElementById("lsReleaseMessage")?.value.trim() || "";
+  if (!version) { showToast("Escribí una versión de prueba"); return; }
+  const { error } = await sb.from("app_config").upsert([
+    { key:"preview_version", value:version },
+    { key:"release_message", value:message }
+  ], { onConflict:"key" });
+  if (error) { showToast("No se pudo guardar la versión de prueba"); return; }
+  showToast(`v${version} guardada como versión de prueba`);
+  loadVersionLab();
+}
+
+async function launchPreviewVersion() {
+  const version = document.getElementById("lsPreviewVersion")?.value.trim().replace(/^v/i, "");
+  if (!version) { showToast("Primero definí la versión de prueba"); return; }
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:600;">
+      <div class="modal-box" style="max-width:410px;">
+        <div class="modal-box-body" style="text-align:center;padding:24px;">
+          <div style="font-size:42px;">🚀</div>
+          <h2>¿Lanzar LiveScroll v${escapeHtml(version)}?</h2>
+          <p style="font-size:13px;color:var(--text-dim);line-height:1.5;">Los usuarios conectados recibirán el aviso de nueva actualización en aproximadamente 12 segundos.</p>
+          <div style="display:flex;gap:10px;margin-top:18px;">
+            <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
+            <button class="btn" style="flex:1;" onclick="confirmLaunchVersion('${escapeHtml(version)}')">🚀 Lanzar</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function confirmLaunchVersion(version) {
+  const message = document.getElementById("lsReleaseMessage")?.value.trim() || "";
+  const { error } = await sb.from("app_config").upsert([
+    { key:"stable_version", value:version },
+    { key:"preview_version", value:version },
+    { key:"release_message", value:message }
+  ], { onConflict:"key" });
+  if (error) { showToast("No se pudo lanzar la versión"); return; }
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast(`🚀 LiveScroll v${version} lanzada`);
+  loadVersionLab();
+}
+
 async function renderAdmin() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando canjes...</p>`;
@@ -4566,6 +4736,23 @@ async function renderAdmin() {
 
   main.innerHTML = `
     <h1 class="page-title">🛠 Panel de Admin</h1>
+
+    <h3 style="margin-top:18px;">🧪 Laboratorio de Versiones</h3>
+    <div class="form-card" style="margin-bottom:22px;">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:14px;">
+        <div><div style="font-size:11px;color:var(--text-dim);">Versión estable</div><div id="lsStableVersion" class="mono" style="font-size:20px;color:var(--green);">Cargando...</div></div>
+        <button class="btn-outline" id="lsPreviewToggleBtn" onclick="toggleAdminPreview()">🧪 Probar versión</button>
+      </div>
+      <label style="font-size:11px;color:var(--text-dim);">Próxima versión</label>
+      <input id="lsPreviewVersion" placeholder="5.3.6" style="width:100%;padding:10px;margin:5px 0 10px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
+      <label style="font-size:11px;color:var(--text-dim);">Mensaje para los usuarios</label>
+      <textarea id="lsReleaseMessage" rows="3" placeholder="Mejoras visuales, rendimiento y nuevas funciones." style="width:100%;padding:10px;margin:5px 0 12px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);resize:vertical;"></textarea>
+      <div style="display:flex;gap:9px;flex-wrap:wrap;">
+        <button class="btn-outline" style="flex:1;min-width:130px;" onclick="savePreviewVersion()">Guardar prueba</button>
+        <button class="btn" style="flex:1;min-width:130px;" onclick="launchPreviewVersion()">🚀 Lanzar versión</button>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);margin-top:10px;">El modo prueba es local a tu sesión de administrador. Lanzar cambia la versión estable para todos.</div>
+    </div>
 
     ${stats && !stats.error ? `
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:24px;">
@@ -4784,6 +4971,7 @@ async function renderAdmin() {
       </div>` : ""}`;
 
   loadStreakWeeksOverview();
+  loadVersionLab();
   loadPlansLockStatus();
   loadWalletLockStatus();
   loadStoreEmojisList();

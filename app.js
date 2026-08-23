@@ -4830,10 +4830,11 @@ function initProfileNovaTilt() {
 async function getEquippedProfileMedals(userId) {
   if (!userId) return [];
 
-  const [{ data, error }, { data: owned }, { data: storeMeta }] = await Promise.all([
+  const [{ data, error }, { data: owned }, { data: storeMeta }, { data: claims }] = await Promise.all([
     sb.rpc("get_equipped_profile_badges", { p_user_id:userId }),
     sb.from("user_badges").select("badge_name,badge_icon,earned_at").eq("user_id", userId),
-    sb.from("store_badges").select("badge_name,rarity,description")
+    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
+    sb.from("user_store_badge_claims").select("badge_id,serial_number").eq("user_id", userId)
   ]);
 
   if (error) {
@@ -4851,17 +4852,27 @@ async function getEquippedProfileMedals(userId) {
     storeByName[String(b.badge_name || "").toLowerCase()] = b;
   });
 
+  const claimByBadgeId = {};
+  (claims || []).forEach(c => {
+    claimByBadgeId[c.badge_id] = c;
+  });
+
   return (data || [])
     .map(m => {
       const key = String(m.badge_name || "").toLowerCase();
       const ownedBadge = ownedByName[key] || {};
       const storeBadge = storeByName[key] || {};
+      const claim = claimByBadgeId[storeBadge.id] || {};
+
       return {
         ...m,
         badge_icon: m.badge_icon || ownedBadge.badge_icon || "🏅",
         earned_at: ownedBadge.earned_at || "",
         rarity: m.rarity || storeBadge.rarity || "",
-        description: storeBadge.description || ""
+        description: storeBadge.description || "",
+        is_limited: !!storeBadge.is_limited,
+        stock_total: storeBadge.stock_total || null,
+        serial_number: claim.serial_number || null
       };
     })
     .sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
@@ -4897,7 +4908,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
         <button type="button"
           class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}${Number(medal.slot_number) === 1 ? " ls-medal-favorite" : ""}"
           title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
-          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}')">
+          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}', '${escapeHtml(medal.serial_number || "")}', '${escapeHtml(medal.stock_total || "")}')">
           ${medal.badge_icon || "🏅"}
         </button>`);
     } else if (ownProfile) {
@@ -4912,7 +4923,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
     </div>`;
 }
 
-function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "") {
+function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "", serialNumber = "", stockTotal = "") {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
@@ -4931,6 +4942,7 @@ function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "
           <div class="ls-medal-detail-meta">
             ${getProfileMedalRarityLabel(rarity) ? `<span class="ls-medal-detail-chip">${getProfileMedalRarityLabel(rarity)}</span>` : ""}
             ${earnedAt ? `<span class="ls-medal-detail-chip">Obtenida ${new Date(earnedAt).toLocaleDateString("es-AR")}</span>` : ""}
+            ${serialNumber && stockTotal ? `<span class="ls-medal-detail-chip" style="color:var(--gold);border-color:rgba(250,204,21,.25);">LIMITED #${serialNumber}/${stockTotal}</span>` : ""}
           </div>
           <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
         </div>
@@ -5689,15 +5701,19 @@ async function openMyMedalsPanel() {
   if (!wrap) return;
 
   // Cargamos catálogo + equipadas para identificar rareza y estado.
-  const [{ data: storeBadges }, equipped] = await Promise.all([
-    sb.from("store_badges").select("badge_name, rarity, description"),
-    getEquippedProfileMedals(currentUser.id)
+  const [{ data: storeBadges }, equipped, { data: serialClaims }] = await Promise.all([
+    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
+    getEquippedProfileMedals(currentUser.id),
+    sb.from("user_store_badge_claims").select("badge_id,serial_number").eq("user_id", currentUser.id)
   ]);
 
   const storeByName = {};
   (storeBadges || []).forEach(b => {
     storeByName[String(b.badge_name || "").toLowerCase()] = b;
   });
+
+  const serialByBadgeId = {};
+  (serialClaims || []).forEach(c => { serialByBadgeId[c.badge_id] = c.serial_number; });
 
   const equippedSet = new Set((equipped || []).map(b => b.badge_name));
 
@@ -5707,6 +5723,9 @@ async function openMyMedalsPanel() {
       ...b,
       rarity: storeMeta?.rarity || null,
       description: storeMeta?.description || "",
+      is_limited: !!storeMeta?.is_limited,
+      stock_total: storeMeta?.stock_total || null,
+      serial_number: storeMeta?.id ? (serialByBadgeId[storeMeta.id] || null) : null,
       equipped: equippedSet.has(b.badge_name)
     };
   });
@@ -5727,7 +5746,7 @@ async function openMyMedalsPanel() {
 
     return `
       <button type="button"
-        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}', '${escapeHtml(b.description || "")}', '${escapeHtml(b.earned_at || "")}')"
+        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}', '${escapeHtml(b.description || "")}', '${escapeHtml(b.earned_at || "")}', '${escapeHtml(b.serial_number || "")}', '${escapeHtml(b.stock_total || "")}')"
         style="position:relative;background:var(--panel-2);border:1px solid ${b.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
         ${b.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
         <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
@@ -5737,6 +5756,7 @@ async function openMyMedalsPanel() {
         <div style="font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${rarityColor};margin-top:5px;">
           ${escapeHtml(rarityLabel)}
         </div>
+        ${b.serial_number && b.stock_total ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);font-weight:900;margin-top:5px;">LIMITED #${b.serial_number}/${b.stock_total}</div>` : ""}
         ${b.earned_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(b.earned_at).toLocaleDateString("es-AR")}</div>` : ""}
       </button>`;
   };

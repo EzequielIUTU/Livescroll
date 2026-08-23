@@ -1910,26 +1910,53 @@ function showFloatingPointsSafe(amount, anchorEl = null) {
   setTimeout(() => el.remove(), 1050);
 }
 
+
+const lsPerfCache = {
+  feed: { data:null, at:0 },
+  directos: { data:null, at:0 }
+};
+let lsTabRenderToken = 0;
+
+function renderFastSkeleton(lines = 5) {
+  return `<div class="ls-fast-skeleton">${Array.from({length:lines}, () => "<i></i>").join("")}</div>`;
+}
+
+function lsCacheFresh(entry, maxAgeMs) {
+  return !!entry?.data && (Date.now() - entry.at) < maxAgeMs;
+}
+
 function switchTab(tab) {
   clearAllWatchIntervals();
   currentTab = tab;
+  const renderToken = ++lsTabRenderToken;
+
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
   if (activeBtn) activeBtn.classList.add("active");
 
-  if (tab === "feed") renderFeed();
+  const main = document.getElementById("appView");
+
+  // Feedback visual en el mismo frame del toque.
+  if (main && ["feed","foryou","profile","users","directos","wallet","plans","store","ranking","admin"].includes(tab)) {
+    main.innerHTML = renderFastSkeleton(tab === "feed" || tab === "foryou" ? 7 : 5);
+  }
+
+  if (tab === "feed") renderFeed(renderToken);
   if (tab === "foryou") renderForYou();
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
   if (tab === "users") renderUsersDirectory();
-  if (tab === "directos") renderDirectos();
+  if (tab === "directos") renderDirectos(renderToken);
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
   if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
 
-  requestAnimationFrame(() => animateCurrentViewSafe());
+  // En desktop conservamos la entrada Nova; en móvil aparece instantáneo.
+  if (window.innerWidth > 700) {
+    requestAnimationFrame(() => animateCurrentViewSafe());
+  }
 }
 
 function updateBalanceUI() {
@@ -1952,20 +1979,40 @@ function showToast(msg) {
 // ============================================================
 // FEED — ver videos de otros y ganar puntos por minuto
 // ============================================================
-async function renderFeed() {
+async function renderFeed(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
+  if (!main) return;
+
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="feedList">Cargando videos...</div>`;
+    <div id="feedList">${renderFastSkeleton(7)}</div>`;
   checkAndShowLoginStreak();
 
-  const { data: videos, error } = await sb
-    .from("videos")
-    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
-    .order("created_at", { ascending: false })
-    .limit(20);
+  let videos = null;
+  let error = null;
+
+  if (lsCacheFresh(lsPerfCache.feed, 45000)) {
+    videos = lsPerfCache.feed.data;
+  } else {
+    const result = await sb
+      .from("videos")
+      .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    videos = result.data;
+    error = result.error;
+
+    if (!error && videos) {
+      lsPerfCache.feed = { data:videos, at:Date.now() };
+    }
+  }
+
+  // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
+  if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;
 
   const list = document.getElementById("feedList");
+  if (!list) return;
   if (error) { list.textContent = "Error cargando videos: " + error.message; return; }
   if (!videos.length) {
     list.innerHTML = `<div style="padding:40px 0; text-align:center;">
@@ -2536,6 +2583,49 @@ function ensureModernMobileStyles() {
         transform:none !important;
         filter:none !important;
       }
+    }
+
+
+    /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
+    .ls-fast-skeleton {
+      display:grid;
+      gap:10px;
+      padding:4px 0;
+    }
+    .ls-fast-skeleton > i {
+      display:block;
+      height:62px;
+      border-radius:13px;
+      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
+      background-size:220% 100%;
+      animation:lsSkeleton 1.05s linear infinite;
+    }
+    @keyframes lsSkeleton { to { background-position:-220% 0; } }
+
+    @media (max-width:700px) {
+      /* En móvil priorizamos respuesta inmediata sobre animación decorativa. */
+      #appView {
+        transition:none !important;
+      }
+      #appView .page-title,
+      #appView .page-sub,
+      #appView .form-card,
+      #appView .video-card,
+      #appView .directo-card,
+      #appView .profile-section,
+      #appView .store-item,
+      #appView .ranking-row {
+        animation-duration:.14s !important;
+        animation-delay:0s !important;
+        transition-duration:.12s !important;
+      }
+      .toast { animation-duration:.16s !important; }
+      .modal-overlay { animation-duration:.16s !important; }
+      .modal-box { transition-duration:.16s !important; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-fast-skeleton > i { animation:none !important; }
     }
 
     /* v5.3.5 — Mobile Feed Full View */
@@ -4387,19 +4477,35 @@ let usersDirectorySearchTimeout = null;
 // ============================================================
 // DIRECTOS (usuarios en vivo ahora)
 // ============================================================
-async function renderDirectos() {
+async function renderDirectos(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">🔴 Directos</h1>
     <p class="page-sub">Creadores de LiveScroll transmitiendo en vivo ahora mismo.</p>
     <div id="directosList">Cargando...</div>`;
 
-  const { data: liveUsers, error } = await sb
-    .from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id, live_platform, live_started_at, social_kick, social_twitch")
-    .eq("is_live", true)
-    .is("ban_reason", null)
-    .order("live_started_at", { ascending: false });
+  let liveUsers = null;
+  let error = null;
+
+  if (lsCacheFresh(lsPerfCache.directos, 15000)) {
+    liveUsers = lsPerfCache.directos.data;
+  } else {
+    const result = await sb
+      .from("profiles")
+      .select("id, username, avatar_emoji, avatar_url, plan_id, live_platform, live_started_at, social_kick, social_twitch")
+      .eq("is_live", true)
+      .is("ban_reason", null)
+      .order("live_started_at", { ascending: false });
+
+    liveUsers = result.data;
+    error = result.error;
+
+    if (!error && liveUsers) {
+      lsPerfCache.directos = { data:liveUsers, at:Date.now() };
+    }
+  }
+
+  if (renderToken !== lsTabRenderToken || currentTab !== "directos") return;
 
   const list = document.getElementById("directosList");
   if (!list) return;

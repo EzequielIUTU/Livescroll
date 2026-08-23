@@ -2954,6 +2954,72 @@ function ensureModernMobileStyles() {
     }
 
 
+
+    /* 5.5.7 — Medallas exclusivas de Tienda */
+    .ls-store-badge-card {
+      position:relative;
+      overflow:hidden;
+      text-align:center;
+      min-height:185px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+    }
+
+    .ls-store-badge-card::before {
+      content:"";
+      position:absolute;
+      inset:-40%;
+      pointer-events:none;
+      opacity:.14;
+      background:radial-gradient(circle, currentColor 0%, transparent 42%);
+      filter:blur(18px);
+    }
+
+    .ls-store-badge-icon {
+      position:relative;
+      z-index:1;
+      width:66px;
+      height:66px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin-bottom:4px;
+      border-radius:50%;
+      font-size:35px;
+      background:rgba(5,7,10,.72);
+      border:1px solid currentColor;
+      box-shadow:0 12px 30px rgba(0,0,0,.30);
+    }
+
+    .ls-rarity-comun { color:#cbd5e1; }
+    .ls-rarity-rara { color:#7dd3fc; }
+    .ls-rarity-epica { color:#c084fc; }
+    .ls-rarity-legendaria { color:#fbbf24; }
+    .ls-rarity-exclusiva { color:#fb7185; }
+
+    .ls-rarity-tag {
+      position:relative;
+      z-index:1;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+    .ls-store-badge-desc {
+      position:relative;
+      z-index:1;
+      max-width:180px;
+      min-height:30px;
+      font-size:10px;
+      line-height:1.4;
+      color:var(--text-dim);
+    }
+
     /* LiveScroll 5.5.7 — IDENTITY */
     .ls-equipped-medals {
       display:flex;
@@ -6211,6 +6277,44 @@ async function renderAdmin() {
       <div id="storeEmojisList">Cargando...</div>
     </div>
 
+
+    <h3 style="margin-top:32px;">🏅 Medallas exclusivas de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px;color:var(--text-dim);margin-top:0;">
+        Creá medallas coleccionables. Cuando alguien la compra, pasa a su colección real y puede equiparla entre sus 3 medallas de perfil.
+      </p>
+
+      <div style="display:grid;grid-template-columns:70px 1fr;gap:8px;margin-bottom:8px;">
+        <input type="text" id="newStoreBadgeIcon" placeholder="🏅" maxlength="8"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);text-align:center;font-size:20px;">
+        <input type="text" id="newStoreBadgeName" placeholder="Nombre de la medalla"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      </div>
+
+      <textarea id="newStoreBadgeDescription" maxlength="180" rows="2" placeholder="Descripción corta..."
+        style="width:100%;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);resize:vertical;margin-bottom:8px;"></textarea>
+
+      <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
+        <select id="newStoreBadgeRarity"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="comun">Común</option>
+          <option value="rara">Rara</option>
+          <option value="epica">Épica</option>
+          <option value="legendaria">Legendaria</option>
+          <option value="exclusiva">Exclusiva</option>
+        </select>
+        <input type="number" id="newStoreBadgePrice" min="1" placeholder="Precio pts"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-outline" onclick="openEmojiPicker('newStoreBadgeIcon', MEDAL_EMOJIS)">Elegir ícono</button>
+        <button class="btn" onclick="handleAddStoreBadge()">Crear medalla</button>
+      </div>
+
+      <div id="storeBadgesAdminList" style="margin-top:14px;">Cargando...</div>
+    </div>
+
     <h3 style="margin-top:32px;">✨ Otros artículos de la tienda</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-dim); margin-top:0;">Cualquier cosa nueva que quieras vender: insignias, marcos, lo que se te ocurra. Vos elegís la categoría (el texto), el ícono, el nombre y el precio.</p>
@@ -6279,6 +6383,7 @@ async function renderAdmin() {
   loadWalletLockStatus();
   loadStoreEmojisList();
   loadStorePrices();
+  loadStoreBadgesAdminList();
   loadStoreItemsList();
 }
 
@@ -6508,6 +6613,112 @@ async function handleSaveStorePrices() {
   });
   if (error || !data.ok) { showToast("No se pudieron guardar los precios"); return; }
   showToast("Precios actualizados");
+}
+
+
+function getStoreBadgeRarityLabel(rarity) {
+  return ({
+    comun:"Común",
+    rara:"Rara",
+    epica:"Épica",
+    legendaria:"Legendaria",
+    exclusiva:"Exclusiva"
+  })[rarity] || "Común";
+}
+
+function getStoreBadgeRarityClass(rarity) {
+  return `ls-rarity-${["comun","rara","epica","legendaria","exclusiva"].includes(rarity) ? rarity : "comun"}`;
+}
+
+async function loadStoreBadgesAdminList() {
+  const el = document.getElementById("storeBadgesAdminList");
+  if (!el) return;
+
+  const { data, error } = await sb.rpc("admin_get_store_badges");
+  if (error || !data?.length) {
+    el.innerHTML = `<p style="color:var(--text-dim);font-size:12px;">Todavía no creaste medallas de tienda.</p>`;
+    return;
+  }
+
+  el.innerHTML = data.map(b => `
+    <div class="ledger-row">
+      <span>
+        ${b.badge_icon || "🏅"} ${escapeHtml(b.badge_name)}
+        · <span class="${getStoreBadgeRarityClass(b.rarity)}">${getStoreBadgeRarityLabel(b.rarity)}</span>
+        · <span class="mono">${b.price_points} pts</span>
+        ${!b.active ? `<span style="color:var(--text-dim);">(desactivada)</span>` : ""}
+      </span>
+      <div style="display:flex;gap:6px;">
+        <button class="btn-outline" style="padding:4px 8px;font-size:11px;"
+          onclick="handleToggleStoreBadge('${b.id}', ${!b.active})">${b.active ? "Desactivar" : "Activar"}</button>
+        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);"
+          onclick="handleDeleteStoreBadge('${b.id}')">🗑</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleAddStoreBadge() {
+  const icon = document.getElementById("newStoreBadgeIcon")?.value.trim() || "";
+  const name = document.getElementById("newStoreBadgeName")?.value.trim() || "";
+  const description = document.getElementById("newStoreBadgeDescription")?.value.trim() || "";
+  const rarity = document.getElementById("newStoreBadgeRarity")?.value || "comun";
+  const price = Number(document.getElementById("newStoreBadgePrice")?.value || 0);
+
+  if (!icon || !name || !price || price < 1) {
+    showToast("Completá ícono, nombre y precio");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_add_store_badge", {
+    p_badge_icon: icon,
+    p_badge_name: name,
+    p_description: description,
+    p_rarity: rarity,
+    p_price_points: Math.floor(price)
+  });
+
+  if (error || !data?.ok) {
+    showToast(data?.error === "duplicate_name" ? "Ya existe una medalla con ese nombre" : "No se pudo crear");
+    return;
+  }
+
+  document.getElementById("newStoreBadgeIcon").value = "";
+  document.getElementById("newStoreBadgeName").value = "";
+  document.getElementById("newStoreBadgeDescription").value = "";
+  document.getElementById("newStoreBadgePrice").value = "";
+  showToast("🏅 Medalla creada");
+  loadStoreBadgesAdminList();
+}
+
+async function handleToggleStoreBadge(id, active) {
+  const { data, error } = await sb.rpc("admin_toggle_store_badge", {
+    p_badge_id: id,
+    p_active: active
+  });
+
+  if (error || !data?.ok) {
+    showToast("No se pudo cambiar");
+    return;
+  }
+
+  loadStoreBadgesAdminList();
+}
+
+async function handleDeleteStoreBadge(id) {
+  if (!confirm("¿Eliminar esta medalla de la tienda? Quienes ya la compraron la conservan.")) return;
+
+  const { data, error } = await sb.rpc("admin_delete_store_badge", {
+    p_badge_id: id
+  });
+
+  if (error || !data?.ok) {
+    showToast("No se pudo eliminar");
+    return;
+  }
+
+  showToast("Medalla eliminada de la tienda");
+  loadStoreBadgesAdminList();
 }
 
 async function loadStoreItemsList() {
@@ -6792,7 +7003,7 @@ async function renderStore() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tienda...</p>`;
 
-  let emojis, myEmojis, plans, storeItems, myItems, pricesData;
+  let emojis, myEmojis, plans, storeItems, myItems, pricesData, storeBadges, myBadges;
   try {
     const results = await Promise.allSettled([
       sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
@@ -6800,7 +7011,9 @@ async function renderStore() {
       loadPlans(),
       sb.from("store_items").select("*").eq("active", true).order("category").order("sort_order"),
       sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
-      sb.rpc("get_store_prices")
+      sb.rpc("get_store_prices"),
+      sb.from("store_badges").select("*").eq("active", true).order("sort_order").order("price_points"),
+      sb.from("user_badges").select("badge_name").eq("user_id", currentUser.id)
     ]);
 
     emojis = results[0].status === "fulfilled" ? results[0].value?.data : null;
@@ -6809,6 +7022,8 @@ async function renderStore() {
     storeItems = results[3].status === "fulfilled" ? results[3].value?.data : null;
     myItems = results[4].status === "fulfilled" ? results[4].value?.data : null;
     pricesData = results[5].status === "fulfilled" ? results[5].value?.data : null;
+    storeBadges = results[6].status === "fulfilled" ? results[6].value?.data : null;
+    myBadges = results[7].status === "fulfilled" ? results[7].value?.data : null;
 
     results.forEach((r, i) => { if (r.status === "rejected") console.log("Tienda: falló la consulta #" + i, r.reason); });
   } catch (e) {
@@ -6819,6 +7034,7 @@ async function renderStore() {
 
   const myEmojiSet = new Set((myEmojis || []).map(e => e.emoji));
   const myItemSet = new Set((myItems || []).map(i => i.item_id));
+  const myBadgeSet = new Set((myBadges || []).map(b => b.badge_name));
   const myPlan = plans.find(p => p.id === currentProfile.plan_id);
   const canBoost = myPlan && myPlan.id !== "standard";
   const planPrices = (pricesData && pricesData.ok && pricesData.prices) ? pricesData.prices : {};
@@ -6835,6 +7051,27 @@ async function renderStore() {
   main.innerHTML = `
     <h1 class="page-title">🛍️ Tienda de puntos</h1>
     <p class="page-sub">Balance: <strong class="mono" style="color:var(--gold)">${currentProfile.points_balance} pts</strong></p>
+
+
+    <h3 style="margin-top:24px;">🏅 Medallas exclusivas</h3>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:-5px;margin-bottom:12px;">
+      Coleccionalas para siempre y equipá hasta 3 en tu perfil.
+    </p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:24px;">
+      ${(storeBadges || []).length ? storeBadges.map(b => `
+        <div class="form-card ls-store-badge-card ${getStoreBadgeRarityClass(b.rarity)}">
+          <div class="ls-store-badge-icon">${b.badge_icon || "🏅"}</div>
+          <div style="position:relative;z-index:1;font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name)}</div>
+          <div class="ls-rarity-tag">${getStoreBadgeRarityLabel(b.rarity)}</div>
+          <div class="ls-store-badge-desc">${escapeHtml(b.description || "Medalla exclusiva de LiveScroll.")}</div>
+          ${myBadgeSet.has(b.badge_name)
+            ? `<div style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</div>`
+            : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;"
+                onclick="handleBuyStoreBadge('${b.id}')">${b.price_points} pts</button>`}
+        </div>
+      `).join("") : `<p style="font-size:12px;color:var(--text-dim);">Todavía no hay medallas disponibles.</p>`}
+    </div>
 
     <h3 style="margin-top:24px;">😎 Emojis exclusivos</h3>
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
@@ -6907,6 +7144,35 @@ async function handleBuyBoost() {
   await loadProfile();
   updateBalanceUI();
   showToast("¡Boost activado por 24hs!");
+  renderStore();
+}
+
+
+async function handleBuyStoreBadge(badgeId) {
+  if (!confirm("¿Comprar esta medalla? Quedará permanentemente en tu colección.")) return;
+
+  const { data, error } = await sb.rpc("buy_store_badge", {
+    p_badge_id: badgeId
+  });
+
+  if (error || !data?.ok) {
+    const messages = {
+      saldo_insuficiente:"No tenés suficientes puntos.",
+      ya_la_tenes:"Ya tenés esta medalla.",
+      no_disponible:"Esta medalla ya no está disponible."
+    };
+    showToast(messages[data?.error] || "No se pudo comprar");
+    return;
+  }
+
+  currentProfile.points_balance = Number(data.new_balance ?? currentProfile.points_balance);
+  updateBalanceUI();
+
+  // Forzamos refresco del perfil para que aparezca inmediatamente
+  // en la lista de medallas equipables.
+  lsPerfCache.profileVideos.at = 0;
+
+  showToast(`🏅 ¡${data.badge_name || "Medalla"} agregada a tu colección!`);
   renderStore();
 }
 

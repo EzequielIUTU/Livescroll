@@ -1466,6 +1466,143 @@ function ensureModernMobileStyles() {
         box-sizing:border-box !important;
       }
     }
+
+    /* Celulares compactos / antiguos (ej: Galaxy J7, 360px) */
+    @media (max-width:390px) {
+      body {
+        font-size:14px !important;
+      }
+
+      #appView {
+        padding-left:6px !important;
+        padding-right:6px !important;
+      }
+
+      .profile-hero {
+        border-radius:13px !important;
+      }
+
+      .profile-cover {
+        min-height:112px !important;
+        height:112px !important;
+      }
+
+      .profile-hero-top {
+        gap:8px !important;
+        padding-left:10px !important;
+        padding-right:10px !important;
+      }
+
+      .profile-avatar-ring {
+        transform:scale(.88);
+        transform-origin:left center;
+        margin-right:-7px !important;
+      }
+
+      .profile-name-block h1 {
+        font-size:19px !important;
+        line-height:1.08 !important;
+      }
+
+      .profile-name-block .handle,
+      .profile-bio {
+        font-size:11px !important;
+      }
+
+      .profile-stats-row {
+        gap:5px !important;
+        margin-top:10px !important;
+      }
+
+      .stat-pill {
+        padding:8px 3px !important;
+        border-radius:11px !important;
+      }
+
+      .stat-pill .num {
+        font-size:18px !important;
+      }
+
+      .stat-pill .lbl {
+        font-size:9px !important;
+      }
+
+      .profile-section {
+        margin-top:12px !important;
+      }
+
+      .profile-section-head {
+        margin-bottom:7px !important;
+      }
+
+      .profile-section-head .ico {
+        transform:scale(.88);
+      }
+
+      .form-card {
+        padding:11px !important;
+      }
+
+      .grid-menu-btn {
+        width:42px !important;
+        height:42px !important;
+        min-width:42px !important;
+        min-height:42px !important;
+        font-size:25px !important;
+      }
+
+      .btn,
+      .btn-outline {
+        min-height:40px;
+        padding:8px 11px !important;
+        font-size:12px !important;
+      }
+
+      .nav-plan-chip {
+        transform:scale(.88);
+        transform-origin:right center;
+      }
+
+      #notifBell,
+      .nav-changelog-btn {
+        margin-left:1px !important;
+      }
+
+      .ls-action-sheet {
+        border-radius:18px;
+        padding:7px;
+      }
+
+      .ls-sheet-action {
+        min-height:48px;
+        padding:8px 10px;
+      }
+
+      .modal-box,
+      .auth-box {
+        max-height:88dvh !important;
+        border-radius:16px !important;
+      }
+    }
+
+    @media (max-width:390px) and (max-height:740px) {
+      .profile-cover {
+        min-height:96px !important;
+        height:96px !important;
+      }
+
+      .profile-hero-actions {
+        margin-top:8px !important;
+      }
+
+      .profile-section {
+        margin-top:9px !important;
+      }
+
+      .modal-overlay {
+        padding:5px !important;
+      }
+    }
   `;
 
   document.head.appendChild(style);
@@ -2768,7 +2905,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -2800,23 +2937,58 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
-    <div class="profile-hero">
-      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
-      <div class="profile-hero-top">
-        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
-        <div class="profile-name-block">
-          <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-          <div class="handle">Perfil público</div>
+    <div class="profile-hero" style="position:relative; overflow:hidden;">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
+        style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
+
+      ${profile.profile_side_image_url ? `
+        <div aria-hidden="true" style="
+          position:absolute;
+          left:0;
+          right:0;
+          top:150px;
+          bottom:0;
+          z-index:1;
+          overflow:hidden;
+          pointer-events:none;
+        ">
+          <img src="${escapeHtml(profile.profile_side_image_url)}" alt="" style="
+            position:absolute;
+            inset:0;
+            width:100%;
+            height:100%;
+            object-fit:cover;
+            object-position:center center;
+            opacity:0.42;
+            filter:saturate(0.95) contrast(1.06);
+          ">
+          <div style="
+            position:absolute;
+            inset:0;
+            background:
+              linear-gradient(180deg, rgba(13,16,20,0.16) 0%, rgba(13,16,20,0.28) 48%, rgba(13,16,20,0.72) 100%),
+              linear-gradient(90deg, rgba(13,16,20,0.40) 0%, rgba(13,16,20,0.18) 50%, rgba(13,16,20,0.30) 100%);
+          "></div>
         </div>
-      </div>
-      ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
-      ${renderSocialIcons(profile)}
-      <div class="profile-stats-row">
-        <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
-        <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
-      </div>
-      <div class="profile-hero-actions">
-        <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+      ` : ""}
+
+      <div style="position:relative; z-index:2;">
+        <div class="profile-hero-top">
+          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+          <div class="profile-name-block">
+            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+            <div class="handle">Perfil público</div>
+          </div>
+        </div>
+        ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
+        ${renderSocialIcons(profile)}
+        <div class="profile-stats-row">
+          <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
+          <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
+        </div>
+        <div class="profile-hero-actions">
+          <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+        </div>
       </div>
     </div>
 

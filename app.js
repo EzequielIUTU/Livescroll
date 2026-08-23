@@ -1989,13 +1989,12 @@ async function renderProfile() {
             alt=""
             style="
               position:absolute;
-              right:-2%;
-              top:0;
-              width:min(58%, 360px);
+              inset:0;
+              width:100%;
               height:100%;
               object-fit:cover;
-              object-position:center top;
-              opacity:0.34;
+              object-position:center center;
+              opacity:0.42;
               filter:saturate(0.95) contrast(1.06);
             "
           >
@@ -2003,15 +2002,14 @@ async function renderProfile() {
             position:absolute;
             inset:0;
             background:
-              linear-gradient(90deg,
-                rgba(13,16,20,0.98) 0%,
-                rgba(13,16,20,0.88) 30%,
-                rgba(13,16,20,0.52) 62%,
-                rgba(13,16,20,0.22) 100%),
               linear-gradient(180deg,
-                rgba(13,16,20,0.18) 0%,
-                rgba(13,16,20,0.38) 72%,
-                rgba(13,16,20,0.92) 100%);
+                rgba(13,16,20,0.16) 0%,
+                rgba(13,16,20,0.28) 48%,
+                rgba(13,16,20,0.72) 100%),
+              linear-gradient(90deg,
+                rgba(13,16,20,0.40) 0%,
+                rgba(13,16,20,0.18) 50%,
+                rgba(13,16,20,0.30) 100%);
           "></div>
         </div>
       ` : ""}

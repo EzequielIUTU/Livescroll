@@ -5962,7 +5962,7 @@ function openLocalObsLive() {
       <button class="btn-outline" style="padding:7px 10px;" onclick="renderDirectos()">← Directos</button>
       <div>
         <div style="font-size:10px;color:var(--green);font-weight:900;">● EN VIVO · OBS</div>
-        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Prueba local con MediaMTX</div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Prueba HTTPS con MediaMTX</div>
       </div>
     </div>
 
@@ -5970,7 +5970,7 @@ function openLocalObsLive() {
       <section class="ls-live-video-shell">
         <div class="ls-live-video-area" style="background:#000;">
           <iframe
-            src="http://localhost:8888/livescroll/"
+            src="https://controversial-queen-filter-approach.trycloudflare.com/livescroll/"
             allow="autoplay; fullscreen; picture-in-picture"
             allowfullscreen
             scrolling="no"
@@ -6022,7 +6022,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
         <div>
           <div style="font-weight:900;">🎥 Prueba OBS local</div>
           <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
-            MediaMTX · localhost · ruta livescroll
+            MediaMTX · Cloudflare HTTPS · ruta livescroll
           </div>
         </div>
         <button class="btn" type="button" onclick="openLocalObsLive()">🔴 Ver directo OBS</button>

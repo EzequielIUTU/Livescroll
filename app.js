@@ -5795,6 +5795,134 @@ function startConnectedLiveRefresh() {
   }, 60000);
 }
 
+
+function openObsStreamingSetup() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) {
+    alert("No se encontró el contenedor de ventanas de LiveScroll.");
+    return;
+  }
+
+  wrap.innerHTML = `
+    <div style="
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      background:rgba(0,0,0,.82);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+    " onclick="if(event.target===this) closeObsStreamingSetup()">
+
+      <div style="
+        width:min(560px,96vw);
+        max-height:90vh;
+        overflow:auto;
+        background:var(--panel);
+        border:1px solid var(--gold-dim);
+        border-radius:18px;
+        box-shadow:0 20px 70px rgba(0,0,0,.55);
+      ">
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:10px;
+          padding:18px;
+          border-bottom:1px solid var(--border);
+        ">
+          <div>
+            <div style="font-size:19px;font-weight:900;">🎥 Configurar OBS</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">LiveScroll 5.8.0 · OBS Streaming</div>
+          </div>
+
+          <button type="button"
+            onclick="closeObsStreamingSetup()"
+            style="
+              width:38px;
+              height:38px;
+              border-radius:50%;
+              border:1px solid var(--border);
+              background:var(--panel-2);
+              color:var(--text);
+              cursor:pointer;
+              font-size:18px;
+            ">✕</button>
+        </div>
+
+        <div style="padding:18px;">
+          <div style="
+            padding:14px;
+            border:1px solid rgba(244,197,66,.28);
+            background:rgba(244,197,66,.06);
+            border-radius:12px;
+            margin-bottom:14px;
+          ">
+            <div style="font-weight:800;margin-bottom:6px;">📡 Transmitir desde OBS</div>
+            <div style="font-size:12px;color:var(--text-dim);line-height:1.55;">
+              Esta sección va a darte los datos privados que OBS necesita para transmitir directamente a LiveScroll.
+            </div>
+          </div>
+
+          <label style="font-size:10px;color:var(--text-dim);">SERVIDOR DE TRANSMISIÓN</label>
+          <div style="display:flex;gap:7px;margin-top:5px;margin-bottom:13px;">
+            <input id="obsServerValue"
+              value="Servidor todavía no conectado"
+              readonly
+              style="flex:1;min-width:0;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
+          </div>
+
+          <label style="font-size:10px;color:var(--text-dim);">STREAM KEY</label>
+          <div style="display:flex;gap:7px;margin-top:5px;">
+            <input id="obsStreamKeyValue"
+              value="Se generará cuando conectemos el servidor"
+              readonly
+              style="flex:1;min-width:0;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
+          </div>
+
+          <div style="
+            margin-top:16px;
+            padding:13px;
+            border:1px solid var(--border);
+            border-radius:12px;
+            background:var(--panel-2);
+          ">
+            <div style="font-size:12px;font-weight:800;margin-bottom:8px;">Cómo se conecta en OBS</div>
+            <div style="font-size:11px;color:var(--text-dim);line-height:1.75;">
+              1. Abrí <b style="color:var(--text);">OBS → Ajustes → Emisión</b>.<br>
+              2. Elegí <b style="color:var(--text);">Servicio personalizado</b>.<br>
+              3. Pegá el servidor de LiveScroll.<br>
+              4. Pegá tu Stream Key privada.<br>
+              5. Tocá <b style="color:var(--text);">Iniciar transmisión</b>.
+            </div>
+          </div>
+
+          <div style="
+            margin-top:13px;
+            padding:11px;
+            border-radius:10px;
+            background:rgba(34,197,94,.06);
+            border:1px solid rgba(34,197,94,.18);
+            color:var(--text-dim);
+            font-size:10px;
+            line-height:1.5;
+          ">
+            🔒 La Stream Key será privada y exclusiva de tu cuenta.
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeObsStreamingSetup() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+window.openObsStreamingSetup = openObsStreamingSetup;
+window.closeObsStreamingSetup = closeObsStreamingSetup;
+
 async function renderDirectos(renderToken = lsTabRenderToken) {
   startConnectedLiveRefresh();
   const main = document.getElementById("appView");
@@ -5832,7 +5960,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
       <div class="ls-studio-live-head"><h3>📡 EN VIVO DESDE LIVESCROLL STUDIO</h3><span>${studioLives.length} directo${studioLives.length===1?"":"s"}</span></div>
       ${studioLives.map(s => {
         const p = s.profiles || {};
-        return `<div class="ls-studio-live-card" onclick="openStudioLive('${s.id}')">
+        return `<div class="ls-studio-live-card" onclick="window.openStudioLive ? window.openStudioLive('${s.id}') : openStudioLive('${s.id}')">
           <div class="ls-studio-live-preview">
             ${s.preview_url && isSafeUrl(s.preview_url) ? `<img src="${escapeHtml(s.preview_url)}">` : `<div style="font-size:28px;">📡</div>`}
             <div class="ls-studio-live-chip">EN VIVO</div>

@@ -913,14 +913,14 @@ function showConnected579Launch() {
 
         <div class="ls-next-era-head">
           <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NEW STAGE</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NUEVA ETAPA</div>
           <h2 class="ls-next-era-title" style="font-size:clamp(29px,7vw,48px);line-height:.98;margin-bottom:8px;">5.7.9</h2>
           <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:.12em;">CONNECTED</div>
         </div>
 
         <div class="ls-next-era-body" style="text-align:center;">
           <div style="font-size:40px;margin:3px 0 10px;">📡</div>
-          <h3 style="margin:0 0 8px;font-size:19px;">The next connection begins.</h3>
+          <h3 style="margin:0 0 8px;font-size:19px;">Una nueva forma de conectarnos comienza.</h3>
           <p style="font-size:12px;color:var(--text-dim);line-height:1.65;max-width:405px;margin:0 auto;">
             Empezamos a construir una nueva generación de LiveScroll:
             directos más rápidos, una experiencia móvil más inmediata
@@ -930,20 +930,20 @@ function showConnected579Launch() {
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 4px;">
             <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
               <div style="font-size:20px;">⚡</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">FASTER LIVE</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">DIRECTOS MÁS RÁPIDOS</div>
             </div>
             <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
               <div style="font-size:20px;">📱</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">MOBILE</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">MÓVIL</div>
             </div>
             <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
               <div style="font-size:20px;">🔔</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">CONNECTED</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">CONECTADOS</div>
             </div>
           </div>
 
           <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:.12em;margin-top:14px;">
-            COMING SOON
+            PRÓXIMAMENTE
           </div>
         </div>
 

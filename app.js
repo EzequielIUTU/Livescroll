@@ -949,6 +949,7 @@ function showChangelogModal(entries) {
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
     actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
@@ -961,7 +962,7 @@ function showChangelogModal(entries) {
       <div id="changelogBox" class="modal-box" style="transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
         <div class="modal-box-header"><h2>✨ Novedades</h2></div>
         <div class="modal-box-body">
-          ${["nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
+          ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
             <div style="margin-bottom:14px;">
               <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
               ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
@@ -993,6 +994,7 @@ async function openChangelogHistory() {
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
     actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
@@ -1024,7 +1026,7 @@ async function openChangelogHistory() {
         <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);">v${escapeHtml(label)}</div>
         ${v === currentVersion ? `<span style="font-size:10px; font-weight:700; color:#12130f; background:var(--gold); padding:2px 8px; border-radius:20px; letter-spacing:0.04em;">ACTUAL</span>` : ""}
       </div>
-      ${["nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v].cats[cat] ? `
+      ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v].cats[cat] ? `
         <div style="margin-bottom:10px;">
           <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
           ${byVersion[v].cats[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
@@ -1852,7 +1854,7 @@ async function renderFeed() {
       ${videos.map((v, i) => {
         const isMine = v.user_id === currentUser.id;
         return `
-        <div class="feed-item" data-video-id="${v.id}">
+        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
           <div class="feed-phone">
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
@@ -1877,8 +1879,46 @@ async function renderFeed() {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
+  fitMobileFeedViewport("feedVertical");
   setupPullToRefresh(renderFeed);
   setupSwipeNavigation("feed", { left: "foryou" });
+}
+
+
+let lsFeedViewportResizeBound = false;
+
+function fitMobileFeedViewport(containerId = "feedVertical") {
+  if (window.innerWidth > 700) return;
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const top = Math.max(0, container.getBoundingClientRect().top);
+
+  // Dejamos solo una pequeña zona segura inferior. La altura se calcula
+  // según dónde empieza realmente el feed, así no desperdiciamos espacio.
+  const safeBottom = 8;
+  const usable = Math.max(430, Math.floor(viewportHeight - top - safeBottom));
+
+  container.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
+  document.documentElement.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
+
+  if (!lsFeedViewportResizeBound) {
+    lsFeedViewportResizeBound = true;
+
+    const refresh = () => {
+      const active =
+        document.getElementById("profileFeedVertical") ||
+        document.getElementById("feedVertical") ||
+        document.querySelector("#foryouList .feed-vertical");
+
+      if (active) fitMobileFeedViewport(active.id || "feedVertical");
+    };
+
+    window.addEventListener("resize", refresh, { passive:true });
+    window.visualViewport?.addEventListener("resize", refresh, { passive:true });
+  }
 }
 
 function setupPullToRefresh(refreshFn) {
@@ -2094,7 +2134,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
         ${videos.map((v) => {
           const isMine = v.user_id === currentUser.id;
           return `
-          <div class="feed-item" data-video-id="${v.id}">
+          <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
             <div class="feed-phone">
               <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
               ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
@@ -2119,6 +2159,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
+  fitMobileFeedViewport("profileFeedVertical");
 
   const container = document.getElementById("profileFeedVertical");
   const startEl = document.querySelector(`#profileFeedVertical [data-video-id="${startVideoId}"]`);
@@ -2150,6 +2191,117 @@ function ensureModernMobileStyles() {
   const style = document.createElement("style");
   style.id = "livescrollModernMobileStyles";
   style.textContent = `
+    /* v5.3.5 — Mobile Feed Full View */
+    :root {
+      --ls-mobile-feed-height: 640px;
+    }
+
+    @media (max-width:700px) {
+      #feedVertical,
+      #profileFeedVertical,
+      #foryouList .feed-vertical {
+        scroll-snap-type:y mandatory !important;
+      }
+
+      #feedVertical > .feed-item,
+      #profileFeedVertical > .feed-item,
+      #foryouList .feed-vertical > .feed-item {
+        height:var(--ls-mobile-feed-height) !important;
+        min-height:var(--ls-mobile-feed-height) !important;
+        max-height:var(--ls-mobile-feed-height) !important;
+        margin:0 !important;
+        scroll-snap-align:start !important;
+        scroll-snap-stop:always !important;
+        overflow:hidden !important;
+      }
+
+      #feedVertical .feed-phone,
+      #profileFeedVertical .feed-phone,
+      #foryouList .feed-phone {
+        width:100% !important;
+        height:100% !important;
+        min-height:100% !important;
+        max-height:100% !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        overflow:hidden !important;
+      }
+
+      #feedVertical .feed-embed-frame,
+      #profileFeedVertical .feed-embed-frame,
+      #foryouList .feed-embed-frame {
+        position:absolute !important;
+        inset:0 !important;
+        width:100% !important;
+        height:100% !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        background:#000 !important;
+      }
+
+      #feedVertical .feed-embed-frame iframe,
+      #profileFeedVertical .feed-embed-frame iframe,
+      #foryouList .feed-embed-frame iframe {
+        width:100% !important;
+        height:100% !important;
+        border:0 !important;
+      }
+
+      #feedVertical .feed-actions,
+      #profileFeedVertical .feed-actions,
+      #foryouList .feed-actions {
+        right:10px !important;
+        bottom:118px !important;
+        z-index:12 !important;
+      }
+
+      #feedVertical .feed-overlay,
+      #profileFeedVertical .feed-overlay,
+      #foryouList .feed-overlay {
+        left:12px !important;
+        right:68px !important;
+        bottom:18px !important;
+        z-index:10 !important;
+      }
+
+      /* MP4: reservamos abajo la barra nativa del reproductor. */
+      .feed-item.ls-upload-feed-item .feed-overlay {
+        bottom:72px !important;
+        pointer-events:none !important;
+      }
+
+      .feed-item.ls-upload-feed-item .feed-overlay .author {
+        pointer-events:auto !important;
+      }
+
+      .feed-item.ls-upload-feed-item .feed-actions {
+        bottom:148px !important;
+      }
+
+      .feed-item.ls-upload-feed-item .dbltap-like-zone {
+        width:100% !important;
+        height:100% !important;
+      }
+
+      .feed-item.ls-upload-feed-item video {
+        width:100% !important;
+        height:100% !important;
+        object-fit:contain !important;
+        background:#000 !important;
+      }
+
+      .feed-nudge {
+        top:14px !important;
+        bottom:auto !important;
+        left:50% !important;
+        transform:translateX(-50%) !important;
+        white-space:nowrap !important;
+        z-index:11 !important;
+        opacity:.72 !important;
+      }
+    }
+
     /* LiveScroll Mobile/UI Upgrade */
     html, body {
       max-width:100%;
@@ -3848,7 +4000,7 @@ async function renderForYou() {
   list.innerHTML = `
     <div class="feed-vertical" id="feedVertical">
       ${videos.map((v, i) => `
-        <div class="feed-item" data-video-id="${v.id}">
+        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
           <div class="feed-phone">
             <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
@@ -3871,6 +4023,7 @@ async function renderForYou() {
     </div>`;
 
   setupFeedObserver(videos);
+  fitMobileFeedViewport("feedVertical");
   setupDoubleTapLike();
   setupPullToRefresh(renderForYou);
   setupSwipeNavigation("foryou", { right: "feed" });

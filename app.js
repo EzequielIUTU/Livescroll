@@ -5920,7 +5920,13 @@ async function openStudioLive(sessionId) {
       <section class="ls-live-video-shell">
         <div class="ls-live-video-area">
           ${session.playback_url && isSafeUrl(session.playback_url)
-            ? `<video src="${escapeHtml(session.playback_url)}" autoplay playsinline controls style="width:100%;height:100%;background:#000;"></video>`
+            ? `<iframe
+                src="${escapeHtml(session.playback_url)}"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowfullscreen
+                scrolling="no"
+                style="width:100%;height:100%;border:0;background:#000;"
+              ></iframe>`
             : `<div class="ls-live-video-placeholder"><div class="ico">📡</div><strong>La señal de LiveScroll Studio aparecerá acá.</strong><div>El reproductor ya está preparado para recibir el stream.</div></div>`}
         </div>
         <div class="ls-live-details">

@@ -275,6 +275,12 @@ async function handleLogin() {
 
 async function handleLogout() {
   clearAllWatchIntervals();
+
+  if (notifRealtimeChannel) {
+    await sb.removeChannel(notifRealtimeChannel);
+    notifRealtimeChannel = null;
+  }
+
   await sb.auth.signOut();
 }
 
@@ -411,7 +417,8 @@ async function renderApp() {
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
-  loadNotifications();
+  await loadNotifications();
+  subscribeToNotifications();
 
   checkBoostStatus();
   checkBlockedStatus();
@@ -2024,13 +2031,13 @@ async function handleShare(videoId, url) {
   showToast(`+${data.points} pts por compartir`);
 }
 
-async function openComments(videoId) {
+async function openComments(videoId, focusCommentId = null) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
       <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; max-height:70dvh; border-radius:20px 20px 0 0; padding:20px; padding-bottom:max(20px, env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
-          <h3 style="margin:0;">Comentarios</h3>
+          <h3 style="margin:0;">💬 Comentarios</h3>
           <button onclick="closeComments()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div id="commentsList" style="overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto; min-height:0; margin-bottom:14px;">Cargando...</div>
@@ -2041,10 +2048,10 @@ async function openComments(videoId) {
       </div>
     </div>`;
 
-  await loadComments(videoId);
+  await loadComments(videoId, focusCommentId);
 }
 
-async function loadComments(videoId) {
+async function loadComments(videoId, focusCommentId = null) {
   const { data: comments } = await sb
     .from("video_comments")
     .select("*, profiles!video_comments_user_id_fkey(username, plan_id)")
@@ -2053,14 +2060,30 @@ async function loadComments(videoId) {
 
   const list = document.getElementById("commentsList");
   if (!list) return;
+
   list.innerHTML = comments && comments.length
     ? comments.map(c => `
-        <div style="margin-bottom:12px; font-size:13px;">
-          <strong style="color:var(--gold);">@${escapeHtml(c.profiles?.username || "usuario")}</strong> ${getPlanBadgeHtml(c.profiles?.plan_id)}
-          <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
-          <div>${escapeHtml(c.content)}</div>
+        <div id="comment-${c.id}" style="margin-bottom:10px; padding:10px; font-size:13px; border-radius:10px; transition:background 0.3s ease, border-color 0.3s ease; ${focusCommentId === c.id ? "background:rgba(255,255,255,0.05); border:1px solid var(--gold-dim);" : "border:1px solid transparent;"}">
+          <div>
+            <strong style="color:var(--gold); cursor:pointer;" onclick="closeComments(); viewPublicProfile('${escapeHtml(c.profiles?.username || "")}')">@${escapeHtml(c.profiles?.username || "usuario")}</strong>
+            ${getPlanBadgeHtml(c.profiles?.plan_id)}
+            <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
+          </div>
+          <div style="margin-top:4px; line-height:1.4;">${escapeHtml(c.content)}</div>
         </div>`).join("")
     : `<p style="color:var(--text-dim); font-size:13px;">Sé el primero en comentar.</p>`;
+
+  if (focusCommentId) {
+    setTimeout(() => {
+      const commentEl = document.getElementById(`comment-${focusCommentId}`);
+      if (!commentEl) return;
+      commentEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        commentEl.style.background = "";
+        commentEl.style.borderColor = "transparent";
+      }, 2500);
+    }, 150);
+  }
 }
 
 async function submitComment(videoId) {
@@ -2430,22 +2453,105 @@ async function submitReport(videoId, reason) {
 }
 
 let notifCache = [];
+let notifRealtimeChannel = null;
+
+function getNotificationIcon(type) {
+  const icons = { like: "❤️", comment: "💬", follow: "👤", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
+  return icons[type] || "🔔";
+}
+
+function updateNotificationBadge() {
+  const unread = notifCache.filter(n => !n.read).length;
+  const badge = document.getElementById("notifBadge");
+  if (!badge) return;
+  if (unread > 0) {
+    badge.textContent = unread > 99 ? "99+" : unread;
+    badge.classList.remove("hidden");
+  } else {
+    badge.textContent = "";
+    badge.classList.add("hidden");
+  }
+}
 
 async function loadNotifications() {
-  const { data } = await sb
+  if (!currentUser) return;
+  const { data, error } = await sb
     .from("notifications")
     .select("*")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(30);
+
+  if (error) {
+    console.error("Error cargando notificaciones:", error);
+    return;
+  }
 
   notifCache = data || [];
-  const unread = notifCache.filter(n => !n.read).length;
-  const badge = document.getElementById("notifBadge");
-  if (badge) {
-    if (unread > 0) { badge.textContent = unread; badge.classList.remove("hidden"); }
-    else { badge.classList.add("hidden"); }
+  updateNotificationBadge();
+  if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+}
+
+function subscribeToNotifications() {
+  if (!currentUser) return;
+  if (notifRealtimeChannel) {
+    sb.removeChannel(notifRealtimeChannel);
+    notifRealtimeChannel = null;
   }
+
+  notifRealtimeChannel = sb
+    .channel(`notifications-${currentUser.id}`)
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "notifications",
+      filter: `user_id=eq.${currentUser.id}`
+    }, payload => {
+      const notification = payload.new;
+      if (!notifCache.some(n => n.id === notification.id)) notifCache.unshift(notification);
+      notifCache = notifCache.slice(0, 30);
+      updateNotificationBadge();
+      if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+      showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
+    })
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") console.log("Notificaciones Realtime conectadas");
+    });
+}
+
+function renderNotificationPanelContent() {
+  const list = document.getElementById("notifPanelList");
+  if (!list) return;
+  if (!notifCache.length) {
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;padding:18px 10px;text-align:center;">Sin notificaciones todavía.</p>`;
+    return;
+  }
+
+  list.innerHTML = notifCache.map(n => {
+    const clickable = n.video_id || n.actor_id || n.comment_id;
+    return `
+      <div onclick="${clickable ? `handleNotificationClick('${n.id}')` : ""}" style="display:flex;gap:10px;padding:11px 8px;border-bottom:1px solid var(--border);font-size:13px;cursor:${clickable ? "pointer" : "default"};border-radius:8px;transition:background 0.15s ease;${n.read ? "opacity:0.62;" : "background:rgba(255,255,255,0.025);"}">
+        <div style="font-size:20px;width:28px;flex-shrink:0;text-align:center;padding-top:1px;">${getNotificationIcon(n.type)}</div>
+        <div style="min-width:0;flex:1;">
+          <div style="color:var(--text);line-height:1.35;">${escapeHtml(n.message || "Nueva notificación")}</div>
+          <div style="color:var(--text-dim);font-size:10px;margin-top:4px;">${formatNotificationTime(n.created_at)}${clickable ? " · Tocá para ver" : ""}</div>
+        </div>
+        ${!n.read ? `<div style="width:7px;height:7px;border-radius:50%;background:var(--gold);margin-top:7px;flex-shrink:0;"></div>` : ""}
+      </div>`;
+  }).join("");
+}
+
+function formatNotificationTime(dateString) {
+  const date = new Date(dateString);
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (diffSeconds < 60) return "Ahora";
+  const minutes = Math.floor(diffSeconds / 60);
+  if (minutes < 60) return `Hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days <= 7) return `Hace ${days} d`;
+  return date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function toggleNotifPanel() {
@@ -2454,21 +2560,20 @@ function toggleNotifPanel() {
 
   const panel = document.createElement("div");
   panel.id = "notifPanel";
-  panel.style.cssText = "position:absolute; top:60px; right:20px; width:300px; max-height:400px; overflow-y:auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,0.5);";
+  panel.style.cssText = "position:absolute;top:60px;right:20px;width:min(360px, calc(100vw - 24px));max-height:480px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px;z-index:160;box-shadow:0 14px 40px rgba(0,0,0,0.55);";
   panel.innerHTML = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 2px;">
-      <strong style="font-size:14px;">Notificaciones</strong>
-      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; line-height:1; padding:2px 4px;">✕</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;padding:3px 5px 8px;border-bottom:1px solid var(--border);">
+      <div><strong style="font-size:14px;">🔔 Notificaciones</strong><div style="color:var(--text-dim);font-size:10px;margin-top:2px;">Actividad reciente</div></div>
+      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:4px 7px;">✕</button>
     </div>
-    ${notifCache.length
-      ? notifCache.map(n => `
-          <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px; ${n.read ? "opacity:0.5;" : ""}">
-            <div>${escapeHtml(n.message)}</div>
-            <div style="color:var(--text-dim); font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString("es-AR")}</div>
-          </div>`).join("")
-      : `<p style="color:var(--text-dim); font-size:13px; padding:10px;">Sin notificaciones todavía.</p>`}`;
-
+    <div id="notifPanelList" style="max-height:400px;overflow-y:auto;padding-right:2px;"></div>`;
   document.body.appendChild(panel);
+  renderNotificationPanelContent();
+
+  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
+    notifCache = notifCache.map(n => ({ ...n, read: true }));
+    updateNotificationBadge();
+  });
 
   setTimeout(() => {
     document.addEventListener("click", function closeOnOutsideClick(e) {
@@ -2480,12 +2585,35 @@ function toggleNotifPanel() {
       }
     });
   }, 0);
-
-  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
-    document.getElementById("notifBadge")?.classList.add("hidden");
-  });
 }
 
+async function handleNotificationClick(notificationId) {
+  const notification = notifCache.find(n => n.id === notificationId);
+  if (!notification) return;
+  document.getElementById("notifPanel")?.remove();
+  notification.read = true;
+  updateNotificationBadge();
+
+  if (notification.type === "comment" && notification.video_id) {
+    await openComments(notification.video_id, notification.comment_id || null);
+    return;
+  }
+  if (notification.type === "like" && notification.video_id) {
+    await openSharedVideo(notification.video_id);
+    return;
+  }
+  if (notification.type === "follow" && notification.actor_id) {
+    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
+    if (!actor?.username) { showToast("Ese perfil ya no está disponible"); return; }
+    await viewPublicProfile(actor.username);
+    return;
+  }
+  if (notification.video_id) { await openSharedVideo(notification.video_id); return; }
+  if (notification.actor_id) {
+    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
+    if (actor?.username) await viewPublicProfile(actor.username);
+  }
+}
 
 function copyReferralLink() {
   const input = document.getElementById("referralLinkInput");

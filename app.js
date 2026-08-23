@@ -6736,13 +6736,34 @@ async function renderAdmin() {
 
     <h3 style="margin-top:32px;">🎨 Emojis de la tienda</h3>
     <div class="form-card" style="margin-bottom:14px;">
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
         <input type="text" id="newEmojiChar" placeholder="🐐" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
         <button type="button" class="btn-outline" onclick="openEmojiPicker('newEmojiChar', FACE_EMOJIS)">Elegir</button>
         <input type="text" id="newEmojiName" placeholder="Nombre (ej: GOAT)" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-        <input type="number" id="newEmojiPrice" placeholder="Precio en pts" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-        <button class="btn" onclick="handleAddStoreEmoji()">Agregar</button>
+        <input type="number" id="newEmojiPrice" min="0" placeholder="0 = GRATIS" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
       </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;margin-bottom:10px;">
+        <select id="newEmojiRarity" style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="comun">Común</option>
+          <option value="rara">Rara</option>
+          <option value="epica">Épica</option>
+          <option value="legendaria">Legendaria</option>
+          <option value="exclusiva">Exclusiva</option>
+        </select>
+
+        <select id="newEmojiEdition"
+          onchange="document.getElementById('newEmojiStock').disabled=this.value!=='limited';"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="standard">Edición normal</option>
+          <option value="limited">Edición limitada</option>
+        </select>
+
+        <input type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      </div>
+
+      <button class="btn" onclick="handleAddStoreEmoji()">Agregar emoji</button>
       <div id="storeEmojisList">Cargando...</div>
     </div>
 
@@ -7024,7 +7045,13 @@ async function loadStoreEmojisList() {
 
   el.innerHTML = data.map(e => `
     <div class="ledger-row">
-      <span>${e.emoji} ${escapeHtml(e.name)} · <span class="mono">${e.price_points} pts</span> ${!e.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}</span>
+      <span>
+        ${e.emoji} ${escapeHtml(e.name)}
+        · <span class="${getStoreBadgeRarityClass(e.rarity || "comun")}">${getStoreBadgeRarityLabel(e.rarity || "comun")}</span>
+        · <span class="mono">${Number(e.price_points) === 0 ? "GRATIS" : `${e.price_points} pts`}</span>
+        ${e.is_limited ? ` · <span style="color:var(--gold);font-weight:800;">LIMITED ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}/${e.stock_total}</span>` : ""}
+        ${!e.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
+      </span>
       <div style="display:flex; gap:6px;">
         <button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleToggleStoreEmoji('${e.id}', ${!e.active})">${e.active ? "Desactivar" : "Activar"}</button>
         <button class="btn-outline" style="padding:4px 8px; font-size:11px; color:var(--red);" onclick="handleDeleteStoreEmoji('${e.id}')">🗑</button>
@@ -7036,17 +7063,44 @@ async function loadStoreEmojisList() {
 async function handleAddStoreEmoji() {
   const emoji = document.getElementById("newEmojiChar").value.trim();
   const name = document.getElementById("newEmojiName").value.trim();
-  const price = parseInt(document.getElementById("newEmojiPrice").value, 10);
+  const price = Number(document.getElementById("newEmojiPrice").value || 0);
+  const rarity = document.getElementById("newEmojiRarity")?.value || "comun";
+  const isLimited = document.getElementById("newEmojiEdition")?.value === "limited";
+  const stock = Number(document.getElementById("newEmojiStock")?.value || 0);
 
-  if (!emoji || !name || !price) { showToast("Completá los 3 campos"); return; }
+  if (!emoji || !name || Number.isNaN(price) || price < 0) {
+    showToast("Completá emoji, nombre y precio");
+    return;
+  }
 
-  const { data, error } = await sb.rpc("admin_add_store_emoji", { p_emoji: emoji, p_name: name, p_price: price });
-  if (error || !data.ok) { showToast("No se pudo agregar"); return; }
+  if (isLimited && stock < 1) {
+    showToast("Indicá el stock de la edición limitada");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_add_store_emoji", {
+    p_emoji: emoji,
+    p_name: name,
+    p_price: Math.floor(price),
+    p_rarity: rarity,
+    p_is_limited: isLimited,
+    p_stock_total: isLimited ? Math.floor(stock) : null
+  });
+
+  if (error || !data?.ok) {
+    showToast(data?.error === "duplicate_emoji" ? "Ese emoji ya existe" : "No se pudo agregar");
+    return;
+  }
 
   document.getElementById("newEmojiChar").value = "";
   document.getElementById("newEmojiName").value = "";
   document.getElementById("newEmojiPrice").value = "";
-  showToast("Emoji agregado");
+  document.getElementById("newEmojiRarity").value = "comun";
+  document.getElementById("newEmojiEdition").value = "standard";
+  document.getElementById("newEmojiStock").value = "";
+  document.getElementById("newEmojiStock").disabled = true;
+
+  showToast(isLimited ? "😎 Emoji limitado creado" : "Emoji agregado");
   loadStoreEmojisList();
 }
 
@@ -7714,12 +7768,26 @@ async function renderStore() {
     <h3 style="margin-top:24px;">😎 Emojis exclusivos</h3>
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
       ${(emojis || []).map(e => `
-        <div class="form-card" style="text-align:center;">
-          <div style="font-size:30px;">${e.emoji}</div>
-          <div style="font-size:12px; margin:4px 0;">${escapeHtml(e.name)}</div>
+        <div class="form-card ls-store-badge-card ${getStoreBadgeRarityClass(e.rarity || "comun")}" style="text-align:center;min-height:170px;">
+          <div class="ls-store-badge-icon" style="font-size:34px;">${e.emoji}</div>
+          <div style="position:relative;z-index:1;font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(e.name)}</div>
+          <div class="ls-rarity-tag">${getStoreBadgeRarityLabel(e.rarity || "comun")}</div>
+
+          ${e.is_limited ? `
+            <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:900;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(250,204,21,.22);background:rgba(250,204,21,.05);padding:3px 7px;border-radius:999px;">
+              LIMITED · ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}/${e.stock_total}
+            </div>
+            ${getLimitedStockStatus(e) === "last"
+              ? `<div class="ls-limited-urgency ls-limited-last">⚠ ÚLTIMA UNIDAD</div>`
+              : getLimitedStockStatus(e) === "low"
+                ? `<div class="ls-limited-urgency">🔥 ÚLTIMAS ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}</div>`
+                : ""}` : ""}
+
           ${myEmojiSet.has(e.emoji)
-            ? `<span style="font-size:11px; color:var(--green);">✓ Tenés este</span>`
-            : `<button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleBuyEmoji('${e.id}')">${e.price_points} pts</button>`}
+            ? `<span style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</span>`
+            : (e.is_limited && Number(e.stock_sold || 0) >= Number(e.stock_total || 0))
+              ? `<span style="position:relative;z-index:1;font-size:10px;font-weight:900;color:var(--text-dim);margin-top:5px;">AGOTADO</span>`
+              : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;" onclick="handleBuyEmoji('${e.id}')">${Number(e.price_points) === 0 ? "GRATIS" : `${e.price_points} pts`}</button>`}
         </div>
       `).join("")}
     </div>
@@ -7760,15 +7828,37 @@ async function renderStore() {
 }
 
 async function handleBuyEmoji(emojiId) {
-  const { data, error } = await sb.rpc("buy_emoji", { p_user_id: currentUser.id, p_emoji_id: emojiId });
-  if (error || !data.ok) {
-    const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", ya_lo_tenes: "Ya tenés este emoji." };
-    showToast(msgs[data?.error] || "No se pudo comprar");
+  const btn = document.querySelector(`[onclick="handleBuyEmoji('${emojiId}')"]`);
+  const isFree = btn?.textContent?.trim() === "GRATIS";
+
+  if (!confirm(isFree
+    ? "¿Reclamar este emoji gratis? Quedará en tu colección."
+    : "¿Comprar este emoji? Quedará en tu colección.")) return;
+
+  const { data, error } = await sb.rpc("buy_emoji", {
+    p_user_id: currentUser.id,
+    p_emoji_id: emojiId
+  });
+
+  if (error || !data?.ok) {
+    const msgs = {
+      saldo_insuficiente:"No tenés suficientes puntos.",
+      ya_lo_tenes:"Ya tenés este emoji.",
+      no_disponible:"Este emoji ya no está disponible.",
+      agotado:"Esta edición limitada se agotó."
+    };
+    showToast(msgs[data?.error] || "No se pudo obtener el emoji");
     return;
   }
-  await loadProfile();
+
+  currentProfile.points_balance = Number(data.new_balance ?? currentProfile.points_balance);
   updateBalanceUI();
-  showToast(`¡Desbloqueaste ${data.emoji}!`);
+
+  const serialText = data.serial_number && data.stock_total
+    ? ` · #${data.serial_number}/${data.stock_total}`
+    : "";
+
+  showToast(`¡Desbloqueaste ${data.emoji}!${serialText}`);
   renderStore();
 }
 

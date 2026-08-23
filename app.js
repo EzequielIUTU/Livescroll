@@ -1077,7 +1077,14 @@ async function checkAndShowLoginStreak() {
   }
 }
 
+function closeLoginStreakModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  setMobileBottomNavHidden(false);
+}
+
 function showLoginStreakModal() {
+  setMobileBottomNavHidden(true);
   const data = window.__loginStreakData;
   if (!data) return;
   const claimedToday = data.claimed_today;
@@ -1095,7 +1102,7 @@ function showLoginStreakModal() {
       <div class="modal-box" style="max-width:380px;">
         <div class="modal-box-header">
           <h2>📅 Inicio de Sesión</h2>
-          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+          <button onclick="closeLoginStreakModal()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div class="modal-box-body">
           <p style="color:var(--text-dim); font-size:12px; margin-top:0;">Entrá todos los días que puedas — si faltás uno, no se rompe nada, seguís de donde quedaste.</p>
@@ -1117,22 +1124,59 @@ function showLoginStreakModal() {
         <div class="modal-box-footer">
           ${claimedToday
             ? `<button class="btn-outline" style="width:100%;" disabled>Ya reclamaste hoy ✓</button>`
-            : `<button class="btn" style="width:100%;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
+            : `<button class="btn" id="claimLoginStreakBtn" style="width:100%;min-height:48px;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
         </div>
       </div>
     </div>`;
 }
 
 async function handleClaimLoginStreak() {
-  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
-  if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
+  const btn = document.getElementById("claimLoginStreakBtn");
 
-  currentProfile.points_balance += data.points;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Reclamando...";
+  }
+
+  const { data, error } = await sb.rpc("claim_daily_streak", {
+    p_user_id: currentUser.id
+  });
+
+  if (error || !data?.ok) {
+    const reason = data?.error || error?.message || "error_desconocido";
+
+    const messages = {
+      ya_reclamado: "Ya reclamaste la recompensa de hoy.",
+      not_authenticated: "Tu sesión venció. Volvé a iniciar sesión.",
+      invalid_user: "No pudimos validar tu cuenta. Recargá LiveScroll.",
+      cuenta_bloqueada: "Tu cuenta todavía no puede reclamar recompensas."
+    };
+
+    showToast(messages[reason] || "No se pudo reclamar. Probá nuevamente.");
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Reclamar";
+    }
+
+    console.warn("Error reclamando Inicio de Sesión:", reason, error || data);
+    return;
+  }
+
+  currentProfile.points_balance += Number(data.points || 0);
   currentProfile.streak_current_day = data.day;
+  currentProfile.streak_last_login_date = new Date().toISOString().slice(0, 10);
+
   updateBalanceUI();
-  showFloatingPointsSafe(data.points);
-  document.getElementById("globalModalWrap").innerHTML = "";
+  showFloatingPointsSafe(Number(data.points || 0));
+
+  // Cerramos el selector, pero mantenemos oculta la navegación
+  // porque enseguida mostramos el premio.
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+
   showStreakModal(data);
+
   const banner = document.getElementById("loginStreakBannerWrap");
   if (banner) banner.innerHTML = "";
 }
@@ -1164,7 +1208,14 @@ async function claimDailyStreak() {
   showStreakModal(data);
 }
 
+function closeStreakRewardModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  setMobileBottomNavHidden(false);
+}
+
 function showStreakModal(data) {
+  setMobileBottomNavHidden(true);
   const wrap = document.getElementById("globalModalWrap");
   const wasCompleted = data.completed_week;
 
@@ -1190,7 +1241,7 @@ function showStreakModal(data) {
             <div style="font-size:32px;">${data.emoji_reward}</div>
             <div style="font-size:13px; color:var(--green); margin-top:6px;">¡Nuevo emoji de avatar desbloqueado!</div>
           </div>` : ""}
-        <button class="btn" style="width:100%;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Genial</button>
+        <button class="btn" style="width:100%;min-height:48px;" onclick="closeStreakRewardModal()">Genial</button>
       </div>
     </div>`;
 }
@@ -1256,6 +1307,33 @@ function ensureSafeMobileUpgradeStyles() {
   style.id = "lsSafeMobileUpgradeStyles";
   style.textContent = `
     .ls-mobile-nav-safe { display:none; }
+
+    body,
+    button,
+    a,
+    label,
+    p,
+    span,
+    div,
+    h1, h2, h3, h4, h5, h6,
+    .form-card,
+    .profile-hero,
+    .profile-section,
+    .feed-item {
+      -webkit-user-select:none;
+      user-select:none;
+      -webkit-touch-callout:none;
+    }
+
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    .allow-text-select {
+      -webkit-user-select:text !important;
+      user-select:text !important;
+      -webkit-touch-callout:default;
+    }
 
     .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
     @keyframes lsLikePopSafe {

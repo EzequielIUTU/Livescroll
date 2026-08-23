@@ -6716,7 +6716,7 @@ async function renderAdmin() {
           <option value="legendaria">Legendaria</option>
           <option value="exclusiva">Exclusiva</option>
         </select>
-        <input type="number" id="newStoreBadgePrice" min="1" placeholder="Precio pts"
+        <input type="number" id="newStoreBadgePrice" min="0" placeholder="Precio pts · 0 = GRATIS"
           style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
       </div>
 
@@ -7075,6 +7075,8 @@ async function loadStoreBadgesAdminList() {
       </span>
       <div style="display:flex;gap:6px;">
         <button class="btn-outline" style="padding:4px 8px;font-size:11px;"
+          onclick="openEditStoreBadge('${b.id}')">✏️ Editar</button>
+        <button class="btn-outline" style="padding:4px 8px;font-size:11px;"
           onclick="handleToggleStoreBadge('${b.id}', ${!b.active})">${b.active ? "Desactivar" : "Activar"}</button>
         <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);"
           onclick="handleDeleteStoreBadge('${b.id}')">🗑</button>
@@ -7092,7 +7094,7 @@ async function handleAddStoreBadge() {
   const isLimited = document.getElementById("newStoreBadgeEdition")?.value === "limited";
   const stock = Number(document.getElementById("newStoreBadgeStock")?.value || 0);
 
-  if (!icon || !name || !price || price < 1) {
+  if (!icon || !name || Number.isNaN(price) || price < 0) {
     showToast("Completá ícono, nombre y precio");
     return;
   }
@@ -7124,6 +7126,126 @@ async function handleAddStoreBadge() {
   document.getElementById("newStoreBadgeStock").value = "";
   document.getElementById("newStoreBadgeStock").disabled = true;
   showToast(isLimited ? "💎 Edición limitada creada" : "🏅 Medalla creada");
+  loadStoreBadgesAdminList();
+}
+
+
+async function openEditStoreBadge(id) {
+  const { data, error } = await sb.rpc("admin_get_store_badges");
+  if (error) {
+    showToast("No se pudo cargar la medalla");
+    return;
+  }
+
+  const badge = (data || []).find(b => b.id === id);
+  if (!badge) {
+    showToast("Medalla no encontrada");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:260;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:440px;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <h2 style="margin:0;font-size:18px;">✏️ Editar medalla</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Podés cambiar sus datos sin borrarla.</div>
+          </div>
+          <button onclick="document.getElementById('globalModalWrap').innerHTML=''"
+            style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body">
+          <div style="display:grid;grid-template-columns:70px 1fr;gap:8px;margin-bottom:8px;">
+            <input id="editStoreBadgeIcon" value="${escapeHtml(badge.badge_icon || "🏅")}" maxlength="8"
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);text-align:center;font-size:20px;">
+            <input id="editStoreBadgeName" value="${escapeHtml(badge.badge_name || "")}"
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          </div>
+
+          <textarea id="editStoreBadgeDescription" rows="2" maxlength="180"
+            style="width:100%;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);resize:vertical;margin-bottom:8px;">${escapeHtml(badge.description || "")}</textarea>
+
+          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
+            <select id="editStoreBadgeRarity"
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              ${["comun","rara","epica","legendaria","exclusiva"].map(r => `<option value="${r}" ${badge.rarity===r ? "selected" : ""}>${getStoreBadgeRarityLabel(r)}</option>`).join("")}
+            </select>
+            <input type="number" id="editStoreBadgePrice" min="0" value="${Number(badge.price_points || 0)}"
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
+            <select id="editStoreBadgeEdition"
+              onchange="document.getElementById('editStoreBadgeStock').disabled=this.value!=='limited';"
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+              <option value="standard" ${badge.is_limited ? "" : "selected"}>Edición normal</option>
+              <option value="limited" ${badge.is_limited ? "selected" : ""}>Edición limitada</option>
+            </select>
+            <input type="number" id="editStoreBadgeStock" min="${Math.max(1, Number(badge.stock_sold || 0))}"
+              value="${badge.is_limited ? Number(badge.stock_total || 1) : ""}"
+              ${badge.is_limited ? "" : "disabled"}
+              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          </div>
+
+          ${badge.is_limited ? `<div style="font-size:9px;color:var(--text-dim);margin-top:6px;">
+            Ya reclamadas/compradas: ${Number(badge.stock_sold || 0)}. El stock total no puede quedar por debajo de ese número.
+          </div>` : ""}
+        </div>
+
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="handleSaveStoreBadgeEdit('${badge.id}')">Guardar cambios</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function handleSaveStoreBadgeEdit(id) {
+  const icon = document.getElementById("editStoreBadgeIcon")?.value.trim() || "";
+  const name = document.getElementById("editStoreBadgeName")?.value.trim() || "";
+  const description = document.getElementById("editStoreBadgeDescription")?.value.trim() || "";
+  const rarity = document.getElementById("editStoreBadgeRarity")?.value || "comun";
+  const price = Number(document.getElementById("editStoreBadgePrice")?.value || 0);
+  const isLimited = document.getElementById("editStoreBadgeEdition")?.value === "limited";
+  const stock = Number(document.getElementById("editStoreBadgeStock")?.value || 0);
+
+  if (!icon || !name || Number.isNaN(price) || price < 0) {
+    showToast("Revisá ícono, nombre y precio");
+    return;
+  }
+
+  if (isLimited && stock < 1) {
+    showToast("La edición limitada necesita stock");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_update_store_badge", {
+    p_badge_id: id,
+    p_badge_icon: icon,
+    p_badge_name: name,
+    p_description: description,
+    p_rarity: rarity,
+    p_price_points: Math.floor(price),
+    p_is_limited: isLimited,
+    p_stock_total: isLimited ? Math.floor(stock) : null
+  });
+
+  if (error || !data?.ok) {
+    const messages = {
+      duplicate_name:"Ya existe otra medalla con ese nombre",
+      stock_below_sold:"El stock total no puede ser menor a lo ya entregado",
+      invalid_price:"El precio no puede ser negativo",
+      invalid_stock:"Revisá el stock"
+    };
+    showToast(messages[data?.error] || "No se pudo guardar");
+    return;
+  }
+
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast("🏅 Medalla actualizada");
   loadStoreBadgesAdminList();
 }
 
@@ -7510,7 +7632,7 @@ async function renderStore() {
             : (b.is_limited && Number(b.stock_sold || 0) >= Number(b.stock_total || 0))
               ? `<div style="position:relative;z-index:1;font-size:10px;font-weight:900;color:var(--text-dim);margin-top:5px;">AGOTADA</div>`
               : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;"
-                  onclick="handleBuyStoreBadge('${b.id}')">${b.price_points} pts</button>`}
+                  onclick="handleBuyStoreBadge('${b.id}')">${Number(b.price_points) === 0 ? "GRATIS" : `${b.price_points} pts`}</button>`}
         </div>
       `).join("") : `<p style="font-size:12px;color:var(--text-dim);">Todavía no hay medallas disponibles.</p>`}
     </div>
@@ -7591,7 +7713,12 @@ async function handleBuyBoost() {
 
 
 async function handleBuyStoreBadge(badgeId) {
-  if (!confirm("¿Comprar esta medalla? Quedará permanentemente en tu colección.")) return;
+  const badgeCard = document.querySelector(`[onclick="handleBuyStoreBadge('${badgeId}')"]`);
+  const isFree = badgeCard?.textContent?.trim() === "GRATIS";
+
+  if (!confirm(isFree
+    ? "¿Reclamar esta medalla gratis? Quedará permanentemente en tu colección."
+    : "¿Comprar esta medalla? Quedará permanentemente en tu colección.")) return;
 
   const { data, error } = await sb.rpc("buy_store_badge", {
     p_badge_id: badgeId

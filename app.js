@@ -6720,6 +6720,17 @@ async function renderAdmin() {
           style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
       </div>
 
+      <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
+        <select id="newStoreBadgeEdition"
+          onchange="document.getElementById('newStoreBadgeStock').disabled=this.value!=='limited';"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="standard">Edición normal</option>
+          <option value="limited">Edición limitada</option>
+        </select>
+        <input type="number" id="newStoreBadgeStock" min="1" placeholder="Unidades" disabled
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+      </div>
+
       <div style="display:flex;gap:8px;">
         <button type="button" class="btn-outline" onclick="openEmojiPicker('newStoreBadgeIcon', MEDAL_EMOJIS)">Elegir ícono</button>
         <button class="btn" onclick="handleAddStoreBadge()">Crear medalla</button>
@@ -7059,6 +7070,7 @@ async function loadStoreBadgesAdminList() {
         ${b.badge_icon || "🏅"} ${escapeHtml(b.badge_name)}
         · <span class="${getStoreBadgeRarityClass(b.rarity)}">${getStoreBadgeRarityLabel(b.rarity)}</span>
         · <span class="mono">${b.price_points} pts</span>
+        ${b.is_limited ? ` · <span style="color:var(--gold);font-weight:800;">LIMITED ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}/${b.stock_total}</span>` : ""}
         ${!b.active ? `<span style="color:var(--text-dim);">(desactivada)</span>` : ""}
       </span>
       <div style="display:flex;gap:6px;">
@@ -7077,9 +7089,15 @@ async function handleAddStoreBadge() {
   const description = document.getElementById("newStoreBadgeDescription")?.value.trim() || "";
   const rarity = document.getElementById("newStoreBadgeRarity")?.value || "comun";
   const price = Number(document.getElementById("newStoreBadgePrice")?.value || 0);
+  const isLimited = document.getElementById("newStoreBadgeEdition")?.value === "limited";
+  const stock = Number(document.getElementById("newStoreBadgeStock")?.value || 0);
 
   if (!icon || !name || !price || price < 1) {
     showToast("Completá ícono, nombre y precio");
+    return;
+  }
+  if (isLimited && stock < 1) {
+    showToast("Indicá cuántas unidades tendrá la edición limitada");
     return;
   }
 
@@ -7088,7 +7106,9 @@ async function handleAddStoreBadge() {
     p_badge_name: name,
     p_description: description,
     p_rarity: rarity,
-    p_price_points: Math.floor(price)
+    p_price_points: Math.floor(price),
+    p_is_limited: isLimited,
+    p_stock_total: isLimited ? Math.floor(stock) : null
   });
 
   if (error || !data?.ok) {
@@ -7100,7 +7120,10 @@ async function handleAddStoreBadge() {
   document.getElementById("newStoreBadgeName").value = "";
   document.getElementById("newStoreBadgeDescription").value = "";
   document.getElementById("newStoreBadgePrice").value = "";
-  showToast("🏅 Medalla creada");
+  document.getElementById("newStoreBadgeEdition").value = "standard";
+  document.getElementById("newStoreBadgeStock").value = "";
+  document.getElementById("newStoreBadgeStock").disabled = true;
+  showToast(isLimited ? "💎 Edición limitada creada" : "🏅 Medalla creada");
   loadStoreBadgesAdminList();
 }
 
@@ -7477,11 +7500,17 @@ async function renderStore() {
           <div class="ls-store-badge-icon">${b.badge_icon || "🏅"}</div>
           <div style="position:relative;z-index:1;font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name)}</div>
           <div class="ls-rarity-tag">${getStoreBadgeRarityLabel(b.rarity)}</div>
+          ${b.is_limited ? `
+            <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:900;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(250,204,21,.22);background:rgba(250,204,21,.05);padding:3px 7px;border-radius:999px;">
+              LIMITED · ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}/${b.stock_total}
+            </div>` : ""}
           <div class="ls-store-badge-desc">${escapeHtml(b.description || "Medalla exclusiva de LiveScroll.")}</div>
           ${myBadgeSet.has(b.badge_name)
             ? `<div style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</div>`
-            : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;"
-                onclick="handleBuyStoreBadge('${b.id}')">${b.price_points} pts</button>`}
+            : (b.is_limited && Number(b.stock_sold || 0) >= Number(b.stock_total || 0))
+              ? `<div style="position:relative;z-index:1;font-size:10px;font-weight:900;color:var(--text-dim);margin-top:5px;">AGOTADA</div>`
+              : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;"
+                  onclick="handleBuyStoreBadge('${b.id}')">${b.price_points} pts</button>`}
         </div>
       `).join("") : `<p style="font-size:12px;color:var(--text-dim);">Todavía no hay medallas disponibles.</p>`}
     </div>
@@ -7575,6 +7604,7 @@ async function handleBuyStoreBadge(badgeId) {
       saldo_insuficiente:"No tenés suficientes puntos.",
       ya_la_tenes:"Ya tenés esta medalla.",
       no_disponible:"Esta medalla ya no está disponible.",
+      agotada:"Esta edición limitada se agotó.",
       not_authenticated:"Tu sesión necesita renovarse."
     };
     showToast(messages[code] || "No se pudo comprar la medalla");

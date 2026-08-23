@@ -1334,6 +1334,131 @@ function ensureSafeMobileUpgradeStyles() {
       -webkit-touch-callout:default;
     }
 
+
+    /* ===== LiveScroll Modern Pass: visual only ===== */
+    .feed-item {
+      border-radius:18px !important;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.07) !important;
+      box-shadow:0 10px 28px rgba(0,0,0,.16);
+    }
+
+    .feed-item button {
+      transition:transform .16s ease, opacity .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    .feed-item button:active {
+      transform:scale(.94);
+    }
+
+    .profile-hero,
+    .profile-section,
+    .form-card {
+      border-radius:18px !important;
+    }
+
+    .profile-stats-row {
+      gap:8px !important;
+    }
+
+    .stat-pill {
+      border-radius:14px !important;
+      transition:transform .18s ease, border-color .18s ease;
+    }
+
+    .stat-pill:active {
+      transform:scale(.97);
+    }
+
+    .btn,
+    .btn-outline {
+      min-height:42px;
+      border-radius:12px !important;
+      transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+      touch-action:manipulation;
+    }
+
+    .btn:active,
+    .btn-outline:active {
+      transform:scale(.97);
+    }
+
+    .modal-box {
+      border-radius:20px;
+      box-shadow:0 22px 70px rgba(0,0,0,.42);
+    }
+
+    .modal-box-header {
+      padding-bottom:12px;
+    }
+
+    .modal-box-footer {
+      gap:10px;
+    }
+
+    .ls-nova .feed-item {
+      box-shadow:0 14px 36px rgba(0,0,0,.22);
+      backdrop-filter:blur(5px);
+      -webkit-backdrop-filter:blur(5px);
+    }
+
+    .ls-nova .profile-hero,
+    .ls-nova .profile-section,
+    .ls-nova .form-card {
+      box-shadow:0 10px 30px rgba(0,0,0,.12);
+    }
+
+    .ls-nova .btn:hover,
+    .ls-nova .btn-outline:hover {
+      transform:translateY(-1px);
+    }
+
+    .ls-legacy .feed-item,
+    .ls-legacy .profile-hero,
+    .ls-legacy .profile-section,
+    .ls-legacy .form-card,
+    .ls-legacy .modal-box {
+      box-shadow:none !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
+    }
+
+    @media (max-width:700px) {
+      .feed-item {
+        border-radius:15px !important;
+      }
+
+      .profile-hero,
+      .profile-section,
+      .form-card {
+        border-radius:15px !important;
+      }
+
+      .btn,
+      .btn-outline {
+        min-height:44px;
+      }
+
+      .modal-box {
+        max-width:calc(100vw - 18px);
+      }
+    }
+
+    @media (max-width:360px) {
+      .feed-item {
+        border-radius:12px !important;
+      }
+
+      .profile-stats-row {
+        gap:5px !important;
+      }
+
+      .stat-pill {
+        padding-left:7px !important;
+        padding-right:7px !important;
+      }
+    }
+
     .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
     @keyframes lsLikePopSafe {
       0%,100% { transform:scale(1); }

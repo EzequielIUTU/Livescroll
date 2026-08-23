@@ -1515,6 +1515,22 @@ function ensureSafeMobileUpgradeStyles() {
         border-top:1px solid var(--border) !important;
         padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
       }
+
+      .ls-comments-overlay-safe {
+        align-items:flex-end !important;
+        padding:0 0 78px 0 !important;
+        box-sizing:border-box !important;
+      }
+
+      .ls-comments-panel-safe {
+        width:100% !important;
+        max-width:560px !important;
+        height:min(66vh, 560px) !important;
+        max-height:calc(100vh - 96px) !important;
+        border-radius:18px 18px 0 0 !important;
+        margin:0 !important;
+        box-sizing:border-box !important;
+      }
     }
   `;
 
@@ -3462,7 +3478,7 @@ async function handleShare(videoId, url) {
 }
 
 async function openComments(videoId, focusCommentId = null) {
-  setMobileBottomNavHidden(true);
+  setMobileBottomNavHidden(false);
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
@@ -3532,7 +3548,9 @@ async function submitComment(videoId) {
 }
 
 function closeComments() {
-  closeManagedModal();
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  setMobileBottomNavHidden(false);
 }
 
 function renderAvatarHtml(profile, size) {

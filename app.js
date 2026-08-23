@@ -893,13 +893,104 @@ async function checkPendingContent() {
 }
 
 
+async function checkConnected579Launch() {
+  if (!currentUser?.id) return;
+
+  const { data, error } = await sb.rpc("get_connected_579_launch_pending");
+  if (error || !data?.pending) return;
+
+  showConnected579Launch();
+}
+
+function showConnected579Launch() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="ls-next-era-changelog">
+      <div class="ls-next-era-box" style="max-width:520px;text-align:center;">
+        <div class="ls-next-era-scan"></div>
+
+        <div class="ls-next-era-head">
+          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NEW STAGE</div>
+          <h2 class="ls-next-era-title" style="font-size:clamp(29px,7vw,48px);line-height:.98;margin-bottom:8px;">5.7.9</h2>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:.12em;">CONNECTED</div>
+        </div>
+
+        <div class="ls-next-era-body" style="text-align:center;">
+          <div style="font-size:40px;margin:3px 0 10px;">📡</div>
+          <h3 style="margin:0 0 8px;font-size:19px;">The next connection begins.</h3>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.65;max-width:405px;margin:0 auto;">
+            Empezamos a construir una nueva generación de LiveScroll:
+            directos más rápidos, una experiencia móvil más inmediata
+            y nuevas formas de mantenerte conectado.
+          </p>
+
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 4px;">
+            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
+              <div style="font-size:20px;">⚡</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">FASTER LIVE</div>
+            </div>
+            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
+              <div style="font-size:20px;">📱</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">MOBILE</div>
+            </div>
+            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
+              <div style="font-size:20px;">🔔</div>
+              <div style="font-size:9px;font-weight:800;margin-top:5px;">CONNECTED</div>
+            </div>
+          </div>
+
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:.12em;margin-top:14px;">
+            COMING SOON
+          </div>
+        </div>
+
+        <div class="ls-next-era-foot">
+          <button class="ls-road6-btn" style="width:100%;" onclick="acknowledgeConnected579Launch(this)">
+            CONTINUAR EL CAMINO →
+          </button>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:9px;">5.7.9 se encuentra actualmente en desarrollo.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function acknowledgeConnected579Launch(btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "CONECTANDO...";
+  }
+
+  const { data, error } = await sb.rpc("acknowledge_connected_579_launch");
+
+  if (error || !data?.ok) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "CONTINUAR EL CAMINO →";
+    }
+    showToast("No se pudo guardar el aviso");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+
 async function checkCollection568Launch() {
   if (!currentUser?.id) return;
 
   const { data, error } = await sb.rpc("get_collection_568_launch_pending");
-  if (error || !data?.pending) return;
+  if (error) return;
 
-  showCollection568Launch();
+  if (data?.pending) {
+    showCollection568Launch();
+    return;
+  }
+
+  checkConnected579Launch();
 }
 
 function showCollection568Launch() {
@@ -961,6 +1052,10 @@ async function acknowledgeCollection568Launch(btn) {
 
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
+
+  // Si todavía no vio la siguiente etapa, la mostramos sin obligarlo
+  // a cerrar y volver a abrir la app.
+  checkConnected579Launch();
 }
 
 function showRoadTo6Teaser() {

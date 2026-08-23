@@ -285,7 +285,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -516,6 +516,14 @@ function initLiveScrollExperienceMode() {
 
       .ls-experience-badge:active {
         transform:scale(.96);
+      }
+
+      @media (max-width:700px) {
+        .ls-experience-badge {
+          bottom:max(82px, calc(72px + env(safe-area-inset-bottom))) !important;
+          right:10px !important;
+          z-index:340 !important;
+        }
       }
 
       .ls-mode-overlay {
@@ -1783,9 +1791,17 @@ function isSafeUrl(url) {
 
 function getEmbedPlaceholderHtml(video) {
   const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣", youtube: "🔴", upload: "🎬" };
-  const thumb = video.platform === "youtube" ? getThumbnailHtml(video) : "";
+  const thumb = (video.platform === "youtube" || video.platform === "upload") ? getThumbnailHtml(video) : "";
+
+  if (video.platform === "upload" && thumb.startsWith("<video")) {
+    return `<div class="feed-fallback" style="position:relative;overflow:hidden;">
+      ${thumb.replace("<video ", `<video style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7;pointer-events:none;" `)}
+      <div class="platform-icon" style="position:relative;z-index:2;">▶️</div>
+    </div>`;
+  }
+
   return `<div class="feed-fallback">
-    ${thumb && thumb.startsWith("<img") ? thumb.replace('alt="miniatura"', 'alt="miniatura" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.5;"') : ""}
+    ${thumb && thumb.startsWith("<img") ? thumb.replace(/alt="[^"]*"/, 'alt="miniatura"').replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.55;" `) : ""}
     <div class="platform-icon" style="position:relative;">${icons[video.platform] || "▶️"}</div>
   </div>`;
 }
@@ -1899,9 +1915,15 @@ function closeProfileVideoFeed() {
 
 function getGridCoverHtml(video) {
   const thumb = getThumbnailHtml(video);
+
   if (thumb.startsWith("<img")) {
     return thumb.replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;" `);
   }
+
+  if (thumb.startsWith("<video")) {
+    return thumb;
+  }
+
   return `<div class="grid-fallback">${thumb}</div>`;
 }
 
@@ -2320,7 +2342,21 @@ function getThumbnailHtml(video) {
     const id = extractYoutubeId(video.video_url);
     if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy">`;
   }
-  if (video.platform === "upload") return "🎬";
+
+  if (video.platform === "upload") {
+    if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
+      return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy">`;
+    }
+
+    // Videos viejos sin carátula persistida: mostramos el propio MP4 como preview.
+    if (isSafeUrl(video.video_url)) {
+      return `<video src="${escapeHtml(video.video_url)}#t=0.3" preload="metadata" muted playsinline
+        style="width:100%;height:100%;object-fit:cover;pointer-events:none;background:#050607;"></video>`;
+    }
+
+    return "🎬";
+  }
+
   const icons = { kick: "🟢", twitch: "🟣", tiktok: "🎵" };
   return icons[video.platform] || "▶️";
 }
@@ -2768,6 +2804,66 @@ async function handleUploadLink() {
   switchTab("feed");
 }
 
+
+async function createVideoThumbnailBlob(file) {
+  return new Promise((resolve) => {
+    let objectUrl = null;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    const cleanup = () => {
+      try { video.pause(); } catch (_) {}
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+
+    const fail = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    video.onerror = fail;
+
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      video.currentTime = Math.min(Math.max(0.2, duration * 0.12), Math.max(0.2, duration - 0.1));
+    };
+
+    video.onseeked = () => {
+      try {
+        const sourceW = video.videoWidth || 1280;
+        const sourceH = video.videoHeight || 720;
+        const maxW = 720;
+        const scale = Math.min(1, maxW / sourceW);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(sourceW * scale));
+        canvas.height = Math.max(1, Math.round(sourceH * scale));
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return fail();
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          cleanup();
+          resolve(blob || null);
+        }, "image/jpeg", 0.82);
+      } catch (_) {
+        fail();
+      }
+    };
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      video.src = objectUrl;
+    } catch (_) {
+      fail();
+    }
+  });
+}
+
 async function handleUploadFile() {
   const title = document.getElementById("uploadTitle").value.trim();
   const file = trimmedFile || rawSelectedFile;
@@ -2798,11 +2894,33 @@ async function handleUploadFile() {
 
   const { data: publicUrlData } = sb.storage.from("clip-videos").getPublicUrl(path);
 
+  let thumbnailUrl = null;
+  try {
+    const thumbnailBlob = await createVideoThumbnailBlob(file);
+
+    if (thumbnailBlob) {
+      const thumbPath = `${currentUser.id}/thumbnails/${Date.now()}-thumb.jpg`;
+      const { error: thumbUploadError } = await sb.storage.from("clip-videos").upload(thumbPath, thumbnailBlob, {
+        cacheControl: "3600",
+        contentType: "image/jpeg",
+        upsert: false
+      });
+
+      if (!thumbUploadError) {
+        const { data: thumbPublic } = sb.storage.from("clip-videos").getPublicUrl(thumbPath);
+        thumbnailUrl = thumbPublic?.publicUrl || null;
+      }
+    }
+  } catch (thumbErr) {
+    console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
+  }
+
   const { error: insertError } = await sb.from("videos").insert({
     user_id: currentUser.id,
     platform: "upload",
     title,
-    video_url: publicUrlData.publicUrl
+    video_url: publicUrlData.publicUrl,
+    thumbnail_url: thumbnailUrl
   });
 
   btn.disabled = false;
@@ -3085,7 +3203,7 @@ async function renderProfile() {
       <div class="profile-section-head">
         <div class="ico">🏅</div>
         <h3>Medallas</h3>
-        <div class="sub"><button onclick="switchTab('feed')" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver Inicio de Sesión →</button></div>
+        <div class="sub"><button onclick="openMyMedalsPanel()" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver mis medallas →</button></div>
       </div>
       <div class="form-card">
         <div class="streak-badges">
@@ -3093,6 +3211,9 @@ async function renderProfile() {
         </div>
       </div>
     </div>` : "";
+
+
+  window.__myProfileBadges = badges || [];
 
   const referralSectionHtml = `
     <div class="profile-section">
@@ -3161,7 +3282,7 @@ async function renderProfile() {
   main.innerHTML = `
     <div class="profile-hero" style="position:relative; overflow:hidden;">
       <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
-        style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}');` : ""}">
+        style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}'); background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
         <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
       </div>
 
@@ -3548,6 +3669,42 @@ async function loadUsersDirectory(term) {
     </div>`).join("");
 }
 
+
+function openMyMedalsPanel() {
+  const badges = window.__myProfileBadges || [];
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:430px;max-height:88dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:19px;">🏅 Mis medallas</h2>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${badges.length} desbloqueada${badges.length === 1 ? "" : "s"}</div>
+          </div>
+          <button type="button" onclick="document.getElementById('globalModalWrap').innerHTML=''"
+            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-box-body" style="overflow-y:auto;">
+          ${badges.length ? `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
+              ${badges.map(b => `
+                <div style="background:var(--panel-2);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
+                  <div style="font-size:34px;margin-bottom:7px;">${b.badge_icon || "🏅"}</div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name || "Medalla")}</div>
+                  ${b.earned_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(b.earned_at).toLocaleDateString("es-AR")}</div>` : ""}
+                </div>`).join("")}
+            </div>` :
+            `<div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:13px;">
+              <div style="font-size:42px;margin-bottom:8px;">🏅</div>
+              Todavía no desbloqueaste medallas.
+            </div>`}
+        </div>
+      </div>
+    </div>`;
+}
+
 async function viewPublicProfile(username) {
   if (!username) return;
   if (username === currentProfile.username) { switchTab("profile"); return; }
@@ -3559,7 +3716,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -3591,23 +3748,37 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
-    <div class="profile-hero">
-      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
-      <div class="profile-hero-top">
-        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
-        <div class="profile-name-block">
-          <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-          <div class="handle">Perfil público</div>
+    <div class="profile-hero" style="position:relative; overflow:hidden;">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
+        style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}'); background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}">
+      </div>
+
+      ${profile.profile_side_image_url ? `
+        <div aria-hidden="true" style="position:absolute;left:0;right:0;top:150px;bottom:0;z-index:1;overflow:hidden;pointer-events:none;">
+          <img src="${escapeHtml(profile.profile_side_image_url)}" alt=""
+            style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;opacity:.42;filter:saturate(.95) contrast(1.06);">
+          <div style="position:absolute;inset:0;background:
+            linear-gradient(180deg,rgba(13,16,20,.16) 0%,rgba(13,16,20,.28) 48%,rgba(13,16,20,.72) 100%),
+            linear-gradient(90deg,rgba(13,16,20,.40) 0%,rgba(13,16,20,.18) 50%,rgba(13,16,20,.30) 100%);"></div>
+        </div>` : ""}
+
+      <div style="position:relative;z-index:2;">
+        <div class="profile-hero-top">
+          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+          <div class="profile-name-block">
+            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+            <div class="handle">Perfil público</div>
+          </div>
         </div>
-      </div>
-      ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
-      ${renderSocialIcons(profile)}
-      <div class="profile-stats-row">
-        <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
-        <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
-      </div>
-      <div class="profile-hero-actions">
-        <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+        ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
+        ${renderSocialIcons(profile)}
+        <div class="profile-stats-row">
+          <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
+          <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
+        </div>
+        <div class="profile-hero-actions">
+          <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+        </div>
       </div>
     </div>
 
@@ -3873,9 +4044,14 @@ async function openEditProfile() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) this.remove()">
-      <div class="modal-box" style="max-width:380px;">
-        <div class="modal-box-header"><h2 style="font-size:19px;">Editar perfil</h2></div>
-        <div class="modal-box-body">
+      <div class="modal-box" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
+          <h2 style="font-size:19px;margin:0;">Editar perfil</h2>
+          <button type="button" onclick="document.getElementById('globalModalWrap').innerHTML=''"
+            aria-label="Cerrar"
+            style="width:40px;height:40px;min-width:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
         <div class="field" style="text-align:center;">
           <label>Foto de perfil</label>
           <div style="margin-bottom:10px;">
@@ -3889,9 +4065,25 @@ async function openEditProfile() {
         </div>
         <div class="field">
           <label>Portada del perfil</label>
-          <div style="border-radius:10px; overflow:hidden; height:70px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
+          <div id="coverPositionPreview"
+            style="border-radius:10px;overflow:hidden;height:105px;background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center ${Number(currentProfile.cover_position_y ?? 50)}%/cover no-repeat` : "var(--panel-2)"};margin-bottom:10px;border:1px solid var(--border);">
+          </div>
+
+          ${currentProfile.cover_url ? `
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px;">
+                <span style="font-size:11px;color:var(--text-dim);">Acomodar imagen</span>
+                <span id="coverPositionValue" class="mono" style="font-size:10px;color:var(--gold);">${Number(currentProfile.cover_position_y ?? 50)}%</span>
+              </div>
+              <input type="range" id="coverPositionRange" min="0" max="100" step="1"
+                value="${Number(currentProfile.cover_position_y ?? 50)}"
+                oninput="previewCoverPosition(this.value)"
+                style="width:100%;">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;"><span>Arriba</span><span>Abajo</span></div>
+            </div>` : ""}
+
           <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
-          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Se ve mejor en formato horizontal (ancha).</div>
+          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Después podés elegir qué parte de la foto se ve.</div>
           ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
         </div>
         <div class="field">
@@ -3971,9 +4163,9 @@ async function openEditProfile() {
           <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
         </div>
         </div>
-        <div class="modal-box-footer" style="display:flex; gap:10px;">
-          <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
-          <button class="btn" style="flex:1;" onclick="saveProfileEdits()">Guardar</button>
+        <div class="modal-box-footer" style="display:flex;gap:10px;position:sticky;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--border);">
+          <button class="btn-outline" style="flex:1;min-height:46px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
+          <button class="btn" style="flex:1;min-height:46px;" onclick="saveProfileEdits()">Guardar</button>
         </div>
       </div>
     </div>`;
@@ -4051,6 +4243,18 @@ async function handleRemoveAvatarPhoto() {
   openEditProfile();
 }
 
+
+function previewCoverPosition(value) {
+  const y = Math.max(0, Math.min(100, Number(value) || 50));
+  const preview = document.getElementById("coverPositionPreview");
+  const label = document.getElementById("coverPositionValue");
+
+  if (preview && currentProfile.cover_url) {
+    preview.style.backgroundPosition = `center ${y}%`;
+  }
+  if (label) label.textContent = `${y}%`;
+}
+
 async function handleCoverPhotoUpload() {
   const fileInput = document.getElementById("coverPhotoInput");
   const file = fileInput.files[0];
@@ -4072,11 +4276,12 @@ async function handleCoverPhotoUpload() {
   const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
   const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
 
-  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl }).eq("id", currentUser.id);
+  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl, cover_position_y: 50 }).eq("id", currentUser.id);
   if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
 
   currentProfile.cover_url = freshUrl;
-  showToast("¡Portada actualizada!");
+  currentProfile.cover_position_y = 50;
+  showToast("¡Portada actualizada! Ahora podés acomodarla.");
   openEditProfile();
 }
 
@@ -4178,9 +4383,13 @@ async function saveProfileEdits() {
     currentProfile.username = newUsername;
   }
 
+  const coverPositionEl = document.getElementById("coverPositionRange");
+  const coverPositionY = coverPositionEl ? Math.max(0, Math.min(100, Number(coverPositionEl.value) || 50)) : Number(currentProfile.cover_position_y ?? 50);
+
   const { error: updateError } = await sb.from("profiles").update({
     bio,
     avatar_emoji: window.selectedAvatarEmoji,
+    cover_position_y: coverPositionY,
     social_kick: document.getElementById("socialKick").value.trim() || null,
     social_twitch: document.getElementById("socialTwitch").value.trim() || null,
     social_youtube: document.getElementById("socialYoutube").value.trim() || null,
@@ -4192,6 +4401,7 @@ async function saveProfileEdits() {
 
   currentProfile.bio = bio;
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
+  currentProfile.cover_position_y = coverPositionY;
   currentProfile.social_kick = document.getElementById("socialKick").value.trim();
   currentProfile.social_twitch = document.getElementById("socialTwitch").value.trim();
   currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
@@ -4340,13 +4550,29 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
-    <h3 style="margin-top:32px;">🔒 Candado de Planes</h3>
-    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div>
-        <div style="font-size:13px;">Controla si el resto de los usuarios puede ver la pestaña de Planes.</div>
-        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre ves todo, esto no te afecta.</div>
+    <h3 style="margin-top:32px;">🔒 Acceso a Planes y Billetera</h3>
+    <div class="form-card" style="margin-bottom:14px;padding:0;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
+        <div style="flex:1;min-width:190px;">
+          <div style="font-size:13px;font-weight:700;">💎 Planes</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Mostrá u ocultá la sección para los demás usuarios.</div>
+        </div>
+        <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
       </div>
-      <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
+
+      <div style="border-top:1px solid var(--border);"></div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
+        <div style="flex:1;min-width:190px;">
+          <div style="font-size:13px;font-weight:700;">👛 Billetera</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Pausá o habilitá el acceso a canjes.</div>
+        </div>
+        <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
+      </div>
+
+      <div style="padding:0 14px 12px;color:var(--text-dim);font-size:10px;">
+        Tu cuenta de administrador mantiene acceso a ambas secciones.
+      </div>
     </div>
 
     <h3 style="margin-top:32px;">💵 Precios de la tienda</h3>
@@ -4410,14 +4636,7 @@ async function renderAdmin() {
       </div>
     </div>
 
-    <h3 style="margin-top:32px;">🔒 Candado de Billetera</h3>
-    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-      <div>
-        <div style="font-size:13px;">Pausa que cualquiera pueda pedir un canje, sin tocar los puntos de nadie.</div>
-        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre podés retirar igual, esto no te afecta.</div>
-      </div>
-      <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
-    </div>
+
 
     <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
     <div class="form-card" style="margin-bottom:14px;">

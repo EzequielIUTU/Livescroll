@@ -1245,38 +1245,6 @@ function ensureSafeMobileUpgradeStyles() {
   style.textContent = `
     .ls-mobile-nav-safe { display:none; }
 
-    .ls-skeleton-safe {
-      position:relative;
-      overflow:hidden;
-      background:var(--panel-2);
-      border:1px solid var(--border);
-      border-radius:20px;
-    }
-
-    .ls-skeleton-safe::after {
-      content:"";
-      position:absolute;
-      inset:0;
-      transform:translateX(-100%);
-      background:linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
-      animation:lsSkeletonSafe 1.2s infinite;
-    }
-
-    .ls-legacy .ls-skeleton-safe::after {
-      animation:none !important;
-      display:none;
-    }
-
-    @keyframes lsSkeletonSafe {
-      100% { transform:translateX(100%); }
-    }
-
-    .ls-feed-skeleton-safe {
-      width:min(100%, 430px);
-      height:520px;
-      margin:10px auto 18px;
-    }
-
     .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
     @keyframes lsLikePopSafe {
       0%,100% { transform:scale(1); }
@@ -1289,20 +1257,25 @@ function ensureSafeMobileUpgradeStyles() {
       50% { transform:scale(1.08); }
     }
 
+    .ls-legacy .ls-like-pop-safe,
+    .ls-legacy .ls-balance-pop-safe {
+      animation:none !important;
+    }
+
     @media (max-width:700px) {
       body {
-        padding-bottom:max(74px, calc(64px + env(safe-area-inset-bottom))) !important;
+        padding-bottom:78px !important;
       }
 
       #appView {
-        padding-bottom:max(82px, calc(72px + env(safe-area-inset-bottom))) !important;
+        padding-bottom:88px !important;
       }
 
       .ls-mobile-nav-safe {
         position:fixed;
         left:8px;
         right:8px;
-        bottom:max(8px, env(safe-area-inset-bottom));
+        bottom:8px;
         z-index:320;
         display:grid;
         grid-template-columns:repeat(5, minmax(0,1fr));
@@ -1310,11 +1283,12 @@ function ensureSafeMobileUpgradeStyles() {
         padding:6px;
         border:1px solid var(--border);
         border-radius:18px;
-        background:rgba(13,16,20,.96);
-        box-shadow:0 10px 28px rgba(0,0,0,.34);
+        background:rgba(13,16,20,.97);
       }
 
-      .ls-legacy .ls-mobile-nav-safe { box-shadow:none; }
+      .ls-nova .ls-mobile-nav-safe {
+        box-shadow:0 10px 28px rgba(0,0,0,.34);
+      }
 
       .ls-mobile-nav-safe button {
         border:0;
@@ -1339,7 +1313,11 @@ function ensureSafeMobileUpgradeStyles() {
         background:rgba(255,255,255,.045);
       }
 
-      .ls-mobile-nav-safe .ic { font-size:19px; line-height:1; }
+      .ls-mobile-nav-safe .ic {
+        font-size:19px;
+        line-height:1;
+      }
+
       .ls-mobile-nav-safe .lb {
         font-size:9px;
         font-weight:700;
@@ -1365,49 +1343,71 @@ function ensureSafeMobileUpgradeStyles() {
     }
 
     @media (max-width:360px) {
-      .ls-mobile-nav-safe { left:5px; right:5px; padding:5px 3px; }
-      .ls-mobile-nav-safe .lb { font-size:8px; }
+      .ls-mobile-nav-safe {
+        left:5px;
+        right:5px;
+        padding:5px 3px;
+      }
+
+      .ls-mobile-nav-safe .lb {
+        font-size:8px;
+      }
     }
   `;
+
   document.head.appendChild(style);
 }
 
 function ensureSafeMobileBottomNav() {
   ensureSafeMobileUpgradeStyles();
+
   let nav = document.getElementById("lsMobileBottomNavSafe");
+
   if (!nav) {
     nav = document.createElement("nav");
     nav.id = "lsMobileBottomNavSafe";
     nav.className = "ls-mobile-nav-safe";
     nav.setAttribute("aria-label", "Navegación móvil");
+
     nav.innerHTML = `
-      <button type="button" data-tab="feed" onclick="switchTab('feed')"><span class="ic">🏠</span><span class="lb">Inicio</span></button>
-      <button type="button" data-tab="foryou" onclick="switchTab('foryou')"><span class="ic">✨</span><span class="lb">Para Ti</span></button>
-      <button type="button" data-tab="upload" onclick="switchTab('upload')"><span class="ic">＋</span><span class="lb">Subir</span></button>
-      <button type="button" data-tab="directos" onclick="switchTab('directos')"><span class="ic">🔴</span><span class="lb">Directos</span></button>
-      <button type="button" data-tab="profile" onclick="switchTab('profile')"><span class="ic">👤</span><span class="lb">Perfil</span></button>`;
+      <button type="button" data-tab="feed" onclick="switchTab('feed')">
+        <span class="ic">🏠</span><span class="lb">Inicio</span>
+      </button>
+      <button type="button" data-tab="foryou" onclick="switchTab('foryou')">
+        <span class="ic">✨</span><span class="lb">Para Ti</span>
+      </button>
+      <button type="button" data-tab="upload" onclick="switchTab('upload')">
+        <span class="ic">＋</span><span class="lb">Subir</span>
+      </button>
+      <button type="button" data-tab="directos" onclick="switchTab('directos')">
+        <span class="ic">🔴</span><span class="lb">Directos</span>
+      </button>
+      <button type="button" data-tab="profile" onclick="switchTab('profile')">
+        <span class="ic">👤</span><span class="lb">Perfil</span>
+      </button>`;
+
     document.body.appendChild(nav);
   }
+
   updateSafeMobileBottomNav();
 }
 
 function updateSafeMobileBottomNav() {
   const nav = document.getElementById("lsMobileBottomNavSafe");
   if (!nav) return;
+
   nav.querySelectorAll("button[data-tab]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === currentTab);
   });
 }
 
-function safeFeedSkeletonHtml() {
-  return `<div class="ls-feed-skeleton-safe ls-skeleton-safe"></div>`;
-}
-
 function safePulseElement(el, className) {
-  if (!el) return;
+  if (!el || window.__liveScrollLegacyMode) return;
+
   el.classList.remove(className);
   void el.offsetWidth;
   el.classList.add(className);
+
   setTimeout(() => el.classList.remove(className), 450);
 }
 
@@ -1456,7 +1456,7 @@ async function renderFeed() {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="feedList">${safeFeedSkeletonHtml()}</div>`;
+    <div id="feedList">Cargando videos...</div>`;
   checkAndShowLoginStreak();
 
   const { data: videos, error } = await sb
@@ -3181,7 +3181,7 @@ function logSocialClick(ownerId, platform) {
 // ============================================================
 async function renderForYou() {
   const main = document.getElementById("appView");
-  main.innerHTML = `<div id="foryouList">${safeFeedSkeletonHtml()}</div>`;
+  main.innerHTML = `<div id="foryouList">Cargando destacados...</div>`;
 
   const { data: featured, error } = await sb.rpc("get_featured_videos");
   const list = document.getElementById("foryouList");

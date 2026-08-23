@@ -2953,6 +2953,125 @@ function ensureModernMobileStyles() {
       .ls-next-era-foot { padding:12px 17px 16px; }
     }
 
+
+    /* LiveScroll 5.5.7 — IDENTITY */
+    .ls-equipped-medals {
+      display:flex;
+      align-items:center;
+      gap:7px;
+      margin-top:8px;
+      min-height:30px;
+      flex-wrap:wrap;
+    }
+
+    .ls-equipped-medal {
+      position:relative;
+      width:31px;
+      height:31px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      border:1px solid rgba(250,204,21,.28);
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255,255,255,.12), transparent 32%),
+        rgba(8,10,13,.72);
+      box-shadow:0 5px 16px rgba(0,0,0,.24), inset 0 0 12px rgba(250,204,21,.035);
+      font-size:17px;
+      cursor:pointer;
+      transform:translateZ(0);
+      transition:transform .14s ease, border-color .14s ease;
+    }
+
+    .ls-equipped-medal:hover {
+      transform:translateY(-2px) scale(1.05);
+      border-color:rgba(250,204,21,.58);
+    }
+
+    .ls-equipped-medal-slot {
+      width:31px;
+      height:31px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      border:1px dashed rgba(255,255,255,.16);
+      color:var(--text-dim);
+      background:rgba(255,255,255,.018);
+      font-size:12px;
+    }
+
+    .ls-medal-picker-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(118px,1fr));
+      gap:9px;
+    }
+
+    .ls-medal-picker-item {
+      min-height:88px;
+      padding:11px 9px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      text-align:center;
+      border-radius:13px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--text);
+      cursor:pointer;
+      font-family:inherit;
+      transition:transform .14s ease,border-color .14s ease,background .14s ease;
+    }
+
+    .ls-medal-picker-item:hover {
+      transform:translateY(-2px);
+      border-color:var(--gold-dim);
+    }
+
+    .ls-medal-picker-item.selected {
+      border-color:var(--gold);
+      background:rgba(250,204,21,.065);
+      box-shadow:inset 0 0 0 1px rgba(250,204,21,.08);
+    }
+
+    .ls-medal-picker-icon {
+      font-size:27px;
+      line-height:1;
+    }
+
+    .ls-medal-picker-name {
+      font-size:10px;
+      line-height:1.25;
+      color:var(--text-dim);
+    }
+
+    .ls-medal-detail-icon {
+      width:72px;
+      height:72px;
+      margin:0 auto 14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      font-size:40px;
+      border:1px solid rgba(250,204,21,.32);
+      background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.12),transparent 32%),rgba(250,204,21,.045);
+      box-shadow:0 15px 42px rgba(0,0,0,.35);
+    }
+
+    @media (max-width:700px) {
+      .ls-equipped-medal,
+      .ls-equipped-medal-slot {
+        width:30px;
+        height:30px;
+      }
+      .ls-equipped-medal {
+        transition:none;
+      }
+    }
+
     /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
     .ls-fast-shimmer,
     .ls-fast-profile-skeleton i,
@@ -4384,6 +4503,163 @@ function initProfileNovaTilt() {
   hero.addEventListener("mouseleave", reset);
 }
 
+
+async function getEquippedProfileMedals(userId) {
+  if (!userId) return [];
+
+  const { data, error } = await sb.rpc("get_equipped_profile_badges", {
+    p_user_id: userId
+  });
+
+  if (error) {
+    console.warn("No se pudieron cargar medallas equipadas:", error);
+    return [];
+  }
+
+  return (data || []).sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
+}
+
+function renderEquippedMedalsInline(medals, ownProfile = false) {
+  const safe = Array.isArray(medals) ? medals.slice(0,3) : [];
+  const slots = [];
+
+  for (let i = 1; i <= 3; i++) {
+    const medal = safe.find(m => Number(m.slot_number) === i);
+
+    if (medal) {
+      slots.push(`
+        <button type="button"
+          class="ls-equipped-medal"
+          title="${escapeHtml(medal.badge_name || "Medalla")}"
+          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}')">
+          ${medal.badge_icon || "🏅"}
+        </button>`);
+    } else if (ownProfile) {
+      slots.push(`<button type="button" class="ls-equipped-medal-slot" title="Espacio libre" onclick="openEquipMedalsPanel()">＋</button>`);
+    }
+  }
+
+  return `
+    <div class="ls-equipped-medals">
+      ${slots.join("")}
+      ${ownProfile ? `<button type="button" onclick="openEquipMedalsPanel()" style="background:none;border:0;color:var(--gold);font-family:inherit;font-size:10px;cursor:pointer;padding:5px 2px;">Editar</button>` : ""}
+    </div>`;
+}
+
+function openMedalDetail(name, icon) {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:350px;">
+        <div class="modal-box-body" style="padding:26px;text-align:center;">
+          <div class="ls-medal-detail-icon">${icon || "🏅"}</div>
+          <h2 style="margin:0 0 6px;">${escapeHtml(name || "Medalla")}</h2>
+          <div style="font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">MEDALLA DE PERFIL</div>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
+            Esta medalla forma parte de la identidad pública de este perfil.
+          </p>
+          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function openEquipMedalsPanel() {
+  const badges = window.__myProfileBadges || [];
+  const current = await getEquippedProfileMedals(currentUser.id);
+  const selected = current.map(m => m.badge_name).filter(Boolean);
+
+  window.__selectedProfileMedals = selected.slice(0,3);
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:230;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:450px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header">
+          <div>
+            <h2 style="margin:0;">🏅 Tu identidad</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Elegí hasta 3 medallas para mostrar debajo de tu nombre.</div>
+          </div>
+          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          <div id="medalSelectionCount" style="font-size:11px;color:var(--gold);margin-bottom:12px;">${window.__selectedProfileMedals.length}/3 seleccionadas</div>
+
+          ${badges.length ? `
+            <div class="ls-medal-picker-grid">
+              ${badges.map(b => `
+                <button type="button"
+                  class="ls-medal-picker-item ${window.__selectedProfileMedals.includes(b.badge_name) ? "selected" : ""}"
+                  data-medal-name="${escapeHtml(b.badge_name)}"
+                  onclick="toggleProfileMedalSelection(this, '${escapeHtml(b.badge_name)}')">
+                  <div class="ls-medal-picker-icon">${b.badge_icon || "🏅"}</div>
+                  <div class="ls-medal-picker-name">${escapeHtml(b.badge_name)}</div>
+                </button>
+              `).join("")}
+            </div>` :
+            `<div style="padding:24px 8px;text-align:center;color:var(--text-dim);font-size:12px;">Todavía no tenés medallas para equipar.</div>`
+          }
+        </div>
+
+        <div class="modal-box-footer" style="display:flex;gap:9px;">
+          <button class="btn-outline" style="flex:1;" onclick="clearProfileMedalSelection()">Quitar todas</button>
+          <button class="btn" style="flex:1;" onclick="saveEquippedProfileMedals()">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function toggleProfileMedalSelection(button, badgeName) {
+  const list = window.__selectedProfileMedals || [];
+  const idx = list.indexOf(badgeName);
+
+  if (idx >= 0) {
+    list.splice(idx,1);
+    button?.classList.remove("selected");
+  } else {
+    if (list.length >= 3) {
+      showToast("Podés mostrar hasta 3 medallas");
+      return;
+    }
+    list.push(badgeName);
+    button?.classList.add("selected");
+  }
+
+  window.__selectedProfileMedals = list;
+  const count = document.getElementById("medalSelectionCount");
+  if (count) count.textContent = `${list.length}/3 seleccionadas`;
+}
+
+function clearProfileMedalSelection() {
+  window.__selectedProfileMedals = [];
+  document.querySelectorAll(".ls-medal-picker-item.selected").forEach(el => el.classList.remove("selected"));
+  const count = document.getElementById("medalSelectionCount");
+  if (count) count.textContent = "0/3 seleccionadas";
+}
+
+async function saveEquippedProfileMedals() {
+  const selected = (window.__selectedProfileMedals || []).slice(0,3);
+
+  const { data, error } = await sb.rpc("set_equipped_profile_badges", {
+    p_badge_names: selected
+  });
+
+  if (error || !data?.ok) {
+    console.error(error || data);
+    showToast("No se pudieron guardar las medallas");
+    return;
+  }
+
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast("🏅 Identidad actualizada");
+  renderProfile();
+}
+
 async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
@@ -4446,6 +4722,7 @@ async function renderProfile() {
     .eq("followed_id", currentUser.id);
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
+  const equippedBadges = await getEquippedProfileMedals(currentUser.id);
 
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
@@ -4472,7 +4749,10 @@ async function renderProfile() {
       <div class="profile-section-head">
         <div class="ico">🏅</div>
         <h3>Medallas</h3>
-        <div class="sub"><button onclick="openMyMedalsPanel()" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver mis medallas →</button></div>
+        <div class="sub" style="display:flex;gap:9px;align-items:center;">
+          <button onclick="openEquipMedalsPanel()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;">Equipar 3</button>
+          <button onclick="openMyMedalsPanel()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Ver todas →</button>
+        </div>
       </div>
       <div class="form-card">
         <div class="streak-badges">
@@ -4629,6 +4909,7 @@ async function renderProfile() {
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
             <div class="handle">Tu perfil en LiveScroll</div>
+            ${renderEquippedMedalsInline(equippedBadges, true)}
           </div>
         </div>
         ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
@@ -5061,6 +5342,7 @@ async function viewPublicProfile(username) {
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
   const isFollowing = !!amIFollowing;
+  const theirEquippedBadges = await getEquippedProfileMedals(profile.id);
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
@@ -5085,6 +5367,7 @@ async function viewPublicProfile(username) {
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle">Perfil público</div>
+            ${theirEquippedBadges.length ? renderEquippedMedalsInline(theirEquippedBadges, false) : ""}
           </div>
         </div>
         ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}

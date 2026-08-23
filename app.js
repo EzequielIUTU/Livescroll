@@ -847,9 +847,90 @@ async function checkPendingContent() {
   } else if (data.tutorial_pending) {
     showTutorialModal();
   } else if (data.changelog_pending) {
+    // Si estuvo varios días afuera, primero ve "Mientras no estabas..."
+    // y recién al ponerse al día comprobamos el teaser.
     showChangelogModal(data.changelog_entries || []);
+  } else if (data.road_to_6_teaser_pending) {
+    showRoadTo6Teaser();
   }
 }
+
+function showRoadTo6Teaser() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="ls-road6-overlay">
+      <div class="ls-road6-card">
+        <div class="ls-road6-scan"></div>
+        <div class="ls-road6-content">
+          <div class="ls-road6-kicker">LIVE SCROLL · NEXT ERA</div>
+          <div class="ls-road6-mark">◈</div>
+
+          <h2 class="ls-road6-title">Algo grande<br>está comenzando.</h2>
+
+          <div class="ls-road6-copy">
+            LiveScroll está entrando en una nueva etapa. Durante las próximas versiones vas a empezar a descubrir partes de lo que estamos preparando.
+          </div>
+
+          <div class="ls-road6-signals">
+            <div class="ls-road6-signal"><b>⚡</b>Más rápido</div>
+            <div class="ls-road6-signal"><b>🏅</b>Más personal</div>
+            <div class="ls-road6-signal"><b>🔔</b>Más conectado</div>
+            <div class="ls-road6-signal"><b>📡</b>Más cerca</div>
+          </div>
+
+          <div class="ls-road6-road">
+            5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
+            5.8.0 → 5.9.0 → <strong>6.0.0</strong>
+          </div>
+
+          <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
+            Comenzar el camino →
+          </button>
+
+          <div class="ls-road6-foot">
+            El camino hacia LiveScroll 6 comienza ahora.
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function acknowledgeRoadTo6Teaser() {
+  const btn = document.querySelector(".ls-road6-btn");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Preparando lo que viene...";
+  }
+
+  const { data, error } = await sb.rpc("acknowledge_road_to_6_teaser");
+
+  if (error || !data?.ok) {
+    console.error(error || data);
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Intentar nuevamente";
+    }
+    showToast("No se pudo guardar todavía");
+    return;
+  }
+
+  const overlay = document.querySelector(".ls-road6-overlay");
+  const card = document.querySelector(".ls-road6-card");
+
+  if (overlay) overlay.style.opacity = "0";
+  if (card) {
+    card.style.transform = "scale(.94) translateY(-14px)";
+    card.style.opacity = "0";
+  }
+
+  setTimeout(() => {
+    const wrap = document.getElementById("globalModalWrap");
+    if (wrap) wrap.innerHTML = "";
+  }, 360);
+}
+
 
 const tutorialSteps = [
   { icon: "👋", title: "¡Bienvenido a LiveScroll!", text: "Acá subís y mirás clips de Kick, Twitch, YouTube y TikTok, y ganás puntos por cada cosa que hacés." },
@@ -2243,6 +2324,220 @@ function ensureModernMobileStyles() {
   const style = document.createElement("style");
   style.id = "livescrollModernMobileStyles";
   style.textContent = `
+
+    /* Road to LiveScroll 6 — teaser único por cuenta */
+    .ls-road6-overlay {
+      position:fixed;
+      inset:0;
+      z-index:920;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      box-sizing:border-box;
+      background:
+        radial-gradient(circle at 50% 110%, rgba(250,204,21,.16), transparent 42%),
+        radial-gradient(circle at 18% 10%, rgba(125,211,252,.10), transparent 32%),
+        rgba(2,4,8,.94);
+      backdrop-filter:blur(14px);
+      animation:lsRoad6OverlayIn .55s ease both;
+    }
+
+    .ls-road6-card {
+      position:relative;
+      width:min(440px,100%);
+      overflow:hidden;
+      border-radius:24px;
+      border:1px solid rgba(250,204,21,.28);
+      background:linear-gradient(160deg, rgba(22,24,31,.98), rgba(7,9,13,.99) 64%);
+      box-shadow:0 30px 100px rgba(0,0,0,.72), 0 0 45px rgba(250,204,21,.08);
+      transform-origin:center;
+      animation:lsRoad6CardIn .85s cubic-bezier(.16,1,.3,1) both;
+    }
+
+    .ls-road6-card::before {
+      content:"";
+      position:absolute;
+      width:180px;
+      height:180px;
+      top:-95px;
+      right:-70px;
+      border-radius:50%;
+      background:rgba(250,204,21,.13);
+      filter:blur(12px);
+      animation:lsRoad6Glow 3s ease-in-out infinite;
+    }
+
+    .ls-road6-scan {
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:.24;
+      background:linear-gradient(110deg, transparent 20%, rgba(255,255,255,.12) 45%, transparent 70%);
+      transform:translateX(-120%);
+      animation:lsRoad6Scan 2.8s 1s ease-in-out infinite;
+    }
+
+    .ls-road6-content {
+      position:relative;
+      z-index:2;
+      padding:30px 24px 22px;
+      text-align:center;
+    }
+
+    .ls-road6-kicker {
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px;
+      letter-spacing:.20em;
+      color:var(--gold);
+      text-transform:uppercase;
+      opacity:0;
+      animation:lsRoad6Rise .55s .42s ease forwards;
+    }
+
+    .ls-road6-mark {
+      width:72px;
+      height:72px;
+      margin:18px auto 16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:22px;
+      border:1px solid rgba(250,204,21,.30);
+      background:rgba(250,204,21,.07);
+      font-size:34px;
+      box-shadow:inset 0 0 25px rgba(250,204,21,.05);
+      opacity:0;
+      animation:lsRoad6Mark .7s .55s cubic-bezier(.16,1,.3,1) forwards;
+    }
+
+    .ls-road6-title {
+      margin:0;
+      font-size:clamp(25px,7vw,34px);
+      line-height:1.05;
+      letter-spacing:-.04em;
+      color:var(--text);
+      opacity:0;
+      animation:lsRoad6Rise .6s .68s ease forwards;
+    }
+
+    .ls-road6-copy {
+      max-width:350px;
+      margin:13px auto 0;
+      color:var(--text-dim);
+      font-size:13px;
+      line-height:1.55;
+      opacity:0;
+      animation:lsRoad6Rise .6s .82s ease forwards;
+    }
+
+    .ls-road6-signals {
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:7px;
+      margin:22px 0 18px;
+      opacity:0;
+      animation:lsRoad6Rise .6s .96s ease forwards;
+    }
+
+    .ls-road6-signal {
+      padding:10px 4px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.025);
+      font-size:9px;
+      color:var(--text-dim);
+    }
+
+    .ls-road6-signal b {
+      display:block;
+      margin-bottom:5px;
+      font-size:19px;
+      font-weight:400;
+    }
+
+    .ls-road6-road {
+      padding:12px 13px;
+      border-radius:13px;
+      border:1px solid rgba(250,204,21,.16);
+      background:rgba(250,204,21,.035);
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px;
+      color:var(--gold);
+      line-height:1.5;
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.08s ease forwards;
+    }
+
+    .ls-road6-btn {
+      width:100%;
+      min-height:48px;
+      margin-top:18px;
+      border:0;
+      border-radius:13px;
+      cursor:pointer;
+      font-family:inherit;
+      font-weight:800;
+      color:#12130f;
+      background:linear-gradient(135deg, #fde047, #f59e0b);
+      box-shadow:0 10px 28px rgba(245,158,11,.15);
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.2s ease forwards;
+    }
+
+    .ls-road6-foot {
+      margin-top:11px;
+      font-size:9px;
+      color:var(--text-dim);
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.32s ease forwards;
+    }
+
+    @keyframes lsRoad6OverlayIn {
+      from { opacity:0; }
+      to { opacity:1; }
+    }
+    @keyframes lsRoad6CardIn {
+      0% { opacity:0; transform:translateY(38px) scale(.92); filter:blur(8px); }
+      70% { opacity:1; transform:translateY(-3px) scale(1.01); filter:blur(0); }
+      100% { opacity:1; transform:none; filter:blur(0); }
+    }
+    @keyframes lsRoad6Rise {
+      from { opacity:0; transform:translateY(12px); }
+      to { opacity:1; transform:none; }
+    }
+    @keyframes lsRoad6Mark {
+      from { opacity:0; transform:scale(.55) rotate(-12deg); }
+      to { opacity:1; transform:none; }
+    }
+    @keyframes lsRoad6Glow {
+      0%,100% { opacity:.45; transform:scale(.9); }
+      50% { opacity:1; transform:scale(1.15); }
+    }
+    @keyframes lsRoad6Scan {
+      0%,55% { transform:translateX(-120%); }
+      85%,100% { transform:translateX(120%); }
+    }
+
+    @media (max-width:420px) {
+      .ls-road6-overlay { padding:10px; }
+      .ls-road6-content { padding:25px 17px 18px; }
+      .ls-road6-signals { gap:5px; }
+      .ls-road6-signal { font-size:8px; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-road6-overlay,
+      .ls-road6-card,
+      .ls-road6-card *,
+      .ls-road6-card::before {
+        animation:none !important;
+        opacity:1 !important;
+        transform:none !important;
+        filter:none !important;
+      }
+    }
+
     /* v5.3.5 — Mobile Feed Full View */
     :root {
       --ls-mobile-feed-height: 640px;

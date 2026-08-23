@@ -1120,6 +1120,7 @@ async function handleClaimLoginStreak() {
   currentProfile.points_balance += data.points;
   currentProfile.streak_current_day = data.day;
   updateBalanceUI();
+  showFloatingPointsSafe(data.points);
   document.getElementById("globalModalWrap").innerHTML = "";
   showStreakModal(data);
   const banner = document.getElementById("loginStreakBannerWrap");
@@ -1149,6 +1150,7 @@ async function claimDailyStreak() {
   currentProfile.points_balance += data.points;
   currentProfile.streak_current_day = data.day;
   updateBalanceUI();
+  showFloatingPointsSafe(data.points);
   showStreakModal(data);
 }
 
@@ -1360,6 +1362,88 @@ function ensureSafeMobileUpgradeStyles() {
       }
     }
 
+    .ls-view-enter-safe {
+      animation:lsViewEnterSafe .20s ease both;
+    }
+
+    @keyframes lsViewEnterSafe {
+      from { opacity:.45; transform:translateY(5px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    .ls-points-float-safe {
+      position:fixed;
+      z-index:600;
+      pointer-events:none;
+      color:var(--gold);
+      font-family:'JetBrains Mono', monospace;
+      font-weight:800;
+      font-size:15px;
+      text-shadow:0 2px 8px rgba(0,0,0,.7);
+      animation:lsPointsFloatSafe .95s ease-out forwards;
+    }
+
+    @keyframes lsPointsFloatSafe {
+      0% { opacity:0; transform:translate(-50%, 6px) scale(.9); }
+      15% { opacity:1; }
+      100% { opacity:0; transform:translate(-50%, -44px) scale(1.06); }
+    }
+
+    .ls-upload-preview-safe {
+      display:none;
+      position:relative;
+      margin-top:12px;
+      width:100%;
+      aspect-ratio:16 / 10;
+      overflow:hidden;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:#050607;
+    }
+
+    .ls-upload-preview-safe.active {
+      display:block;
+    }
+
+    .ls-upload-preview-safe video {
+      width:100%;
+      height:100%;
+      display:block;
+      object-fit:contain;
+      background:#000;
+    }
+
+    .ls-upload-preview-safe .tag {
+      position:absolute;
+      top:8px;
+      left:8px;
+      z-index:2;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.72);
+      color:#fff;
+      font-size:10px;
+      font-weight:700;
+    }
+
+    .ls-upload-preview-msg-safe {
+      display:none;
+      padding:14px;
+      color:var(--text-dim);
+      font-size:12px;
+      line-height:1.45;
+      text-align:center;
+    }
+
+    .ls-upload-preview-msg-safe.active {
+      display:block;
+    }
+
+    .ls-legacy .ls-view-enter-safe,
+    .ls-legacy .ls-points-float-safe {
+      animation:none !important;
+    }
+
     @media (max-width:360px) {
       .ls-mobile-nav-safe {
         left:5px;
@@ -1429,6 +1513,42 @@ function safePulseElement(el, className) {
   setTimeout(() => el.classList.remove(className), 450);
 }
 
+function animateCurrentViewSafe() {
+  if (window.__liveScrollLegacyMode) return;
+
+  const main = document.getElementById("appView");
+  if (!main) return;
+
+  main.classList.remove("ls-view-enter-safe");
+  void main.offsetWidth;
+  main.classList.add("ls-view-enter-safe");
+
+  setTimeout(() => main.classList.remove("ls-view-enter-safe"), 260);
+}
+
+function showFloatingPointsSafe(amount, anchorEl = null) {
+  const points = Number(amount);
+  if (!Number.isFinite(points) || points <= 0 || window.__liveScrollLegacyMode) return;
+
+  const anchor = anchorEl || document.getElementById("navBalance");
+  const rect = anchor?.getBoundingClientRect();
+
+  const el = document.createElement("div");
+  el.className = "ls-points-float-safe";
+  el.textContent = `+${points} pts`;
+
+  if (rect) {
+    el.style.left = `${rect.left + rect.width / 2}px`;
+    el.style.top = `${Math.max(56, rect.top + rect.height / 2)}px`;
+  } else {
+    el.style.left = "50%";
+    el.style.top = "90px";
+  }
+
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1050);
+}
+
 function switchTab(tab) {
   clearAllWatchIntervals();
   currentTab = tab;
@@ -1448,6 +1568,8 @@ function switchTab(tab) {
   if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
+
+  requestAnimationFrame(() => animateCurrentViewSafe());
 }
 
 function updateBalanceUI() {
@@ -2233,6 +2355,7 @@ function startWatching(video) {
       if (data.ok) {
         currentProfile.points_balance += data.points_viewer;
         updateBalanceUI();
+        showFloatingPointsSafe(data.points_viewer, document.getElementById(`pts-${video.id}`));
         const ptsEl = document.getElementById(`pts-${video.id}`);
         if (ptsEl) ptsEl.innerHTML = `+${data.points_viewer} pts <span class="mono">${watchSeconds[video.id]}s</span>`;
       } else if (data.error === "daily_cap_reached") {
@@ -2314,6 +2437,12 @@ function renderUpload() {
             onchange="previewFileSize()"
             style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
           <div id="fileSizeInfo" style="font-size:12px;margin-top:6px;"></div>
+
+          <div id="uploadPreviewSafe" class="ls-upload-preview-safe">
+            <div class="tag">Vista previa</div>
+            <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
+            <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
+          </div>
         </div>
         <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
           <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
@@ -2337,11 +2466,65 @@ function renderUpload() {
 const MAX_FILE_MB = 50;
 let rawSelectedFile = null;
 let trimmedFile = null;
+let uploadPreviewUrlSafe = null;
 
 function previewFileSize() {
   rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
   trimmedFile = null;
   refreshFileSizeUI();
+  refreshUploadPreviewSafe();
+}
+
+function clearUploadPreviewSafe() {
+  const preview = document.getElementById("uploadPreviewSafe");
+  const video = document.getElementById("uploadPreviewVideoSafe");
+  const msg = document.getElementById("uploadPreviewMsgSafe");
+
+  if (uploadPreviewUrlSafe) {
+    URL.revokeObjectURL(uploadPreviewUrlSafe);
+    uploadPreviewUrlSafe = null;
+  }
+
+  if (video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.style.display = "";
+  }
+
+  if (msg) {
+    msg.textContent = "";
+    msg.classList.remove("active");
+  }
+
+  preview?.classList.remove("active");
+}
+
+function refreshUploadPreviewSafe() {
+  const preview = document.getElementById("uploadPreviewSafe");
+  const video = document.getElementById("uploadPreviewVideoSafe");
+  const msg = document.getElementById("uploadPreviewMsgSafe");
+  const file = trimmedFile || rawSelectedFile;
+
+  if (!preview || !video || !msg) return;
+
+  clearUploadPreviewSafe();
+  if (!file) return;
+
+  uploadPreviewUrlSafe = URL.createObjectURL(file);
+  preview.classList.add("active");
+  video.src = uploadPreviewUrlSafe;
+
+  video.onerror = () => {
+    video.style.display = "none";
+    msg.textContent = "Este formato no puede previsualizarse en este navegador, pero podés subirlo normalmente.";
+    msg.classList.add("active");
+  };
+
+  video.onloadedmetadata = () => {
+    video.style.display = "";
+    msg.classList.remove("active");
+  };
 }
 
 function refreshFileSizeUI() {
@@ -2373,6 +2556,7 @@ function refreshFileSizeUI() {
 function discardTrim() {
   trimmedFile = null;
   refreshFileSizeUI();
+  refreshUploadPreviewSafe();
 }
 
 function formatTrimSeconds(s) {
@@ -2491,6 +2675,7 @@ async function confirmVideoTrim() {
 
     closeVideoTrimmer();
     refreshFileSizeUI();
+    refreshUploadPreviewSafe();
     showToast("¡Video recortado!");
   } catch (e) {
     showToast("No se pudo recortar. Probá con otro navegador o un archivo distinto.");
@@ -2539,6 +2724,7 @@ async function setUploadMode(mode) {
   window.currentUploadMode = mode;
   rawSelectedFile = null;
   trimmedFile = null;
+  clearUploadPreviewSafe();
   document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
   document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
   document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
@@ -2576,6 +2762,7 @@ async function handleUploadLink() {
   } else {
     currentProfile.points_balance += 25;
     updateBalanceUI();
+    showFloatingPointsSafe(25);
     showToast("+25 pts por tu video");
   }
   switchTab("feed");
@@ -2628,6 +2815,7 @@ async function handleUploadFile() {
   } else {
     currentProfile.points_balance += 25;
     updateBalanceUI();
+    showFloatingPointsSafe(25);
     showToast("+25 pts por tu video");
   }
   switchTab("feed");
@@ -3060,6 +3248,7 @@ async function handleLike(videoId) {
   safePulseElement(btn, "ls-like-pop-safe");
   currentProfile.points_balance += data.points;
   updateBalanceUI();
+  showFloatingPointsSafe(data.points, btn);
   showToast(`+${data.points} pt por el like`);
 }
 
@@ -3078,6 +3267,7 @@ async function handleShare(videoId, url) {
   if (error || !data.ok) return; // ya compartido antes, o tope diario: no molestamos con error
   currentProfile.points_balance += data.points;
   updateBalanceUI();
+  showFloatingPointsSafe(data.points);
   showToast(`+${data.points} pts por compartir`);
 }
 

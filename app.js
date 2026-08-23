@@ -31,6 +31,43 @@ let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsStudioLiveStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsStudioLiveStyles";
+  style.textContent = `
+    .ls-studio-live-section{margin-bottom:18px}
+    .ls-studio-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+    .ls-studio-live-head h3{margin:0;font-size:12px;letter-spacing:.04em}
+    .ls-studio-live-head span{font-size:9px;color:var(--text-dim)}
+    .ls-studio-live-card{display:grid;grid-template-columns:150px 1fr auto;gap:13px;align-items:center;min-height:92px;padding:10px;border:1px solid rgba(34,197,94,.25);border-radius:14px;background:linear-gradient(90deg,rgba(34,197,94,.045),transparent 45%),var(--panel);cursor:pointer;margin-bottom:9px;overflow:hidden}
+    .ls-studio-live-preview{aspect-ratio:16/9;border-radius:10px;background:#050607;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+    .ls-studio-live-preview img{width:100%;height:100%;object-fit:cover}
+    .ls-studio-live-chip{position:absolute;top:6px;left:6px;padding:3px 6px;border-radius:6px;background:#dc2626;color:#fff;font-size:8px;font-weight:900}
+    .ls-studio-live-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ls-studio-live-user{margin-top:5px;font-size:10px;color:var(--text-dim)}
+    .ls-studio-live-meta{margin-top:7px;font-size:9px;color:var(--green)}
+    .ls-studio-live-open{padding:8px 10px;border-radius:9px;border:1px solid rgba(34,197,94,.28);color:var(--green);font-size:10px;font-weight:800}
+    .ls-live-viewer-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;min-height:540px}
+    .ls-live-video-shell,.ls-live-chat{border:1px solid var(--border);border-radius:15px;background:var(--panel);overflow:hidden}
+    .ls-live-video-area{aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center}
+    .ls-live-video-placeholder{text-align:center;color:var(--text-dim);padding:20px}
+    .ls-live-video-placeholder .ico{font-size:44px;margin-bottom:8px}
+    .ls-live-details{padding:13px 14px;border-top:1px solid var(--border)}
+    .ls-live-chat{display:flex;flex-direction:column;min-height:0}
+    .ls-live-chat-head{padding:12px 13px;border-bottom:1px solid var(--border);font-size:11px;font-weight:800}
+    .ls-live-chat-messages{flex:1;overflow-y:auto;padding:10px;min-height:340px}
+    .ls-live-chat-message{margin-bottom:8px;font-size:10px;line-height:1.4;word-break:break-word}
+    .ls-live-chat-message b{color:var(--gold);margin-right:4px}
+    .ls-live-chat-form{display:flex;gap:7px;padding:10px;border-top:1px solid var(--border)}
+    .ls-live-chat-form input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--ink);color:var(--text)}
+    .ls-live-chat-form button{width:auto;margin:0;padding:8px 11px}
+    @media(max-width:760px){.ls-studio-live-card{grid-template-columns:120px 1fr}.ls-studio-live-open{display:none}.ls-live-viewer-layout{grid-template-columns:1fr}.ls-live-chat-messages{min-height:220px;max-height:330px}}
+  `;
+  document.head.appendChild(style);
+});
+
 // ============================================================
 // ARRANQUE
 // ============================================================
@@ -5763,60 +5800,184 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">🔴 Directos</h1>
-    <p class="page-sub">Creadores de LiveScroll transmitiendo en vivo ahora mismo.</p>
+    <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
     <div id="directosList">Cargando...</div>`;
 
-  let liveUsers = null;
-  let error = null;
+  const [ext, studio] = await Promise.allSettled([
+    sb.from("profiles")
+      .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch")
+      .eq("is_live",true)
+      .is("ban_reason",null)
+      .order("live_started_at",{ascending:false}),
+    sb.from("studio_live_sessions")
+      .select("id,user_id,title,started_at,viewer_count,preview_url,profiles!studio_live_sessions_user_id_fkey(id,username,avatar_emoji,avatar_url,plan_id)")
+      .eq("status","live")
+      .order("started_at",{ascending:false})
+  ]);
 
-  if (lsCacheFresh(lsPerfCache.directos, 15000)) {
-    liveUsers = lsPerfCache.directos.data;
-  } else {
-    const result = await sb
-      .from("profiles")
-      .select("id, username, avatar_emoji, avatar_url, plan_id, live_platform, live_started_at, social_kick, social_twitch")
-      .eq("is_live", true)
-      .is("ban_reason", null)
-      .order("live_started_at", { ascending: false });
-
-    liveUsers = result.data;
-    error = result.error;
-
-    if (!error && liveUsers) {
-      lsPerfCache.directos = { data:liveUsers, at:Date.now() };
-    }
-  }
+  const liveUsers = ext.status === "fulfilled" ? (ext.value?.data || []) : [];
+  const studioLives = studio.status === "fulfilled" ? (studio.value?.data || []) : [];
 
   if (renderToken !== lsTabRenderToken || currentTab !== "directos") return;
-
   const list = document.getElementById("directosList");
   if (!list) return;
 
-  if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar quién está en vivo.</p>`; return; }
-  if (!liveUsers || !liveUsers.length) {
-    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
+  let html = "";
+
+  if (studioLives.length) {
+    html += `<section class="ls-studio-live-section">
+      <div class="ls-studio-live-head"><h3>📡 EN VIVO DESDE LIVESCROLL STUDIO</h3><span>${studioLives.length} directo${studioLives.length===1?"":"s"}</span></div>
+      ${studioLives.map(s => {
+        const p = s.profiles || {};
+        return `<div class="ls-studio-live-card" onclick="openStudioLive('${s.id}')">
+          <div class="ls-studio-live-preview">
+            ${s.preview_url && isSafeUrl(s.preview_url) ? `<img src="${escapeHtml(s.preview_url)}">` : `<div style="font-size:28px;">📡</div>`}
+            <div class="ls-studio-live-chip">EN VIVO</div>
+          </div>
+          <div>
+            <div class="ls-studio-live-title">${escapeHtml(s.title || "Directo en LiveScroll")}</div>
+            <div class="ls-studio-live-user">@${escapeHtml(p.username || "usuario")} ${getPlanBadgeHtml(p.plan_id)}</div>
+            <div class="ls-studio-live-meta">LiveScroll Studio · ${Number(s.viewer_count || 0)} viendo</div>
+          </div>
+          <div class="ls-studio-live-open">Entrar →</div>
+        </div>`;
+      }).join("")}
+    </section>`;
+  }
+
+  if (liveUsers.length) {
+    html += `<section>
+      <div class="ls-studio-live-head"><h3>🌐 DIRECTOS EXTERNOS</h3><span>Kick / Twitch</span></div>
+      ${liveUsers.map(u => {
+        const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+        const watchButtons = [
+          (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
+            ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
+          (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
+            ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : ""
+        ].join("");
+        return `<div class="directo-card">
+          <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>
+          <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
+            <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+            <div class="plat">${platformLabel} · en vivo</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">${watchButtons}</div>
+        </div>`;
+      }).join("")}
+    </section>`;
+  }
+
+  if (!studioLives.length && !liveUsers.length) {
+    html = `<p style="color:var(--text-dim);font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
+  }
+
+  list.innerHTML = html;
+}
+
+let lsStudioChatChannel = null;
+
+function stopStudioLiveChat() {
+  if (lsStudioChatChannel) {
+    sb.removeChannel(lsStudioChatChannel);
+    lsStudioChatChannel = null;
+  }
+}
+
+function renderStudioChatMessage(m) {
+  return `<div class="ls-live-chat-message"><b>@${escapeHtml(m.profiles?.username || "usuario")}</b>${escapeHtml(m.message || "")}</div>`;
+}
+
+async function openStudioLive(sessionId) {
+  stopConnectedLiveRefresh();
+  stopStudioLiveChat();
+
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando directo...</p>`;
+
+  const [{data:session,error},{data:messages}] = await Promise.all([
+    sb.from("studio_live_sessions")
+      .select("id,user_id,title,status,started_at,viewer_count,playback_url,profiles!studio_live_sessions_user_id_fkey(id,username,avatar_emoji,avatar_url,plan_id)")
+      .eq("id",sessionId).single(),
+    sb.from("studio_live_chat_messages")
+      .select("id,user_id,message,created_at,profiles!studio_live_chat_messages_user_id_fkey(username)")
+      .eq("session_id",sessionId).order("created_at",{ascending:true}).limit(100)
+  ]);
+
+  if (error || !session) {
+    main.innerHTML = `<button class="btn-outline" onclick="renderDirectos()">← Volver a Directos</button><p class="error-msg" style="margin-top:14px;">Este directo ya no está disponible.</p>`;
     return;
   }
 
-  list.innerHTML = liveUsers.map(u => {
-    const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
-    const watchButtons = [
-      (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
-        ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
-      (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
-        ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : "",
-    ].join("");
-    return `
-    <div class="directo-card">
-      <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u, 52)}</div>
-      <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
-        <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
-        <div class="plat">${platformLabel} · en vivo</div>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:6px;">${watchButtons}</div>
+  const p = session.profiles || {};
+  main.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <button class="btn-outline" style="padding:7px 10px;" onclick="stopStudioLiveChat();renderDirectos()">← Directos</button>
+      <div><div style="font-size:10px;color:var(--green);font-weight:900;">● EN VIVO · LIVESCROLL STUDIO</div><div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Experiencia interna de LiveScroll</div></div>
+    </div>
+
+    <div class="ls-live-viewer-layout">
+      <section class="ls-live-video-shell">
+        <div class="ls-live-video-area">
+          ${session.playback_url && isSafeUrl(session.playback_url)
+            ? `<video src="${escapeHtml(session.playback_url)}" autoplay playsinline controls style="width:100%;height:100%;background:#000;"></video>`
+            : `<div class="ls-live-video-placeholder"><div class="ico">📡</div><strong>La señal de LiveScroll Studio aparecerá acá.</strong><div>El reproductor ya está preparado para recibir el stream.</div></div>`}
+        </div>
+        <div class="ls-live-details">
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <div>
+              <div style="font-size:15px;font-weight:800;">${escapeHtml(session.title || "Directo en LiveScroll")}</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:5px;cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(p.username || "")}')">@${escapeHtml(p.username || "usuario")} ${getPlanBadgeHtml(p.plan_id)}</div>
+            </div>
+            <div style="font-size:10px;color:var(--green);">${Number(session.viewer_count || 0)} viendo</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="ls-live-chat">
+        <div class="ls-live-chat-head">💬 Chat del directo</div>
+        <div class="ls-live-chat-messages" id="studioLiveChatMessages">${(messages || []).map(renderStudioChatMessage).join("")}</div>
+        <form class="ls-live-chat-form" onsubmit="sendStudioLiveChat(event,'${session.id}')">
+          <input id="studioLiveChatInput" maxlength="220" placeholder="Escribí un mensaje..." autocomplete="off">
+          <button class="btn" type="submit">Enviar</button>
+        </form>
+      </aside>
     </div>`;
-  }).join("");
+
+  const box = document.getElementById("studioLiveChatMessages");
+  if (box) box.scrollTop = box.scrollHeight;
+
+  lsStudioChatChannel = sb.channel(`studio-live-chat-${session.id}`)
+    .on("postgres_changes",{event:"INSERT",schema:"public",table:"studio_live_chat_messages",filter:`session_id=eq.${session.id}`},async payload => {
+      const {data} = await sb.from("studio_live_chat_messages")
+        .select("id,user_id,message,created_at,profiles!studio_live_chat_messages_user_id_fkey(username)")
+        .eq("id",payload.new.id).single();
+      const target = document.getElementById("studioLiveChatMessages");
+      if (target && data) {
+        target.insertAdjacentHTML("beforeend",renderStudioChatMessage(data));
+        target.scrollTop = target.scrollHeight;
+      }
+    }).subscribe();
 }
+
+async function sendStudioLiveChat(event,sessionId) {
+  event.preventDefault();
+  const input = document.getElementById("studioLiveChatInput");
+  const message = input?.value.trim() || "";
+  if (!message) return;
+
+  input.disabled = true;
+  const {data,error} = await sb.rpc("send_studio_live_chat_message",{p_session_id:sessionId,p_message:message});
+  input.disabled = false;
+
+  if (error || !data?.ok) {
+    showToast("No se pudo enviar el mensaje");
+    return;
+  }
+  input.value = "";
+  input.focus();
+}
+
 
 async function renderUsersDirectory() {
   const main = document.getElementById("appView");

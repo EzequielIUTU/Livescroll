@@ -36,6 +36,12 @@ let liveScrollPreviewEnabled = false;
 const STATUS_FEATURE_VERSION = "5.3.6";
 let liveScrollReleaseConfigCache = null;
 
+let statusRawFile = null;
+let statusTrimmedFile = null;
+let statusObjectUrl = null;
+let statusViewerTimer = null;
+let statusViewerRaf = null;
+
 async function isStatusFeatureEnabled() {
   if (currentProfile?.is_admin && liveScrollPreviewEnabled) return true;
 
@@ -106,9 +112,9 @@ function renderProfileStatusCard(status, ownProfile = false) {
       <div class="form-card ls-status-card">
         <div class="ls-status-emoji">${escapeHtml(status.emoji || "✨")}</div>
         <div style="min-width:0;flex:1;">
-          <div class="ls-status-text">${escapeHtml(status.content || "")}</div>
+          <div class="ls-status-text">${escapeHtml(status.content || (status.media_type === "video" ? "🎬 Video" : status.media_type === "image" ? "🖼️ Imagen" : ""))}</div>
           <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
-            Visible durante 24 horas${status.is_highlight ? " · ⭐ Guardado en Destacadas" : ""}
+            ${status.media_type === "video" ? "🎬 Video" : status.media_type === "image" ? "🖼️ Imagen" : "📝 Texto"} · Visible durante 24 horas${status.is_highlight ? " · ⭐ Guardado en Destacadas" : ""}
           </div>
         </div>
         ${ownProfile ? `<button class="btn-outline" style="padding:7px 10px;font-size:11px;" onclick="openStatusComposer()">Editar</button>` : ""}
@@ -138,22 +144,342 @@ function renderHighlightsSection(statuses) {
     </div>`;
 }
 
+
+function closeStatusStoryViewer() {
+  if (statusViewerTimer) clearTimeout(statusViewerTimer);
+  if (statusViewerRaf) cancelAnimationFrame(statusViewerRaf);
+  statusViewerTimer = null;
+  statusViewerRaf = null;
+
+  const video = document.getElementById("lsStoryVideo");
+  if (video) {
+    try { video.pause(); } catch (_) {}
+  }
+
+  document.getElementById("lsStatusStoryOverlay")?.remove();
+}
+
+function animateStoryProgress(durationMs) {
+  const bar = document.getElementById("lsStoryProgressBar");
+  if (!bar) return;
+
+  const started = performance.now();
+
+  const step = (now) => {
+    const pct = Math.max(0, Math.min(1, (now - started) / durationMs));
+    bar.style.width = `${pct * 100}%`;
+
+    if (pct < 1 && document.getElementById("lsStatusStoryOverlay")) {
+      statusViewerRaf = requestAnimationFrame(step);
+    }
+  };
+
+  statusViewerRaf = requestAnimationFrame(step);
+}
+
+function renderStoryOwner(profile) {
+  if (!profile) return "";
+  return `
+    <div class="ls-story-owner">
+      <div class="ls-story-owner-avatar">${renderAvatarHtml(profile, 28)}</div>
+      <span>@${escapeHtml(profile.username || "")}</span>
+    </div>`;
+}
+
+async function openStatusStoryViewer(status, ownerProfile = null) {
+  if (!status) return;
+
+  closeStatusStoryViewer();
+
+  const overlay = document.createElement("div");
+  overlay.id = "lsStatusStoryOverlay";
+  overlay.className = "ls-story-overlay";
+
+  const type = status.media_type || "text";
+  const caption = escapeHtml(status.content || "");
+  const mediaUrl = status.media_url && isSafeUrl(status.media_url) ? escapeHtml(status.media_url) : "";
+
+  let mediaHtml = "";
+  if (type === "image" && mediaUrl) {
+    mediaHtml = `<img src="${mediaUrl}" alt="Estado">`;
+  } else if (type === "video" && mediaUrl) {
+    mediaHtml = `<video id="lsStoryVideo" src="${mediaUrl}" playsinline autoplay muted></video>`;
+  } else {
+    mediaHtml = `
+      <div class="ls-story-text-bg"></div>
+      <div class="ls-story-text">${escapeHtml(status.emoji || "✨")}<br>${caption}</div>`;
+  }
+
+  overlay.innerHTML = `
+    <div class="ls-story-shell">
+      <div class="ls-story-progress-track"><div id="lsStoryProgressBar" class="ls-story-progress-bar"></div></div>
+      <button class="ls-story-close" onclick="closeStatusStoryViewer()" aria-label="Cerrar">✕</button>
+      ${renderStoryOwner(ownerProfile)}
+      <div class="ls-story-content">${mediaHtml}</div>
+      ${(type === "image" || type === "video") && caption ? `<div class="ls-story-caption">${caption}</div>` : ""}
+    </div>`;
+
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeStatusStoryViewer();
+  });
+
+  document.body.appendChild(overlay);
+
+  if (type === "video" && mediaUrl) {
+    const video = document.getElementById("lsStoryVideo");
+    const bar = document.getElementById("lsStoryProgressBar");
+
+    const startVideoProgress = () => {
+      const duration = Math.min(Number(video.duration) || 30, 30);
+
+      const sync = () => {
+        if (!document.getElementById("lsStatusStoryOverlay")) return;
+        const pct = duration > 0 ? Math.min(1, video.currentTime / duration) : 0;
+        if (bar) bar.style.width = `${pct * 100}%`;
+
+        if (video.currentTime >= duration || video.ended) {
+          closeStatusStoryViewer();
+          return;
+        }
+
+        statusViewerRaf = requestAnimationFrame(sync);
+      };
+
+      statusViewerRaf = requestAnimationFrame(sync);
+      video.play().catch(() => {});
+    };
+
+    if (video.readyState >= 1) startVideoProgress();
+    else video.addEventListener("loadedmetadata", startVideoProgress, { once:true });
+
+    video.addEventListener("ended", closeStatusStoryViewer, { once:true });
+  } else {
+    const durationMs = 7000;
+    animateStoryProgress(durationMs);
+    statusViewerTimer = setTimeout(closeStatusStoryViewer, durationMs);
+  }
+}
+
 async function showHighlightedStatus(statusId) {
   const { data } = await sb.from("profile_statuses").select("*").eq("id", statusId).maybeSingle();
   if (!data) return;
 
+  const owner = data.user_id === currentUser?.id
+    ? currentProfile
+    : (await sb.from("profiles").select("id,username,avatar_url,avatar_emoji,plan_id").eq("id", data.user_id).maybeSingle()).data;
+
+  openStatusStoryViewer(data, owner || null);
+}
+
+function setStatusComposerType(type) {
+  const allowed = ["text","image","video"];
+  if (!allowed.includes(type)) type = "text";
+  window.__statusComposerType = type;
+
+  document.querySelectorAll("[data-status-type]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.statusType === type);
+  });
+
+  const fileWrap = document.getElementById("statusFileWrap");
+  const emojiWrap = document.getElementById("statusEmojiWrap");
+  if (fileWrap) fileWrap.classList.toggle("hidden", type === "text");
+  if (emojiWrap) emojiWrap.classList.toggle("hidden", type !== "text");
+
+  if (type === "image") {
+    const input = document.getElementById("statusMediaFile");
+    if (input) input.accept = "image/*";
+  } else if (type === "video") {
+    const input = document.getElementById("statusMediaFile");
+    if (input) input.accept = "video/*";
+  }
+
+  if (type === "text") {
+    clearStatusMediaSelection();
+  }
+}
+
+function clearStatusMediaSelection() {
+  statusRawFile = null;
+  statusTrimmedFile = null;
+
+  if (statusObjectUrl) {
+    URL.revokeObjectURL(statusObjectUrl);
+    statusObjectUrl = null;
+  }
+
+  const input = document.getElementById("statusMediaFile");
+  if (input) input.value = "";
+
+  const preview = document.getElementById("statusMediaPreview");
+  if (preview) {
+    preview.classList.remove("active");
+    preview.innerHTML = "";
+  }
+
+  const info = document.getElementById("statusMediaInfo");
+  if (info) info.textContent = "";
+}
+
+function previewStatusMediaFile() {
+  const input = document.getElementById("statusMediaFile");
+  const file = input?.files?.[0] || null;
+  const type = window.__statusComposerType || "text";
+  const preview = document.getElementById("statusMediaPreview");
+  const info = document.getElementById("statusMediaInfo");
+
+  statusRawFile = file;
+  statusTrimmedFile = null;
+
+  if (statusObjectUrl) {
+    URL.revokeObjectURL(statusObjectUrl);
+    statusObjectUrl = null;
+  }
+
+  if (!file || !preview || !info) return;
+
+  if (type === "image" && !file.type.startsWith("image/")) {
+    info.textContent = "Elegí una imagen.";
+    return;
+  }
+
+  if (type === "video" && !file.type.startsWith("video/")) {
+    info.textContent = "Elegí un video.";
+    return;
+  }
+
+  statusObjectUrl = URL.createObjectURL(file);
+  preview.classList.add("active");
+
+  if (type === "image") {
+    preview.innerHTML = `<img src="${statusObjectUrl}" alt="Vista previa">`;
+    info.textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB`;
+  } else {
+    preview.innerHTML = `<video id="statusPreviewVideo" src="${statusObjectUrl}" controls muted playsinline></video>`;
+    const video = document.getElementById("statusPreviewVideo");
+    video.addEventListener("loadedmetadata", () => {
+      const dur = video.duration || 0;
+      info.innerHTML = `${formatTrimSeconds(dur)} · ${(file.size / 1024 / 1024).toFixed(1)} MB` +
+        (dur > 30
+          ? ` <span style="color:var(--gold);">· Debés recortarlo a 30 s o menos</span> <button type="button" class="btn-outline" style="margin-left:6px;padding:5px 9px;font-size:10px;" onclick="openStatusVideoTrimmer()">✂️ Recortar</button>`
+          : "");
+    }, { once:true });
+  }
+}
+
+function openStatusVideoTrimmer() {
+  if (!statusRawFile) return;
+
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Tu navegador no permite recortar acá.");
+    return;
+  }
+
   const wrap = document.getElementById("globalModalWrap");
+  const objectUrl = URL.createObjectURL(statusRawFile);
+
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) this.innerHTML=''">
-      <div class="modal-box" style="max-width:380px;">
-        <div class="modal-box-body" style="text-align:center;padding:26px;">
-          <div style="font-size:52px;margin-bottom:10px;">${escapeHtml(data.emoji || "✨")}</div>
-          <div style="font-size:17px;line-height:1.45;">${escapeHtml(data.content || "")}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:12px;">⭐ Destacada</div>
-          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+    <div class="modal-overlay" style="z-index:760;">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-box-header"><h2>✂️ Recortar estado</h2></div>
+        <div class="modal-box-body">
+          <video id="statusTrimVideo" src="${objectUrl}" controls muted style="width:100%;border-radius:10px;background:#000;"></video>
+          <div style="margin-top:12px;">
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-dim);">
+              <span>Inicio <span id="statusTrimStartLabel">0:00</span></span>
+              <span>Fin <span id="statusTrimEndLabel">0:30</span></span>
+            </div>
+            <input type="range" id="statusTrimStart" min="0" max="30" step=".1" value="0" style="width:100%;">
+            <input type="range" id="statusTrimEnd" min="0" max="30" step=".1" value="30" style="width:100%;">
+            <div style="font-size:11px;color:var(--gold);margin-top:5px;">Máximo 30 segundos.</div>
+          </div>
+        </div>
+        <div class="modal-box-footer" style="display:flex;gap:9px;">
+          <button class="btn-outline" style="flex:1;" onclick="openStatusComposer()">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="confirmStatusVideoTrim()">Recortar y usar</button>
         </div>
       </div>
     </div>`;
+
+  const video = document.getElementById("statusTrimVideo");
+  video.addEventListener("loadedmetadata", () => {
+    const dur = video.duration || 0;
+    const end = Math.min(30, dur);
+    const s = document.getElementById("statusTrimStart");
+    const e = document.getElementById("statusTrimEnd");
+    s.max = dur;
+    e.max = dur;
+    e.value = end;
+
+    const update = () => {
+      let sv = Number(s.value);
+      let ev = Number(e.value);
+
+      if (ev <= sv) ev = Math.min(dur, sv + 1);
+      if (ev - sv > 30) ev = sv + 30;
+
+      e.value = ev;
+      document.getElementById("statusTrimStartLabel").textContent = formatTrimSeconds(sv);
+      document.getElementById("statusTrimEndLabel").textContent = formatTrimSeconds(ev);
+    };
+
+    s.addEventListener("input", () => {
+      const ev = Number(e.value);
+      if (ev - Number(s.value) > 30) e.value = Number(s.value) + 30;
+      video.currentTime = Number(s.value);
+      update();
+    });
+
+    e.addEventListener("input", () => {
+      if (Number(e.value) - Number(s.value) > 30) s.value = Math.max(0, Number(e.value) - 30);
+      video.currentTime = Number(e.value);
+      update();
+    });
+
+    update();
+  }, { once:true });
+}
+
+async function confirmStatusVideoTrim() {
+  const video = document.getElementById("statusTrimVideo");
+  const start = Number(document.getElementById("statusTrimStart")?.value || 0);
+  const end = Number(document.getElementById("statusTrimEnd")?.value || 0);
+
+  if (!video || end <= start || end - start > 30) {
+    showToast("Elegí entre 1 y 30 segundos.");
+    return;
+  }
+
+  showToast("Recortando video...");
+
+  try {
+    const result = await trimVideoClientSide(video, start, end);
+    const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
+    statusTrimmedFile = new File([result.blob], `estado-recortado.${ext}`, { type: result.mimeType });
+
+    const savedTrim = statusTrimmedFile;
+    openStatusComposer();
+    statusTrimmedFile = savedTrim;
+    statusRawFile = savedTrim;
+
+    const preview = document.getElementById("statusMediaPreview");
+    const info = document.getElementById("statusMediaInfo");
+    if (statusObjectUrl) URL.revokeObjectURL(statusObjectUrl);
+    statusObjectUrl = URL.createObjectURL(savedTrim);
+
+    if (preview) {
+      preview.classList.add("active");
+      preview.innerHTML = `<video src="${statusObjectUrl}" controls muted playsinline></video>`;
+    }
+    if (info) info.textContent = `✂️ Recortado · ${(savedTrim.size / 1024 / 1024).toFixed(1)} MB`;
+
+    window.__statusComposerType = "video";
+    setStatusComposerType("video");
+    showToast("Video listo para el estado");
+  } catch (err) {
+    console.error(err);
+    showToast("No se pudo recortar este video");
+    openStatusComposer();
+  }
 }
 
 async function openStatusComposer() {
@@ -164,27 +490,48 @@ async function openStatusComposer() {
 
   const active = await getActiveStatusForUser(currentUser.id);
   const wrap = document.getElementById("globalModalWrap");
+  const initialType = active?.media_type || "text";
+  window.__statusComposerType = initialType;
 
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:250;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:410px;">
+      <div class="modal-box" style="max-width:430px;">
         <div class="modal-box-header">
           <h2 style="margin:0;">✨ Estado de 24 horas</h2>
         </div>
+
         <div class="modal-box-body">
-          <div style="display:grid;grid-template-columns:76px 1fr;gap:10px;">
-            <div>
-              <label style="font-size:11px;color:var(--text-dim);">Emoji</label>
-              <input id="statusEmoji" maxlength="4" value="${escapeHtml(active?.emoji || "✨")}"
-                style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);text-align:center;font-size:22px;">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--text-dim);">Tu estado</label>
-              <input id="statusContent" maxlength="120" value="${escapeHtml(active?.content || "")}"
-                placeholder="¿Qué estás haciendo?"
-                style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);">
-            </div>
+          <div class="ls-status-type-tabs">
+            <button type="button" data-status-type="text" onclick="setStatusComposerType('text')">📝 Texto</button>
+            <button type="button" data-status-type="image" onclick="setStatusComposerType('image')">🖼️ Imagen</button>
+            <button type="button" data-status-type="video" onclick="setStatusComposerType('video')">🎬 Video</button>
           </div>
+
+          <div id="statusEmojiWrap">
+            <label style="font-size:11px;color:var(--text-dim);">Emoji</label>
+            <input id="statusEmoji" maxlength="4" value="${escapeHtml(active?.emoji || "✨")}"
+              style="width:74px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);text-align:center;font-size:22px;">
+          </div>
+
+          <div style="margin-top:12px;">
+            <label style="font-size:11px;color:var(--text-dim);">${initialType === "text" ? "Tu estado" : "Texto opcional"}</label>
+            <textarea id="statusContent" maxlength="120" rows="3"
+              placeholder="¿Qué estás haciendo?"
+              style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);resize:vertical;">${escapeHtml(active?.content || "")}</textarea>
+          </div>
+
+          <div id="statusFileWrap" class="${initialType === "text" ? "hidden" : ""}" style="margin-top:12px;">
+            <label style="font-size:11px;color:var(--text-dim);">Archivo</label>
+            <input type="file" id="statusMediaFile" onchange="previewStatusMediaFile()"
+              style="width:100%;padding:9px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
+            <div id="statusMediaInfo" style="font-size:10px;color:var(--text-dim);margin-top:6px;"></div>
+            <div id="statusMediaPreview" class="ls-status-media-preview"></div>
+          </div>
+
+          ${active?.media_url ? `
+            <div style="font-size:10px;color:var(--text-dim);margin-top:9px;">
+              Si no elegís un archivo nuevo, se mantiene el medio actual.
+            </div>` : ""}
 
           <label style="display:flex;gap:9px;align-items:center;margin-top:15px;font-size:12px;cursor:pointer;">
             <input type="checkbox" id="statusHighlight" ${active?.is_highlight ? "checked" : ""}>
@@ -192,9 +539,10 @@ async function openStatusComposer() {
           </label>
 
           <div style="font-size:10px;color:var(--text-dim);line-height:1.45;margin-top:10px;">
-            El estado activo desaparece del aura a las 24 horas. Si lo guardás en Destacadas, seguirá visible en tu perfil.
+            Texto e imágenes se muestran durante 7 s. Los videos usan su duración real, con un máximo de 30 s.
           </div>
         </div>
+
         <div class="modal-box-footer" style="display:flex;gap:9px;">
           ${active ? `<button class="btn-outline" style="color:var(--red);" onclick="deleteMyStatus('${active.id}')">Eliminar</button>` : ""}
           <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
@@ -202,37 +550,135 @@ async function openStatusComposer() {
         </div>
       </div>
     </div>`;
+
+  setStatusComposerType(initialType);
+}
+
+async function getVideoDurationFromFile(file) {
+  return new Promise((resolve) => {
+    let url = null;
+    const video = document.createElement("video");
+
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const duration = Number(video.duration) || 0;
+      if (url) URL.revokeObjectURL(url);
+      resolve(duration);
+    };
+    video.onerror = () => {
+      if (url) URL.revokeObjectURL(url);
+      resolve(0);
+    };
+
+    url = URL.createObjectURL(file);
+    video.src = url;
+  });
+}
+
+async function uploadStatusMedia(file, mediaType) {
+  if (!file) return null;
+
+  const ext = (file.name?.split(".").pop() || (mediaType === "image" ? "jpg" : "webm"))
+    .replace(/[^a-zA-Z0-9]/g, "") || "bin";
+
+  const path = `${currentUser.id}/statuses/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+
+  const { error } = await sb.storage.from("clip-videos").upload(path, file, {
+    cacheControl: "3600",
+    contentType: file.type || undefined,
+    upsert: false
+  });
+
+  if (error) throw error;
+
+  const { data } = sb.storage.from("clip-videos").getPublicUrl(path);
+  return data?.publicUrl || null;
 }
 
 async function saveMyStatus(existingId = "") {
-  const content = document.getElementById("statusContent")?.value.trim();
+  const content = document.getElementById("statusContent")?.value.trim() || "";
   const emoji = document.getElementById("statusEmoji")?.value.trim() || "✨";
   const isHighlight = !!document.getElementById("statusHighlight")?.checked;
+  const mediaType = window.__statusComposerType || "text";
+  const selectedFile = statusTrimmedFile || statusRawFile;
 
-  if (!content) {
+  if (mediaType === "text" && !content) {
     showToast("Escribí algo para tu estado");
     return;
   }
 
+  if ((mediaType === "image" || mediaType === "video") && !selectedFile && !existingId) {
+    showToast(mediaType === "image" ? "Elegí una imagen" : "Elegí un video");
+    return;
+  }
+
+  if (mediaType === "image" && selectedFile && selectedFile.size > 8 * 1024 * 1024) {
+    showToast("La imagen debe pesar menos de 8 MB");
+    return;
+  }
+
+  if (mediaType === "video" && selectedFile) {
+    const duration = await getVideoDurationFromFile(selectedFile);
+    if (duration > 30.05) {
+      showToast("Recortá el video a 30 segundos o menos");
+      return;
+    }
+    if (selectedFile.size > 50 * 1024 * 1024) {
+      showToast("El video debe pesar menos de 50 MB");
+      return;
+    }
+  }
+
+  let mediaUrl = null;
+
+  if (existingId) {
+    const { data: existing } = await sb
+      .from("profile_statuses")
+      .select("media_url, media_type")
+      .eq("id", existingId)
+      .eq("user_id", currentUser.id)
+      .maybeSingle();
+
+    if (existing && existing.media_type === mediaType) {
+      mediaUrl = existing.media_url || null;
+    }
+  }
+
+  if (selectedFile && mediaType !== "text") {
+    try {
+      showToast("Subiendo estado...");
+      mediaUrl = await uploadStatusMedia(selectedFile, mediaType);
+    } catch (err) {
+      console.error(err);
+      showToast("No se pudo subir el archivo del estado");
+      return;
+    }
+  }
+
+  if (mediaType === "text") mediaUrl = null;
+
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+  const payload = {
+    content: content || "",
+    emoji,
+    media_type: mediaType,
+    media_url: mediaUrl,
+    is_highlight: isHighlight,
+    expires_at: expiresAt,
+    updated_at: new Date().toISOString()
+  };
+
   let error;
+
   if (existingId) {
-    ({ error } = await sb.from("profile_statuses").update({
-      content,
-      emoji,
-      is_highlight: isHighlight,
-      expires_at: expiresAt,
-      updated_at: new Date().toISOString()
-    }).eq("id", existingId).eq("user_id", currentUser.id));
+    ({ error } = await sb.from("profile_statuses")
+      .update(payload)
+      .eq("id", existingId)
+      .eq("user_id", currentUser.id));
   } else {
-    ({ error } = await sb.from("profile_statuses").insert({
-      user_id: currentUser.id,
-      content,
-      emoji,
-      is_highlight: isHighlight,
-      expires_at: expiresAt
-    }));
+    ({ error } = await sb.from("profile_statuses")
+      .insert({ ...payload, user_id: currentUser.id }));
   }
 
   if (error) {
@@ -241,6 +687,7 @@ async function saveMyStatus(existingId = "") {
     return;
   }
 
+  clearStatusMediaSelection();
   document.getElementById("globalModalWrap").innerHTML = "";
   showToast("✨ Estado publicado por 24 h");
   renderProfile();
@@ -1826,6 +2273,202 @@ function ensureSafeMobileUpgradeStyles() {
     @keyframes lsStatusAuraPulse {
       0%,100% { opacity:.52; transform:scale(.96); }
       50% { opacity:1; transform:scale(1.07); }
+    }
+
+
+    .ls-story-overlay {
+      position:fixed;
+      inset:0;
+      z-index:700;
+      background:rgba(0,0,0,.92);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:12px;
+      box-sizing:border-box;
+    }
+
+    .ls-story-shell {
+      position:relative;
+      width:min(430px, 100%);
+      height:min(82vh, 760px);
+      max-height:calc(100vh - 24px);
+      border-radius:22px;
+      overflow:hidden;
+      background:#080a0d;
+      border:1px solid rgba(255,255,255,.11);
+      box-shadow:0 28px 90px rgba(0,0,0,.65);
+    }
+
+    .ls-story-progress-track {
+      position:absolute;
+      top:10px;
+      left:12px;
+      right:52px;
+      height:3px;
+      border-radius:10px;
+      background:rgba(255,255,255,.22);
+      overflow:hidden;
+      z-index:8;
+    }
+
+    .ls-story-progress-bar {
+      width:0%;
+      height:100%;
+      background:#fff;
+      border-radius:inherit;
+    }
+
+    .ls-story-close {
+      position:absolute;
+      top:15px;
+      right:12px;
+      z-index:9;
+      width:34px;
+      height:34px;
+      border:0;
+      border-radius:50%;
+      background:rgba(0,0,0,.55);
+      color:#fff;
+      font-size:18px;
+      cursor:pointer;
+    }
+
+    .ls-story-owner {
+      position:absolute;
+      top:24px;
+      left:14px;
+      z-index:7;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      color:#fff;
+      font-size:11px;
+      font-weight:700;
+      text-shadow:0 2px 8px rgba(0,0,0,.8);
+    }
+
+    .ls-story-owner-avatar {
+      width:30px;
+      height:30px;
+      border-radius:50%;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.24);
+    }
+
+    .ls-story-content {
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      overflow:hidden;
+    }
+
+    .ls-story-content img,
+    .ls-story-content video {
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      background:#000;
+    }
+
+    .ls-story-text {
+      position:relative;
+      z-index:2;
+      max-width:84%;
+      font-size:clamp(22px, 6vw, 36px);
+      line-height:1.25;
+      font-weight:800;
+      color:#fff;
+      text-shadow:0 4px 18px rgba(0,0,0,.65);
+      overflow-wrap:anywhere;
+    }
+
+    .ls-story-text-bg {
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(circle at 18% 15%, rgba(34,197,94,.34), transparent 35%),
+        radial-gradient(circle at 82% 28%, rgba(125,211,252,.30), transparent 36%),
+        linear-gradient(145deg, #131824, #090b10 58%, #17101e);
+    }
+
+    .ls-story-caption {
+      position:absolute;
+      left:14px;
+      right:14px;
+      bottom:18px;
+      z-index:7;
+      color:#fff;
+      font-size:14px;
+      line-height:1.4;
+      text-align:left;
+      text-shadow:0 2px 10px rgba(0,0,0,.9);
+    }
+
+    .ls-status-media-preview {
+      display:none;
+      margin-top:12px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      background:#050607;
+    }
+
+    .ls-status-media-preview.active {
+      display:block;
+    }
+
+    .ls-status-media-preview img,
+    .ls-status-media-preview video {
+      display:block;
+      width:100%;
+      max-height:300px;
+      object-fit:contain;
+      background:#000;
+    }
+
+    .ls-status-type-tabs {
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:7px;
+      margin-bottom:13px;
+    }
+
+    .ls-status-type-tabs button {
+      min-height:42px;
+      border:1px solid var(--border);
+      border-radius:11px;
+      background:var(--panel-2);
+      color:var(--text-dim);
+      font-family:inherit;
+      cursor:pointer;
+    }
+
+    .ls-status-type-tabs button.active {
+      color:var(--gold);
+      border-color:var(--gold-dim);
+      background:rgba(255,255,255,.05);
+    }
+
+    @media (max-width:700px) {
+      .ls-story-overlay {
+        padding:0;
+      }
+
+      .ls-story-shell {
+        width:100%;
+        height:100vh;
+        max-height:100vh;
+        border-radius:0;
+        border:0;
+      }
     }
 
     .ls-status-card {
@@ -3734,6 +4377,7 @@ async function renderProfile() {
   const statusFeatureEnabled = await isStatusFeatureEnabled();
   const activeProfileStatus = statusFeatureEnabled ? await getActiveStatusForUser(currentUser.id) : null;
   const highlightedProfileStatuses = statusFeatureEnabled ? await getHighlightedStatuses(currentUser.id) : [];
+  window.__activeOwnStatus = activeProfileStatus || null;
 
   const { count: followersCount } = await sb
     .from("follows")
@@ -3894,7 +4538,7 @@ async function renderProfile() {
       <div style="position:relative; z-index:2;">
         <div class="profile-hero-top">
           <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${renderStatusAuraClass(!!activeProfileStatus)}"
-            ${activeProfileStatus ? `onclick="openStatusComposer()" title="Tenés un estado activo"` : ""}>
+            ${activeProfileStatus ? `onclick="openStatusStoryViewer(window.__activeOwnStatus, currentProfile)" title="Ver tu estado"` : ""}>
             ${renderAvatarHtml(currentProfile, 60)}
           </div>
           <div class="profile-name-block">
@@ -4284,20 +4928,13 @@ async function showPublicActiveStatus(userId) {
     return;
   }
 
-  const wrap = document.getElementById("globalModalWrap");
-  const remainingHours = Math.max(1, Math.ceil((new Date(status.expires_at).getTime() - Date.now()) / 3600000));
+  const { data: owner } = await sb
+    .from("profiles")
+    .select("id,username,avatar_url,avatar_emoji,plan_id")
+    .eq("id", userId)
+    .maybeSingle();
 
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:245;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:380px;">
-        <div class="modal-box-body" style="text-align:center;padding:28px;">
-          <div style="font-size:54px;margin-bottom:10px;">${escapeHtml(status.emoji || "✨")}</div>
-          <div style="font-size:18px;line-height:1.45;">${escapeHtml(status.content || "")}</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:12px;">⏳ ${remainingHours} h restantes</div>
-          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
-        </div>
-      </div>
-    </div>`;
+  openStatusStoryViewer(status, owner || null);
 }
 
 async function viewPublicProfile(username) {

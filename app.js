@@ -410,9 +410,11 @@ function detectLiveScrollExperience() {
 
 function closeLiveScrollModeInfo() {
   document.getElementById("lsModeInfoOverlay")?.remove();
+  setMobileBottomNavHidden(false);
 }
 
 function openLiveScrollModeInfo() {
+  setMobileBottomNavHidden(true);
   const mode = window.__liveScrollExperienceMode || "nova";
   closeLiveScrollModeInfo();
 
@@ -1463,9 +1465,72 @@ function ensureSafeMobileUpgradeStyles() {
         font-size:8px;
       }
     }
+
+    @media (max-width:700px) {
+      .feed-vertical,
+      #feedList,
+      #foryouList {
+        padding-bottom:84px !important;
+        box-sizing:border-box !important;
+      }
+
+      .feed-item:last-child {
+        margin-bottom:76px !important;
+      }
+
+      .ls-profile-edit-modal {
+        width:100% !important;
+        max-width:100% !important;
+        height:100vh !important;
+        max-height:100vh !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        display:flex !important;
+        flex-direction:column !important;
+        overflow:hidden !important;
+      }
+
+      .ls-profile-edit-header {
+        flex:0 0 auto !important;
+        position:sticky !important;
+        top:0 !important;
+        z-index:20 !important;
+        background:var(--panel) !important;
+        border-bottom:1px solid var(--border) !important;
+      }
+
+      .ls-profile-edit-body {
+        flex:1 1 auto !important;
+        min-height:0 !important;
+        overflow-y:auto !important;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      .ls-profile-edit-footer {
+        flex:0 0 auto !important;
+        position:sticky !important;
+        bottom:0 !important;
+        z-index:20 !important;
+        background:var(--panel) !important;
+        border-top:1px solid var(--border) !important;
+        padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
+      }
+    }
   `;
 
   document.head.appendChild(style);
+}
+
+function setMobileBottomNavHidden(hidden) {
+  const nav = document.getElementById("lsMobileBottomNavSafe");
+  if (!nav) return;
+  nav.style.display = hidden ? "none" : "";
+}
+
+function closeManagedModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  setMobileBottomNavHidden(false);
 }
 
 function ensureSafeMobileBottomNav() {
@@ -1560,6 +1625,7 @@ function showFloatingPointsSafe(amount, anchorEl = null) {
 function switchTab(tab) {
   clearAllWatchIntervals();
   currentTab = tab;
+  setMobileBottomNavHidden(false);
   updateSafeMobileBottomNav();
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
@@ -1862,6 +1928,7 @@ async function openSharedVideo(videoId) {
 }
 
 async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
+  setMobileBottomNavHidden(true);
   const { data: myLikes } = await sb
     .from("video_likes")
     .select("video_id")
@@ -1910,7 +1977,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
 
 function closeProfileVideoFeed() {
   clearAllWatchIntervals();
-  document.getElementById("globalModalWrap").innerHTML = "";
+  closeManagedModal();
 }
 
 function getGridCoverHtml(video) {
@@ -2217,9 +2284,11 @@ function ensureModernMobileStyles() {
 
 function closeVideoActionSheet() {
   document.getElementById("videoActionSheetOverlay")?.remove();
+  setMobileBottomNavHidden(false);
 }
 
 function openVideoActionSheet(videoId) {
+  setMobileBottomNavHidden(true);
   const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
   if (!video) return;
 
@@ -3393,6 +3462,7 @@ async function handleShare(videoId, url) {
 }
 
 async function openComments(videoId, focusCommentId = null) {
+  setMobileBottomNavHidden(true);
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
@@ -3462,7 +3532,7 @@ async function submitComment(videoId) {
 }
 
 function closeComments() {
-  document.getElementById("globalModalWrap").innerHTML = "";
+  closeManagedModal();
 }
 
 function renderAvatarHtml(profile, size) {
@@ -3671,19 +3741,20 @@ async function loadUsersDirectory(term) {
 
 
 function openMyMedalsPanel() {
+  setMobileBottomNavHidden(true);
   const badges = window.__myProfileBadges || [];
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
       <div class="modal-box" style="max-width:430px;max-height:88dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
             <h2 style="margin:0;font-size:19px;">🏅 Mis medallas</h2>
             <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${badges.length} desbloqueada${badges.length === 1 ? "" : "s"}</div>
           </div>
-          <button type="button" onclick="document.getElementById('globalModalWrap').innerHTML=''"
+          <button type="button" onclick="closeManagedModal()"
             style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
         </div>
         <div class="modal-box-body" style="overflow-y:auto;">
@@ -4037,21 +4108,22 @@ function copyReferralLink() {
 }
 
 async function openEditProfile() {
+  setMobileBottomNavHidden(true);
   const baseEmojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
   const { data: unlocked } = await sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id);
   const emojis = [...baseEmojis, ...(unlocked || []).map(u => u.emoji).filter(e => !baseEmojis.includes(e))];
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) this.remove()">
-      <div class="modal-box" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
-        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
+    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeManagedModal()">
+      <div class="modal-box ls-profile-edit-modal" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header ls-profile-edit-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
           <h2 style="font-size:19px;margin:0;">Editar perfil</h2>
-          <button type="button" onclick="document.getElementById('globalModalWrap').innerHTML=''"
+          <button type="button" onclick="closeManagedModal()"
             aria-label="Cerrar"
             style="width:40px;height:40px;min-width:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
         </div>
-        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+        <div class="modal-box-body ls-profile-edit-body" style="overflow-y:auto;min-height:0;">
         <div class="field" style="text-align:center;">
           <label>Foto de perfil</label>
           <div style="margin-bottom:10px;">
@@ -4163,9 +4235,9 @@ async function openEditProfile() {
           <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
         </div>
         </div>
-        <div class="modal-box-footer" style="display:flex;gap:10px;position:sticky;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--border);">
-          <button class="btn-outline" style="flex:1;min-height:46px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
-          <button class="btn" style="flex:1;min-height:46px;" onclick="saveProfileEdits()">Guardar</button>
+        <div class="modal-box-footer ls-profile-edit-footer" style="display:flex;gap:10px;position:sticky;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--border);">
+          <button class="btn-outline" style="flex:1;min-height:48px;" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn" style="flex:1;min-height:48px;" onclick="saveProfileEdits()">Guardar</button>
         </div>
       </div>
     </div>`;
@@ -4407,7 +4479,7 @@ async function saveProfileEdits() {
   currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
   currentProfile.social_tiktok = document.getElementById("socialTiktok").value.trim();
   currentProfile.social_instagram = document.getElementById("socialInstagram").value.trim();
-  document.getElementById("globalModalWrap").innerHTML = "";
+  closeManagedModal();
   showToast("Perfil actualizado");
   renderProfile();
 }

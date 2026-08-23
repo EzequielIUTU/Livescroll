@@ -31,81 +31,12 @@ let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
-
-document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("lsStudioLiveStyles")) return;
-  const style = document.createElement("style");
-  style.id = "lsStudioLiveStyles";
-  style.textContent = `
-    .ls-studio-live-section{margin-bottom:18px}
-    .ls-studio-live-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
-    .ls-studio-live-head h3{margin:0;font-size:12px;letter-spacing:.04em}
-    .ls-studio-live-head span{font-size:9px;color:var(--text-dim)}
-    .ls-studio-live-card{display:grid;grid-template-columns:150px 1fr auto;gap:13px;align-items:center;min-height:92px;padding:10px;border:1px solid rgba(34,197,94,.25);border-radius:14px;background:linear-gradient(90deg,rgba(34,197,94,.045),transparent 45%),var(--panel);cursor:pointer;margin-bottom:9px;overflow:hidden}
-    .ls-studio-live-preview{aspect-ratio:16/9;border-radius:10px;background:#050607;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
-    .ls-studio-live-preview img{width:100%;height:100%;object-fit:cover}
-    .ls-studio-live-chip{position:absolute;top:6px;left:6px;padding:3px 6px;border-radius:6px;background:#dc2626;color:#fff;font-size:8px;font-weight:900}
-    .ls-studio-live-title{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .ls-studio-live-user{margin-top:5px;font-size:10px;color:var(--text-dim)}
-    .ls-studio-live-meta{margin-top:7px;font-size:9px;color:var(--green)}
-    .ls-studio-live-open{padding:8px 10px;border-radius:9px;border:1px solid rgba(34,197,94,.28);color:var(--green);font-size:10px;font-weight:800}
-    .ls-live-viewer-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;min-height:540px}
-    .ls-live-video-shell,.ls-live-chat{border:1px solid var(--border);border-radius:15px;background:var(--panel);overflow:hidden}
-    .ls-live-video-area{aspect-ratio:16/9;background:#000;display:flex;align-items:center;justify-content:center}
-    .ls-live-video-placeholder{text-align:center;color:var(--text-dim);padding:20px}
-    .ls-live-video-placeholder .ico{font-size:44px;margin-bottom:8px}
-    .ls-live-details{padding:13px 14px;border-top:1px solid var(--border)}
-    .ls-live-chat{display:flex;flex-direction:column;min-height:0}
-    .ls-live-chat-head{padding:12px 13px;border-bottom:1px solid var(--border);font-size:11px;font-weight:800}
-    .ls-live-chat-messages{flex:1;overflow-y:auto;padding:10px;min-height:340px}
-    .ls-live-chat-message{margin-bottom:8px;font-size:10px;line-height:1.4;word-break:break-word}
-    .ls-live-chat-message b{color:var(--gold);margin-right:4px}
-    .ls-live-chat-form{display:flex;gap:7px;padding:10px;border-top:1px solid var(--border)}
-    .ls-live-chat-form input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--ink);color:var(--text)}
-    .ls-live-chat-form button{width:auto;margin:0;padding:8px 11px}
-    @media(max-width:760px){.ls-studio-live-card{grid-template-columns:120px 1fr}.ls-studio-live-open{display:none}.ls-live-viewer-layout{grid-template-columns:1fr}.ls-live-chat-messages{min-height:220px;max-height:330px}}
-  `;
-  document.head.appendChild(style);
-});
-
-
-document.addEventListener("DOMContentLoaded", () => {
-  if (document.getElementById("lsNoTextSelectionStyle")) return;
-
-  const style = document.createElement("style");
-  style.id = "lsNoTextSelectionStyle";
-  style.textContent = `
-    html, body, #appView, #landingView, nav, header, main, section, article,
-    div, span, p, h1, h2, h3, h4, button, a, img, video {
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-touch-callout: none;
-    }
-
-    input, textarea, [contenteditable="true"], .allow-select {
-      -webkit-user-select: text !important;
-      user-select: text !important;
-      -webkit-touch-callout: default;
-    }
-
-    button, a, [onclick] {
-      -webkit-tap-highlight-color: transparent;
-    }
-  `;
-  document.head.appendChild(style);
-});
-
 // ============================================================
 // ARRANQUE
 // ============================================================
 document.addEventListener("DOMContentLoaded", async () => {
   if ("serviceWorker" in navigator) {
-    const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
-    if ("requestIdleCallback" in window) {
-      requestIdleCallback(registerSW, { timeout: 2200 });
-    } else {
-      setTimeout(registerSW, 1200);
-    }
+    navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -344,27 +275,21 @@ async function handleLogin() {
 
 async function handleLogout() {
   clearAllWatchIntervals();
-
-  if (notifRealtimeChannel) {
-    await sb.removeChannel(notifRealtimeChannel);
-    notifRealtimeChannel = null;
-  }
-
   await sb.auth.signOut();
 }
 
 async function loadProfile() {
-  const [profileResult, statusResult] = await Promise.all([
-    sb.from("profiles")
-      .select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform")
-      .eq("id", currentUser.id)
-      .single(),
-    sb.rpc("get_my_status")
-  ]);
+  const { data, error } = await sb.rpc("get_my_profile_data");
 
-  if (!profileResult.error) currentProfile = profileResult.data;
+  if (!error && data?.ok) {
+    currentProfile = data.profile;
+  } else {
+    console.error("No se pudo cargar el perfil privado:", error || data?.error);
+    currentProfile = null;
+    return;
+  }
 
-  const status = statusResult.data;
+  const { data: status } = await sb.rpc("get_my_status");
   if (status && currentProfile) {
     currentProfile.is_admin = status.is_admin;
     currentProfile.is_blocked = status.is_blocked;
@@ -452,443 +377,16 @@ function closeMobileMenu() {
   document.getElementById("mobileMenuPanel")?.remove();
 }
 
-
-// ============================================================
-// COMPATIBILIDAD LEGACY — Android/celulares de recursos limitados
-// No cambia la experiencia normal: solo activa ajustes livianos cuando
-// el navegador/dispositivo parece antiguo o muy limitado.
-// ============================================================
-function detectLiveScrollExperience() {
-  let legacy = false;
-
-  try {
-    const ua = navigator.userAgent || "";
-    const androidMatch = ua.match(/Android\s([0-9]+)/i);
-    const androidMajor = androidMatch ? parseInt(androidMatch[1], 10) : null;
-    const chromeMatch = ua.match(/(?:Chrome|CriOS)\/([0-9]+)/i);
-    const chromeMajor = chromeMatch ? parseInt(chromeMatch[1], 10) : null;
-    const lowMemory = typeof navigator.deviceMemory === "number" && navigator.deviceMemory <= 2;
-    const lowCpu = typeof navigator.hardwareConcurrency === "number" && navigator.hardwareConcurrency <= 4;
-    const narrowOldAndroid = androidMajor !== null && androidMajor <= 8 && window.innerWidth <= 420;
-
-    legacy =
-      (androidMajor !== null && androidMajor <= 7) ||
-      (chromeMajor !== null && chromeMajor < 80) ||
-      lowMemory ||
-      (narrowOldAndroid && lowCpu);
-  } catch (_) {
-    legacy = false;
-  }
-
-  return legacy ? "legacy" : "nova";
-}
-
-
-function closeLiveScrollModeInfo() {
-  document.getElementById("lsModeInfoOverlay")?.remove();
-}
-
-function openLiveScrollModeInfo() {
-  const mode = window.__liveScrollExperienceMode || "nova";
-  closeLiveScrollModeInfo();
-
-  const overlay = document.createElement("div");
-  overlay.id = "lsModeInfoOverlay";
-  overlay.className = "ls-mode-overlay";
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) closeLiveScrollModeInfo();
-  });
-
-  const isLegacy = mode === "legacy";
-
-  overlay.innerHTML = `
-    <div class="ls-mode-panel" role="dialog" aria-modal="true" aria-label="Modo de experiencia LiveScroll">
-      <div class="ls-mode-handle"></div>
-
-      <div class="ls-mode-head">
-        <div class="ls-mode-icon">${isLegacy ? "🪶" : "✨"}</div>
-        <div class="ls-mode-title">
-          <strong>LiveScroll ${isLegacy ? "Legacy" : "Nova"}</strong>
-          <span>${isLegacy ? "Experiencia optimizada" : "Experiencia completa"}</span>
-        </div>
-      </div>
-
-      <div class="ls-mode-current">
-        <strong>Este dispositivo está usando ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
-        LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo.
-      </div>
-
-      ${isLegacy ? `
-        <div class="ls-mode-feature">
-          <div class="ico">⚡</div>
-          <div><strong>Menos carga visual</strong><span>Reduce animaciones, desenfoques y efectos pesados.</span></div>
-        </div>
-        <div class="ls-mode-feature">
-          <div class="ico">📱</div>
-          <div><strong>Mejor compatibilidad</strong><span>Está pensado para celulares antiguos o con recursos limitados.</span></div>
-        </div>
-        <div class="ls-mode-feature">
-          <div class="ico">❤️</div>
-          <div><strong>Mismo LiveScroll</strong><span>Tu cuenta, contenido, puntos y funciones siguen siendo los mismos.</span></div>
-        </div>
-      ` : `
-        <div class="ls-mode-feature">
-          <div class="ico">✨</div>
-          <div><strong>Experiencia visual completa</strong><span>Animaciones, efectos y detalles modernos activos.</span></div>
-        </div>
-        <div class="ls-mode-feature">
-          <div class="ico">🚀</div>
-          <div><strong>Interfaz avanzada</strong><span>LiveScroll aprovecha las capacidades del dispositivo para ofrecer la experiencia completa.</span></div>
-        </div>
-        <div class="ls-mode-feature">
-          <div class="ico">🔄</div>
-          <div><strong>Adaptación automática</strong><span>Si LiveScroll detecta un dispositivo limitado, puede activar Legacy automáticamente.</span></div>
-        </div>
-      `}
-
-      <div class="ls-mode-note">
-        No necesitás configurar nada. El modo se selecciona automáticamente para priorizar una buena experiencia.
-      </div>
-
-      <button type="button" class="ls-mode-close">Entendido</button>
-    </div>
-  `;
-
-  overlay.querySelector(".ls-mode-close")?.addEventListener("click", closeLiveScrollModeInfo);
-  document.body.appendChild(overlay);
-}
-
-function initLiveScrollExperienceMode() {
-  const mode = detectLiveScrollExperience();
-  window.__liveScrollExperienceMode = mode;
-  window.__liveScrollLegacyMode = mode === "legacy";
-
-  document.documentElement.classList.toggle("ls-legacy", mode === "legacy");
-  document.documentElement.classList.toggle("ls-nova", mode === "nova");
-
-  if (!document.getElementById("lsExperienceStyles")) {
-    const style = document.createElement("style");
-    style.id = "lsExperienceStyles";
-    style.textContent = `
-      .ls-experience-badge {
-        position:fixed;
-        right:12px;
-        bottom:max(12px, env(safe-area-inset-bottom));
-        z-index:190;
-        padding:7px 10px;
-        border-radius:999px;
-        border:1px solid var(--border);
-        background:rgba(13,16,20,.88);
-        color:var(--text-dim);
-        font-size:10px;
-        font-weight:700;
-        letter-spacing:.2px;
-        box-shadow:0 8px 24px rgba(0,0,0,.28);
-        pointer-events:auto;
-        cursor:pointer;
-        user-select:none;
-        touch-action:manipulation;
-      }
-
-      .ls-experience-badge:active {
-        transform:scale(.96);
-      }
-
-      @media (max-width:700px) {
-        .ls-experience-badge {
-          bottom:max(12px, env(safe-area-inset-bottom)) !important;
-          right:10px !important;
-          z-index:340 !important;
-        }
-      }
-
-      .ls-mode-overlay {
-        position:fixed;
-        inset:0;
-        z-index:520;
-        background:rgba(0,0,0,.72);
-        display:flex;
-        align-items:flex-end;
-        justify-content:center;
-        padding:12px;
-        padding-bottom:max(12px, env(safe-area-inset-bottom));
-      }
-
-      .ls-mode-panel {
-        width:min(460px, 100%);
-        box-sizing:border-box;
-        background:var(--panel);
-        border:1px solid var(--border);
-        border-radius:22px;
-        padding:16px;
-        color:var(--text);
-        box-shadow:0 -18px 50px rgba(0,0,0,.48);
-      }
-
-      .ls-mode-handle {
-        width:42px;
-        height:4px;
-        border-radius:10px;
-        background:rgba(255,255,255,.2);
-        margin:0 auto 14px;
-      }
-
-      .ls-mode-head {
-        display:flex;
-        gap:12px;
-        align-items:center;
-        margin-bottom:14px;
-      }
-
-      .ls-mode-icon {
-        width:48px;
-        height:48px;
-        border-radius:14px;
-        background:var(--panel-2);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:25px;
-        flex:0 0 48px;
-      }
-
-      .ls-mode-title {
-        min-width:0;
-      }
-
-      .ls-mode-title strong {
-        display:block;
-        font-size:17px;
-        color:var(--gold);
-      }
-
-      .ls-mode-title span {
-        display:block;
-        margin-top:2px;
-        font-size:11px;
-        color:var(--text-dim);
-      }
-
-      .ls-mode-current {
-        border:1px solid var(--gold-dim);
-        background:rgba(255,255,255,.025);
-        border-radius:14px;
-        padding:12px;
-        margin-bottom:12px;
-        font-size:12px;
-        line-height:1.5;
-      }
-
-      .ls-mode-feature {
-        display:flex;
-        gap:10px;
-        align-items:flex-start;
-        padding:9px 4px;
-        font-size:12px;
-        line-height:1.4;
-      }
-
-      .ls-mode-feature .ico {
-        width:24px;
-        flex:0 0 24px;
-        text-align:center;
-        font-size:17px;
-      }
-
-      .ls-mode-feature strong {
-        display:block;
-        font-size:12px;
-        margin-bottom:1px;
-      }
-
-      .ls-mode-feature span {
-        color:var(--text-dim);
-      }
-
-      .ls-mode-note {
-        margin-top:10px;
-        padding-top:10px;
-        border-top:1px solid var(--border);
-        color:var(--text-dim);
-        font-size:10px;
-        line-height:1.45;
-      }
-
-      .ls-mode-close {
-        width:100%;
-        min-height:46px;
-        margin-top:14px;
-        border:0;
-        border-radius:12px;
-        background:var(--gold);
-        color:#10120f;
-        font-family:inherit;
-        font-weight:800;
-        cursor:pointer;
-      }
-
-      .ls-experience-toast {
-        position:fixed;
-        left:50%;
-        bottom:max(24px, calc(env(safe-area-inset-bottom) + 24px));
-        transform:translateX(-50%);
-        width:min(390px, calc(100vw - 24px));
-        z-index:500;
-        box-sizing:border-box;
-        padding:14px 15px;
-        border-radius:16px;
-        background:var(--panel);
-        border:1px solid var(--border);
-        box-shadow:0 16px 45px rgba(0,0,0,.5);
-        color:var(--text);
-        font-size:13px;
-        line-height:1.4;
-        animation:lsExperienceIn .25s ease;
-      }
-
-      .ls-experience-toast strong {
-        display:block;
-        margin-bottom:3px;
-        color:var(--gold);
-      }
-
-      @keyframes lsExperienceIn {
-        from { opacity:0; transform:translate(-50%, 12px); }
-        to { opacity:1; transform:translate(-50%, 0); }
-      }
-
-      .ls-legacy *,
-      .ls-legacy *::before,
-      .ls-legacy *::after {
-        animation-duration:0.001ms !important;
-        animation-iteration-count:1 !important;
-        transition-duration:0.001ms !important;
-        scroll-behavior:auto !important;
-      }
-
-      .ls-legacy [style*="backdrop-filter"],
-      .ls-legacy .ls-action-sheet-overlay,
-      .ls-legacy .grid-menu-btn {
-        backdrop-filter:none !important;
-        -webkit-backdrop-filter:none !important;
-      }
-
-      .ls-legacy .profile-hero,
-      .ls-legacy .form-card,
-      .ls-legacy .profile-section,
-      .ls-legacy .modal-box,
-      .ls-legacy .ls-action-sheet {
-        box-shadow:none !important;
-      }
-
-      .ls-legacy video {
-        filter:none !important;
-      }
-
-      @media (max-width:420px) {
-        .ls-legacy #appView {
-          padding-left:7px !important;
-          padding-right:7px !important;
-        }
-
-        .ls-legacy .profile-hero,
-        .ls-legacy .profile-section,
-        .ls-legacy .form-card {
-          border-radius:12px !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  let badge = document.getElementById("lsExperienceBadge");
-  if (!badge) {
-    badge = document.createElement("div");
-    badge.id = "lsExperienceBadge";
-    badge.className = "ls-experience-badge";
-    document.body.appendChild(badge);
-  }
-
-  badge.textContent = mode === "legacy"
-    ? "🪶 LiveScroll Legacy"
-    : "✨ LiveScroll Nova";
-
-  badge.setAttribute("role", "button");
-  badge.setAttribute("tabindex", "0");
-  badge.setAttribute("aria-label", `Ver información sobre LiveScroll ${mode === "legacy" ? "Legacy" : "Nova"}`);
-
-  if (!badge.dataset.modeInfoBound) {
-    badge.dataset.modeInfoBound = "1";
-    badge.addEventListener("click", openLiveScrollModeInfo);
-    badge.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openLiveScrollModeInfo();
-      }
-    });
-  }
-
-  const storageKey = `livescroll-experience-notice-${mode}-v1`;
-  let alreadyShown = false;
-
-  try {
-    alreadyShown = localStorage.getItem(storageKey) === "1";
-  } catch (_) {}
-
-  if (!alreadyShown) {
-    const toast = document.createElement("div");
-    toast.className = "ls-experience-toast";
-
-    if (mode === "legacy") {
-      toast.innerHTML = `
-        <strong>🪶 LiveScroll Legacy activado</strong>
-        Optimizamos automáticamente la experiencia para que LiveScroll funcione mejor en este dispositivo.
-      `;
-    } else {
-      toast.innerHTML = `
-        <strong>✨ LiveScroll Nova</strong>
-        Estás usando la experiencia completa de LiveScroll.
-      `;
-    }
-
-    document.body.appendChild(toast);
-
-    setTimeout(() => toast.remove(), mode === "legacy" ? 6000 : 4000);
-
-    try {
-      localStorage.setItem(storageKey, "1");
-    } catch (_) {}
-  }
-}
-
 async function renderApp() {
-  initLiveScrollExperienceMode();
-  ensureModernMobileStyles();
-
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
 
-  // 5.4.6: mostramos respuesta inmediata mientras resolvemos
-  // las pocas cosas necesarias para construir la navegación.
-  const appView = document.getElementById("appView");
-  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
-
-  const [visibilityResult, plans] = await Promise.all([
-    sb.from("app_text_config")
-      .select("key, value")
-      .in("key", ["wallet_visibility", "plans_visibility"]),
-    loadPlans()
-  ]);
-
-  const visibilityRows = visibilityResult.data || [];
-  const walletLocked =
-    visibilityRows.find(r => r.key === "wallet_visibility")?.value === "closed" &&
-    !currentProfile.is_admin;
-
-  const plansLocked =
-    visibilityRows.find(r => r.key === "plans_visibility")?.value === "closed" &&
-    !currentProfile.is_admin;
-
+  const { data: visibilityRows } = await sb
+    .from("app_text_config")
+    .select("key, value")
+    .in("key", ["wallet_visibility", "plans_visibility"]);
+  const walletLocked = visibilityRows?.find(r => r.key === "wallet_visibility")?.value === "closed" && !currentProfile.is_admin;
+  const plansLocked = visibilityRows?.find(r => r.key === "plans_visibility")?.value === "closed" && !currentProfile.is_admin;
   window.__navWalletLocked = walletLocked;
   window.__navPlansLocked = plansLocked;
 
@@ -905,14 +403,12 @@ async function renderApp() {
     <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;
 
-  const currentPlan =
-    plans.find(p => p.id === currentProfile.plan_id) ||
-    plans[0] ||
-    { name: currentProfile.plan_id || "Plan" };
+  const plans = await loadPlans();
+  const currentPlan = plans.find(p => p.id === currentProfile.plan_id) || plans[0];
 
   document.getElementById("navRight").innerHTML = `
     <div class="nav-plan-chip">
-      <span class="plan-name">${escapeHtml(currentPlan.name || "Plan")}</span>
+      <span class="plan-name">${currentPlan.name}</span>
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
@@ -922,19 +418,13 @@ async function renderApp() {
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
-  // Lo visible primero.
+  loadNotifications();
+
+  checkBoostStatus();
   checkBlockedStatus();
+  checkPendingContent();
+  // La racha ahora se reclama a mano desde Mi Perfil, no automático al entrar
   switchTab("feed");
-
-  // Lo secundario ya no bloquea la aparición del Feed.
-  // Realtime se conecta enseguida y el historial se carga en paralelo.
-  subscribeToNotifications();
-
-  Promise.allSettled([
-    loadNotifications(),
-    checkBoostStatus(),
-    checkPendingContent()
-  ]).catch(() => {});
 }
 
 async function checkPendingContent() {
@@ -946,258 +436,9 @@ async function checkPendingContent() {
   } else if (data.tutorial_pending) {
     showTutorialModal();
   } else if (data.changelog_pending) {
-    // Si estuvo varios días afuera, primero ve "Mientras no estabas..."
-    // y recién al ponerse al día comprobamos el teaser.
     showChangelogModal(data.changelog_entries || []);
-  } else if (data.road_to_6_teaser_pending) {
-    showRoadTo6Teaser();
-  } else {
-    checkCollection568Launch();
   }
 }
-
-
-async function checkConnected579Launch() {
-  if (!currentUser?.id) return;
-
-  const { data, error } = await sb.rpc("get_connected_579_launch_pending");
-  if (error || !data?.pending) return;
-
-  showConnected579Launch();
-}
-
-function showConnected579Launch() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="ls-next-era-changelog">
-      <div class="ls-next-era-box" style="max-width:520px;text-align:center;">
-        <div class="ls-next-era-scan"></div>
-
-        <div class="ls-next-era-head">
-          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NUEVA ETAPA</div>
-          <h2 class="ls-next-era-title" style="font-size:clamp(29px,7vw,48px);line-height:.98;margin-bottom:8px;">5.7.9</h2>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:.12em;">CONNECTED</div>
-        </div>
-
-        <div class="ls-next-era-body" style="text-align:center;">
-          <div style="font-size:40px;margin:3px 0 10px;">📡</div>
-          <h3 style="margin:0 0 8px;font-size:19px;">Una nueva forma de conectarnos comienza.</h3>
-          <p style="font-size:12px;color:var(--text-dim);line-height:1.65;max-width:405px;margin:0 auto;">
-            Empezamos a construir una nueva generación de LiveScroll:
-            directos más rápidos, una experiencia móvil más inmediata
-            y nuevas formas de mantenerte conectado.
-          </p>
-
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 4px;">
-            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
-              <div style="font-size:20px;">⚡</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">DIRECTOS MÁS RÁPIDOS</div>
-            </div>
-            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
-              <div style="font-size:20px;">📱</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">MÓVIL</div>
-            </div>
-            <div style="padding:11px 6px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);">
-              <div style="font-size:20px;">🔔</div>
-              <div style="font-size:9px;font-weight:800;margin-top:5px;">CONECTADOS</div>
-            </div>
-          </div>
-
-          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:.12em;margin-top:14px;">
-            PRÓXIMAMENTE
-          </div>
-        </div>
-
-        <div class="ls-next-era-foot">
-          <button class="ls-road6-btn" style="width:100%;" onclick="acknowledgeConnected579Launch(this)">
-            CONTINUAR EL CAMINO →
-          </button>
-          <div style="font-size:9px;color:var(--text-dim);margin-top:9px;">5.7.9 se encuentra actualmente en desarrollo.</div>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function acknowledgeConnected579Launch(btn) {
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "CONECTANDO...";
-  }
-
-  const { data, error } = await sb.rpc("acknowledge_connected_579_launch");
-
-  if (error || !data?.ok) {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "CONTINUAR EL CAMINO →";
-    }
-    showToast("No se pudo guardar el aviso");
-    return;
-  }
-
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-}
-
-
-async function checkCollection568Launch() {
-  if (!currentUser?.id) return;
-
-  const { data, error } = await sb.rpc("get_collection_568_launch_pending");
-  if (error) return;
-
-  if (data?.pending) {
-    showCollection568Launch();
-    return;
-  }
-
-  checkConnected579Launch();
-}
-
-function showCollection568Launch() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="ls-next-era-changelog">
-      <div class="ls-next-era-box" style="max-width:520px;text-align:center;">
-        <div class="ls-next-era-scan"></div>
-
-        <div class="ls-next-era-head">
-          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NUEVA ETAPA</div>
-          <h2 class="ls-next-era-title" style="font-size:clamp(29px,7vw,48px);line-height:.98;margin-bottom:8px;">5.6.8</h2>
-          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:.12em;">COLLECTION</div>
-        </div>
-
-        <div class="ls-next-era-body" style="text-align:center;">
-          <div style="font-size:38px;margin:3px 0 10px;">🛍️</div>
-          <h3 style="margin:0 0 10px;font-size:18px;">Tu colección está por evolucionar.</h3>
-          <p style="font-size:12px;color:var(--text-dim);line-height:1.65;max-width:390px;margin:0 auto;">
-            Comenzamos oficialmente a trabajar en una nueva etapa de LiveScroll.
-            Nuevos coleccionables, ediciones especiales y nuevas formas de distinguir tu perfil.
-          </p>
-
-          <div style="margin:18px auto 4px;max-width:360px;padding:11px;border:1px solid rgba(250,204,21,.16);border-radius:12px;background:rgba(250,204,21,.035);">
-            <div style="font-size:10px;color:var(--text-dim);">ESTO RECIÉN EMPIEZA</div>
-            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;color:var(--gold);margin-top:4px;">RUMBO A LIVESCROLL 6</div>
-          </div>
-        </div>
-
-        <div style="padding:0 22px 22px;">
-          <button class="ls-road6-btn" style="width:100%;" onclick="acknowledgeCollection568Launch(this)">
-            DESCUBRIR 5.6.8 →
-          </button>
-          <div style="font-size:9px;color:var(--text-dim);margin-top:9px;">5.6.8 se encuentra actualmente en desarrollo.</div>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function acknowledgeCollection568Launch(btn) {
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "ENTRANDO A COLLECTION...";
-  }
-
-  const { data, error } = await sb.rpc("acknowledge_collection_568_launch");
-
-  if (error || !data?.ok) {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "DESCUBRIR 5.6.8 →";
-    }
-    showToast("No se pudo guardar el aviso");
-    return;
-  }
-
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-
-  // Si todavía no vio la siguiente etapa, la mostramos sin obligarlo
-  // a cerrar y volver a abrir la app.
-  checkConnected579Launch();
-}
-
-function showRoadTo6Teaser() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="ls-road6-overlay">
-      <div class="ls-road6-card">
-        <div class="ls-road6-scan"></div>
-        <div class="ls-road6-content">
-          <div class="ls-road6-kicker">LIVE SCROLL · NEXT ERA</div>
-          <div class="ls-road6-mark">◈</div>
-
-          <h2 class="ls-road6-title">Algo grande<br>está comenzando.</h2>
-
-          <div class="ls-road6-copy">
-            LiveScroll está entrando en una nueva etapa. Durante las próximas versiones vas a empezar a descubrir partes de lo que estamos preparando.
-          </div>
-
-          <div class="ls-road6-signals">
-            <div class="ls-road6-signal"><b>⚡</b>Más rápido</div>
-            <div class="ls-road6-signal"><b>🏅</b>Más personal</div>
-            <div class="ls-road6-signal"><b>🔔</b>Más conectado</div>
-            <div class="ls-road6-signal"><b>📡</b>Más cerca</div>
-          </div>
-
-          <div class="ls-road6-road">
-            5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → <strong>6.0.0</strong>
-          </div>
-
-          <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
-            Comenzar el camino →
-          </button>
-
-          <div class="ls-road6-foot">
-            El camino hacia LiveScroll 6 comienza ahora.
-          </div>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function acknowledgeRoadTo6Teaser() {
-  const btn = document.querySelector(".ls-road6-btn");
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Preparando lo que viene...";
-  }
-
-  const { data, error } = await sb.rpc("acknowledge_road_to_6_teaser");
-
-  if (error || !data?.ok) {
-    console.error(error || data);
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Intentar nuevamente";
-    }
-    showToast("No se pudo guardar todavía");
-    return;
-  }
-
-  const overlay = document.querySelector(".ls-road6-overlay");
-  const card = document.querySelector(".ls-road6-card");
-
-  if (overlay) overlay.style.opacity = "0";
-  if (card) {
-    card.style.transform = "scale(.94) translateY(-14px)";
-    card.style.opacity = "0";
-  }
-
-  setTimeout(() => {
-    const wrap = document.getElementById("globalModalWrap");
-    if (wrap) wrap.innerHTML = "";
-  }, 360);
-}
-
 
 const tutorialSteps = [
   { icon: "👋", title: "¡Bienvenido a LiveScroll!", text: "Acá subís y mirás clips de Kick, Twitch, YouTube y TikTok, y ganás puntos por cada cosa que hacés." },
@@ -1297,145 +538,42 @@ function showChangelogModal(entries) {
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
     actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
-    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
+  const byCategory = {};
+  entries.forEach(e => { byCategory[e.category] = byCategory[e.category] || []; byCategory[e.category].push(e.content); });
 
-  const byVersion = {};
-
-  (entries || []).forEach(e => {
-    const version = Number(e.version || 0);
-    if (!byVersion[version]) {
-      byVersion[version] = { display:e.display_version || null, cats:{} };
-    }
-    if (e.display_version && !byVersion[version].display) {
-      byVersion[version].display = e.display_version;
-    }
-    byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
-    byVersion[version].cats[e.category].push(e.content);
-  });
-
-  const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
-  const multipleVersions = versions.length > 1;
-  const newest = versions[versions.length - 1];
-  const newestLabel = byVersion[newest]?.display || "";
-  const isNextEra = versions.some(v => {
-    const label = byVersion[v]?.display || "";
-    const majorMinor = label.split(".").map(Number);
-    return (majorMinor[0] === 5 && majorMinor[1] >= 4) || majorMinor[0] >= 6;
-  });
-
-  // Versiones anteriores al camino a 6 conservan el modal clásico.
-  if (!isNextEra) {
-    const wrap = document.getElementById("globalModalWrap");
-    wrap.innerHTML = `
-      <div id="changelogOverlay" class="modal-overlay" style="transition:opacity .35s ease;">
-        <div id="changelogBox" class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;transition:transform .35s ease,opacity .35s ease;">
-          <div class="modal-box-header">
-            <div>
-              <h2 style="margin:0;">${multipleVersions ? "👋 Mientras no estabas..." : "✨ Novedades"}</h2>
-              ${multipleVersions ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Mirá todo lo que fuimos sumando desde tu última visita.</div>` : ""}
-            </div>
-          </div>
-          <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-            ${versions.map(v => {
-              const info=byVersion[v];
-              const label=info.display || `${v}.0.0`;
-              return `<div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll v${escapeHtml(label)}</div>
-                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
-                  <div style="margin-bottom:11px;">
-                    <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
-                  </div>`:"").join("")}
-              </div>`;
-            }).join("")}
-          </div>
-          <div class="modal-box-footer"><button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">${multipleVersions ? "Ya estoy al día ✓" : "Aceptar"}</button></div>
-        </div>
-      </div>`;
-    return;
-  }
-
-  const stageNames = {
-    "5.4.6":"PERFORMANCE",
-    "5.5.7":"IDENTITY",
-    "5.6.8":"COLLECTION",
-    "5.7.9":"CONNECTED",
-    "5.8.0":"LIVE",
-    "5.9.0":"CORE",
-    "6.0.0":"NEW ERA"
-  };
-  const stage = stageNames[newestLabel] || "NEXT ERA";
   const wrap = document.getElementById("globalModalWrap");
-
   wrap.innerHTML = `
-    <div id="changelogOverlay" class="ls-next-era-changelog">
-      <div id="changelogBox" class="ls-next-era-box">
-        <div class="ls-next-era-scan"></div>
-
-        <div class="ls-next-era-head">
-          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
-          <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `v${escapeHtml(newestLabel)} · ${stage}`}</h2>
-          <div class="ls-next-era-sub">
-            ${multipleVersions
-              ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
-              : newestLabel === "6.0.0"
-                ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
-                : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
-          </div>
+    <div id="changelogOverlay" class="modal-overlay" style="transition:opacity 0.35s ease;">
+      <div id="changelogBox" class="modal-box" style="transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
+        <div class="modal-box-header"><h2>✨ Novedades</h2></div>
+        <div class="modal-box-body">
+          ${["nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
+            <div style="margin-bottom:14px;">
+              <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
+              ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+            </div>` : "").join("")}
         </div>
-
-        <div class="ls-next-era-body">
-          ${versions.map(v => {
-            const info=byVersion[v];
-            const label=info.display || `${v}.0.0`;
-            return `
-              <div class="ls-next-era-version">
-                <div class="ls-next-era-version-head">
-                  <div class="ls-next-era-version-name">LiveScroll v${escapeHtml(label)}</div>
-                  ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
-                </div>
-                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
-                  <div class="ls-next-era-category">
-                    <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
-                  </div>`:"").join("")}
-              </div>`;
-          }).join("")}
-        </div>
-
-        <div class="ls-next-era-foot">
-          <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
-            ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
-          </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.9.0 → 6.0.0</div>
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">Aceptar</button>
         </div>
       </div>
     </div>`;
 }
 
-
-// ============================================================
-// NOVEDADES — CONGELADO DESDE 5.8.0
-// No modificar el comportamiento de historial/cartel durante la rama 5.8.x.
-// Solo tocarlo al publicar una nueva versión oficial posterior.
-// ============================================================
-
 async function openChangelogHistory() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">
-      <div class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="modal-box" style="max-width:440px;">
         <div class="modal-box-header">
           <h2>📢 Novedades</h2>
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-          <p style="color:var(--text-dim);font-size:12px;margin-top:0;margin-bottom:16px;">
-            Historial completo de las últimas versiones publicadas de LiveScroll.
-          </p>
+        <div class="modal-box-body">
+          <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Todo lo que fuimos sumando y mejorando en LiveScroll.</p>
           <div id="changelogHistoryList">Cargando...</div>
         </div>
       </div>
@@ -1444,89 +582,43 @@ async function openChangelogHistory() {
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
     actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
-    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
 
-  // Pedimos más filas porque p_limit limita entradas, no versiones completas.
-  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 200 });
+  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 30 });
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
 
   if (error || !entries || !entries.length) {
-    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">Todavía no hay novedades publicadas.</p>`;
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Todavía no hay novedades publicadas.</p>`;
     return;
   }
 
-  const semverParts = (value) => String(value || "0.0.0")
-    .split(".")
-    .map(n => Number.parseInt(n, 10) || 0);
-
-  const compareSemverDesc = (a, b) => {
-    const pa = semverParts(a);
-    const pb = semverParts(b);
-    const max = Math.max(pa.length, pb.length, 3);
-    for (let i = 0; i < max; i++) {
-      const av = pa[i] || 0;
-      const bv = pb[i] || 0;
-      if (av !== bv) return bv - av;
-    }
-    return 0;
-  };
-
-  // Agrupamos por la versión que ve el usuario, NO por el número interno.
-  const byDisplayVersion = {};
+  const byVersion = {};
   entries.forEach(e => {
-    const display = String(e.display_version || `${e.version}.0.0`);
-    if (!byDisplayVersion[display]) {
-      byDisplayVersion[display] = {
-        display,
-        internalVersions: new Set(),
-        cats: {}
-      };
-    }
-
-    byDisplayVersion[display].internalVersions.add(Number(e.version || 0));
-    byDisplayVersion[display].cats[e.category] =
-      byDisplayVersion[display].cats[e.category] || [];
-
-    // Evitamos líneas duplicadas si una versión tuvo más de una publicación interna.
-    if (!byDisplayVersion[display].cats[e.category].includes(e.content)) {
-      byDisplayVersion[display].cats[e.category].push(e.content);
-    }
+    byVersion[e.version] = byVersion[e.version] || { display: null, cats: {} };
+    if (e.display_version && !byVersion[e.version].display) byVersion[e.version].display = e.display_version;
+    byVersion[e.version].cats[e.category] = byVersion[e.version].cats[e.category] || [];
+    byVersion[e.version].cats[e.category].push(e.content);
   });
+  const versions = Object.keys(byVersion).map(Number).sort((a, b) => b - a);
+  const currentVersion = versions[0];
 
-  const versions = Object.keys(byDisplayVersion).sort(compareSemverDesc);
-  const currentDisplayVersion = versions[0];
-
-  list.innerHTML = versions.map(display => {
-    const info = byDisplayVersion[display];
-
+  list.innerHTML = versions.map(v => {
+    const label = byVersion[v].display || `${v}.0.0`;
     return `
-      <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);">
-            v${escapeHtml(display)}
-          </div>
-          ${display === currentDisplayVersion
-            ? `<span style="font-size:10px;font-weight:700;color:#12130f;background:var(--green);padding:2px 8px;border-radius:20px;letter-spacing:.04em;">ACTUAL</span>`
-            : ""}
-        </div>
-
-        ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat =>
-          info.cats[cat] ? `
-            <div style="margin-bottom:10px;">
-              <div style="font-weight:600;font-size:13px;color:${labels[cat].color};margin-bottom:6px;">
-                ${labels[cat].title}
-              </div>
-              ${info.cats[cat].map(c =>
-                `<div style="font-size:13px;color:var(--text-dim);margin-bottom:4px;">• ${escapeHtml(c)}</div>`
-              ).join("")}
-            </div>`
-          : ""
-        ).join("")}
-      </div>`;
+    <div style="margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);">v${escapeHtml(label)}</div>
+        ${v === currentVersion ? `<span style="font-size:10px; font-weight:700; color:#12130f; background:var(--gold); padding:2px 8px; border-radius:20px; letter-spacing:0.04em;">ACTUAL</span>` : ""}
+      </div>
+      ${["nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v].cats[cat] ? `
+        <div style="margin-bottom:10px;">
+          <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
+          ${byVersion[v].cats[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
+        </div>` : "").join("")}
+    </div>`;
   }).join("");
 }
 
@@ -1535,37 +627,17 @@ function closeChangelogHistory() {
 }
 
 async function handleAcceptChangelog() {
-  const { error } = await sb.rpc("acknowledge_content", {
-    p_user_id: currentUser.id,
-    p_content_key: "changelog"
-  });
-
-  if (error) {
-    console.error("No se pudo marcar Novedades como vistas:", error);
-    showToast("No se pudo guardar todavía");
-    return;
-  }
+  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "changelog" });
 
   const box = document.getElementById("changelogBox");
   const overlay = document.getElementById("changelogOverlay");
-
-  const continuePendingFlow = () => {
-    const wrap = document.getElementById("globalModalWrap");
-    if (wrap) wrap.innerHTML = "";
-
-    // Importante: volvemos a consultar inmediatamente.
-    // Así, si el usuario ya se puso al día pero todavía no vio
-    // el teaser del camino a LiveScroll 6, aparece en esta misma sesión.
-    setTimeout(() => checkPendingContent(), 120);
-  };
-
   if (box && overlay) {
     box.style.transform = "translate(140%, 140%) scale(0.15)";
     box.style.opacity = "0";
     overlay.style.opacity = "0";
-    setTimeout(continuePendingFlow, 350);
+    setTimeout(() => { document.getElementById("globalModalWrap").innerHTML = ""; }, 350);
   } else {
-    continuePendingFlow();
+    document.getElementById("globalModalWrap").innerHTML = "";
   }
 }
 
@@ -1591,11 +663,6 @@ async function checkAndShowLoginStreak() {
   }
 }
 
-function closeLoginStreakModal() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-}
-
 function showLoginStreakModal() {
   const data = window.__loginStreakData;
   if (!data) return;
@@ -1614,7 +681,7 @@ function showLoginStreakModal() {
       <div class="modal-box" style="max-width:380px;">
         <div class="modal-box-header">
           <h2>📅 Inicio de Sesión</h2>
-          <button onclick="closeLoginStreakModal()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div class="modal-box-body">
           <p style="color:var(--text-dim); font-size:12px; margin-top:0;">Entrá todos los días que puedas — si faltás uno, no se rompe nada, seguís de donde quedaste.</p>
@@ -1636,59 +703,21 @@ function showLoginStreakModal() {
         <div class="modal-box-footer">
           ${claimedToday
             ? `<button class="btn-outline" style="width:100%;" disabled>Ya reclamaste hoy ✓</button>`
-            : `<button class="btn" id="claimLoginStreakBtn" style="width:100%;min-height:48px;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
+            : `<button class="btn" style="width:100%;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
         </div>
       </div>
     </div>`;
 }
 
 async function handleClaimLoginStreak() {
-  const btn = document.getElementById("claimLoginStreakBtn");
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
 
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = "Reclamando...";
-  }
-
-  const { data, error } = await sb.rpc("claim_daily_streak", {
-    p_user_id: currentUser.id
-  });
-
-  if (error || !data?.ok) {
-    const reason = data?.error || error?.message || "error_desconocido";
-
-    const messages = {
-      ya_reclamado: "Ya reclamaste la recompensa de hoy.",
-      not_authenticated: "Tu sesión venció. Volvé a iniciar sesión.",
-      invalid_user: "No pudimos validar tu cuenta. Recargá LiveScroll.",
-      cuenta_bloqueada: "Tu cuenta todavía no puede reclamar recompensas."
-    };
-
-    showToast(messages[reason] || "No se pudo reclamar. Probá nuevamente.");
-
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = "Reclamar";
-    }
-
-    console.warn("Error reclamando Inicio de Sesión:", reason, error || data);
-    return;
-  }
-
-  currentProfile.points_balance += Number(data.points || 0);
+  currentProfile.points_balance += data.points;
   currentProfile.streak_current_day = data.day;
-  currentProfile.streak_last_login_date = new Date().toISOString().slice(0, 10);
-
   updateBalanceUI();
-  showFloatingPointsSafe(Number(data.points || 0));
-
-  // Cerramos el selector, pero mantenemos oculta la navegación
-  // porque enseguida mostramos el premio.
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-
+  document.getElementById("globalModalWrap").innerHTML = "";
   showStreakModal(data);
-
   const banner = document.getElementById("loginStreakBannerWrap");
   if (banner) banner.innerHTML = "";
 }
@@ -1716,13 +745,7 @@ async function claimDailyStreak() {
   currentProfile.points_balance += data.points;
   currentProfile.streak_current_day = data.day;
   updateBalanceUI();
-  showFloatingPointsSafe(data.points);
   showStreakModal(data);
-}
-
-function closeStreakRewardModal() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
 }
 
 function showStreakModal(data) {
@@ -1751,7 +774,7 @@ function showStreakModal(data) {
             <div style="font-size:32px;">${data.emoji_reward}</div>
             <div style="font-size:13px; color:var(--green); margin-top:6px;">¡Nuevo emoji de avatar desbloqueado!</div>
           </div>` : ""}
-        <button class="btn" style="width:100%;min-height:48px;" onclick="closeStreakRewardModal()">Genial</button>
+        <button class="btn" style="width:100%;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Genial</button>
       </div>
     </div>`;
 }
@@ -1765,7 +788,6 @@ async function handlePinVideo(videoId) {
     return;
   }
   showToast("¡Video anclado en Para Ti por 24hs!");
-  lsPerfCache.profileVideos.at = 0;
   renderProfile();
 }
 
@@ -1774,8 +796,6 @@ async function handleDeleteOwnVideo(videoId) {
   const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
   if (error || !data.ok) { showToast("No se pudo eliminar el video"); return; }
   showToast("Video eliminado");
-  lsPerfCache.profileVideos.at = 0;
-  lsPerfCache.feed.at = 0;
   renderProfile();
 }
 
@@ -1812,567 +832,29 @@ function showBoostBanner(expiresAt) {
     </div>`;
 }
 
-
-function ensureSafeMobileUpgradeStyles() {
-  if (document.getElementById("lsSafeMobileUpgradeStyles")) return;
-
-  const style = document.createElement("style");
-  style.id = "lsSafeMobileUpgradeStyles";
-  style.textContent = `
-    body,
-    button,
-    a,
-    label,
-    p,
-    span,
-    div,
-    h1, h2, h3, h4, h5, h6,
-    .form-card,
-    .profile-hero,
-    .profile-section,
-    .feed-item {
-      -webkit-user-select:none;
-      user-select:none;
-      -webkit-touch-callout:none;
-    }
-
-    input,
-    textarea,
-    select,
-    [contenteditable="true"],
-    .allow-text-select {
-      -webkit-user-select:text !important;
-      user-select:text !important;
-      -webkit-touch-callout:default;
-    }
-
-
-    /* ===== LiveScroll Modern Pass: visual only ===== */
-    .feed-item {
-      border-radius:18px !important;
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.07) !important;
-      box-shadow:0 10px 28px rgba(0,0,0,.16);
-    }
-
-    .feed-item button {
-      transition:transform .16s ease, opacity .16s ease, background .16s ease, border-color .16s ease;
-    }
-
-    .feed-item button:active {
-      transform:scale(.94);
-    }
-
-    .profile-hero,
-    .profile-section,
-    .form-card {
-      border-radius:18px !important;
-    }
-
-    .profile-stats-row {
-      gap:8px !important;
-    }
-
-    .stat-pill {
-      border-radius:14px !important;
-      transition:transform .18s ease, border-color .18s ease;
-    }
-
-    .stat-pill:active {
-      transform:scale(.97);
-    }
-
-    .btn,
-    .btn-outline {
-      min-height:42px;
-      border-radius:12px !important;
-      transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
-      touch-action:manipulation;
-    }
-
-    .btn:active,
-    .btn-outline:active {
-      transform:scale(.97);
-    }
-
-    .modal-box {
-      border-radius:20px;
-      box-shadow:0 22px 70px rgba(0,0,0,.42);
-    }
-
-    .modal-box-header {
-      padding-bottom:12px;
-    }
-
-    .modal-box-footer {
-      gap:10px;
-    }
-
-    .ls-nova .feed-item {
-      box-shadow:0 14px 36px rgba(0,0,0,.22);
-      backdrop-filter:blur(5px);
-      -webkit-backdrop-filter:blur(5px);
-    }
-
-    .ls-nova .profile-hero,
-    .ls-nova .profile-section,
-    .ls-nova .form-card {
-      box-shadow:0 10px 30px rgba(0,0,0,.12);
-    }
-
-    .ls-nova .btn:hover,
-    .ls-nova .btn-outline:hover {
-      transform:translateY(-1px);
-    }
-
-    .ls-legacy .feed-item,
-    .ls-legacy .profile-hero,
-    .ls-legacy .profile-section,
-    .ls-legacy .form-card,
-    .ls-legacy .modal-box {
-      box-shadow:none !important;
-      backdrop-filter:none !important;
-      -webkit-backdrop-filter:none !important;
-    }
-
-    @media (max-width:700px) {
-      .feed-item {
-        border-radius:15px !important;
-      }
-
-      .profile-hero,
-      .profile-section,
-      .form-card {
-        border-radius:15px !important;
-      }
-
-      .btn,
-      .btn-outline {
-        min-height:44px;
-      }
-
-      .modal-box {
-        max-width:calc(100vw - 18px);
-      }
-    }
-
-    @media (max-width:360px) {
-      .feed-item {
-        border-radius:12px !important;
-      }
-
-      .profile-stats-row {
-        gap:5px !important;
-      }
-
-      .stat-pill {
-        padding-left:7px !important;
-        padding-right:7px !important;
-      }
-    }
-
-
-    /* v5.3.5 — Perfil Nova: actividad + profundidad */
-    .ls-profile-nova {
-      transform-style:preserve-3d;
-      perspective:900px;
-    }
-    .ls-profile-nova-inner {
-      position:relative;
-      z-index:2;
-      transform-style:preserve-3d;
-      transition:transform .18s ease;
-      will-change:transform;
-    }
-    .ls-profile-nova::after {
-      content:"";
-      position:absolute;
-      inset:-35%;
-      z-index:1;
-      pointer-events:none;
-      opacity:0;
-      background:radial-gradient(circle at var(--ls-glow-x,50%) var(--ls-glow-y,35%), rgba(255,255,255,.11), transparent 34%);
-      transition:opacity .22s ease;
-    }
-    .ls-profile-nova:hover::after { opacity:1; }
-
-    .ls-activity-aura {
-      position:relative;
-      isolation:isolate;
-    }
-    .ls-activity-aura::before {
-      content:"";
-      position:absolute;
-      inset:-5px;
-      border-radius:50%;
-      z-index:-1;
-      background:conic-gradient(from 0deg, #facc15, #7dd3fc, #a78bfa, #22c55e, #facc15);
-      animation:lsActivityAuraSpin 4s linear infinite;
-    }
-    .ls-activity-aura::after {
-      content:"";
-      position:absolute;
-      inset:-9px;
-      border-radius:50%;
-      z-index:-2;
-      background:rgba(125,211,252,.16);
-      filter:blur(7px);
-      animation:lsActivityAuraPulse 2.2s ease-in-out infinite;
-    }
-    @keyframes lsActivityAuraSpin { to { transform:rotate(360deg); } }
-    @keyframes lsActivityAuraPulse {
-      0%,100% { opacity:.42; transform:scale(.96); }
-      50% { opacity:.9; transform:scale(1.06); }
-    }
-
-    .ls-recent-activity {
-      display:grid;
-      gap:8px;
-    }
-    .ls-activity-item {
-      display:flex;
-      align-items:center;
-      gap:11px;
-      padding:11px 12px;
-      border:1px solid var(--border);
-      border-radius:12px;
-      background:rgba(255,255,255,.025);
-    }
-    .ls-activity-icon {
-      width:36px;
-      height:36px;
-      flex:0 0 36px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:11px;
-      background:var(--panel-2);
-      font-size:18px;
-    }
-    .ls-activity-copy { min-width:0; flex:1; }
-    .ls-activity-title { font-size:12px; color:var(--text); }
-    .ls-activity-time { margin-top:2px; font-size:9px; color:var(--text-dim); }
-
-    .ls-new-video-badge {
-      position:absolute;
-      top:7px;
-      left:7px;
-      z-index:5;
-      padding:4px 7px;
-      border-radius:999px;
-      background:rgba(8,10,13,.82);
-      border:1px solid var(--gold-dim);
-      color:var(--gold);
-      font-size:9px;
-      font-weight:800;
-      letter-spacing:.03em;
-      pointer-events:none;
-    }
-
-    /* Legacy queda liviano */
-    .ls-legacy .ls-profile-nova-inner { transform:none !important; }
-    .ls-legacy .ls-profile-nova::after,
-    .ls-legacy .ls-activity-aura::before,
-    .ls-legacy .ls-activity-aura::after { animation:none !important; filter:none !important; }
-
-    @media (hover:none), (max-width:700px) {
-      .ls-profile-nova-inner { transform:none !important; }
-      .ls-profile-nova::after { display:none; }
-    }
-
-    .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
-    @keyframes lsLikePopSafe {
-      0%,100% { transform:scale(1); }
-      50% { transform:scale(1.28); }
-    }
-
-    .ls-balance-pop-safe { animation:lsBalancePopSafe .4s ease; }
-    @keyframes lsBalancePopSafe {
-      0%,100% { transform:scale(1); }
-      50% { transform:scale(1.08); }
-    }
-
-    .ls-legacy .ls-like-pop-safe,
-    .ls-legacy .ls-balance-pop-safe {
-      animation:none !important;
-    }
-
-    @media (max-width:700px) {
-
-    }
-
-    .ls-view-enter-safe {
-      animation:lsViewEnterSafe .20s ease both;
-    }
-
-    @keyframes lsViewEnterSafe {
-      from { opacity:.45; transform:translateY(5px); }
-      to { opacity:1; transform:translateY(0); }
-    }
-
-    .ls-points-float-safe {
-      position:fixed;
-      z-index:600;
-      pointer-events:none;
-      color:var(--gold);
-      font-family:'JetBrains Mono', monospace;
-      font-weight:800;
-      font-size:15px;
-      text-shadow:0 2px 8px rgba(0,0,0,.7);
-      animation:lsPointsFloatSafe .95s ease-out forwards;
-    }
-
-    @keyframes lsPointsFloatSafe {
-      0% { opacity:0; transform:translate(-50%, 6px) scale(.9); }
-      15% { opacity:1; }
-      100% { opacity:0; transform:translate(-50%, -44px) scale(1.06); }
-    }
-
-    .ls-upload-preview-safe {
-      display:none;
-      position:relative;
-      margin-top:12px;
-      width:100%;
-      aspect-ratio:16 / 10;
-      overflow:hidden;
-      border-radius:12px;
-      border:1px solid var(--border);
-      background:#050607;
-    }
-
-    .ls-upload-preview-safe.active {
-      display:block;
-    }
-
-    .ls-upload-preview-safe video {
-      width:100%;
-      height:100%;
-      display:block;
-      object-fit:contain;
-      background:#000;
-    }
-
-    .ls-upload-preview-safe .tag {
-      position:absolute;
-      top:8px;
-      left:8px;
-      z-index:2;
-      padding:4px 8px;
-      border-radius:999px;
-      background:rgba(0,0,0,.72);
-      color:#fff;
-      font-size:10px;
-      font-weight:700;
-    }
-
-    .ls-upload-preview-msg-safe {
-      display:none;
-      padding:14px;
-      color:var(--text-dim);
-      font-size:12px;
-      line-height:1.45;
-      text-align:center;
-    }
-
-    .ls-upload-preview-msg-safe.active {
-      display:block;
-    }
-
-    .ls-legacy .ls-view-enter-safe,
-    .ls-legacy .ls-points-float-safe {
-      animation:none !important;
-    }
-
-
-    @media (max-width:700px) {
-      .ls-profile-edit-modal {
-        width:100% !important;
-        max-width:100% !important;
-        height:100vh !important;
-        max-height:100vh !important;
-        margin:0 !important;
-        border-radius:0 !important;
-        display:flex !important;
-        flex-direction:column !important;
-        overflow:hidden !important;
-      }
-
-      .ls-profile-edit-header {
-        flex:0 0 auto !important;
-        position:sticky !important;
-        top:0 !important;
-        z-index:20 !important;
-        background:var(--panel) !important;
-        border-bottom:1px solid var(--border) !important;
-      }
-
-      .ls-profile-edit-body {
-        flex:1 1 auto !important;
-        min-height:0 !important;
-        overflow-y:auto !important;
-        -webkit-overflow-scrolling:touch;
-      }
-
-      .ls-profile-edit-footer {
-        flex:0 0 auto !important;
-        position:sticky !important;
-        bottom:0 !important;
-        z-index:20 !important;
-        background:var(--panel) !important;
-        border-top:1px solid var(--border) !important;
-        padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
-      }
-
-      .ls-comments-overlay-safe {
-        align-items:flex-end !important;
-        padding:0 !important;
-        box-sizing:border-box !important;
-      }
-
-      .ls-comments-panel-safe {
-        width:100% !important;
-        max-width:560px !important;
-        height:min(66vh, 560px) !important;
-        max-height:calc(100vh - 96px) !important;
-        border-radius:18px 18px 0 0 !important;
-        margin:0 !important;
-        box-sizing:border-box !important;
-      }
-    }
-  `;
-
-  document.head.appendChild(style);
-}
-
-function closeManagedModal() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-}
-
-function safePulseElement(el, className) {
-  if (!el || window.__liveScrollLegacyMode) return;
-
-  el.classList.remove(className);
-  void el.offsetWidth;
-  el.classList.add(className);
-
-  setTimeout(() => el.classList.remove(className), 450);
-}
-
-function animateCurrentViewSafe() {
-  if (window.__liveScrollLegacyMode) return;
-
-  const main = document.getElementById("appView");
-  if (!main) return;
-
-  main.classList.remove("ls-view-enter-safe");
-  void main.offsetWidth;
-  main.classList.add("ls-view-enter-safe");
-
-  setTimeout(() => main.classList.remove("ls-view-enter-safe"), 260);
-}
-
-function showFloatingPointsSafe(amount, anchorEl = null) {
-  const points = Number(amount);
-  if (!Number.isFinite(points) || points <= 0 || window.__liveScrollLegacyMode) return;
-
-  const anchor = anchorEl || document.getElementById("navBalance");
-  const rect = anchor?.getBoundingClientRect();
-
-  const el = document.createElement("div");
-  el.className = "ls-points-float-safe";
-  el.textContent = `+${points} pts`;
-
-  if (rect) {
-    el.style.left = `${rect.left + rect.width / 2}px`;
-    el.style.top = `${Math.max(56, rect.top + rect.height / 2)}px`;
-  } else {
-    el.style.left = "50%";
-    el.style.top = "90px";
-  }
-
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1050);
-}
-
-
-const lsPerfCache = {
-  feed: { data:null, at:0 },
-  directos: { data:null, at:0 },
-  profileVideos: { data:null, at:0 },
-  profileViewsLedger: { data:null, at:0 }
-};
-let lsTabRenderToken = 0;
-
-function renderFastSkeleton(lines = 5, type = "generic") {
-  if (type === "feed") {
-    return `<div style="display:grid;place-items:center;min-height:58vh;">
-      <div style="width:min(390px,100%);height:58vh;border-radius:18px;background:var(--panel-2);overflow:hidden;position:relative;">
-        <div class="ls-fast-shimmer" style="position:absolute;inset:0;"></div>
-      </div>
-    </div>`;
-  }
-  if (type === "profile") {
-    return `<div class="ls-fast-profile-skeleton">
-      <div class="ls-fast-profile-hero">
-        <span class="ls-fast-avatar"></span>
-        <div style="flex:1;display:grid;gap:9px;"><i style="width:44%;"></i><i style="width:64%;"></i></div>
-      </div>
-      <div class="ls-fast-stats">${"<i></i>".repeat(3)}</div>
-      <div class="ls-fast-skeleton">${"<i></i>".repeat(3)}</div>
-    </div>`;
-  }
-  if (type === "directos") return `<div class="ls-fast-skeleton">${'<i style="height:78px;"></i>'.repeat(3)}</div>`;
-  return `<div class="ls-fast-skeleton">${Array.from({length:lines}, () => "<i></i>").join("")}</div>`;
-}
-
-function lsCacheFresh(entry, maxAgeMs) {
-  return !!entry?.data && (Date.now() - entry.at) < maxAgeMs;
-}
-
 function switchTab(tab) {
-  stopConnectedLiveRefresh();
-
   clearAllWatchIntervals();
   currentTab = tab;
-  const renderToken = ++lsTabRenderToken;
-
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
   if (activeBtn) activeBtn.classList.add("active");
 
-  const main = document.getElementById("appView");
-
-  // Feedback visual en el mismo frame del toque.
-  if (main && ["feed","foryou","profile","users","directos","wallet","plans","store","ranking","admin"].includes(tab)) {
-    const skeletonType = (tab === "feed" || tab === "foryou") ? "feed" : tab === "profile" ? "profile" : tab === "directos" ? "directos" : "generic";
-    main.innerHTML = renderFastSkeleton(5, skeletonType);
-  }
-
-  if (tab === "feed") renderFeed(renderToken);
+  if (tab === "feed") renderFeed();
   if (tab === "foryou") renderForYou();
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
   if (tab === "users") renderUsersDirectory();
-  if (tab === "directos") renderDirectos(renderToken);
+  if (tab === "directos") renderDirectos();
   if (tab === "wallet") renderWallet();
   if (tab === "plans") renderPlans();
   if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
-
-  // En desktop conservamos la entrada Nova; en móvil aparece instantáneo.
-  if (window.innerWidth > 700) {
-    requestAnimationFrame(() => animateCurrentViewSafe());
-  }
 }
 
 function updateBalanceUI() {
   const el = document.getElementById("navBalance");
-  if (el) {
-    el.textContent = currentProfile.points_balance + " pts";
-    safePulseElement(el, "ls-balance-pop-safe");
-  }
+  if (el) el.textContent = currentProfile.points_balance + " pts";
 }
 
 function showToast(msg) {
@@ -2387,40 +869,20 @@ function showToast(msg) {
 // ============================================================
 // FEED — ver videos de otros y ganar puntos por minuto
 // ============================================================
-async function renderFeed(renderToken = lsTabRenderToken) {
+async function renderFeed() {
   const main = document.getElementById("appView");
-  if (!main) return;
-
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
+    <div id="feedList">Cargando videos...</div>`;
   checkAndShowLoginStreak();
 
-  let videos = null;
-  let error = null;
-
-  if (lsCacheFresh(lsPerfCache.feed, 45000)) {
-    videos = lsPerfCache.feed.data;
-  } else {
-    const result = await sb
-      .from("videos")
-      .select("*, profiles!videos_user_id_fkey(username, plan_id)")
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    videos = result.data;
-    error = result.error;
-
-    if (!error && videos) {
-      lsPerfCache.feed = { data:videos, at:Date.now() };
-    }
-  }
-
-  // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
-  if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;
+  const { data: videos, error } = await sb
+    .from("videos")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+    .order("created_at", { ascending: false })
+    .limit(20);
 
   const list = document.getElementById("feedList");
-  if (!list) return;
   if (error) { list.textContent = "Error cargando videos: " + error.message; return; }
   if (!videos.length) {
     list.innerHTML = `<div style="padding:40px 0; text-align:center;">
@@ -2442,7 +904,7 @@ async function renderFeed(renderToken = lsTabRenderToken) {
       ${videos.map((v, i) => {
         const isMine = v.user_id === currentUser.id;
         return `
-        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+        <div class="feed-item" data-video-id="${v.id}">
           <div class="feed-phone">
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
@@ -2467,46 +929,8 @@ async function renderFeed(renderToken = lsTabRenderToken) {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
-  fitMobileFeedViewport("feedVertical");
   setupPullToRefresh(renderFeed);
   setupSwipeNavigation("feed", { left: "foryou" });
-}
-
-
-let lsFeedViewportResizeBound = false;
-
-function fitMobileFeedViewport(containerId = "feedVertical") {
-  if (window.innerWidth > 700) return;
-
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  const viewportHeight = window.visualViewport?.height || window.innerHeight;
-  const top = Math.max(0, container.getBoundingClientRect().top);
-
-  // Dejamos solo una pequeña zona segura inferior. La altura se calcula
-  // según dónde empieza realmente el feed, así no desperdiciamos espacio.
-  const safeBottom = 8;
-  const usable = Math.max(430, Math.floor(viewportHeight - top - safeBottom));
-
-  container.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
-  document.documentElement.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
-
-  if (!lsFeedViewportResizeBound) {
-    lsFeedViewportResizeBound = true;
-
-    const refresh = () => {
-      const active =
-        document.getElementById("profileFeedVertical") ||
-        document.getElementById("feedVertical") ||
-        document.querySelector("#foryouList .feed-vertical");
-
-      if (active) fitMobileFeedViewport(active.id || "feedVertical");
-    };
-
-    window.addEventListener("resize", refresh, { passive:true });
-    window.visualViewport?.addEventListener("resize", refresh, { passive:true });
-  }
 }
 
 function setupPullToRefresh(refreshFn) {
@@ -2601,109 +1025,28 @@ function setupSwipeNavigation(fromTab, targets) {
   }, { passive: true });
 }
 
-function preloadFeedVideo(video) {
-  if (!video || loadedEmbeds.has(video.id)) return;
-  const el = document.getElementById(`embed-${video.id}`);
-  if (!el || video.platform !== "upload" || !isSafeUrl(video.video_url)) return;
-
-  const saveData = navigator.connection?.saveData === true;
-  const slowNetwork = ["slow-2g", "2g"].includes(navigator.connection?.effectiveType);
-  const isLegacyMode = document.body.classList.contains("ls-legacy");
-
-  if (saveData || slowNetwork || isLegacyMode) return;
-
-  el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;">
-    <video src="${escapeHtml(video.video_url)}" controls muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
-  </div>`;
-  loadedEmbeds.add(video.id);
-}
-
-function activateLoadedEmbed(video) {
-  if (!video) return;
-  const player = document.querySelector(`#embed-${video.id} video`);
-  if (player) {
-    player.autoplay = true;
-    player.play().catch(() => {});
-  }
-}
-
-function pauseFeedMedia(videoId = null) {
-  const selector = videoId
-    ? `#embed-${videoId} video, #embed-${videoId} audio`
-    : ".feed-item video, .feed-item audio";
-
-  document.querySelectorAll(selector).forEach(media => {
-    try { media.pause(); } catch (_) {}
-  });
-}
-
-function pauseAllFeedMediaExcept(videoId) {
-  document.querySelectorAll(".feed-item video, .feed-item audio").forEach(media => {
-    const host = media.closest("[id^='embed-']");
-    const hostId = host?.id?.replace("embed-", "");
-    if (String(hostId) !== String(videoId)) {
-      try { media.pause(); } catch (_) {}
-    }
-  });
-}
-
-function releaseFeedMediaElement(el) {
-  if (!el) return;
-
-  el.querySelectorAll("video, audio").forEach(media => {
-    try { media.pause(); } catch (_) {}
-    try {
-      media.removeAttribute("src");
-      media.load();
-    } catch (_) {}
-  });
-
-  el.querySelectorAll("iframe").forEach(frame => {
-    try { frame.src = "about:blank"; } catch (_) {}
-  });
-}
-
 function setupFeedObserver(videos) {
-  const videoMap = Object.fromEntries(videos.map(v => [String(v.id), v]));
-  const orderedIds = videos.map(v => String(v.id));
+  const videoMap = Object.fromEntries(videos.map(v => [v.id, v]));
   loadedEmbeds.clear();
-
-  const keepWarmAround = (videoId) => {
-    const idx = orderedIds.indexOf(String(videoId));
-    if (idx < 0) return;
-    const keep = new Set([orderedIds[idx - 1], orderedIds[idx], orderedIds[idx + 1]].filter(Boolean));
-    const nextId = orderedIds[idx + 1];
-    if (nextId && videoMap[nextId]) preloadFeedVideo(videoMap[nextId]);
-
-    Array.from(loadedEmbeds).forEach(id => {
-      if (!keep.has(String(id))) unloadEmbed(id, videoMap[String(id)]);
-    });
-  };
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      const videoId = String(entry.target.dataset.videoId);
-      if (entry.isIntersecting && entry.intersectionRatio > 0.58) {
-        pauseAllFeedMediaExcept(videoId);
+      const videoId = entry.target.dataset.videoId;
+      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
         loadEmbed(videoMap[videoId]);
-        activateLoadedEmbed(videoMap[videoId]);
-        keepWarmAround(videoId);
         startWatching(videoMap[videoId]);
-      } else if (entry.intersectionRatio < 0.25) {
-        pauseFeedMedia(videoId);
+      } else {
         stopWatching(videoId);
+        unloadEmbed(videoId, videoMap[videoId]);
       }
     });
-  }, { threshold:[0,.25,.58,1], rootMargin:"18% 0px 18% 0px" });
+  }, { threshold: [0, 0.6, 1] });
 
   document.querySelectorAll(".feed-item").forEach(el => observer.observe(el));
   feedObserverInstance = observer;
 
-  if (videos[0]) {
-    loadEmbed(videos[0]);
-    activateLoadedEmbed(videos[0]);
-    if (videos[1]) preloadFeedVideo(videos[1]);
-  }
+  // Cargamos el primero de una, sin esperar a que el observer dispare
+  if (videos[0]) loadEmbed(videos[0]);
 }
 
 function isSafeUrl(url) {
@@ -2717,17 +1060,9 @@ function isSafeUrl(url) {
 
 function getEmbedPlaceholderHtml(video) {
   const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣", youtube: "🔴", upload: "🎬" };
-  const thumb = (video.platform === "youtube" || video.platform === "upload") ? getThumbnailHtml(video) : "";
-
-  if (video.platform === "upload" && thumb.startsWith("<video")) {
-    return `<div class="feed-fallback" style="position:relative;overflow:hidden;">
-      ${thumb.replace("<video ", `<video style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7;pointer-events:none;" `)}
-      <div class="platform-icon" style="position:relative;z-index:2;">▶️</div>
-    </div>`;
-  }
-
+  const thumb = video.platform === "youtube" ? getThumbnailHtml(video) : "";
   return `<div class="feed-fallback">
-    ${thumb && thumb.startsWith("<img") ? thumb.replace(/alt="[^"]*"/, 'alt="miniatura"').replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.55;" `) : ""}
+    ${thumb && thumb.startsWith("<img") ? thumb.replace('alt="miniatura"', 'alt="miniatura" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.5;"') : ""}
     <div class="platform-icon" style="position:relative;">${icons[video.platform] || "▶️"}</div>
   </div>`;
 }
@@ -2744,8 +1079,6 @@ function unloadEmbed(videoId, video) {
   if (!loadedEmbeds.has(videoId)) return;
   const el = document.getElementById(`embed-${videoId}`);
   if (!el) return;
-
-  releaseFeedMediaElement(el);
   el.innerHTML = video ? getEmbedPlaceholderHtml(video) : "";
   loadedEmbeds.delete(videoId);
 }
@@ -2757,7 +1090,7 @@ function getEmbedHtml(video) {
   }
   if (video.platform === "upload") {
     return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%;">
-      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>
     </div>`;
   }
   if (video.platform === "youtube") {
@@ -2805,7 +1138,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
         ${videos.map((v) => {
           const isMine = v.user_id === currentUser.id;
           return `
-          <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+          <div class="feed-item" data-video-id="${v.id}">
             <div class="feed-phone">
               <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
               ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
@@ -2830,7 +1163,6 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
 
   setupFeedObserver(videos);
   setupDoubleTapLike();
-  fitMobileFeedViewport("profileFeedVertical");
 
   const container = document.getElementById("profileFeedVertical");
   const startEl = document.querySelector(`#profileFeedVertical [data-video-id="${startVideoId}"]`);
@@ -2839,1399 +1171,18 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
 
 function closeProfileVideoFeed() {
   clearAllWatchIntervals();
-  closeManagedModal();
+  document.getElementById("globalModalWrap").innerHTML = "";
 }
 
 function getGridCoverHtml(video) {
   const thumb = getThumbnailHtml(video);
-
   if (thumb.startsWith("<img")) {
     return thumb.replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;" `);
   }
-
-  if (thumb.startsWith("<video")) {
-    return thumb;
-  }
-
   return `<div class="grid-fallback">${thumb}</div>`;
 }
 
-function ensureModernMobileStyles() {
-  if (document.getElementById("livescrollModernMobileStyles")) return;
-
-  const style = document.createElement("style");
-  style.id = "livescrollModernMobileStyles";
-  style.textContent = `
-
-    /* Road to LiveScroll 6 — teaser único por cuenta */
-    .ls-road6-overlay {
-      position:fixed;
-      inset:0;
-      z-index:920;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-      box-sizing:border-box;
-      background:
-        radial-gradient(circle at 50% 110%, rgba(250,204,21,.16), transparent 42%),
-        radial-gradient(circle at 18% 10%, rgba(125,211,252,.10), transparent 32%),
-        rgba(2,4,8,.94);
-      backdrop-filter:blur(14px);
-      animation:lsRoad6OverlayIn .55s ease both;
-    }
-
-    .ls-road6-card {
-      position:relative;
-      width:min(440px,100%);
-      overflow:hidden;
-      border-radius:24px;
-      border:1px solid rgba(250,204,21,.28);
-      background:linear-gradient(160deg, rgba(22,24,31,.98), rgba(7,9,13,.99) 64%);
-      box-shadow:0 30px 100px rgba(0,0,0,.72), 0 0 45px rgba(250,204,21,.08);
-      transform-origin:center;
-      animation:lsRoad6CardIn .85s cubic-bezier(.16,1,.3,1) both;
-    }
-
-    .ls-road6-card::before {
-      content:"";
-      position:absolute;
-      width:180px;
-      height:180px;
-      top:-95px;
-      right:-70px;
-      border-radius:50%;
-      background:rgba(250,204,21,.13);
-      filter:blur(12px);
-      animation:lsRoad6Glow 3s ease-in-out infinite;
-    }
-
-    .ls-road6-scan {
-      position:absolute;
-      inset:0;
-      pointer-events:none;
-      opacity:.24;
-      background:linear-gradient(110deg, transparent 20%, rgba(255,255,255,.12) 45%, transparent 70%);
-      transform:translateX(-120%);
-      animation:lsRoad6Scan 2.8s 1s ease-in-out infinite;
-    }
-
-    .ls-road6-content {
-      position:relative;
-      z-index:2;
-      padding:30px 24px 22px;
-      text-align:center;
-    }
-
-    .ls-road6-kicker {
-      font-family:'JetBrains Mono',monospace;
-      font-size:10px;
-      letter-spacing:.20em;
-      color:var(--gold);
-      text-transform:uppercase;
-      opacity:0;
-      animation:lsRoad6Rise .55s .42s ease forwards;
-    }
-
-    .ls-road6-mark {
-      width:72px;
-      height:72px;
-      margin:18px auto 16px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:22px;
-      border:1px solid rgba(250,204,21,.30);
-      background:rgba(250,204,21,.07);
-      font-size:34px;
-      box-shadow:inset 0 0 25px rgba(250,204,21,.05);
-      opacity:0;
-      animation:lsRoad6Mark .7s .55s cubic-bezier(.16,1,.3,1) forwards;
-    }
-
-    .ls-road6-title {
-      margin:0;
-      font-size:clamp(25px,7vw,34px);
-      line-height:1.05;
-      letter-spacing:-.04em;
-      color:var(--text);
-      opacity:0;
-      animation:lsRoad6Rise .6s .68s ease forwards;
-    }
-
-    .ls-road6-copy {
-      max-width:350px;
-      margin:13px auto 0;
-      color:var(--text-dim);
-      font-size:13px;
-      line-height:1.55;
-      opacity:0;
-      animation:lsRoad6Rise .6s .82s ease forwards;
-    }
-
-    .ls-road6-signals {
-      display:grid;
-      grid-template-columns:repeat(4,1fr);
-      gap:7px;
-      margin:22px 0 18px;
-      opacity:0;
-      animation:lsRoad6Rise .6s .96s ease forwards;
-    }
-
-    .ls-road6-signal {
-      padding:10px 4px;
-      border-radius:12px;
-      border:1px solid rgba(255,255,255,.08);
-      background:rgba(255,255,255,.025);
-      font-size:9px;
-      color:var(--text-dim);
-    }
-
-    .ls-road6-signal b {
-      display:block;
-      margin-bottom:5px;
-      font-size:19px;
-      font-weight:400;
-    }
-
-    .ls-road6-road {
-      padding:12px 13px;
-      border-radius:13px;
-      border:1px solid rgba(250,204,21,.16);
-      background:rgba(250,204,21,.035);
-      font-family:'JetBrains Mono',monospace;
-      font-size:10px;
-      color:var(--gold);
-      line-height:1.5;
-      opacity:0;
-      animation:lsRoad6Rise .6s 1.08s ease forwards;
-    }
-
-    .ls-road6-btn {
-      width:100%;
-      min-height:48px;
-      margin-top:18px;
-      border:0;
-      border-radius:13px;
-      cursor:pointer;
-      font-family:inherit;
-      font-weight:800;
-      color:#12130f;
-      background:linear-gradient(135deg, #fde047, #f59e0b);
-      box-shadow:0 10px 28px rgba(245,158,11,.15);
-      opacity:0;
-      animation:lsRoad6Rise .6s 1.2s ease forwards;
-    }
-
-    .ls-road6-foot {
-      margin-top:11px;
-      font-size:9px;
-      color:var(--text-dim);
-      opacity:0;
-      animation:lsRoad6Rise .6s 1.32s ease forwards;
-    }
-
-    @keyframes lsRoad6OverlayIn {
-      from { opacity:0; }
-      to { opacity:1; }
-    }
-    @keyframes lsRoad6CardIn {
-      0% { opacity:0; transform:translateY(38px) scale(.92); filter:blur(8px); }
-      70% { opacity:1; transform:translateY(-3px) scale(1.01); filter:blur(0); }
-      100% { opacity:1; transform:none; filter:blur(0); }
-    }
-    @keyframes lsRoad6Rise {
-      from { opacity:0; transform:translateY(12px); }
-      to { opacity:1; transform:none; }
-    }
-    @keyframes lsRoad6Mark {
-      from { opacity:0; transform:scale(.55) rotate(-12deg); }
-      to { opacity:1; transform:none; }
-    }
-    @keyframes lsRoad6Glow {
-      0%,100% { opacity:.45; transform:scale(.9); }
-      50% { opacity:1; transform:scale(1.15); }
-    }
-    @keyframes lsRoad6Scan {
-      0%,55% { transform:translateX(-120%); }
-      85%,100% { transform:translateX(120%); }
-    }
-
-    @media (max-width:420px) {
-      .ls-road6-overlay { padding:10px; }
-      .ls-road6-content { padding:25px 17px 18px; }
-      .ls-road6-signals { gap:5px; }
-      .ls-road6-signal { font-size:8px; }
-    }
-
-    @media (prefers-reduced-motion:reduce) {
-      .ls-road6-overlay,
-      .ls-road6-card,
-      .ls-road6-card *,
-      .ls-road6-card::before {
-        animation:none !important;
-        opacity:1 !important;
-        transform:none !important;
-        filter:none !important;
-      }
-    }
-
-
-
-    /* NEXT ERA — carteles de versión 5.4.6 → 6.0.0 */
-    .ls-next-era-changelog {
-      position:fixed;
-      inset:0;
-      z-index:910;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:16px;
-      box-sizing:border-box;
-      background:
-        radial-gradient(circle at 50% 105%, rgba(250,204,21,.15), transparent 42%),
-        radial-gradient(circle at 12% 8%, rgba(125,211,252,.08), transparent 28%),
-        rgba(2,4,8,.95);
-      backdrop-filter:blur(13px);
-      animation:lsRoad6OverlayIn .45s ease both;
-    }
-    .ls-next-era-box {
-      position:relative;
-      width:min(455px,100%);
-      max-height:90vh;
-      overflow:hidden;
-      display:flex;
-      flex-direction:column;
-      border-radius:24px;
-      border:1px solid rgba(250,204,21,.27);
-      background:linear-gradient(160deg, rgba(22,24,31,.99), rgba(7,9,13,.99) 66%);
-      box-shadow:0 30px 100px rgba(0,0,0,.74), 0 0 45px rgba(250,204,21,.07);
-      animation:lsRoad6CardIn .78s cubic-bezier(.16,1,.3,1) both;
-      transition:transform .35s ease, opacity .35s ease;
-    }
-    .ls-next-era-box::before {
-      content:"";
-      position:absolute;
-      width:180px;
-      height:180px;
-      top:-110px;
-      right:-65px;
-      border-radius:50%;
-      background:rgba(250,204,21,.14);
-      filter:blur(13px);
-      animation:lsRoad6Glow 3.2s ease-in-out infinite;
-      pointer-events:none;
-    }
-    .ls-next-era-scan {
-      position:absolute;
-      inset:0;
-      z-index:1;
-      pointer-events:none;
-      opacity:.20;
-      background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.12) 45%,transparent 70%);
-      transform:translateX(-120%);
-      animation:lsRoad6Scan 3s 1s ease-in-out infinite;
-    }
-    .ls-next-era-head {
-      position:relative;
-      z-index:2;
-      padding:25px 22px 15px;
-      border-bottom:1px solid rgba(255,255,255,.07);
-    }
-    .ls-next-era-kicker {
-      font-family:'JetBrains Mono',monospace;
-      font-size:9px;
-      letter-spacing:.20em;
-      color:var(--gold);
-      text-transform:uppercase;
-    }
-    .ls-next-era-title {
-      margin:8px 0 0;
-      font-size:25px;
-      line-height:1.08;
-      letter-spacing:-.035em;
-      color:var(--text);
-    }
-    .ls-next-era-sub {
-      margin-top:7px;
-      color:var(--text-dim);
-      font-size:11px;
-      line-height:1.45;
-    }
-    .ls-next-era-body {
-      position:relative;
-      z-index:2;
-      overflow-y:auto;
-      min-height:0;
-      padding:17px 22px 4px;
-    }
-    .ls-next-era-version {
-      position:relative;
-      margin-bottom:16px;
-      padding:13px;
-      border:1px solid rgba(250,204,21,.11);
-      border-radius:14px;
-      background:rgba(255,255,255,.018);
-    }
-    .ls-next-era-version-head {
-      display:flex;
-      align-items:center;
-      gap:8px;
-      margin-bottom:10px;
-    }
-    .ls-next-era-version-name {
-      font-family:'JetBrains Mono',monospace;
-      font-size:11px;
-      font-weight:800;
-      color:var(--gold);
-    }
-    .ls-next-era-latest {
-      padding:2px 7px;
-      border-radius:999px;
-      background:var(--gold);
-      color:#12130f;
-      font-size:8px;
-      font-weight:900;
-    }
-    .ls-next-era-category { margin-bottom:10px; }
-    .ls-next-era-category:last-child { margin-bottom:0; }
-    .ls-next-era-category-title {
-      margin-bottom:4px;
-      font-size:11px;
-      font-weight:700;
-    }
-    .ls-next-era-line {
-      color:var(--text-dim);
-      font-size:12px;
-      line-height:1.45;
-      margin:4px 0;
-    }
-    .ls-next-era-foot {
-      position:relative;
-      z-index:3;
-      padding:14px 22px 20px;
-      background:linear-gradient(to top,rgba(7,9,13,1),rgba(7,9,13,.94));
-      border-top:1px solid rgba(255,255,255,.06);
-    }
-    .ls-next-era-btn {
-      width:100%;
-      min-height:46px;
-      border:0;
-      border-radius:13px;
-      cursor:pointer;
-      font-family:inherit;
-      font-weight:850;
-      color:#12130f;
-      background:linear-gradient(135deg,#fde047,#f59e0b);
-      box-shadow:0 10px 28px rgba(245,158,11,.14);
-    }
-    .ls-next-era-road {
-      margin-top:9px;
-      text-align:center;
-      font-family:'JetBrains Mono',monospace;
-      font-size:8px;
-      letter-spacing:.05em;
-      color:rgba(250,204,21,.66);
-    }
-    @media (max-width:420px) {
-      .ls-next-era-changelog { padding:8px; }
-      .ls-next-era-box { max-height:96vh; }
-      .ls-next-era-head { padding:21px 17px 13px; }
-      .ls-next-era-body { padding:14px 17px 2px; }
-      .ls-next-era-foot { padding:12px 17px 16px; }
-    }
-
-
-
-    /* 5.5.7 — Medallas exclusivas de Tienda */
-    .ls-store-badge-card {
-      position:relative;
-      overflow:hidden;
-      text-align:center;
-      min-height:185px;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:6px;
-    }
-
-    .ls-store-badge-card::before {
-      content:"";
-      position:absolute;
-      inset:-40%;
-      pointer-events:none;
-      opacity:.14;
-      background:radial-gradient(circle, currentColor 0%, transparent 42%);
-      filter:blur(18px);
-    }
-
-    .ls-store-badge-icon {
-      position:relative;
-      z-index:1;
-      width:66px;
-      height:66px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      margin-bottom:4px;
-      border-radius:50%;
-      font-size:35px;
-      background:rgba(5,7,10,.72);
-      border:1px solid currentColor;
-      box-shadow:0 12px 30px rgba(0,0,0,.30);
-    }
-
-    .ls-rarity-comun { color:#cbd5e1; }
-    .ls-rarity-rara { color:#7dd3fc; }
-    .ls-rarity-epica { color:#c084fc; }
-    .ls-rarity-legendaria { color:#fbbf24; }
-    .ls-rarity-exclusiva { color:#fb7185; }
-
-    .ls-rarity-tag {
-      position:relative;
-      z-index:1;
-      font-family:'JetBrains Mono',monospace;
-      font-size:8px;
-      font-weight:900;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-    }
-
-
-    .ls-limited-urgency {
-      position:relative;
-      z-index:1;
-      margin-top:6px;
-      padding:4px 8px;
-      border-radius:999px;
-      font-family:'JetBrains Mono',monospace;
-      font-size:8px;
-      font-weight:900;
-      letter-spacing:.06em;
-      border:1px solid rgba(251,146,60,.28);
-      background:rgba(251,146,60,.06);
-      color:#fdba74;
-      animation:lsLimitedUrgency 1.8s ease-in-out infinite;
-    }
-
-    .ls-limited-last {
-      border-color:rgba(248,113,113,.34);
-      background:rgba(248,113,113,.07);
-      color:#fca5a5;
-      animation:lsLimitedUrgency .95s ease-in-out infinite;
-    }
-
-    @keyframes lsLimitedUrgency {
-      0%,100% { transform:scale(1); opacity:.86; }
-      50% { transform:scale(1.035); opacity:1; }
-    }
-
-    @media (prefers-reduced-motion:reduce) {
-      .ls-limited-urgency,
-      .ls-limited-last {
-        animation:none !important;
-      }
-    }
-
-    .ls-store-badge-desc {
-      position:relative;
-      z-index:1;
-      max-width:180px;
-      min-height:30px;
-      font-size:10px;
-      line-height:1.4;
-      color:var(--text-dim);
-    }
-
-    /* LiveScroll 5.5.7 — IDENTITY */
-    .ls-equipped-medals {
-      display:flex;
-      align-items:center;
-      gap:7px;
-      margin-top:8px;
-      min-height:30px;
-      flex-wrap:wrap;
-    }
-
-
-    .ls-equipped-medal.ls-medal-rarity-comun {
-      border-color:#cbd5e1;
-      box-shadow:0 0 0 2px rgba(203,213,225,.12), 0 5px 16px rgba(0,0,0,.24);
-    }
-    .ls-equipped-medal.ls-medal-rarity-rara {
-      border-color:#7dd3fc;
-      box-shadow:0 0 0 2px rgba(125,211,252,.16), 0 0 16px rgba(125,211,252,.20), 0 5px 16px rgba(0,0,0,.24);
-    }
-    .ls-equipped-medal.ls-medal-rarity-epica {
-      border-color:#c084fc;
-      box-shadow:0 0 0 2px rgba(192,132,252,.16), 0 0 18px rgba(192,132,252,.24), 0 5px 16px rgba(0,0,0,.24);
-    }
-    .ls-equipped-medal.ls-medal-rarity-legendaria {
-      border-color:#fbbf24;
-      box-shadow:0 0 0 2px rgba(251,191,36,.18), 0 0 20px rgba(251,191,36,.28), 0 5px 16px rgba(0,0,0,.24);
-    }
-
-    .ls-equipped-medal.ls-medal-rarity-legendaria::before,
-    .ls-equipped-medal.ls-medal-rarity-exclusiva::before {
-      content:"";
-      position:absolute;
-      inset:-7px;
-      border-radius:50%;
-      pointer-events:none;
-      opacity:.30;
-      filter:blur(6px);
-      background:currentColor;
-      animation:lsMedalHalo 2.8s ease-in-out infinite;
-      z-index:-1;
-    }
-
-    .ls-equipped-medal.ls-medal-rarity-exclusiva {
-      background:
-        radial-gradient(circle at 30% 22%, rgba(255,255,255,.16), transparent 28%),
-        linear-gradient(145deg, rgba(251,113,133,.10), rgba(192,132,252,.06)),
-        rgba(8,10,13,.78);
-    }
-
-    @keyframes lsMedalHalo {
-      0%,100% { opacity:.18; transform:scale(.92); }
-      50% { opacity:.42; transform:scale(1.08); }
-    }
-
-    .ls-public-medals-wrap {
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      margin-top:7px;
-      padding:4px 7px;
-      border-radius:999px;
-      background:rgba(255,255,255,.025);
-      border:1px solid rgba(255,255,255,.06);
-      backdrop-filter:blur(5px);
-    }
-
-    .ls-public-medals-wrap .ls-equipped-medals {
-      margin:0 !important;
-      min-height:0 !important;
-      gap:6px !important;
-    }
-
-
-    .ls-public-medals-wrap .ls-equipped-medal.ls-medal-favorite {
-      width:32px;
-      height:32px;
-      flex-basis:32px;
-      font-size:18px;
-    }
-
-    .ls-public-medals-wrap .ls-equipped-medal {
-      width:28px;
-      height:28px;
-      font-size:15px;
-      margin:0;
-      flex:0 0 28px;
-    }
-
-    .ls-medal-detail-meta {
-      display:flex;
-      justify-content:center;
-      gap:7px;
-      flex-wrap:wrap;
-      margin-top:10px;
-    }
-
-
-
-    @media (max-width:520px) {
-      .ls-collection-filter {
-        flex:1 1 auto;
-        min-height:34px;
-      }
-
-      #collection568Grid > div {
-        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
-      }
-
-      #collection568Sort {
-        flex:1 1 150px;
-        min-height:36px;
-      }
-    }
-
-    .ls-collection-filter.active {
-      border-color:var(--gold) !important;
-      color:var(--gold) !important;
-      background:rgba(250,204,21,.045) !important;
-    }
-
-    .ls-medal-detail-chip {
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid var(--border);
-      background:var(--panel-2);
-      font-size:9px;
-      color:var(--text-dim);
-    }
-
-    .ls-equipped-medal.ls-medal-rarity-exclusiva {
-      border-color:#fb7185;
-      box-shadow:0 0 0 2px rgba(251,113,133,.18), 0 0 22px rgba(251,113,133,.30), 0 5px 16px rgba(0,0,0,.24);
-    }
-
-    .ls-equipped-medal.ls-medal-rarity-rara::after,
-    .ls-equipped-medal.ls-medal-rarity-epica::after,
-    .ls-equipped-medal.ls-medal-rarity-legendaria::after,
-    .ls-equipped-medal.ls-medal-rarity-exclusiva::after {
-      content:"";
-      position:absolute;
-      inset:-4px;
-      border-radius:50%;
-      border:1px solid currentColor;
-      opacity:.18;
-      pointer-events:none;
-    }
-
-    .ls-equipped-medal.ls-medal-rarity-epica,
-    .ls-equipped-medal.ls-medal-rarity-legendaria,
-    .ls-equipped-medal.ls-medal-rarity-exclusiva {
-      animation:lsMedalRarePulse 2.6s ease-in-out infinite;
-    }
-
-    @keyframes lsMedalRarePulse {
-      0%,100% { transform:translateZ(0) scale(1); }
-      50% { transform:translateZ(0) scale(1.055); }
-    }
-
-    @media (prefers-reduced-motion:reduce) {
-      .ls-equipped-medal {
-        animation:none !important;
-      }
-    }
-
-
-    .ls-equipped-medal.ls-medal-favorite {
-      width:36px;
-      height:36px;
-      font-size:20px;
-      box-shadow:
-        0 0 0 2px rgba(250,204,21,.16),
-        0 0 22px rgba(250,204,21,.18),
-        0 8px 20px rgba(0,0,0,.28);
-    }
-
-    .ls-equipped-medal.ls-medal-favorite::before {
-      content:"★";
-      position:absolute;
-      top:-7px;
-      right:-5px;
-      z-index:3;
-      font-size:10px;
-      line-height:1;
-      color:var(--gold);
-      text-shadow:0 0 8px rgba(250,204,21,.55);
-      pointer-events:none;
-    }
-
-    .ls-favorite-note {
-      margin:8px 0 13px;
-      padding:8px 10px;
-      border-radius:10px;
-      border:1px solid rgba(250,204,21,.16);
-      background:rgba(250,204,21,.035);
-      color:var(--text-dim);
-      font-size:10px;
-      line-height:1.45;
-    }
-
-    .ls-medal-order-row {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
-      margin-top:8px;
-    }
-
-    .ls-medal-order-btn {
-      min-width:31px;
-      height:28px;
-      border-radius:8px;
-      border:1px solid var(--border);
-      background:var(--panel);
-      color:var(--text);
-      cursor:pointer;
-      font-size:12px;
-    }
-
-    .ls-equipped-medal {
-      position:relative;
-      width:31px;
-      height:31px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:50%;
-      border:1px solid rgba(250,204,21,.28);
-      background:
-        radial-gradient(circle at 32% 24%, rgba(255,255,255,.12), transparent 32%),
-        rgba(8,10,13,.72);
-      box-shadow:0 5px 16px rgba(0,0,0,.24), inset 0 0 12px rgba(250,204,21,.035);
-      font-size:17px;
-      cursor:pointer;
-      transform:translateZ(0);
-      transition:transform .14s ease, border-color .14s ease;
-    }
-
-    .ls-equipped-medal:hover {
-      transform:translateY(-2px) scale(1.05);
-      border-color:rgba(250,204,21,.58);
-    }
-
-    .ls-equipped-medal-slot {
-      width:31px;
-      height:31px;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:50%;
-      border:1px dashed rgba(255,255,255,.16);
-      color:var(--text-dim);
-      background:rgba(255,255,255,.018);
-      font-size:12px;
-    }
-
-    .ls-medal-picker-grid {
-      display:grid;
-      grid-template-columns:repeat(auto-fill,minmax(118px,1fr));
-      gap:9px;
-    }
-
-    .ls-medal-picker-item {
-      min-height:88px;
-      padding:11px 9px;
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap:6px;
-      text-align:center;
-      border-radius:13px;
-      border:1px solid var(--border);
-      background:var(--panel-2);
-      color:var(--text);
-      cursor:pointer;
-      font-family:inherit;
-      transition:transform .14s ease,border-color .14s ease,background .14s ease;
-    }
-
-    .ls-medal-picker-item:hover {
-      transform:translateY(-2px);
-      border-color:var(--gold-dim);
-    }
-
-    .ls-medal-picker-item.selected {
-      border-color:var(--gold);
-      background:rgba(250,204,21,.065);
-      box-shadow:inset 0 0 0 1px rgba(250,204,21,.08);
-    }
-
-    .ls-medal-picker-icon {
-      font-size:27px;
-      line-height:1;
-    }
-
-    .ls-medal-picker-name {
-      font-size:10px;
-      line-height:1.25;
-      color:var(--text-dim);
-    }
-
-    .ls-medal-detail-icon {
-      width:72px;
-      height:72px;
-      margin:0 auto 14px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border-radius:50%;
-      font-size:40px;
-      border:1px solid rgba(250,204,21,.32);
-      background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.12),transparent 32%),rgba(250,204,21,.045);
-      box-shadow:0 15px 42px rgba(0,0,0,.35);
-    }
-
-    @media (max-width:700px) {
-      .ls-equipped-medal,
-      .ls-equipped-medal-slot {
-        width:30px;
-        height:30px;
-      }
-      .ls-equipped-medal {
-        transition:none;
-      }
-    }
-
-    /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
-    .ls-fast-shimmer,
-    .ls-fast-profile-skeleton i,
-    .ls-fast-avatar {
-      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
-      background-size:220% 100%;
-      animation:lsSkeleton 1.05s linear infinite;
-    }
-    .ls-fast-profile-skeleton { display:grid; gap:12px; }
-    .ls-fast-profile-hero {
-      min-height:128px; display:flex; align-items:center; gap:14px; padding:18px;
-      border-radius:16px; background:var(--panel); border:1px solid var(--border);
-    }
-    .ls-fast-profile-hero i { display:block; height:13px; border-radius:999px; }
-    .ls-fast-avatar { width:66px; height:66px; flex:0 0 66px; border-radius:50%; }
-    .ls-fast-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-    .ls-fast-stats i { display:block; height:54px; border-radius:13px; }
-
-    .ls-fast-skeleton {
-      display:grid;
-      gap:10px;
-      padding:4px 0;
-    }
-    .ls-fast-skeleton > i {
-      display:block;
-      height:62px;
-      border-radius:13px;
-      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
-      background-size:220% 100%;
-      animation:lsSkeleton 1.05s linear infinite;
-    }
-    @keyframes lsSkeleton { to { background-position:-220% 0; } }
-
-    @media (max-width:700px) {
-      /* En móvil priorizamos respuesta inmediata sobre animación decorativa. */
-      #appView {
-        transition:none !important;
-      }
-      #appView .page-title,
-      #appView .page-sub,
-      #appView .form-card,
-      #appView .video-card,
-      #appView .directo-card,
-      #appView .profile-section,
-      #appView .store-item,
-      #appView .ranking-row {
-        animation-duration:.14s !important;
-        animation-delay:0s !important;
-        transition-duration:.12s !important;
-      }
-      .toast { animation-duration:.16s !important; }
-      .modal-overlay { animation-duration:.16s !important; }
-      .modal-box { transition-duration:.16s !important; }
-    }
-
-    @media (prefers-reduced-motion:reduce) {
-      .ls-fast-skeleton > i { animation:none !important; }
-    }
-
-    /* v5.3.5 — Mobile Feed Full View */
-    :root {
-      --ls-mobile-feed-height: 640px;
-    }
-
-    @media (max-width:700px) {
-      #feedVertical,
-      #profileFeedVertical,
-      #foryouList .feed-vertical {
-        scroll-snap-type:y mandatory !important;
-      }
-
-      #feedVertical > .feed-item,
-      #profileFeedVertical > .feed-item,
-      #foryouList .feed-vertical > .feed-item {
-        height:var(--ls-mobile-feed-height) !important;
-        min-height:var(--ls-mobile-feed-height) !important;
-        max-height:var(--ls-mobile-feed-height) !important;
-        margin:0 !important;
-        scroll-snap-align:start !important;
-        scroll-snap-stop:always !important;
-        overflow:hidden !important;
-      }
-
-      #feedVertical .feed-phone,
-      #profileFeedVertical .feed-phone,
-      #foryouList .feed-phone {
-        width:100% !important;
-        height:100% !important;
-        min-height:100% !important;
-        max-height:100% !important;
-        margin:0 !important;
-        border-radius:0 !important;
-        overflow:hidden !important;
-      }
-
-      #feedVertical .feed-embed-frame,
-      #profileFeedVertical .feed-embed-frame,
-      #foryouList .feed-embed-frame {
-        position:absolute !important;
-        inset:0 !important;
-        width:100% !important;
-        height:100% !important;
-        display:flex !important;
-        align-items:center !important;
-        justify-content:center !important;
-        background:#000 !important;
-      }
-
-      #feedVertical .feed-embed-frame iframe,
-      #profileFeedVertical .feed-embed-frame iframe,
-      #foryouList .feed-embed-frame iframe {
-        width:100% !important;
-        height:100% !important;
-        border:0 !important;
-      }
-
-      #feedVertical .feed-actions,
-      #profileFeedVertical .feed-actions,
-      #foryouList .feed-actions {
-        right:10px !important;
-        bottom:118px !important;
-        z-index:12 !important;
-      }
-
-      #feedVertical .feed-overlay,
-      #profileFeedVertical .feed-overlay,
-      #foryouList .feed-overlay {
-        left:12px !important;
-        right:68px !important;
-        bottom:18px !important;
-        z-index:10 !important;
-      }
-
-      /* MP4: reservamos abajo la barra nativa del reproductor. */
-      .feed-item.ls-upload-feed-item .feed-overlay {
-        bottom:72px !important;
-        pointer-events:none !important;
-      }
-
-      .feed-item.ls-upload-feed-item .feed-overlay .author {
-        pointer-events:auto !important;
-      }
-
-      .feed-item.ls-upload-feed-item .feed-actions {
-        bottom:148px !important;
-      }
-
-      .feed-item.ls-upload-feed-item .dbltap-like-zone {
-        width:100% !important;
-        height:100% !important;
-      }
-
-      .feed-item.ls-upload-feed-item video {
-        width:100% !important;
-        height:100% !important;
-        object-fit:contain !important;
-        background:#000 !important;
-      }
-
-      .feed-nudge {
-        top:14px !important;
-        bottom:auto !important;
-        left:50% !important;
-        transform:translateX(-50%) !important;
-        white-space:nowrap !important;
-        z-index:11 !important;
-        opacity:.72 !important;
-      }
-    }
-
-    /* LiveScroll Mobile/UI Upgrade */
-    html, body {
-      max-width:100%;
-      overflow-x:hidden;
-    }
-
-    #appView,
-    .profile-section,
-    .profile-hero,
-    .form-card,
-    .modal-box {
-      box-sizing:border-box;
-      max-width:100%;
-    }
-
-    .grid-menu-btn {
-      width:42px !important;
-      height:42px !important;
-      min-width:42px !important;
-      min-height:42px !important;
-      border-radius:50% !important;
-      display:flex !important;
-      align-items:center !important;
-      justify-content:center !important;
-      font-size:25px !important;
-      line-height:1 !important;
-      background:rgba(8,10,14,.78) !important;
-      backdrop-filter:blur(10px);
-      -webkit-backdrop-filter:blur(10px);
-      border:1px solid rgba(255,255,255,.16) !important;
-      color:#fff !important;
-      padding:0 0 7px !important;
-      z-index:12 !important;
-      box-shadow:0 6px 18px rgba(0,0,0,.28);
-      touch-action:manipulation;
-    }
-
-    .grid-menu-btn:active {
-      transform:scale(.94);
-    }
-
-    .ls-action-sheet-overlay {
-      position:fixed;
-      inset:0;
-      z-index:400;
-      background:rgba(0,0,0,.66);
-      backdrop-filter:blur(3px);
-      -webkit-backdrop-filter:blur(3px);
-      display:flex;
-      align-items:flex-end;
-      justify-content:center;
-      padding:12px;
-      padding-bottom:max(12px, env(safe-area-inset-bottom));
-      animation:lsFadeIn .16s ease;
-    }
-
-    .ls-action-sheet {
-      width:min(520px, 100%);
-      background:var(--panel);
-      border:1px solid var(--border);
-      border-radius:22px;
-      padding:10px;
-      box-shadow:0 -18px 55px rgba(0,0,0,.55);
-      animation:lsSheetUp .22s cubic-bezier(.2,.8,.2,1);
-      overflow:hidden;
-    }
-
-    .ls-action-sheet-handle {
-      width:42px;
-      height:4px;
-      border-radius:10px;
-      background:rgba(255,255,255,.22);
-      margin:3px auto 10px;
-    }
-
-    .ls-action-sheet-title {
-      padding:6px 10px 13px;
-      border-bottom:1px solid var(--border);
-      margin-bottom:6px;
-    }
-
-    .ls-action-sheet-title strong {
-      display:block;
-      font-size:14px;
-      color:var(--text);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-
-    .ls-action-sheet-title span {
-      display:block;
-      margin-top:3px;
-      color:var(--text-dim);
-      font-size:11px;
-    }
-
-    .ls-sheet-action {
-      width:100%;
-      min-height:52px;
-      border:0;
-      border-radius:13px;
-      background:transparent;
-      color:var(--text);
-      display:flex;
-      align-items:center;
-      gap:12px;
-      padding:10px 13px;
-      font-family:inherit;
-      font-size:14px;
-      text-align:left;
-      cursor:pointer;
-      touch-action:manipulation;
-    }
-
-    .ls-sheet-action:hover,
-    .ls-sheet-action:active {
-      background:var(--panel-2);
-    }
-
-    .ls-sheet-action .ico {
-      width:34px;
-      height:34px;
-      flex:0 0 34px;
-      border-radius:10px;
-      background:rgba(255,255,255,.06);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:18px;
-    }
-
-    .ls-sheet-action .txt {
-      min-width:0;
-      flex:1;
-    }
-
-    .ls-sheet-action .txt strong {
-      display:block;
-      font-size:14px;
-    }
-
-    .ls-sheet-action .txt small {
-      display:block;
-      color:var(--text-dim);
-      font-size:11px;
-      margin-top:2px;
-    }
-
-    .ls-sheet-action.danger {
-      color:var(--red);
-    }
-
-    .ls-sheet-action[disabled] {
-      opacity:.46;
-      cursor:not-allowed;
-    }
-
-    @keyframes lsSheetUp {
-      from { transform:translateY(28px); opacity:0; }
-      to { transform:translateY(0); opacity:1; }
-    }
-
-    @keyframes lsFadeIn {
-      from { opacity:0; }
-      to { opacity:1; }
-    }
-
-    @media (max-width:700px) {
-      #appView {
-        width:100% !important;
-        padding-left:10px !important;
-        padding-right:10px !important;
-      }
-
-      .profile-hero,
-      .profile-section,
-      .form-card {
-        border-radius:16px !important;
-      }
-
-      .profile-hero {
-        overflow:hidden !important;
-      }
-
-      .profile-stats-row {
-        display:grid !important;
-        grid-template-columns:repeat(3, minmax(0,1fr)) !important;
-        gap:7px !important;
-        width:100% !important;
-      }
-
-      .stat-pill {
-        min-width:0 !important;
-        padding:10px 5px !important;
-      }
-
-      .stat-pill .num {
-        font-size:clamp(18px, 6vw, 24px) !important;
-      }
-
-      .stat-pill .lbl {
-        font-size:10px !important;
-        white-space:normal !important;
-        line-height:1.15 !important;
-      }
-
-      .profile-name-block h1 {
-        font-size:clamp(20px, 6vw, 28px) !important;
-        overflow-wrap:anywhere;
-      }
-
-      .profile-section-head {
-        gap:8px !important;
-        align-items:center !important;
-      }
-
-      .profile-section-head h3 {
-        min-width:0;
-        font-size:15px !important;
-      }
-
-      .profile-section-head .sub {
-        font-size:10px !important;
-        text-align:right;
-      }
-
-      .video-grid {
-        gap:7px !important;
-      }
-
-      .video-grid-tile {
-        min-width:0 !important;
-        overflow:hidden !important;
-      }
-
-      .grid-menu-btn {
-        width:46px !important;
-        height:46px !important;
-        min-width:46px !important;
-        min-height:46px !important;
-        font-size:28px !important;
-        top:8px !important;
-        right:8px !important;
-      }
-
-      .video-grid-menu {
-        display:none !important;
-      }
-
-      .modal-overlay {
-        padding:10px !important;
-        align-items:flex-end !important;
-      }
-
-      .modal-box,
-      .auth-box {
-        width:100% !important;
-        max-width:100% !important;
-        max-height:92dvh !important;
-        overflow-y:auto !important;
-        border-radius:20px !important;
-      }
-
-      button,
-      .btn,
-      .btn-outline {
-        touch-action:manipulation;
-      }
-
-      input,
-      textarea,
-      select {
-        max-width:100% !important;
-        box-sizing:border-box !important;
-      }
-    }
-  `;
-
-  document.head.appendChild(style);
-}
-
-function closeVideoActionSheet() {
-  document.getElementById("videoActionSheetOverlay")?.remove();
-}
-
-function openVideoActionSheet(videoId) {
-  const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
-  if (!video) return;
-
-  const pin = window.__profilePinContext || {};
-  const isPinned = Array.isArray(pin.pinnedIds) && pin.pinnedIds.includes(videoId);
-  const canPin = !!pin.canPin;
-  const limitReached = canPin && !isPinned && (pin.pinsUsed >= pin.maxPinned);
-
-  closeVideoActionSheet();
-
-  const overlay = document.createElement("div");
-  overlay.id = "videoActionSheetOverlay";
-  overlay.className = "ls-action-sheet-overlay";
-  overlay.onclick = (e) => {
-    if (e.target === overlay) closeVideoActionSheet();
-  };
-
-  let pinAction = "";
-  if (isPinned) {
-    pinAction = `
-      <button class="ls-sheet-action" disabled>
-        <span class="ico">📌</span>
-        <span class="txt">
-          <strong>Video anclado</strong>
-          <small>Ya está destacado en Para Ti</small>
-        </span>
-      </button>`;
-  } else if (canPin) {
-    pinAction = `
-      <button class="ls-sheet-action" ${limitReached ? "disabled" : ""}
-        onclick="closeVideoActionSheet(); handlePinVideo('${videoId}')">
-        <span class="ico">📌</span>
-        <span class="txt">
-          <strong>Anclar 24 h</strong>
-          <small>${limitReached
-            ? `Ya usaste ${pin.pinsUsed}/${pin.maxPinned} espacios disponibles`
-            : `Destacalo en Para Ti · ${pin.pinsUsed}/${pin.maxPinned} usados`}</small>
-        </span>
-      </button>`;
-  } else {
-    pinAction = `
-      <button class="ls-sheet-action" disabled>
-        <span class="ico">📌</span>
-        <span class="txt">
-          <strong>Anclar 24 h</strong>
-          <small>Tu plan actual no incluye videos anclados</small>
-        </span>
-      </button>`;
-  }
-
-  overlay.innerHTML = `
-    <div class="ls-action-sheet">
-      <div class="ls-action-sheet-handle"></div>
-
-      <div class="ls-action-sheet-title">
-        <strong>${escapeHtml(video.title || "Video")}</strong>
-        <span>Opciones del video</span>
-      </div>
-
-      ${pinAction}
-
-      <button class="ls-sheet-action"
-        onclick="closeVideoActionSheet(); openProfileVideoFeed(window.__profileFeedVideos, '${videoId}', window.__profileFeedAuthor)">
-        <span class="ico">▶️</span>
-        <span class="txt">
-          <strong>Ver video</strong>
-          <small>Abrir dentro de LiveScroll</small>
-        </span>
-      </button>
-
-      <button class="ls-sheet-action"
-        onclick="closeVideoActionSheet(); window.open('${escapeHtml(video.video_url)}', '_blank', 'noopener')">
-        <span class="ico">🔗</span>
-        <span class="txt">
-          <strong>Abrir enlace</strong>
-          <small>Ver el archivo o plataforma original</small>
-        </span>
-      </button>
-
-      <button class="ls-sheet-action danger"
-        onclick="closeVideoActionSheet(); handleDeleteOwnVideo('${videoId}')">
-        <span class="ico">🗑️</span>
-        <span class="txt">
-          <strong>Eliminar video</strong>
-          <small>Esta acción no se puede deshacer</small>
-        </span>
-      </button>
-
-      <button class="ls-sheet-action" onclick="closeVideoActionSheet()">
-        <span class="ico">✕</span>
-        <span class="txt"><strong>Cancelar</strong></span>
-      </button>
-    </div>`;
-
-  document.body.appendChild(overlay);
-}
-
 function toggleVideoTileMenu(videoId) {
-  ensureModernMobileStyles();
-
-  if (window.matchMedia("(max-width: 700px)").matches) {
-    openVideoActionSheet(videoId);
-    return;
-  }
-
   document.querySelectorAll(".video-grid-menu").forEach(el => {
     if (el.id !== `menu-${videoId}`) el.classList.add("hidden");
   });
@@ -4249,21 +1200,7 @@ function getThumbnailHtml(video) {
     const id = extractYoutubeId(video.video_url);
     if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy">`;
   }
-
-  if (video.platform === "upload") {
-    if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
-      return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy">`;
-    }
-
-    // Videos viejos sin carátula persistida: mostramos el propio MP4 como preview.
-    if (isSafeUrl(video.video_url)) {
-      return `<video src="${escapeHtml(video.video_url)}#t=0.3" preload="metadata" muted playsinline
-        style="width:100%;height:100%;object-fit:cover;pointer-events:none;background:#050607;"></video>`;
-    }
-
-    return "🎬";
-  }
-
+  if (video.platform === "upload") return "🎬";
   const icons = { kick: "🟢", twitch: "🟣", tiktok: "🎵" };
   return icons[video.platform] || "▶️";
 }
@@ -4298,7 +1235,6 @@ function startWatching(video) {
       if (data.ok) {
         currentProfile.points_balance += data.points_viewer;
         updateBalanceUI();
-        showFloatingPointsSafe(data.points_viewer, document.getElementById(`pts-${video.id}`));
         const ptsEl = document.getElementById(`pts-${video.id}`);
         if (ptsEl) ptsEl.innerHTML = `+${data.points_viewer} pts <span class="mono">${watchSeconds[video.id]}s</span>`;
       } else if (data.error === "daily_cap_reached") {
@@ -4330,13 +1266,7 @@ function clearAllWatchIntervals() {
   Object.values(watchIntervals).forEach(clearInterval);
   watchIntervals = {};
   watchSeconds = {};
-
-  // 5.4.6 FINAL: nada del Feed queda reproduciéndose detrás de otra pantalla.
-  document.querySelectorAll(".feed-item [id^='embed-'], [id^='embed-'].feed-embed-frame").forEach(releaseFeedMediaElement);
-  pauseFeedMedia();
-
   loadedEmbeds.clear();
-
   if (feedObserverInstance) {
     feedObserverInstance.disconnect();
     feedObserverInstance = null;
@@ -4386,12 +1316,6 @@ function renderUpload() {
             onchange="previewFileSize()"
             style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
           <div id="fileSizeInfo" style="font-size:12px;margin-top:6px;"></div>
-
-          <div id="uploadPreviewSafe" class="ls-upload-preview-safe">
-            <div class="tag">Vista previa</div>
-            <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
-            <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
-          </div>
         </div>
         <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
           <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
@@ -4415,65 +1339,11 @@ function renderUpload() {
 const MAX_FILE_MB = 50;
 let rawSelectedFile = null;
 let trimmedFile = null;
-let uploadPreviewUrlSafe = null;
 
 function previewFileSize() {
   rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
   trimmedFile = null;
   refreshFileSizeUI();
-  refreshUploadPreviewSafe();
-}
-
-function clearUploadPreviewSafe() {
-  const preview = document.getElementById("uploadPreviewSafe");
-  const video = document.getElementById("uploadPreviewVideoSafe");
-  const msg = document.getElementById("uploadPreviewMsgSafe");
-
-  if (uploadPreviewUrlSafe) {
-    URL.revokeObjectURL(uploadPreviewUrlSafe);
-    uploadPreviewUrlSafe = null;
-  }
-
-  if (video) {
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    video.style.display = "";
-  }
-
-  if (msg) {
-    msg.textContent = "";
-    msg.classList.remove("active");
-  }
-
-  preview?.classList.remove("active");
-}
-
-function refreshUploadPreviewSafe() {
-  const preview = document.getElementById("uploadPreviewSafe");
-  const video = document.getElementById("uploadPreviewVideoSafe");
-  const msg = document.getElementById("uploadPreviewMsgSafe");
-  const file = trimmedFile || rawSelectedFile;
-
-  if (!preview || !video || !msg) return;
-
-  clearUploadPreviewSafe();
-  if (!file) return;
-
-  uploadPreviewUrlSafe = URL.createObjectURL(file);
-  preview.classList.add("active");
-  video.src = uploadPreviewUrlSafe;
-
-  video.onerror = () => {
-    video.style.display = "none";
-    msg.textContent = "Este formato no puede previsualizarse en este navegador, pero podés subirlo normalmente.";
-    msg.classList.add("active");
-  };
-
-  video.onloadedmetadata = () => {
-    video.style.display = "";
-    msg.classList.remove("active");
-  };
 }
 
 function refreshFileSizeUI() {
@@ -4505,7 +1375,6 @@ function refreshFileSizeUI() {
 function discardTrim() {
   trimmedFile = null;
   refreshFileSizeUI();
-  refreshUploadPreviewSafe();
 }
 
 function formatTrimSeconds(s) {
@@ -4624,7 +1493,6 @@ async function confirmVideoTrim() {
 
     closeVideoTrimmer();
     refreshFileSizeUI();
-    refreshUploadPreviewSafe();
     showToast("¡Video recortado!");
   } catch (e) {
     showToast("No se pudo recortar. Probá con otro navegador o un archivo distinto.");
@@ -4673,7 +1541,6 @@ async function setUploadMode(mode) {
   window.currentUploadMode = mode;
   rawSelectedFile = null;
   trimmedFile = null;
-  clearUploadPreviewSafe();
   document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
   document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
   document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
@@ -4711,70 +1578,9 @@ async function handleUploadLink() {
   } else {
     currentProfile.points_balance += 25;
     updateBalanceUI();
-    showFloatingPointsSafe(25);
     showToast("+25 pts por tu video");
   }
   switchTab("feed");
-}
-
-
-async function createVideoThumbnailBlob(file) {
-  return new Promise((resolve) => {
-    let objectUrl = null;
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-
-    const cleanup = () => {
-      try { video.pause(); } catch (_) {}
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-
-    const fail = () => {
-      cleanup();
-      resolve(null);
-    };
-
-    video.onerror = fail;
-
-    video.onloadedmetadata = () => {
-      const duration = Number.isFinite(video.duration) ? video.duration : 0;
-      video.currentTime = Math.min(Math.max(0.2, duration * 0.12), Math.max(0.2, duration - 0.1));
-    };
-
-    video.onseeked = () => {
-      try {
-        const sourceW = video.videoWidth || 1280;
-        const sourceH = video.videoHeight || 720;
-        const maxW = 720;
-        const scale = Math.min(1, maxW / sourceW);
-
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round(sourceW * scale));
-        canvas.height = Math.max(1, Math.round(sourceH * scale));
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return fail();
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        canvas.toBlob((blob) => {
-          cleanup();
-          resolve(blob || null);
-        }, "image/jpeg", 0.82);
-      } catch (_) {
-        fail();
-      }
-    };
-
-    try {
-      objectUrl = URL.createObjectURL(file);
-      video.src = objectUrl;
-    } catch (_) {
-      fail();
-    }
-  });
 }
 
 async function handleUploadFile() {
@@ -4807,33 +1613,11 @@ async function handleUploadFile() {
 
   const { data: publicUrlData } = sb.storage.from("clip-videos").getPublicUrl(path);
 
-  let thumbnailUrl = null;
-  try {
-    const thumbnailBlob = await createVideoThumbnailBlob(file);
-
-    if (thumbnailBlob) {
-      const thumbPath = `${currentUser.id}/thumbnails/${Date.now()}-thumb.jpg`;
-      const { error: thumbUploadError } = await sb.storage.from("clip-videos").upload(thumbPath, thumbnailBlob, {
-        cacheControl: "3600",
-        contentType: "image/jpeg",
-        upsert: false
-      });
-
-      if (!thumbUploadError) {
-        const { data: thumbPublic } = sb.storage.from("clip-videos").getPublicUrl(thumbPath);
-        thumbnailUrl = thumbPublic?.publicUrl || null;
-      }
-    }
-  } catch (thumbErr) {
-    console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
-  }
-
   const { error: insertError } = await sb.from("videos").insert({
     user_id: currentUser.id,
     platform: "upload",
     title,
-    video_url: publicUrlData.publicUrl,
-    thumbnail_url: thumbnailUrl
+    video_url: publicUrlData.publicUrl
   });
 
   btn.disabled = false;
@@ -4846,7 +1630,6 @@ async function handleUploadFile() {
   } else {
     currentProfile.points_balance += 25;
     updateBalanceUI();
-    showFloatingPointsSafe(25);
     showToast("+25 pts por tu video");
   }
   switchTab("feed");
@@ -5036,358 +1819,24 @@ async function handleRedeem() {
 // ============================================================
 // MI PERFIL — videos propios y cuánto generaron
 // ============================================================
-
-function lsTimeAgo(dateString) {
-  if (!dateString) return "";
-  const diff = Math.max(0, Date.now() - new Date(dateString).getTime());
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "Ahora";
-  if (mins < 60) return `Hace ${mins} min`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Hace ${hrs} h`;
-  const days = Math.floor(hrs / 24);
-  return `Hace ${days} d`;
-}
-
-function lsIsWithinHours(dateString, hours) {
-  if (!dateString) return false;
-  const t = new Date(dateString).getTime();
-  return Number.isFinite(t) && (Date.now() - t) >= 0 && (Date.now() - t) <= hours * 3600000;
-}
-
-function lsBuildRecentActivity(videos, badges) {
-  const items = [];
-
-  (videos || []).slice(0, 3).forEach(v => {
-    items.push({
-      icon:"🎬",
-      title:`Subiste “${v.title || "un video"}”`,
-      date:v.created_at
-    });
-  });
-
-  (badges || []).slice(-2).forEach(b => {
-    const d = b.earned_at || b.created_at || b.unlocked_at;
-    if (d) items.push({
-      icon:b.badge_icon || "🏅",
-      title:`Ganaste la medalla “${b.badge_name || "Nueva medalla"}”`,
-      date:d
-    });
-  });
-
-  return items
-    .filter(x => x.date)
-    .sort((a,b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 4);
-}
-
-function initProfileNovaTilt() {
-  const hero = document.getElementById("lsProfileNovaHero");
-  const inner = document.getElementById("lsProfileNovaInner");
-  if (!hero || !inner || window.matchMedia("(hover:none)").matches) return;
-
-  const move = (e) => {
-    const r = hero.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    const y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
-    const ry = (x - .5) * 3.2;
-    const rx = (.5 - y) * 2.4;
-    hero.style.setProperty("--ls-glow-x", `${x*100}%`);
-    hero.style.setProperty("--ls-glow-y", `${y*100}%`);
-    inner.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
-  };
-  const reset = () => { inner.style.transform = ""; };
-  hero.addEventListener("mousemove", move);
-  hero.addEventListener("mouseleave", reset);
-}
-
-
-async function getEquippedProfileMedals(userId) {
-  if (!userId) return [];
-
-  const [{ data, error }, { data: owned }, { data: storeMeta }, { data: claims }] = await Promise.all([
-    sb.rpc("get_equipped_profile_badges", { p_user_id:userId }),
-    sb.from("user_badges").select("badge_name,badge_icon,earned_at").eq("user_id", userId),
-    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
-    sb.from("user_store_badge_claims").select("badge_id,serial_number").eq("user_id", userId)
-  ]);
-
-  if (error) {
-    console.warn("No se pudieron cargar medallas equipadas:", error);
-    return [];
-  }
-
-  const ownedByName = {};
-  (owned || []).forEach(b => {
-    ownedByName[String(b.badge_name || "").toLowerCase()] = b;
-  });
-
-  const storeByName = {};
-  (storeMeta || []).forEach(b => {
-    storeByName[String(b.badge_name || "").toLowerCase()] = b;
-  });
-
-  const claimByBadgeId = {};
-  (claims || []).forEach(c => {
-    claimByBadgeId[c.badge_id] = c;
-  });
-
-  return (data || [])
-    .map(m => {
-      const key = String(m.badge_name || "").toLowerCase();
-      const ownedBadge = ownedByName[key] || {};
-      const storeBadge = storeByName[key] || {};
-      const claim = claimByBadgeId[storeBadge.id] || {};
-
-      return {
-        ...m,
-        badge_icon: m.badge_icon || ownedBadge.badge_icon || "🏅",
-        earned_at: ownedBadge.earned_at || "",
-        rarity: m.rarity || storeBadge.rarity || "",
-        description: storeBadge.description || "",
-        is_limited: !!storeBadge.is_limited,
-        stock_total: storeBadge.stock_total || null,
-        serial_number: claim.serial_number || null
-      };
-    })
-    .sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
-}
-
-
-function getProfileMedalRarityClass(rarity) {
-  const safe = ["comun","rara","epica","legendaria","exclusiva"].includes(rarity)
-    ? rarity
-    : "";
-  return safe ? `ls-medal-rarity-${safe}` : "";
-}
-
-function getProfileMedalRarityLabel(rarity) {
-  return ({
-    comun:"Común",
-    rara:"Rara",
-    epica:"Épica",
-    legendaria:"Legendaria",
-    exclusiva:"Exclusiva"
-  })[rarity] || "";
-}
-
-function renderEquippedMedalsInline(medals, ownProfile = false) {
-  const safe = Array.isArray(medals) ? medals.slice(0,3) : [];
-  const slots = [];
-
-  for (let i = 1; i <= 3; i++) {
-    const medal = safe.find(m => Number(m.slot_number) === i);
-
-    if (medal) {
-      slots.push(`
-        <button type="button"
-          class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}${Number(medal.slot_number) === 1 ? " ls-medal-favorite" : ""}"
-          title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
-          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}', '${escapeHtml(medal.serial_number || "")}', '${escapeHtml(medal.stock_total || "")}')">
-          ${medal.badge_icon || "🏅"}
-        </button>`);
-    } else if (ownProfile) {
-      slots.push(`<button type="button" class="ls-equipped-medal-slot" title="Espacio libre" onclick="openEquipMedalsPanel()">＋</button>`);
-    }
-  }
-
-  return `
-    <div class="ls-equipped-medals">
-      ${slots.join("")}
-      ${ownProfile ? `<button type="button" onclick="openEquipMedalsPanel()" style="background:none;border:0;color:var(--gold);font-family:inherit;font-size:10px;cursor:pointer;padding:5px 2px;">Editar</button>` : ""}
-    </div>`;
-}
-
-function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "", serialNumber = "", stockTotal = "") {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:350px;">
-        <div class="modal-box-body" style="padding:26px;text-align:center;">
-          <div class="ls-medal-detail-icon">${icon || "🏅"}</div>
-          <h2 style="margin:0 0 6px;">${escapeHtml(name || "Medalla")}</h2>
-          <div style="font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">
-            ${getProfileMedalRarityLabel(rarity) ? `MEDALLA ${getProfileMedalRarityLabel(rarity).toUpperCase()}` : "MEDALLA DE PERFIL"}
-          </div>
-          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
-            ${escapeHtml(description || "Esta medalla forma parte de la identidad pública de este perfil.")}
-          </p>
-          <div class="ls-medal-detail-meta">
-            ${getProfileMedalRarityLabel(rarity) ? `<span class="ls-medal-detail-chip">${getProfileMedalRarityLabel(rarity)}</span>` : ""}
-            ${earnedAt ? `<span class="ls-medal-detail-chip">Obtenida ${new Date(earnedAt).toLocaleDateString("es-AR")}</span>` : ""}
-            ${serialNumber && stockTotal ? `<span class="ls-medal-detail-chip" style="color:var(--gold);border-color:rgba(250,204,21,.25);">LIMITED #${serialNumber}/${stockTotal}</span>` : ""}
-          </div>
-          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function openEquipMedalsPanel() {
-  const badges = window.__myProfileBadges || [];
-  const current = await getEquippedProfileMedals(currentUser.id);
-  const selected = current.map(m => m.badge_name).filter(Boolean);
-
-  window.__selectedProfileMedals = selected.slice(0,3);
-
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:230;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:450px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
-        <div class="modal-box-header">
-          <div>
-            <h2 style="margin:0;">🏅 Tu identidad</h2>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Elegí hasta 3 medallas. La primera queda como tu favorita ★.</div>
-          </div>
-          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
-        </div>
-
-        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-          <div id="medalSelectionCount" style="font-size:11px;color:var(--gold);margin-bottom:8px;">${window.__selectedProfileMedals.length}/3 seleccionadas</div>
-          <div class="ls-favorite-note">★ La medalla que quede primera será tu favorita y tendrá un destaque especial en tu perfil.</div>
-
-          ${badges.length ? `
-            <div class="ls-medal-picker-grid">
-              ${badges.map(b => `
-                <div
-                  class="ls-medal-picker-item ${window.__selectedProfileMedals.includes(b.badge_name) ? "selected" : ""}"
-                  data-medal-name="${escapeHtml(b.badge_name)}"
-                  onclick="toggleProfileMedalSelection(this, '${escapeHtml(b.badge_name)}')">
-                  <div class="ls-medal-picker-icon">${b.badge_icon || "🏅"}</div>
-                  <div class="ls-medal-picker-name">${escapeHtml(b.badge_name)}</div>
-                  <div class="ls-medal-order-row" onclick="event.stopPropagation();">
-                    <button type="button" class="ls-medal-order-btn" title="Mover antes"
-                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', -1)">←</button>
-                    <span class="mono" style="font-size:9px;color:var(--text-dim);" id="medalOrder-${escapeHtml(b.badge_name)}"></span>
-                    <button type="button" class="ls-medal-order-btn" title="Mover después"
-                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', 1)">→</button>
-                  </div>
-                </div>
-              `).join("")}
-            </div>` :
-            `<div style="padding:24px 8px;text-align:center;color:var(--text-dim);font-size:12px;">Todavía no tenés medallas para equipar.</div>`
-          }
-        </div>
-
-        <div class="modal-box-footer" style="display:flex;gap:9px;">
-          <button class="btn-outline" style="flex:1;" onclick="clearProfileMedalSelection()">Quitar todas</button>
-          <button class="btn" style="flex:1;" onclick="saveEquippedProfileMedals()">Guardar</button>
-        </div>
-      </div>
-    </div>`;
-
-  setTimeout(() => refreshProfileMedalOrderUI(), 0);
-}
-
-
-function refreshProfileMedalOrderUI() {
-  const list = window.__selectedProfileMedals || [];
-
-  document.querySelectorAll(".ls-medal-picker-item").forEach(el => {
-    const name = el.dataset.medalName;
-    const idx = list.indexOf(name);
-    el.classList.toggle("selected", idx >= 0);
-
-    const orderEl = el.querySelector("[id^='medalOrder-']");
-    if (orderEl) {
-      orderEl.textContent = idx >= 0 ? (idx === 0 ? "★ 1" : `${idx + 1}`) : "";
-    }
-  });
-
-  const count = document.getElementById("medalSelectionCount");
-  if (count) count.textContent = `${list.length}/3 seleccionadas`;
-}
-
-function moveSelectedProfileMedal(badgeName, direction) {
-  const list = window.__selectedProfileMedals || [];
-  const idx = list.indexOf(badgeName);
-
-  if (idx < 0) {
-    showToast("Primero seleccioná esa medalla");
-    return;
-  }
-
-  const next = idx + Number(direction);
-  if (next < 0 || next >= list.length) return;
-
-  [list[idx], list[next]] = [list[next], list[idx]];
-  window.__selectedProfileMedals = list;
-  refreshProfileMedalOrderUI();
-}
-
-function toggleProfileMedalSelection(button, badgeName) {
-  const list = window.__selectedProfileMedals || [];
-  const idx = list.indexOf(badgeName);
-
-  if (idx >= 0) {
-    list.splice(idx,1);
-    button?.classList.remove("selected");
-  } else {
-    if (list.length >= 3) {
-      showToast("Podés mostrar hasta 3 medallas");
-      return;
-    }
-    list.push(badgeName);
-    button?.classList.add("selected");
-  }
-
-  window.__selectedProfileMedals = list;
-  refreshProfileMedalOrderUI();
-}
-
-function clearProfileMedalSelection() {
-  window.__selectedProfileMedals = [];
-  refreshProfileMedalOrderUI();
-}
-
-async function saveEquippedProfileMedals() {
-  const selected = (window.__selectedProfileMedals || []).slice(0,3);
-
-  const { data, error } = await sb.rpc("set_equipped_profile_badges", {
-    p_badge_names: selected
-  });
-
-  if (error || !data?.ok) {
-    console.error(error || data);
-    showToast("No se pudieron guardar las medallas");
-    return;
-  }
-
-  document.getElementById("globalModalWrap").innerHTML = "";
-  showToast("🏅 Identidad actualizada");
-  renderProfile();
-}
-
 async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
 
-  let videos = null;
-  let error = null;
-
-  if (lsCacheFresh(lsPerfCache.profileVideos, 30000)) {
-    videos = lsPerfCache.profileVideos.data;
-  } else {
-    const result = await sb.from("videos").select("*").eq("user_id", currentUser.id).order("created_at", { ascending:false });
-    videos = result.data;
-    error = result.error;
-    if (!error && videos) lsPerfCache.profileVideos = { data:videos, at:Date.now() };
-  }
+  const { data: videos, error } = await sb
+    .from("videos")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false });
 
   if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${error.message}</p>`; return; }
 
-  let watchedByOther = null;
-  if (lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
-    watchedByOther = lsPerfCache.profileViewsLedger.data;
-  } else {
-    const result = await sb.from("points_ledger").select("amount").eq("user_id", currentUser.id).eq("reason", "watched_by_other");
-    watchedByOther = result.data || [];
-    lsPerfCache.profileViewsLedger = { data:watchedByOther, at:Date.now() };
-  }
+  // Puntos totales generados por ser visto (no incluye el 25 fijo de subir)
+  const { data: watchedByOther } = await sb
+    .from("points_ledger")
+    .select("amount")
+    .eq("user_id", currentUser.id)
+    .eq("reason", "watched_by_other");
 
   const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
 
@@ -5424,7 +1873,6 @@ async function renderProfile() {
     .eq("followed_id", currentUser.id);
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
-  const equippedBadges = await getEquippedProfileMedals(currentUser.id);
 
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
@@ -5451,10 +1899,7 @@ async function renderProfile() {
       <div class="profile-section-head">
         <div class="ico">🏅</div>
         <h3>Medallas</h3>
-        <div class="sub" style="display:flex;gap:9px;align-items:center;">
-          <button onclick="openEquipMedalsPanel()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;">Equipar 3</button>
-          <button onclick="openMyMedalsPanel()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Mi colección →</button>
-        </div>
+        <div class="sub"><button onclick="switchTab('feed')" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver Inicio de Sesión →</button></div>
       </div>
       <div class="form-card">
         <div class="streak-badges">
@@ -5462,35 +1907,6 @@ async function renderProfile() {
         </div>
       </div>
     </div>` : "";
-
-
-  const recentActivity = lsBuildRecentActivity(videos, badges || []);
-  const latestVideo = videos?.[0] || null;
-  const hasFreshActivity = !!(
-    (latestVideo && lsIsWithinHours(latestVideo.created_at, 24)) ||
-    currentProfile.is_live
-  );
-
-  const recentActivityHtml = recentActivity.length ? `
-    <div class="profile-section">
-      <div class="profile-section-head">
-        <div class="ico">⚡</div>
-        <h3>Actividad reciente</h3>
-        <div class="sub">Lo último en tu perfil</div>
-      </div>
-      <div class="form-card ls-recent-activity">
-        ${recentActivity.map(a => `
-          <div class="ls-activity-item">
-            <div class="ls-activity-icon">${a.icon}</div>
-            <div class="ls-activity-copy">
-              <div class="ls-activity-title">${escapeHtml(a.title)}</div>
-              <div class="ls-activity-time">${lsTimeAgo(a.date)}</div>
-            </div>
-          </div>`).join("")}
-      </div>
-    </div>` : "";
-
-  window.__myProfileBadges = badges || [];
 
   const referralSectionHtml = `
     <div class="profile-section">
@@ -5514,12 +1930,6 @@ async function renderProfile() {
 
   window.__profileFeedVideos = videos;
   window.__profileFeedAuthor = { username: currentProfile.username, plan_id: currentProfile.plan_id };
-  window.__profilePinContext = {
-    canPin,
-    pinsUsed,
-    maxPinned: myPlan?.max_pinned_videos || 0,
-    pinnedIds: Array.from(pinnedIds)
-  };
 
   const videosSectionHtml = `
     <div class="profile-section">
@@ -5533,9 +1943,8 @@ async function renderProfile() {
           ${videos.map(v => `
             <div class="video-grid-tile" id="tile-${v.id}">
               ${getGridCoverHtml(v)}
-              ${lsIsWithinHours(v.created_at, 24) ? `<div class="ls-new-video-badge">🔥 NUEVO</div>` : ""}
               ${pinnedIds.has(v.id) ? `<div class="pinned-badge">📌</div>` : ""}
-              <button class="grid-menu-btn" aria-label="Opciones del video" title="Opciones" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
+              <button class="grid-menu-btn" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
               <div class="grid-overlay" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
                 <div class="grid-stats">
                   <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
@@ -5558,82 +1967,33 @@ async function renderProfile() {
     </div>`;
 
   main.innerHTML = `
-    <div class="profile-hero ls-profile-nova" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
-      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
-        style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}'); background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
+    <div class="profile-hero">
+      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner" style="${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}');` : ""}">
         <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
       </div>
-
-      ${currentProfile.profile_side_image_url ? `
-        <div aria-hidden="true" style="
-          position:absolute;
-          left:0;
-          right:0;
-          top:150px;
-          bottom:0;
-          z-index:1;
-          overflow:hidden;
-          pointer-events:none;
-        ">
-          <img
-            src="${escapeHtml(currentProfile.profile_side_image_url)}"
-            alt=""
-            style="
-              position:absolute;
-              inset:0;
-              width:100%;
-              height:100%;
-              object-fit:cover;
-              object-position:center center;
-              opacity:0.42;
-              filter:saturate(0.95) contrast(1.06);
-            "
-          >
-          <div style="
-            position:absolute;
-            inset:0;
-            background:
-              linear-gradient(180deg,
-                rgba(13,16,20,0.16) 0%,
-                rgba(13,16,20,0.28) 48%,
-                rgba(13,16,20,0.72) 100%),
-              linear-gradient(90deg,
-                rgba(13,16,20,0.40) 0%,
-                rgba(13,16,20,0.18) 50%,
-                rgba(13,16,20,0.30) 100%);
-          "></div>
+      <div class="profile-hero-top">
+        <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
+        <div class="profile-name-block">
+          <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
+          <div class="handle">Tu perfil en LiveScroll</div>
         </div>
-      ` : ""}
-
-      <div class="ls-profile-nova-inner" id="lsProfileNovaInner" style="position:relative; z-index:2;">
-        <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
-          <div class="profile-name-block">
-            <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
-            <div class="handle">Tu perfil en LiveScroll</div>
-            ${renderEquippedMedalsInline(equippedBadges, true)}
-          </div>
-        </div>
-        ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
-        ${renderSocialIcons(currentProfile)}
-        <div class="profile-stats-row">
-          <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
-          <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
-          <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
-        </div>
-        <div class="profile-hero-actions">
-          <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
-        </div>
+      </div>
+      ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
+      ${renderSocialIcons(currentProfile)}
+      <div class="profile-stats-row">
+        <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
+        <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
+        <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
+      </div>
+      <div class="profile-hero-actions">
+        <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
       </div>
     </div>
 
-    ${recentActivityHtml}
     ${socialClicksHtml}
     ${streakSectionHtml}
     ${referralSectionHtml}
     ${videosSectionHtml}`;
-
-  initProfileNovaTilt();
 }
 
 async function handleLike(videoId) {
@@ -5648,10 +2008,8 @@ async function handleLike(videoId) {
   }
 
   btn.classList.add("liked");
-  safePulseElement(btn, "ls-like-pop-safe");
   currentProfile.points_balance += data.points;
   updateBalanceUI();
-  showFloatingPointsSafe(data.points, btn);
   showToast(`+${data.points} pt por el like`);
 }
 
@@ -5670,17 +2028,16 @@ async function handleShare(videoId, url) {
   if (error || !data.ok) return; // ya compartido antes, o tope diario: no molestamos con error
   currentProfile.points_balance += data.points;
   updateBalanceUI();
-  showFloatingPointsSafe(data.points);
   showToast(`+${data.points} pts por compartir`);
 }
 
-async function openComments(videoId, focusCommentId = null) {
+async function openComments(videoId) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
       <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; max-height:70dvh; border-radius:20px 20px 0 0; padding:20px; padding-bottom:max(20px, env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
-          <h3 style="margin:0;">💬 Comentarios</h3>
+          <h3 style="margin:0;">Comentarios</h3>
           <button onclick="closeComments()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div id="commentsList" style="overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto; min-height:0; margin-bottom:14px;">Cargando...</div>
@@ -5691,10 +2048,10 @@ async function openComments(videoId, focusCommentId = null) {
       </div>
     </div>`;
 
-  await loadComments(videoId, focusCommentId);
+  await loadComments(videoId);
 }
 
-async function loadComments(videoId, focusCommentId = null) {
+async function loadComments(videoId) {
   const { data: comments } = await sb
     .from("video_comments")
     .select("*, profiles!video_comments_user_id_fkey(username, plan_id)")
@@ -5703,30 +2060,14 @@ async function loadComments(videoId, focusCommentId = null) {
 
   const list = document.getElementById("commentsList");
   if (!list) return;
-
   list.innerHTML = comments && comments.length
     ? comments.map(c => `
-        <div id="comment-${c.id}" style="margin-bottom:10px; padding:10px; font-size:13px; border-radius:10px; transition:background 0.3s ease, border-color 0.3s ease; ${focusCommentId === c.id ? "background:rgba(255,255,255,0.05); border:1px solid var(--gold-dim);" : "border:1px solid transparent;"}">
-          <div>
-            <strong style="color:var(--gold); cursor:pointer;" onclick="closeComments(); viewPublicProfile('${escapeHtml(c.profiles?.username || "")}')">@${escapeHtml(c.profiles?.username || "usuario")}</strong>
-            ${getPlanBadgeHtml(c.profiles?.plan_id)}
-            <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
-          </div>
-          <div style="margin-top:4px; line-height:1.4;">${escapeHtml(c.content)}</div>
+        <div style="margin-bottom:12px; font-size:13px;">
+          <strong style="color:var(--gold);">@${escapeHtml(c.profiles?.username || "usuario")}</strong> ${getPlanBadgeHtml(c.profiles?.plan_id)}
+          <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
+          <div>${escapeHtml(c.content)}</div>
         </div>`).join("")
     : `<p style="color:var(--text-dim); font-size:13px;">Sé el primero en comentar.</p>`;
-
-  if (focusCommentId) {
-    setTimeout(() => {
-      const commentEl = document.getElementById(`comment-${focusCommentId}`);
-      if (!commentEl) return;
-      commentEl.scrollIntoView({ behavior: "smooth", block: "center" });
-      setTimeout(() => {
-        commentEl.style.background = "";
-        commentEl.style.borderColor = "transparent";
-      }, 2500);
-    }, 150);
-  }
 }
 
 async function submitComment(videoId) {
@@ -5744,8 +2085,7 @@ async function submitComment(videoId) {
 }
 
 function closeComments() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
+  document.getElementById("globalModalWrap").innerHTML = "";
 }
 
 function renderAvatarHtml(profile, size) {
@@ -5818,7 +2158,7 @@ async function renderForYou() {
   list.innerHTML = `
     <div class="feed-vertical" id="feedVertical">
       ${videos.map((v, i) => `
-        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+        <div class="feed-item" data-video-id="${v.id}">
           <div class="feed-phone">
             <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
@@ -5841,7 +2181,6 @@ async function renderForYou() {
     </div>`;
 
   setupFeedObserver(videos);
-  fitMobileFeedViewport("feedVertical");
   setupDoubleTapLike();
   setupPullToRefresh(renderForYou);
   setupSwipeNavigation("foryou", { right: "feed" });
@@ -5858,413 +2197,48 @@ let usersDirectorySearchTimeout = null;
 // ============================================================
 // DIRECTOS (usuarios en vivo ahora)
 // ============================================================
-let lsConnectedLiveRefreshTimer = null;
-
-function stopConnectedLiveRefresh() {
-  if (lsConnectedLiveRefreshTimer) {
-    clearInterval(lsConnectedLiveRefreshTimer);
-    lsConnectedLiveRefreshTimer = null;
-  }
-}
-
-function startConnectedLiveRefresh() {
-  stopConnectedLiveRefresh();
-  lsConnectedLiveRefreshTimer = setInterval(() => {
-    if (document.hidden || currentTab !== "directos") return;
-    lsPerfCache.directos = { data:null, at:0 };
-    renderDirectos(lsTabRenderToken);
-  }, 60000);
-}
-
-
-function openObsStreamingSetup() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) {
-    alert("No se encontró el contenedor de ventanas de LiveScroll.");
-    return;
-  }
-
-  wrap.innerHTML = `
-    <div style="
-      position:fixed;
-      inset:0;
-      z-index:99999;
-      background:rgba(0,0,0,.82);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:18px;
-    " onclick="if(event.target===this) closeObsStreamingSetup()">
-
-      <div style="
-        width:min(560px,96vw);
-        max-height:90vh;
-        overflow:auto;
-        background:var(--panel);
-        border:1px solid var(--gold-dim);
-        border-radius:18px;
-        box-shadow:0 20px 70px rgba(0,0,0,.55);
-      ">
-        <div style="
-          display:flex;
-          align-items:center;
-          justify-content:space-between;
-          gap:10px;
-          padding:18px;
-          border-bottom:1px solid var(--border);
-        ">
-          <div>
-            <div style="font-size:19px;font-weight:900;">🎥 Configurar OBS</div>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">LiveScroll 5.8.0 · OBS Streaming</div>
-          </div>
-
-          <button type="button"
-            onclick="closeObsStreamingSetup()"
-            style="
-              width:38px;
-              height:38px;
-              border-radius:50%;
-              border:1px solid var(--border);
-              background:var(--panel-2);
-              color:var(--text);
-              cursor:pointer;
-              font-size:18px;
-            ">✕</button>
-        </div>
-
-        <div style="padding:18px;">
-          <div style="
-            padding:14px;
-            border:1px solid rgba(244,197,66,.28);
-            background:rgba(244,197,66,.06);
-            border-radius:12px;
-            margin-bottom:14px;
-          ">
-            <div style="font-weight:800;margin-bottom:6px;">📡 Transmitir desde OBS</div>
-            <div style="font-size:12px;color:var(--text-dim);line-height:1.55;">
-              Esta sección va a darte los datos privados que OBS necesita para transmitir directamente a LiveScroll.
-            </div>
-          </div>
-
-          <label style="font-size:10px;color:var(--text-dim);">SERVIDOR DE TRANSMISIÓN</label>
-          <div style="display:flex;gap:7px;margin-top:5px;margin-bottom:13px;">
-            <input id="obsServerValue"
-              value="Servidor todavía no conectado"
-              readonly
-              style="flex:1;min-width:0;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
-          </div>
-
-          <label style="font-size:10px;color:var(--text-dim);">STREAM KEY</label>
-          <div style="display:flex;gap:7px;margin-top:5px;">
-            <input id="obsStreamKeyValue"
-              value="Se generará cuando conectemos el servidor"
-              readonly
-              style="flex:1;min-width:0;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:9px;color:var(--text);">
-          </div>
-
-          <div style="
-            margin-top:16px;
-            padding:13px;
-            border:1px solid var(--border);
-            border-radius:12px;
-            background:var(--panel-2);
-          ">
-            <div style="font-size:12px;font-weight:800;margin-bottom:8px;">Cómo se conecta en OBS</div>
-            <div style="font-size:11px;color:var(--text-dim);line-height:1.75;">
-              1. Abrí <b style="color:var(--text);">OBS → Ajustes → Emisión</b>.<br>
-              2. Elegí <b style="color:var(--text);">Servicio personalizado</b>.<br>
-              3. Pegá el servidor de LiveScroll.<br>
-              4. Pegá tu Stream Key privada.<br>
-              5. Tocá <b style="color:var(--text);">Iniciar transmisión</b>.
-            </div>
-          </div>
-
-          <div style="
-            margin-top:13px;
-            padding:11px;
-            border-radius:10px;
-            background:rgba(34,197,94,.06);
-            border:1px solid rgba(34,197,94,.18);
-            color:var(--text-dim);
-            font-size:10px;
-            line-height:1.5;
-          ">
-            🔒 La Stream Key será privada y exclusiva de tu cuenta.
-          </div>
-        </div>
-      </div>
-    </div>`;
-}
-
-function closeObsStreamingSetup() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-}
-
-window.openObsStreamingSetup = openObsStreamingSetup;
-window.closeObsStreamingSetup = closeObsStreamingSetup;
-
-
-function openLocalObsLive() {
-  stopConnectedLiveRefresh();
-
-  const main = document.getElementById("appView");
-  if (!main) return;
-
-  main.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <button class="btn-outline" style="padding:7px 10px;" onclick="renderDirectos()">← Directos</button>
-      <div>
-        <div style="font-size:10px;color:var(--green);font-weight:900;">● EN VIVO · OBS</div>
-        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Prueba HTTPS con MediaMTX</div>
-      </div>
-    </div>
-
-    <div class="ls-live-viewer-layout">
-      <section class="ls-live-video-shell">
-        <div class="ls-live-video-area" style="background:#000;">
-          <iframe
-            src="https://controversial-queen-filter-approach.trycloudflare.com/livescroll/"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowfullscreen
-            scrolling="no"
-            style="display:block;width:100%;height:100%;min-height:520px;border:0;background:#000;"
-          ></iframe>
-        </div>
-
-        <div class="ls-live-details">
-          <div style="display:flex;justify-content:space-between;gap:10px;">
-            <div>
-              <div style="font-size:15px;font-weight:800;">Prueba de transmisión OBS</div>
-              <div style="font-size:10px;color:var(--text-dim);margin-top:5px;">
-                OBS → MediaMTX → LiveScroll
-              </div>
-            </div>
-            <div style="font-size:10px;color:var(--green);">● EN VIVO</div>
-          </div>
-        </div>
-      </section>
-
-      <aside class="ls-live-chat">
-        <div class="ls-live-chat-head">💬 Chat del directo</div>
-        <div class="ls-live-chat-messages" style="display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--text-dim);font-size:11px;">
-          El reproductor OBS ya está conectado.<br><br>
-          En la siguiente etapa vinculamos este directo a tu usuario y al chat real de LiveScroll.
-        </div>
-      </aside>
-    </div>`;
-}
-window.openLocalObsLive = openLocalObsLive;
-
-async function renderDirectos(renderToken = lsTabRenderToken) {
-  startConnectedLiveRefresh();
+async function renderDirectos() {
   const main = document.getElementById("appView");
   main.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
-      <button class="btn" onclick="window.openObsStreamingSetup && window.openObsStreamingSetup()">🎥 Configurar OBS</button>
-    </div>
-    <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
-    <div class="ls-obs-local-test" style="
-      margin:14px 0;
-      padding:14px;
-      border:1px solid rgba(244,197,66,.25);
-      border-radius:14px;
-      background:var(--panel);
-    ">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:900;">🎥 Prueba OBS local</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
-            MediaMTX · Cloudflare HTTPS · ruta livescroll
-          </div>
-        </div>
-        <button class="btn" type="button" onclick="openLocalObsLive()">🔴 Ver directo OBS</button>
-      </div>
-    </div>
+    <h1 class="page-title">🔴 Directos</h1>
+    <p class="page-sub">Creadores de LiveScroll transmitiendo en vivo ahora mismo.</p>
     <div id="directosList">Cargando...</div>`;
 
-  const [ext, studio] = await Promise.allSettled([
-    sb.from("profiles")
-      .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch")
-      .eq("is_live",true)
-      .is("ban_reason",null)
-      .order("live_started_at",{ascending:false}),
-    sb.from("studio_live_sessions")
-      .select("id,user_id,title,started_at,viewer_count,preview_url,profiles!studio_live_sessions_user_id_fkey(id,username,avatar_emoji,avatar_url,plan_id)")
-      .eq("status","live")
-      .order("started_at",{ascending:false})
-  ]);
+  const { data: liveUsers, error } = await sb
+    .from("profiles")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, live_platform, live_started_at, social_kick, social_twitch")
+    .eq("is_live", true)
+    .is("ban_reason", null)
+    .order("live_started_at", { ascending: false });
 
-  const liveUsers = ext.status === "fulfilled" ? (ext.value?.data || []) : [];
-  const studioLives = studio.status === "fulfilled" ? (studio.value?.data || []) : [];
-
-  if (renderToken !== lsTabRenderToken || currentTab !== "directos") return;
   const list = document.getElementById("directosList");
   if (!list) return;
 
-  let html = "";
-
-  if (studioLives.length) {
-    html += `<section class="ls-studio-live-section">
-      <div class="ls-studio-live-head"><h3>📡 EN VIVO DESDE LIVESCROLL STUDIO</h3><span>${studioLives.length} directo${studioLives.length===1?"":"s"}</span></div>
-      ${studioLives.map(s => {
-        const p = s.profiles || {};
-        return `<div class="ls-studio-live-card" onclick="window.openStudioLive ? window.openStudioLive('${s.id}') : openStudioLive('${s.id}')">
-          <div class="ls-studio-live-preview">
-            ${s.preview_url && isSafeUrl(s.preview_url) ? `<img src="${escapeHtml(s.preview_url)}">` : `<div style="font-size:28px;">📡</div>`}
-            <div class="ls-studio-live-chip">EN VIVO</div>
-          </div>
-          <div>
-            <div class="ls-studio-live-title">${escapeHtml(s.title || "Directo en LiveScroll")}</div>
-            <div class="ls-studio-live-user">@${escapeHtml(p.username || "usuario")} ${getPlanBadgeHtml(p.plan_id)}</div>
-            <div class="ls-studio-live-meta">LiveScroll Studio · ${Number(s.viewer_count || 0)} viendo</div>
-          </div>
-          <div class="ls-studio-live-open">Entrar →</div>
-        </div>`;
-      }).join("")}
-    </section>`;
-  }
-
-  if (liveUsers.length) {
-    html += `<section>
-      <div class="ls-studio-live-head"><h3>🌐 DIRECTOS EXTERNOS</h3><span>Kick / Twitch</span></div>
-      ${liveUsers.map(u => {
-        const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
-        const watchButtons = [
-          (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
-            ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
-          (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
-            ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : ""
-        ].join("");
-        return `<div class="directo-card">
-          <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>
-          <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
-            <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
-            <div class="plat">${platformLabel} · en vivo</div>
-          </div>
-          <div style="display:flex;flex-direction:column;gap:6px;">${watchButtons}</div>
-        </div>`;
-      }).join("")}
-    </section>`;
-  }
-
-  if (!studioLives.length && !liveUsers.length) {
-    html = `<p style="color:var(--text-dim);font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
-  }
-
-  list.innerHTML = html;
-}
-
-let lsStudioChatChannel = null;
-
-function stopStudioLiveChat() {
-  if (lsStudioChatChannel) {
-    sb.removeChannel(lsStudioChatChannel);
-    lsStudioChatChannel = null;
-  }
-}
-
-function renderStudioChatMessage(m) {
-  return `<div class="ls-live-chat-message"><b>@${escapeHtml(m.profiles?.username || "usuario")}</b>${escapeHtml(m.message || "")}</div>`;
-}
-
-async function openStudioLive(sessionId) {
-  stopConnectedLiveRefresh();
-  stopStudioLiveChat();
-
-  const main = document.getElementById("appView");
-  main.innerHTML = `<p>Cargando directo...</p>`;
-
-  const [{data:session,error},{data:messages}] = await Promise.all([
-    sb.from("studio_live_sessions")
-      .select("id,user_id,title,status,started_at,viewer_count,playback_url,profiles!studio_live_sessions_user_id_fkey(id,username,avatar_emoji,avatar_url,plan_id)")
-      .eq("id",sessionId).single(),
-    sb.from("studio_live_chat_messages")
-      .select("id,user_id,message,created_at,profiles!studio_live_chat_messages_user_id_fkey(username)")
-      .eq("session_id",sessionId).order("created_at",{ascending:true}).limit(100)
-  ]);
-
-  if (error || !session) {
-    main.innerHTML = `<button class="btn-outline" onclick="renderDirectos()">← Volver a Directos</button><p class="error-msg" style="margin-top:14px;">Este directo ya no está disponible.</p>`;
+  if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar quién está en vivo.</p>`; return; }
+  if (!liveUsers || !liveUsers.length) {
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
     return;
   }
 
-  const p = session.profiles || {};
-  main.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <button class="btn-outline" style="padding:7px 10px;" onclick="stopStudioLiveChat();renderDirectos()">← Directos</button>
-      <div><div style="font-size:10px;color:var(--green);font-weight:900;">● EN VIVO · LIVESCROLL STUDIO</div><div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Experiencia interna de LiveScroll</div></div>
-    </div>
-
-    <div class="ls-live-viewer-layout">
-      <section class="ls-live-video-shell">
-        <div class="ls-live-video-area">
-          ${session.playback_url && isSafeUrl(session.playback_url)
-            ? `<iframe
-                src="${escapeHtml(session.playback_url)}"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowfullscreen
-                scrolling="no"
-                style="width:100%;height:100%;border:0;background:#000;"
-              ></iframe>`
-            : `<div class="ls-live-video-placeholder"><div class="ico">📡</div><strong>La señal de LiveScroll Studio aparecerá acá.</strong><div>El reproductor ya está preparado para recibir el stream.</div></div>`}
-        </div>
-        <div class="ls-live-details">
-          <div style="display:flex;justify-content:space-between;gap:10px;">
-            <div>
-              <div style="font-size:15px;font-weight:800;">${escapeHtml(session.title || "Directo en LiveScroll")}</div>
-              <div style="font-size:10px;color:var(--text-dim);margin-top:5px;cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(p.username || "")}')">@${escapeHtml(p.username || "usuario")} ${getPlanBadgeHtml(p.plan_id)}</div>
-            </div>
-            <div style="font-size:10px;color:var(--green);">${Number(session.viewer_count || 0)} viendo</div>
-          </div>
-        </div>
-      </section>
-
-      <aside class="ls-live-chat">
-        <div class="ls-live-chat-head">💬 Chat del directo</div>
-        <div class="ls-live-chat-messages" id="studioLiveChatMessages">${(messages || []).map(renderStudioChatMessage).join("")}</div>
-        <form class="ls-live-chat-form" onsubmit="sendStudioLiveChat(event,'${session.id}')">
-          <input id="studioLiveChatInput" maxlength="220" placeholder="Escribí un mensaje..." autocomplete="off">
-          <button class="btn" type="submit">Enviar</button>
-        </form>
-      </aside>
+  list.innerHTML = liveUsers.map(u => {
+    const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+    const watchButtons = [
+      (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
+        ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
+      (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
+        ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : "",
+    ].join("");
+    return `
+    <div class="directo-card">
+      <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u, 52)}</div>
+      <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
+        <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="plat">${platformLabel} · en vivo</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">${watchButtons}</div>
     </div>`;
-
-  const box = document.getElementById("studioLiveChatMessages");
-  if (box) box.scrollTop = box.scrollHeight;
-
-  lsStudioChatChannel = sb.channel(`studio-live-chat-${session.id}`)
-    .on("postgres_changes",{event:"INSERT",schema:"public",table:"studio_live_chat_messages",filter:`session_id=eq.${session.id}`},async payload => {
-      const {data} = await sb.from("studio_live_chat_messages")
-        .select("id,user_id,message,created_at,profiles!studio_live_chat_messages_user_id_fkey(username)")
-        .eq("id",payload.new.id).single();
-      const target = document.getElementById("studioLiveChatMessages");
-      if (target && data) {
-        target.insertAdjacentHTML("beforeend",renderStudioChatMessage(data));
-        target.scrollTop = target.scrollHeight;
-      }
-    }).subscribe();
+  }).join("");
 }
-
-async function sendStudioLiveChat(event,sessionId) {
-  event.preventDefault();
-  const input = document.getElementById("studioLiveChatInput");
-  const message = input?.value.trim() || "";
-  if (!message) return;
-
-  input.disabled = true;
-  const {data,error} = await sb.rpc("send_studio_live_chat_message",{p_session_id:sessionId,p_message:message});
-  input.disabled = false;
-
-  if (error || !data?.ok) {
-    showToast("No se pudo enviar el mensaje");
-    return;
-  }
-  input.value = "";
-  input.focus();
-}
-
 
 async function renderUsersDirectory() {
   const main = document.getElementById("appView");
@@ -6318,311 +2292,6 @@ async function loadUsersDirectory(term) {
     </div>`).join("");
 }
 
-
-
-function openEmojiDetail(name, emoji, rarity = "", obtainedAt = "", serialNumber = "", stockTotal = "") {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  const rarityLabel = rarity ? getProfileMedalRarityLabel(rarity) : "Emoji";
-  const rarityClass = rarity ? getProfileMedalRarityClass(rarity) : "";
-
-  const rarityColor =
-    rarity === "rara" ? "#7dd3fc" :
-    rarity === "epica" ? "#c084fc" :
-    rarity === "legendaria" ? "#fbbf24" :
-    rarity === "exclusiva" ? "#fb7185" :
-    rarity === "comun" ? "#cbd5e1" :
-    "var(--text-dim)";
-
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) openMyMedalsPanel()">
-      <div class="modal-box" style="max-width:390px;text-align:center;overflow:hidden;">
-        <div style="position:relative;padding:28px 22px 20px;background:
-          radial-gradient(circle at 50% 15%, ${rarityColor}18, transparent 48%),
-          var(--panel);">
-
-          <button type="button" onclick="openMyMedalsPanel()"
-            style="position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:17px;cursor:pointer;">✕</button>
-
-          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--text-dim);margin-bottom:17px;">
-            LIVESCROLL · COLLECTION
-          </div>
-
-          <div class="ls-equipped-medal ${rarityClass}"
-            style="width:92px;height:92px;margin:0 auto 15px;font-size:52px;pointer-events:none;">
-            ${emoji}
-          </div>
-
-          <h2 style="margin:0;font-size:22px;">${escapeHtml(name || "Emoji")}</h2>
-
-          <div style="font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:${rarityColor};margin-top:7px;">
-            ${escapeHtml(rarityLabel)}
-          </div>
-
-          ${serialNumber && stockTotal ? `
-            <div style="display:inline-flex;margin-top:13px;padding:6px 10px;border-radius:999px;border:1px solid rgba(250,204,21,.25);background:rgba(250,204,21,.05);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;color:var(--gold);">
-              LIMITED #${serialNumber}/${stockTotal}
-            </div>` : ""}
-
-          <div style="margin:18px auto 0;max-width:290px;padding:12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--border);">
-            <div style="font-size:11px;color:var(--text-dim);line-height:1.55;">
-              Emoji desbloqueado para usar en tu perfil de LiveScroll.
-            </div>
-            ${obtainedAt ? `
-              <div style="font-size:10px;color:var(--text-dim);margin-top:8px;">
-                Obtenido el ${new Date(obtainedAt).toLocaleDateString("es-AR")}
-              </div>` : ""}
-          </div>
-        </div>
-
-        <div style="padding:0 22px 22px;">
-          <button class="btn-outline" style="width:100%;" onclick="openMyMedalsPanel()">Volver a Mi colección</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function openMyMedalsPanel() {
-  const badges = window.__myProfileBadges || [];
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  const [
-    { data: storeBadges },
-    equipped,
-    { data: badgeClaims },
-    { data: unlockedEmojis },
-    { data: storeEmojis },
-    { data: emojiClaims }
-  ] = await Promise.all([
-    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
-    getEquippedProfileMedals(currentUser.id),
-    sb.from("user_store_badge_claims").select("badge_id,serial_number,claimed_at").eq("user_id", currentUser.id),
-    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
-    sb.from("store_emojis").select("id,emoji,name,rarity,is_limited,stock_total"),
-    sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id)
-  ]);
-
-  const storeBadgeByName = {};
-  (storeBadges || []).forEach(b => {
-    storeBadgeByName[String(b.badge_name || "").toLowerCase()] = b;
-  });
-
-  const badgeClaimById = {};
-  (badgeClaims || []).forEach(c => { badgeClaimById[c.badge_id] = c; });
-
-  const equippedSet = new Set((equipped || []).map(b => b.badge_name));
-
-  const normalizedBadges = badges.map(b => {
-    const meta = storeBadgeByName[String(b.badge_name || "").toLowerCase()] || {};
-    const claim = badgeClaimById[meta.id] || {};
-    return {
-      type:"badge",
-      icon:b.badge_icon || "🏅",
-      name:b.badge_name || "Medalla",
-      rarity:meta.rarity || null,
-      description:meta.description || "",
-      is_limited:!!meta.is_limited,
-      stock_total:meta.stock_total || null,
-      serial_number:claim.serial_number || null,
-      obtained_at:claim.claimed_at || b.earned_at || null,
-      equipped:equippedSet.has(b.badge_name)
-    };
-  });
-
-  const emojiMetaByChar = {};
-  (storeEmojis || []).forEach(e => { emojiMetaByChar[e.emoji] = e; });
-
-  const emojiClaimById = {};
-  (emojiClaims || []).forEach(c => { emojiClaimById[c.emoji_id] = c; });
-
-  const normalizedEmojis = (unlockedEmojis || []).map(e => {
-    const meta = emojiMetaByChar[e.emoji] || {};
-    const claim = emojiClaimById[meta.id] || {};
-    return {
-      type:"emoji",
-      icon:e.emoji,
-      name:meta.name || "Emoji",
-      rarity:meta.rarity || null,
-      description:"Emoji desbloqueado para usar en tu perfil.",
-      is_limited:!!meta.is_limited,
-      stock_total:meta.stock_total || null,
-      serial_number:claim.serial_number || null,
-      obtained_at:claim.claimed_at || null,
-      equipped:false
-    };
-  });
-
-  window.__collection568Items = [...normalizedBadges, ...normalizedEmojis];
-  // La colección se reconstruye desde Supabase cada vez que se abre,
-  // evitando mostrar stock/seriales viejos después de una compra.
-  window.__collection568Filter = "all";
-  window.__collection568Sort = "rarity";
-
-  const allItems = window.__collection568Items;
-
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
-      <div class="modal-box" style="max-width:520px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
-        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
-            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
-              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${normalizedBadges.length} medallas · ${normalizedEmojis.length} emojis
-            </div>
-          </div>
-          <button type="button" onclick="closeManagedModal()"
-            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
-        </div>
-
-        <div class="modal-box-body" style="overflow-y:auto;">
-          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
-            <button class="btn-outline ls-collection-filter active" data-filter="all" onclick="setCollection568Filter('all',this)" style="padding:6px 9px;font-size:10px;">Todos</button>
-            <button class="btn-outline ls-collection-filter" data-filter="badge" onclick="setCollection568Filter('badge',this)" style="padding:6px 9px;font-size:10px;">Medallas</button>
-            <button class="btn-outline ls-collection-filter" data-filter="emoji" onclick="setCollection568Filter('emoji',this)" style="padding:6px 9px;font-size:10px;">Emojis</button>
-            <button class="btn-outline ls-collection-filter" data-filter="limited" onclick="setCollection568Filter('limited',this)" style="padding:6px 9px;font-size:10px;">Limitados</button>
-            <button class="btn-outline ls-collection-filter" data-filter="top" onclick="setCollection568Filter('top',this)" style="padding:6px 9px;font-size:10px;">Legendarios+</button>
-          </div>
-
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
-            <select id="collection568Sort" onchange="setCollection568Sort(this.value)"
-              style="padding:8px 10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:10px;">
-              <option value="rarity">Más raros</option>
-              <option value="newest">Más nuevos</option>
-              <option value="serial">Nº de edición</option>
-              <option value="name">Nombre A-Z</option>
-            </select>
-
-            <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
-          </div>
-
-          <div id="collection568Summary" style="font-size:10px;color:var(--text-dim);margin-bottom:10px;"></div>
-          <div id="collection568Grid"></div>
-        </div>
-      </div>
-    </div>`;
-
-  renderCollection568Grid();
-}
-
-function setCollection568Filter(filter, button) {
-  window.__collection568Filter = filter || "all";
-
-  document.querySelectorAll(".ls-collection-filter").forEach(btn => {
-    btn.classList.toggle("active", btn === button);
-    btn.style.borderColor = btn === button ? "var(--gold)" : "";
-    btn.style.color = btn === button ? "var(--gold)" : "";
-  });
-
-  renderCollection568Grid();
-}
-
-function setCollection568Sort(sort) {
-  window.__collection568Sort = sort || "rarity";
-  renderCollection568Grid();
-}
-
-function renderCollection568Grid() {
-  const grid = document.getElementById("collection568Grid");
-  const summary = document.getElementById("collection568Summary");
-  if (!grid) return;
-
-  const rarityRank = { exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
-  const filter = window.__collection568Filter || "all";
-  const sort = window.__collection568Sort || "rarity";
-
-  let items = [...(window.__collection568Items || [])];
-
-  if (filter === "badge") items = items.filter(i => i.type === "badge");
-  if (filter === "emoji") items = items.filter(i => i.type === "emoji");
-  if (filter === "limited") items = items.filter(i => i.is_limited);
-  if (filter === "top") items = items.filter(i => ["legendaria","exclusiva"].includes(i.rarity));
-
-  if (sort === "rarity") {
-    items.sort((a,b) => {
-      const rarityDiff=(rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
-      if (rarityDiff) return rarityDiff;
-      return new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0);
-    });
-  }
-
-  if (sort === "newest") {
-    items.sort((a,b) => new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0));
-  }
-
-  if (sort === "serial") {
-    items.sort((a,b) => {
-      const aHas = Number.isFinite(Number(a.serial_number)) && Number(a.serial_number) > 0;
-      const bHas = Number.isFinite(Number(b.serial_number)) && Number(b.serial_number) > 0;
-      if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
-      if (aHas && bHas) return Number(a.serial_number)-Number(b.serial_number);
-      return (rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
-    });
-  }
-
-  if (sort === "name") {
-    items.sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
-  }
-
-  if (summary) {
-    const labels = {
-      all:"Todos",
-      badge:"Medallas",
-      emoji:"Emojis",
-      limited:"Limitados",
-      top:"Legendarios y exclusivos"
-    };
-    summary.textContent = `${labels[filter] || "Todos"} · ${items.length} resultado${items.length===1?"":"s"}`;
-  }
-
-  if (!items.length) {
-    grid.innerHTML = `
-      <div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:12px;">
-        <div style="font-size:36px;margin-bottom:8px;">💎</div>
-        No hay objetos que coincidan con este filtro.
-      </div>`;
-    return;
-  }
-
-  const renderItem = (item) => {
-    const rarityClass=item.rarity ? getProfileMedalRarityClass(item.rarity) : "";
-    const rarityLabel=item.rarity ? getProfileMedalRarityLabel(item.rarity) : (item.type==="emoji" ? "Emoji" : "Logro");
-    const rarityColor =
-      item.rarity === "rara" ? "#7dd3fc" :
-      item.rarity === "epica" ? "#c084fc" :
-      item.rarity === "legendaria" ? "#fbbf24" :
-      item.rarity === "exclusiva" ? "#fb7185" :
-      item.rarity === "comun" ? "#cbd5e1" :
-      "var(--text-dim)";
-
-    const onclick = item.type === "badge"
-      ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
-      : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
-
-    return `
-      <button type="button" onclick="${onclick}"
-        style="position:relative;background:var(--panel-2);border:1px solid ${item.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
-        ${item.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
-        <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
-          ${item.icon}
-        </div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(item.name)}</div>
-        <div style="font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${rarityColor};margin-top:5px;">
-          ${escapeHtml(rarityLabel)}
-        </div>
-        ${item.serial_number && item.stock_total ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);font-weight:900;margin-top:5px;">LIMITED #${item.serial_number}/${item.stock_total}</div>` : ""}
-        ${item.obtained_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(item.obtained_at).toLocaleDateString("es-AR")}</div>` : ""}
-      </button>`;
-  };
-
-  grid.innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
-      ${items.map(renderItem).join("")}
-    </div>`;
-}
-
 async function viewPublicProfile(username) {
   if (!username) return;
   if (username === currentProfile.username) { switchTab("profile"); return; }
@@ -6634,7 +2303,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -6662,43 +2331,27 @@ async function viewPublicProfile(username) {
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
   const isFollowing = !!amIFollowing;
-  const theirEquippedBadges = await getEquippedProfileMedals(profile.id);
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
-    <div class="profile-hero" style="position:relative; overflow:hidden;">
-      <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
-        style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}'); background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}">
+    <div class="profile-hero">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
+      <div class="profile-hero-top">
+        <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+        <div class="profile-name-block">
+          <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+          <div class="handle">Perfil público</div>
+        </div>
       </div>
-
-      ${profile.profile_side_image_url ? `
-        <div aria-hidden="true" style="position:absolute;left:0;right:0;top:150px;bottom:0;z-index:1;overflow:hidden;pointer-events:none;">
-          <img src="${escapeHtml(profile.profile_side_image_url)}" alt=""
-            style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;opacity:.42;filter:saturate(.95) contrast(1.06);">
-          <div style="position:absolute;inset:0;background:
-            linear-gradient(180deg,rgba(13,16,20,.16) 0%,rgba(13,16,20,.28) 48%,rgba(13,16,20,.72) 100%),
-            linear-gradient(90deg,rgba(13,16,20,.40) 0%,rgba(13,16,20,.18) 50%,rgba(13,16,20,.30) 100%);"></div>
-        </div>` : ""}
-
-      <div style="position:relative;z-index:2;">
-        <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
-          <div class="profile-name-block">
-            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-            <div class="handle">Perfil público</div>
-            ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
-          </div>
-        </div>
-        ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
-        ${renderSocialIcons(profile)}
-        <div class="profile-stats-row">
-          <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
-          <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
-        </div>
-        <div class="profile-hero-actions">
-          <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
-        </div>
+      ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
+      ${renderSocialIcons(profile)}
+      <div class="profile-stats-row">
+        <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
+        <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
+      </div>
+      <div class="profile-hero-actions">
+        <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
       </div>
     </div>
 
@@ -6784,105 +2437,22 @@ async function submitReport(videoId, reason) {
 }
 
 let notifCache = [];
-let notifRealtimeChannel = null;
-
-function getNotificationIcon(type) {
-  const icons = { like: "❤️", comment: "💬", follow: "👤", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
-  return icons[type] || "🔔";
-}
-
-function updateNotificationBadge() {
-  const unread = notifCache.filter(n => !n.read).length;
-  const badge = document.getElementById("notifBadge");
-  if (!badge) return;
-  if (unread > 0) {
-    badge.textContent = unread > 99 ? "99+" : unread;
-    badge.classList.remove("hidden");
-  } else {
-    badge.textContent = "";
-    badge.classList.add("hidden");
-  }
-}
 
 async function loadNotifications() {
-  if (!currentUser) return;
-  const { data, error } = await sb
+  const { data } = await sb
     .from("notifications")
     .select("*")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false })
-    .limit(30);
-
-  if (error) {
-    console.error("Error cargando notificaciones:", error);
-    return;
-  }
+    .limit(20);
 
   notifCache = data || [];
-  updateNotificationBadge();
-  if (document.getElementById("notifPanel")) renderNotificationPanelContent();
-}
-
-function subscribeToNotifications() {
-  if (!currentUser) return;
-  if (notifRealtimeChannel) {
-    sb.removeChannel(notifRealtimeChannel);
-    notifRealtimeChannel = null;
+  const unread = notifCache.filter(n => !n.read).length;
+  const badge = document.getElementById("notifBadge");
+  if (badge) {
+    if (unread > 0) { badge.textContent = unread; badge.classList.remove("hidden"); }
+    else { badge.classList.add("hidden"); }
   }
-
-  notifRealtimeChannel = sb
-    .channel(`notifications-${currentUser.id}`)
-    .on("postgres_changes", {
-      event: "INSERT",
-      schema: "public",
-      table: "notifications",
-      filter: `user_id=eq.${currentUser.id}`
-    }, payload => {
-      const notification = payload.new;
-      if (!notifCache.some(n => n.id === notification.id)) notifCache.unshift(notification);
-      notifCache = notifCache.slice(0, 30);
-      updateNotificationBadge();
-      if (document.getElementById("notifPanel")) renderNotificationPanelContent();
-      showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
-    })
-    .subscribe(status => {
-      if (status === "SUBSCRIBED") console.log("Notificaciones Realtime conectadas");
-    });
-}
-
-function renderNotificationPanelContent() {
-  const list = document.getElementById("notifPanelList");
-  if (!list) return;
-  if (!notifCache.length) {
-    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;padding:18px 10px;text-align:center;">Sin notificaciones todavía.</p>`;
-    return;
-  }
-
-  list.innerHTML = notifCache.map(n => {
-    const clickable = n.video_id || n.actor_id || n.comment_id;
-    return `
-      <div onclick="${clickable ? `handleNotificationClick('${n.id}')` : ""}" style="display:flex;gap:10px;padding:11px 8px;border-bottom:1px solid var(--border);font-size:13px;cursor:${clickable ? "pointer" : "default"};border-radius:8px;transition:background 0.15s ease;${n.read ? "opacity:0.62;" : "background:rgba(255,255,255,0.025);"}">
-        <div style="font-size:20px;width:28px;flex-shrink:0;text-align:center;padding-top:1px;">${getNotificationIcon(n.type)}</div>
-        <div style="min-width:0;flex:1;">
-          <div style="color:var(--text);line-height:1.35;">${escapeHtml(n.message || "Nueva notificación")}</div>
-          <div style="color:var(--text-dim);font-size:10px;margin-top:4px;">${formatNotificationTime(n.created_at)}${clickable ? " · Tocá para ver" : ""}</div>
-        </div>
-        ${!n.read ? `<div style="width:7px;height:7px;border-radius:50%;background:var(--gold);margin-top:7px;flex-shrink:0;"></div>` : ""}
-      </div>`;
-  }).join("");
-}
-
-function formatNotificationTime(dateString) {
-  const date = new Date(dateString);
-  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (diffSeconds < 60) return "Ahora";
-  const minutes = Math.floor(diffSeconds / 60);
-  if (minutes < 60) return `Hace ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Hace ${hours} h`;
-  const days = Math.floor(hours / 24);
-  if (days <= 7) return `Hace ${days} d`;
-  return date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 function toggleNotifPanel() {
@@ -6891,20 +2461,21 @@ function toggleNotifPanel() {
 
   const panel = document.createElement("div");
   panel.id = "notifPanel";
-  panel.style.cssText = "position:absolute;top:60px;right:20px;width:min(360px, calc(100vw - 24px));max-height:480px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px;z-index:160;box-shadow:0 14px 40px rgba(0,0,0,0.55);";
+  panel.style.cssText = "position:absolute; top:60px; right:20px; width:300px; max-height:400px; overflow-y:auto; background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:12px; z-index:60; box-shadow:0 10px 30px rgba(0,0,0,0.5);";
   panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;padding:3px 5px 8px;border-bottom:1px solid var(--border);">
-      <div><strong style="font-size:14px;">🔔 Notificaciones</strong><div style="color:var(--text-dim);font-size:10px;margin-top:2px;">Actividad reciente</div></div>
-      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:4px 7px;">✕</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding:0 2px;">
+      <strong style="font-size:14px;">Notificaciones</strong>
+      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none; border:none; color:var(--text-dim); font-size:18px; cursor:pointer; line-height:1; padding:2px 4px;">✕</button>
     </div>
-    <div id="notifPanelList" style="max-height:400px;overflow-y:auto;padding-right:2px;"></div>`;
-  document.body.appendChild(panel);
-  renderNotificationPanelContent();
+    ${notifCache.length
+      ? notifCache.map(n => `
+          <div style="padding:10px; border-bottom:1px solid var(--border); font-size:13px; ${n.read ? "opacity:0.5;" : ""}">
+            <div>${escapeHtml(n.message)}</div>
+            <div style="color:var(--text-dim); font-size:11px; margin-top:2px;">${new Date(n.created_at).toLocaleString("es-AR")}</div>
+          </div>`).join("")
+      : `<p style="color:var(--text-dim); font-size:13px; padding:10px;">Sin notificaciones todavía.</p>`}`;
 
-  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
-    notifCache = notifCache.map(n => ({ ...n, read: true }));
-    updateNotificationBadge();
-  });
+  document.body.appendChild(panel);
 
   setTimeout(() => {
     document.addEventListener("click", function closeOnOutsideClick(e) {
@@ -6916,35 +2487,12 @@ function toggleNotifPanel() {
       }
     });
   }, 0);
+
+  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
+    document.getElementById("notifBadge")?.classList.add("hidden");
+  });
 }
 
-async function handleNotificationClick(notificationId) {
-  const notification = notifCache.find(n => n.id === notificationId);
-  if (!notification) return;
-  document.getElementById("notifPanel")?.remove();
-  notification.read = true;
-  updateNotificationBadge();
-
-  if (notification.type === "comment" && notification.video_id) {
-    await openComments(notification.video_id, notification.comment_id || null);
-    return;
-  }
-  if (notification.type === "like" && notification.video_id) {
-    await openSharedVideo(notification.video_id);
-    return;
-  }
-  if (notification.type === "follow" && notification.actor_id) {
-    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
-    if (!actor?.username) { showToast("Ese perfil ya no está disponible"); return; }
-    await viewPublicProfile(actor.username);
-    return;
-  }
-  if (notification.video_id) { await openSharedVideo(notification.video_id); return; }
-  if (notification.actor_id) {
-    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
-    if (actor?.username) await viewPublicProfile(actor.username);
-  }
-}
 
 function copyReferralLink() {
   const input = document.getElementById("referralLinkInput");
@@ -6963,15 +2511,10 @@ async function openEditProfile() {
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeManagedModal()">
-      <div class="modal-box ls-profile-edit-modal" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
-        <div class="modal-box-header ls-profile-edit-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
-          <h2 style="font-size:19px;margin:0;">Editar perfil</h2>
-          <button type="button" onclick="closeManagedModal()"
-            aria-label="Cerrar"
-            style="width:40px;height:40px;min-width:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
-        </div>
-        <div class="modal-box-body ls-profile-edit-body" style="overflow-y:auto;min-height:0;">
+    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) this.remove()">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-header"><h2 style="font-size:19px;">Editar perfil</h2></div>
+        <div class="modal-box-body">
         <div class="field" style="text-align:center;">
           <label>Foto de perfil</label>
           <div style="margin-bottom:10px;">
@@ -6985,75 +2528,11 @@ async function openEditProfile() {
         </div>
         <div class="field">
           <label>Portada del perfil</label>
-          <div id="coverPositionPreview"
-            style="border-radius:10px;overflow:hidden;height:105px;background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center ${Number(currentProfile.cover_position_y ?? 50)}%/cover no-repeat` : "var(--panel-2)"};margin-bottom:10px;border:1px solid var(--border);">
-          </div>
-
-          ${currentProfile.cover_url ? `
-            <div style="margin-bottom:12px;">
-              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px;">
-                <span style="font-size:11px;color:var(--text-dim);">Acomodar imagen</span>
-                <span id="coverPositionValue" class="mono" style="font-size:10px;color:var(--gold);">${Number(currentProfile.cover_position_y ?? 50)}%</span>
-              </div>
-              <input type="range" id="coverPositionRange" min="0" max="100" step="1"
-                value="${Number(currentProfile.cover_position_y ?? 50)}"
-                oninput="previewCoverPosition(this.value)"
-                style="width:100%;">
-              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;"><span>Arriba</span><span>Abajo</span></div>
-            </div>` : ""}
-
+          <div style="border-radius:10px; overflow:hidden; height:70px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
           <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
-          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Después podés elegir qué parte de la foto se ve.</div>
+          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Se ve mejor en formato horizontal (ancha).</div>
           ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
         </div>
-        <div class="field">
-          <label>Imagen de fondo del perfil</label>
-          <div style="
-            position:relative;
-            height:150px;
-            border-radius:12px;
-            overflow:hidden;
-            background:var(--panel-2);
-            margin-bottom:10px;
-            border:1px solid var(--border);
-          ">
-            ${currentProfile.profile_side_image_url
-              ? `
-                <img
-                  src="${escapeHtml(currentProfile.profile_side_image_url)}"
-                  alt="Fondo decorativo"
-                  style="
-                    width:100%;
-                    height:100%;
-                    object-fit:cover;
-                    object-position:center top;
-                    opacity:0.55;
-                  "
-                >
-                <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(13,16,20,.9), rgba(13,16,20,.2));"></div>
-                <div style="position:absolute; left:12px; bottom:10px; font-size:12px; color:#fff; font-weight:600;">Vista previa · queda detrás del contenido</div>
-              `
-              : `
-                <div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:12px; text-align:center; padding:16px;">
-                  Subí una imagen vertical o temática.<br>Se mostrará detrás del contenido, no reemplaza la portada.
-                </div>
-              `}
-          </div>
-          <input
-            type="file"
-            id="profileSideImageInput"
-            accept="image/*"
-            onchange="handleProfileSideImageUpload()"
-            style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;"
-          >
-          <div id="profileSideImageStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">
-            Máximo 5MB. Recomendado: imagen vertical. Se usa como fondo decorativo en segundo plano.
-          </div>
-          ${currentProfile.profile_side_image_url
-            ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveProfileSideImage()">🗑️ Quitar imagen de fondo</button>`
-            : ""}
-        </div>
-
         <div class="field">
           <label>Avatar (si no tenés foto)</label>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -7083,9 +2562,9 @@ async function openEditProfile() {
           <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
         </div>
         </div>
-        <div class="modal-box-footer ls-profile-edit-footer" style="display:flex;gap:10px;position:sticky;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--border);">
-          <button class="btn-outline" style="flex:1;min-height:48px;" onclick="closeManagedModal()">Cancelar</button>
-          <button class="btn" style="flex:1;min-height:48px;" onclick="saveProfileEdits()">Guardar</button>
+        <div class="modal-box-footer" style="display:flex; gap:10px;">
+          <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="saveProfileEdits()">Guardar</button>
         </div>
       </div>
     </div>`;
@@ -7163,18 +2642,6 @@ async function handleRemoveAvatarPhoto() {
   openEditProfile();
 }
 
-
-function previewCoverPosition(value) {
-  const y = Math.max(0, Math.min(100, Number(value) || 50));
-  const preview = document.getElementById("coverPositionPreview");
-  const label = document.getElementById("coverPositionValue");
-
-  if (preview && currentProfile.cover_url) {
-    preview.style.backgroundPosition = `center ${y}%`;
-  }
-  if (label) label.textContent = `${y}%`;
-}
-
 async function handleCoverPhotoUpload() {
   const fileInput = document.getElementById("coverPhotoInput");
   const file = fileInput.files[0];
@@ -7196,12 +2663,11 @@ async function handleCoverPhotoUpload() {
   const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
   const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
 
-  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl, cover_position_y: 50 }).eq("id", currentUser.id);
+  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl }).eq("id", currentUser.id);
   if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
 
   currentProfile.cover_url = freshUrl;
-  currentProfile.cover_position_y = 50;
-  showToast("¡Portada actualizada! Ahora podés acomodarla.");
+  showToast("¡Portada actualizada!");
   openEditProfile();
 }
 
@@ -7210,76 +2676,6 @@ async function handleRemoveCoverPhoto() {
   if (error) { showToast("No se pudo quitar la portada"); return; }
   currentProfile.cover_url = null;
   showToast("Portada quitada");
-  openEditProfile();
-}
-
-
-async function handleProfileSideImageUpload() {
-  const fileInput = document.getElementById("profileSideImageInput");
-  const file = fileInput?.files?.[0];
-  const statusEl = document.getElementById("profileSideImageStatus");
-  if (!file || !statusEl) return;
-
-  if (!file.type.startsWith("image/")) {
-    statusEl.textContent = "Tiene que ser una imagen.";
-    statusEl.style.color = "var(--red)";
-    return;
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    statusEl.textContent = "El archivo supera los 5MB.";
-    statusEl.style.color = "var(--red)";
-    return;
-  }
-
-  statusEl.textContent = "Subiendo...";
-  statusEl.style.color = "var(--text-dim)";
-
-  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg";
-  const path = `${currentUser.id}/profile-background.${ext}`;
-
-  const { error: uploadError } = await sb.storage
-    .from("avatars")
-    .upload(path, file, { cacheControl: "3600", upsert: true });
-
-  if (uploadError) {
-    statusEl.textContent = "Error al subir: " + uploadError.message;
-    statusEl.style.color = "var(--red)";
-    return;
-  }
-
-  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
-  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
-
-  const { error: updateError } = await sb
-    .from("profiles")
-    .update({ profile_side_image_url: freshUrl })
-    .eq("id", currentUser.id);
-
-  if (updateError) {
-    statusEl.textContent = "No se pudo guardar.";
-    statusEl.style.color = "var(--red)";
-    return;
-  }
-
-  currentProfile.profile_side_image_url = freshUrl;
-  showToast("¡Fondo del perfil actualizado!");
-  openEditProfile();
-}
-
-async function handleRemoveProfileSideImage() {
-  const { error } = await sb
-    .from("profiles")
-    .update({ profile_side_image_url: null })
-    .eq("id", currentUser.id);
-
-  if (error) {
-    showToast("No se pudo quitar la imagen de fondo");
-    return;
-  }
-
-  currentProfile.profile_side_image_url = null;
-  showToast("Imagen de fondo quitada");
   openEditProfile();
 }
 
@@ -7303,13 +2699,9 @@ async function saveProfileEdits() {
     currentProfile.username = newUsername;
   }
 
-  const coverPositionEl = document.getElementById("coverPositionRange");
-  const coverPositionY = coverPositionEl ? Math.max(0, Math.min(100, Number(coverPositionEl.value) || 50)) : Number(currentProfile.cover_position_y ?? 50);
-
   const { error: updateError } = await sb.from("profiles").update({
     bio,
     avatar_emoji: window.selectedAvatarEmoji,
-    cover_position_y: coverPositionY,
     social_kick: document.getElementById("socialKick").value.trim() || null,
     social_twitch: document.getElementById("socialTwitch").value.trim() || null,
     social_youtube: document.getElementById("socialYoutube").value.trim() || null,
@@ -7321,13 +2713,12 @@ async function saveProfileEdits() {
 
   currentProfile.bio = bio;
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
-  currentProfile.cover_position_y = coverPositionY;
   currentProfile.social_kick = document.getElementById("socialKick").value.trim();
   currentProfile.social_twitch = document.getElementById("socialTwitch").value.trim();
   currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
   currentProfile.social_tiktok = document.getElementById("socialTiktok").value.trim();
   currentProfile.social_instagram = document.getElementById("socialInstagram").value.trim();
-  closeManagedModal();
+  document.getElementById("globalModalWrap").innerHTML = "";
   showToast("Perfil actualizado");
   renderProfile();
 }
@@ -7470,29 +2861,13 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
-    <h3 style="margin-top:32px;">🔒 Acceso a Planes y Billetera</h3>
-    <div class="form-card" style="margin-bottom:14px;padding:0;overflow:hidden;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
-        <div style="flex:1;min-width:190px;">
-          <div style="font-size:13px;font-weight:700;">💎 Planes</div>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Mostrá u ocultá la sección para los demás usuarios.</div>
-        </div>
-        <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
+    <h3 style="margin-top:32px;">🔒 Candado de Planes</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Controla si el resto de los usuarios puede ver la pestaña de Planes.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre ves todo, esto no te afecta.</div>
       </div>
-
-      <div style="border-top:1px solid var(--border);"></div>
-
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
-        <div style="flex:1;min-width:190px;">
-          <div style="font-size:13px;font-weight:700;">👛 Billetera</div>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Pausá o habilitá el acceso a canjes.</div>
-        </div>
-        <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
-      </div>
-
-      <div style="padding:0 14px 12px;color:var(--text-dim);font-size:10px;">
-        Tu cuenta de administrador mantiene acceso a ambas secciones.
-      </div>
+      <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
     <h3 style="margin-top:32px;">💵 Precios de la tienda</h3>
@@ -7521,84 +2896,14 @@ async function renderAdmin() {
 
     <h3 style="margin-top:32px;">🎨 Emojis de la tienda</h3>
     <div class="form-card" style="margin-bottom:14px;">
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
         <input type="text" id="newEmojiChar" placeholder="🐐" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
         <button type="button" class="btn-outline" onclick="openEmojiPicker('newEmojiChar', FACE_EMOJIS)">Elegir</button>
         <input type="text" id="newEmojiName" placeholder="Nombre (ej: GOAT)" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
-        <input type="number" id="newEmojiPrice" min="0" placeholder="0 = GRATIS" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="number" id="newEmojiPrice" placeholder="Precio en pts" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <button class="btn" onclick="handleAddStoreEmoji()">Agregar</button>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;margin-bottom:10px;">
-        <select id="newEmojiRarity" style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          <option value="comun">Común</option>
-          <option value="rara">Rara</option>
-          <option value="epica">Épica</option>
-          <option value="legendaria">Legendaria</option>
-          <option value="exclusiva">Exclusiva</option>
-        </select>
-
-        <select id="newEmojiEdition"
-          onchange="document.getElementById('newEmojiStock').disabled=this.value!=='limited';"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          <option value="standard">Edición normal</option>
-          <option value="limited">Edición limitada</option>
-        </select>
-
-        <input type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      </div>
-
-      <button class="btn" onclick="handleAddStoreEmoji()">Agregar emoji</button>
       <div id="storeEmojisList">Cargando...</div>
-    </div>
-
-
-    <h3 style="margin-top:32px;">🏅 Medallas exclusivas de la tienda</h3>
-    <div class="form-card" style="margin-bottom:14px;">
-      <p style="font-size:12px;color:var(--text-dim);margin-top:0;">
-        Creá medallas coleccionables. Cuando alguien la compra, pasa a su colección real y puede equiparla entre sus 3 medallas de perfil.
-      </p>
-
-      <div style="display:grid;grid-template-columns:70px 1fr;gap:8px;margin-bottom:8px;">
-        <input type="text" id="newStoreBadgeIcon" placeholder="🏅" maxlength="8"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);text-align:center;font-size:20px;">
-        <input type="text" id="newStoreBadgeName" placeholder="Nombre de la medalla"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      </div>
-
-      <textarea id="newStoreBadgeDescription" maxlength="180" rows="2" placeholder="Descripción corta..."
-        style="width:100%;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);resize:vertical;margin-bottom:8px;"></textarea>
-
-      <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
-        <select id="newStoreBadgeRarity"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          <option value="comun">Común</option>
-          <option value="rara">Rara</option>
-          <option value="epica">Épica</option>
-          <option value="legendaria">Legendaria</option>
-          <option value="exclusiva">Exclusiva</option>
-        </select>
-        <input type="number" id="newStoreBadgePrice" min="0" placeholder="Precio pts · 0 = GRATIS"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      </div>
-
-      <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
-        <select id="newStoreBadgeEdition"
-          onchange="document.getElementById('newStoreBadgeStock').disabled=this.value!=='limited';"
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          <option value="standard">Edición normal</option>
-          <option value="limited">Edición limitada</option>
-        </select>
-        <input type="number" id="newStoreBadgeStock" min="1" placeholder="Unidades" disabled
-          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-      </div>
-
-      <div style="display:flex;gap:8px;">
-        <button type="button" class="btn-outline" onclick="openEmojiPicker('newStoreBadgeIcon', MEDAL_EMOJIS)">Elegir ícono</button>
-        <button class="btn" onclick="handleAddStoreBadge()">Crear medalla</button>
-      </div>
-
-      <div id="storeBadgesAdminList" style="margin-top:14px;">Cargando...</div>
     </div>
 
     <h3 style="margin-top:32px;">✨ Otros artículos de la tienda</h3>
@@ -7626,7 +2931,14 @@ async function renderAdmin() {
       </div>
     </div>
 
-
+    <h3 style="margin-top:32px;">🔒 Candado de Billetera</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Pausa que cualquiera pueda pedir un canje, sin tocar los puntos de nadie.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre podés retirar igual, esto no te afecta.</div>
+      </div>
+      <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
+    </div>
 
     <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
     <div class="form-card" style="margin-bottom:14px;">
@@ -7669,7 +2981,6 @@ async function renderAdmin() {
   loadWalletLockStatus();
   loadStoreEmojisList();
   loadStorePrices();
-  loadStoreBadgesAdminList();
   loadStoreItemsList();
 }
 
@@ -7830,13 +3141,7 @@ async function loadStoreEmojisList() {
 
   el.innerHTML = data.map(e => `
     <div class="ledger-row">
-      <span>
-        ${e.emoji} ${escapeHtml(e.name)}
-        · <span class="${getStoreBadgeRarityClass(e.rarity || "comun")}">${getStoreBadgeRarityLabel(e.rarity || "comun")}</span>
-        · <span class="mono">${Number(e.price_points) === 0 ? "GRATIS" : `${e.price_points} pts`}</span>
-        ${e.is_limited ? ` · <span style="color:var(--gold);font-weight:800;">LIMITED ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}/${e.stock_total}</span>` : ""}
-        ${!e.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
-      </span>
+      <span>${e.emoji} ${escapeHtml(e.name)} · <span class="mono">${e.price_points} pts</span> ${!e.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}</span>
       <div style="display:flex; gap:6px;">
         <button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleToggleStoreEmoji('${e.id}', ${!e.active})">${e.active ? "Desactivar" : "Activar"}</button>
         <button class="btn-outline" style="padding:4px 8px; font-size:11px; color:var(--red);" onclick="handleDeleteStoreEmoji('${e.id}')">🗑</button>
@@ -7848,44 +3153,17 @@ async function loadStoreEmojisList() {
 async function handleAddStoreEmoji() {
   const emoji = document.getElementById("newEmojiChar").value.trim();
   const name = document.getElementById("newEmojiName").value.trim();
-  const price = Number(document.getElementById("newEmojiPrice").value || 0);
-  const rarity = document.getElementById("newEmojiRarity")?.value || "comun";
-  const isLimited = document.getElementById("newEmojiEdition")?.value === "limited";
-  const stock = Number(document.getElementById("newEmojiStock")?.value || 0);
+  const price = parseInt(document.getElementById("newEmojiPrice").value, 10);
 
-  if (!emoji || !name || Number.isNaN(price) || price < 0) {
-    showToast("Completá emoji, nombre y precio");
-    return;
-  }
+  if (!emoji || !name || !price) { showToast("Completá los 3 campos"); return; }
 
-  if (isLimited && stock < 1) {
-    showToast("Indicá el stock de la edición limitada");
-    return;
-  }
-
-  const { data, error } = await sb.rpc("admin_add_store_emoji", {
-    p_emoji: emoji,
-    p_name: name,
-    p_price: Math.floor(price),
-    p_rarity: rarity,
-    p_is_limited: isLimited,
-    p_stock_total: isLimited ? Math.floor(stock) : null
-  });
-
-  if (error || !data?.ok) {
-    showToast(data?.error === "duplicate_emoji" ? "Ese emoji ya existe" : "No se pudo agregar");
-    return;
-  }
+  const { data, error } = await sb.rpc("admin_add_store_emoji", { p_emoji: emoji, p_name: name, p_price: price });
+  if (error || !data.ok) { showToast("No se pudo agregar"); return; }
 
   document.getElementById("newEmojiChar").value = "";
   document.getElementById("newEmojiName").value = "";
   document.getElementById("newEmojiPrice").value = "";
-  document.getElementById("newEmojiRarity").value = "comun";
-  document.getElementById("newEmojiEdition").value = "standard";
-  document.getElementById("newEmojiStock").value = "";
-  document.getElementById("newEmojiStock").disabled = true;
-
-  showToast(isLimited ? "😎 Emoji limitado creado" : "Emoji agregado");
+  showToast("Emoji agregado");
   loadStoreEmojisList();
 }
 
@@ -7932,259 +3210,6 @@ async function handleSaveStorePrices() {
   });
   if (error || !data.ok) { showToast("No se pudieron guardar los precios"); return; }
   showToast("Precios actualizados");
-}
-
-
-function getLimitedStockStatus(badge) {
-  if (!badge?.is_limited) return "";
-
-  const total = Math.max(0, Number(badge.stock_total || 0));
-  const sold = Math.max(0, Number(badge.stock_sold || 0));
-  const left = Math.max(0, total - sold);
-
-  if (left === 0) return "soldout";
-  if (left === 1) return "last";
-  if (left <= 5) return "low";
-  return "";
-}
-
-function getStoreBadgeRarityLabel(rarity) {
-  return ({
-    comun:"Común",
-    rara:"Rara",
-    epica:"Épica",
-    legendaria:"Legendaria",
-    exclusiva:"Exclusiva"
-  })[rarity] || "Común";
-}
-
-function getStoreBadgeRarityClass(rarity) {
-  return `ls-rarity-${["comun","rara","epica","legendaria","exclusiva"].includes(rarity) ? rarity : "comun"}`;
-}
-
-async function loadStoreBadgesAdminList() {
-  const el = document.getElementById("storeBadgesAdminList");
-  if (!el) return;
-
-  const { data, error } = await sb.rpc("admin_get_store_badges");
-  if (error || !data?.length) {
-    el.innerHTML = `<p style="color:var(--text-dim);font-size:12px;">Todavía no creaste medallas de tienda.</p>`;
-    return;
-  }
-
-  el.innerHTML = data.map(b => `
-    <div class="ledger-row">
-      <span>
-        ${b.badge_icon || "🏅"} ${escapeHtml(b.badge_name)}
-        · <span class="${getStoreBadgeRarityClass(b.rarity)}">${getStoreBadgeRarityLabel(b.rarity)}</span>
-        · <span class="mono">${b.price_points} pts</span>
-        ${b.is_limited ? ` · <span style="color:var(--gold);font-weight:800;">LIMITED ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}/${b.stock_total}</span>` : ""}
-        ${!b.active ? `<span style="color:var(--text-dim);">(desactivada)</span>` : ""}
-      </span>
-      <div style="display:flex;gap:6px;">
-        <button class="btn-outline" style="padding:4px 8px;font-size:11px;"
-          onclick="openEditStoreBadge('${b.id}')">✏️ Editar</button>
-        <button class="btn-outline" style="padding:4px 8px;font-size:11px;"
-          onclick="handleToggleStoreBadge('${b.id}', ${!b.active})">${b.active ? "Desactivar" : "Activar"}</button>
-        <button class="btn-outline" style="padding:4px 8px;font-size:11px;color:var(--red);"
-          onclick="handleDeleteStoreBadge('${b.id}')">🗑</button>
-      </div>
-    </div>
-  `).join("");
-}
-
-async function handleAddStoreBadge() {
-  const icon = document.getElementById("newStoreBadgeIcon")?.value.trim() || "";
-  const name = document.getElementById("newStoreBadgeName")?.value.trim() || "";
-  const description = document.getElementById("newStoreBadgeDescription")?.value.trim() || "";
-  const rarity = document.getElementById("newStoreBadgeRarity")?.value || "comun";
-  const price = Number(document.getElementById("newStoreBadgePrice")?.value || 0);
-  const isLimited = document.getElementById("newStoreBadgeEdition")?.value === "limited";
-  const stock = Number(document.getElementById("newStoreBadgeStock")?.value || 0);
-
-  if (!icon || !name || Number.isNaN(price) || price < 0) {
-    showToast("Completá ícono, nombre y precio");
-    return;
-  }
-  if (isLimited && stock < 1) {
-    showToast("Indicá cuántas unidades tendrá la edición limitada");
-    return;
-  }
-
-  const { data, error } = await sb.rpc("admin_add_store_badge", {
-    p_badge_icon: icon,
-    p_badge_name: name,
-    p_description: description,
-    p_rarity: rarity,
-    p_price_points: Math.floor(price),
-    p_is_limited: isLimited,
-    p_stock_total: isLimited ? Math.floor(stock) : null
-  });
-
-  if (error || !data?.ok) {
-    showToast(data?.error === "duplicate_name" ? "Ya existe una medalla con ese nombre" : "No se pudo crear");
-    return;
-  }
-
-  document.getElementById("newStoreBadgeIcon").value = "";
-  document.getElementById("newStoreBadgeName").value = "";
-  document.getElementById("newStoreBadgeDescription").value = "";
-  document.getElementById("newStoreBadgePrice").value = "";
-  document.getElementById("newStoreBadgeEdition").value = "standard";
-  document.getElementById("newStoreBadgeStock").value = "";
-  document.getElementById("newStoreBadgeStock").disabled = true;
-  showToast(isLimited ? "💎 Edición limitada creada" : "🏅 Medalla creada");
-  loadStoreBadgesAdminList();
-}
-
-
-async function openEditStoreBadge(id) {
-  const { data, error } = await sb.rpc("admin_get_store_badges");
-  if (error) {
-    showToast("No se pudo cargar la medalla");
-    return;
-  }
-
-  const badge = (data || []).find(b => b.id === id);
-  if (!badge) {
-    showToast("Medalla no encontrada");
-    return;
-  }
-
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:260;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:440px;">
-        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;">
-          <div>
-            <h2 style="margin:0;font-size:18px;">✏️ Editar medalla</h2>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Podés cambiar sus datos sin borrarla.</div>
-          </div>
-          <button onclick="document.getElementById('globalModalWrap').innerHTML=''"
-            style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
-        </div>
-
-        <div class="modal-box-body">
-          <div style="display:grid;grid-template-columns:70px 1fr;gap:8px;margin-bottom:8px;">
-            <input id="editStoreBadgeIcon" value="${escapeHtml(badge.badge_icon || "🏅")}" maxlength="8"
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);text-align:center;font-size:20px;">
-            <input id="editStoreBadgeName" value="${escapeHtml(badge.badge_name || "")}"
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          </div>
-
-          <textarea id="editStoreBadgeDescription" rows="2" maxlength="180"
-            style="width:100%;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);resize:vertical;margin-bottom:8px;">${escapeHtml(badge.description || "")}</textarea>
-
-          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:8px;">
-            <select id="editStoreBadgeRarity"
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-              ${["comun","rara","epica","legendaria","exclusiva"].map(r => `<option value="${r}" ${badge.rarity===r ? "selected" : ""}>${getStoreBadgeRarityLabel(r)}</option>`).join("")}
-            </select>
-            <input type="number" id="editStoreBadgePrice" min="0" value="${Number(badge.price_points || 0)}"
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 130px;gap:8px;">
-            <select id="editStoreBadgeEdition"
-              onchange="document.getElementById('editStoreBadgeStock').disabled=this.value!=='limited';"
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-              <option value="standard" ${badge.is_limited ? "" : "selected"}>Edición normal</option>
-              <option value="limited" ${badge.is_limited ? "selected" : ""}>Edición limitada</option>
-            </select>
-            <input type="number" id="editStoreBadgeStock" min="${Math.max(1, Number(badge.stock_sold || 0))}"
-              value="${badge.is_limited ? Number(badge.stock_total || 1) : ""}"
-              ${badge.is_limited ? "" : "disabled"}
-              style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
-          </div>
-
-          ${badge.is_limited ? `<div style="font-size:9px;color:var(--text-dim);margin-top:6px;">
-            Ya reclamadas/compradas: ${Number(badge.stock_sold || 0)}. El stock total no puede quedar por debajo de ese número.
-          </div>` : ""}
-        </div>
-
-        <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="handleSaveStoreBadgeEdit('${badge.id}')">Guardar cambios</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function handleSaveStoreBadgeEdit(id) {
-  const icon = document.getElementById("editStoreBadgeIcon")?.value.trim() || "";
-  const name = document.getElementById("editStoreBadgeName")?.value.trim() || "";
-  const description = document.getElementById("editStoreBadgeDescription")?.value.trim() || "";
-  const rarity = document.getElementById("editStoreBadgeRarity")?.value || "comun";
-  const price = Number(document.getElementById("editStoreBadgePrice")?.value || 0);
-  const isLimited = document.getElementById("editStoreBadgeEdition")?.value === "limited";
-  const stock = Number(document.getElementById("editStoreBadgeStock")?.value || 0);
-
-  if (!icon || !name || Number.isNaN(price) || price < 0) {
-    showToast("Revisá ícono, nombre y precio");
-    return;
-  }
-
-  if (isLimited && stock < 1) {
-    showToast("La edición limitada necesita stock");
-    return;
-  }
-
-  const { data, error } = await sb.rpc("admin_update_store_badge", {
-    p_badge_id: id,
-    p_badge_icon: icon,
-    p_badge_name: name,
-    p_description: description,
-    p_rarity: rarity,
-    p_price_points: Math.floor(price),
-    p_is_limited: isLimited,
-    p_stock_total: isLimited ? Math.floor(stock) : null
-  });
-
-  if (error || !data?.ok) {
-    const messages = {
-      duplicate_name:"Ya existe otra medalla con ese nombre",
-      stock_below_sold:"El stock total no puede ser menor a lo ya entregado",
-      invalid_price:"El precio no puede ser negativo",
-      invalid_stock:"Revisá el stock"
-    };
-    showToast(messages[data?.error] || "No se pudo guardar");
-    return;
-  }
-
-  document.getElementById("globalModalWrap").innerHTML = "";
-  showToast("🏅 Medalla actualizada");
-  loadStoreBadgesAdminList();
-}
-
-async function handleToggleStoreBadge(id, active) {
-  const { data, error } = await sb.rpc("admin_toggle_store_badge", {
-    p_badge_id: id,
-    p_active: active
-  });
-
-  if (error || !data?.ok) {
-    showToast("No se pudo cambiar");
-    return;
-  }
-
-  loadStoreBadgesAdminList();
-}
-
-async function handleDeleteStoreBadge(id) {
-  if (!confirm("¿Eliminar esta medalla de la tienda? Quienes ya la compraron la conservan.")) return;
-
-  const { data, error } = await sb.rpc("admin_delete_store_badge", {
-    p_badge_id: id
-  });
-
-  if (error || !data?.ok) {
-    showToast("No se pudo eliminar");
-    return;
-  }
-
-  showToast("Medalla eliminada de la tienda");
-  loadStoreBadgesAdminList();
 }
 
 async function loadStoreItemsList() {
@@ -8469,7 +3494,7 @@ async function renderStore() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tienda...</p>`;
 
-  let emojis, myEmojis, plans, storeItems, myItems, pricesData, storeBadges, myBadges;
+  let emojis, myEmojis, plans, storeItems, myItems, pricesData;
   try {
     const results = await Promise.allSettled([
       sb.from("store_emojis").select("*").eq("active", true).order("price_points"),
@@ -8477,9 +3502,7 @@ async function renderStore() {
       loadPlans(),
       sb.from("store_items").select("*").eq("active", true).order("category").order("sort_order"),
       sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
-      sb.rpc("get_store_prices"),
-      sb.from("store_badges").select("*").eq("active", true).order("sort_order").order("price_points"),
-      sb.from("user_badges").select("badge_name").eq("user_id", currentUser.id)
+      sb.rpc("get_store_prices")
     ]);
 
     emojis = results[0].status === "fulfilled" ? results[0].value?.data : null;
@@ -8488,8 +3511,6 @@ async function renderStore() {
     storeItems = results[3].status === "fulfilled" ? results[3].value?.data : null;
     myItems = results[4].status === "fulfilled" ? results[4].value?.data : null;
     pricesData = results[5].status === "fulfilled" ? results[5].value?.data : null;
-    storeBadges = results[6].status === "fulfilled" ? results[6].value?.data : null;
-    myBadges = results[7].status === "fulfilled" ? results[7].value?.data : null;
 
     results.forEach((r, i) => { if (r.status === "rejected") console.log("Tienda: falló la consulta #" + i, r.reason); });
   } catch (e) {
@@ -8500,7 +3521,6 @@ async function renderStore() {
 
   const myEmojiSet = new Set((myEmojis || []).map(e => e.emoji));
   const myItemSet = new Set((myItems || []).map(i => i.item_id));
-  const myBadgeSet = new Set((myBadges || []).map(b => b.badge_name));
   const myPlan = plans.find(p => p.id === currentProfile.plan_id);
   const canBoost = myPlan && myPlan.id !== "standard";
   const planPrices = (pricesData && pricesData.ok && pricesData.prices) ? pricesData.prices : {};
@@ -8518,61 +3538,15 @@ async function renderStore() {
     <h1 class="page-title">🛍️ Tienda de puntos</h1>
     <p class="page-sub">Balance: <strong class="mono" style="color:var(--gold)">${currentProfile.points_balance} pts</strong></p>
 
-
-    <h3 style="margin-top:24px;">🏅 Medallas exclusivas</h3>
-    <p style="font-size:11px;color:var(--text-dim);margin-top:-5px;margin-bottom:12px;">
-      Coleccionalas para siempre y equipá hasta 3 en tu perfil.
-    </p>
-
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:24px;">
-      ${(storeBadges || []).length ? storeBadges.map(b => `
-        <div class="form-card ls-store-badge-card ${getStoreBadgeRarityClass(b.rarity)}">
-          <div class="ls-store-badge-icon">${b.badge_icon || "🏅"}</div>
-          <div style="position:relative;z-index:1;font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name)}</div>
-          <div class="ls-rarity-tag">${getStoreBadgeRarityLabel(b.rarity)}</div>
-          ${b.is_limited ? `
-            <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:900;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(250,204,21,.22);background:rgba(250,204,21,.05);padding:3px 7px;border-radius:999px;">
-              LIMITED · ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}/${b.stock_total}
-            </div>
-            ${getLimitedStockStatus(b) === "last"
-              ? `<div class="ls-limited-urgency ls-limited-last">⚠ ÚLTIMA UNIDAD</div>`
-              : getLimitedStockStatus(b) === "low"
-                ? `<div class="ls-limited-urgency">🔥 ÚLTIMAS ${Math.max(0, Number(b.stock_total || 0) - Number(b.stock_sold || 0))}</div>`
-                : ""}` : ""}
-          <div class="ls-store-badge-desc">${escapeHtml(b.description || "Medalla exclusiva de LiveScroll.")}</div>
-          ${myBadgeSet.has(b.badge_name)
-            ? `<div style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</div>`
-            : (b.is_limited && Number(b.stock_sold || 0) >= Number(b.stock_total || 0))
-              ? `<div style="position:relative;z-index:1;font-size:10px;font-weight:900;color:var(--text-dim);margin-top:5px;">AGOTADA</div>`
-              : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;"
-                  onclick="handleBuyStoreBadge('${b.id}')">${Number(b.price_points) === 0 ? "GRATIS" : `${b.price_points} pts`}</button>`}
-        </div>
-      `).join("") : `<p style="font-size:12px;color:var(--text-dim);">Todavía no hay medallas disponibles.</p>`}
-    </div>
-
     <h3 style="margin-top:24px;">😎 Emojis exclusivos</h3>
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
       ${(emojis || []).map(e => `
-        <div class="form-card ls-store-badge-card ${getStoreBadgeRarityClass(e.rarity || "comun")}" style="text-align:center;min-height:170px;">
-          <div class="ls-store-badge-icon" style="font-size:34px;">${e.emoji}</div>
-          <div style="position:relative;z-index:1;font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(e.name)}</div>
-          <div class="ls-rarity-tag">${getStoreBadgeRarityLabel(e.rarity || "comun")}</div>
-
-          ${e.is_limited ? `
-            <div style="position:relative;z-index:1;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:900;letter-spacing:.08em;color:var(--gold);border:1px solid rgba(250,204,21,.22);background:rgba(250,204,21,.05);padding:3px 7px;border-radius:999px;">
-              LIMITED · ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}/${e.stock_total}
-            </div>
-            ${getLimitedStockStatus(e) === "last"
-              ? `<div class="ls-limited-urgency ls-limited-last">⚠ ÚLTIMA UNIDAD</div>`
-              : getLimitedStockStatus(e) === "low"
-                ? `<div class="ls-limited-urgency">🔥 ÚLTIMAS ${Math.max(0, Number(e.stock_total || 0)-Number(e.stock_sold || 0))}</div>`
-                : ""}` : ""}
-
+        <div class="form-card" style="text-align:center;">
+          <div style="font-size:30px;">${e.emoji}</div>
+          <div style="font-size:12px; margin:4px 0;">${escapeHtml(e.name)}</div>
           ${myEmojiSet.has(e.emoji)
-            ? `<span style="position:relative;z-index:1;font-size:10px;color:var(--green);margin-top:5px;">✓ En tu colección</span>`
-            : (e.is_limited && Number(e.stock_sold || 0) >= Number(e.stock_total || 0))
-              ? `<span style="position:relative;z-index:1;font-size:10px;font-weight:900;color:var(--text-dim);margin-top:5px;">AGOTADO</span>`
-              : `<button class="btn-outline" style="position:relative;z-index:1;padding:6px 10px;font-size:10px;margin-top:5px;" onclick="handleBuyEmoji('${e.id}')">${Number(e.price_points) === 0 ? "GRATIS" : `${e.price_points} pts`}</button>`}
+            ? `<span style="font-size:11px; color:var(--green);">✓ Tenés este</span>`
+            : `<button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleBuyEmoji('${e.id}')">${e.price_points} pts</button>`}
         </div>
       `).join("")}
     </div>
@@ -8613,37 +3587,15 @@ async function renderStore() {
 }
 
 async function handleBuyEmoji(emojiId) {
-  const btn = document.querySelector(`[onclick="handleBuyEmoji('${emojiId}')"]`);
-  const isFree = btn?.textContent?.trim() === "GRATIS";
-
-  if (!confirm(isFree
-    ? "¿Reclamar este emoji gratis? Quedará en tu colección."
-    : "¿Comprar este emoji? Quedará en tu colección.")) return;
-
-  const { data, error } = await sb.rpc("buy_emoji", {
-    p_user_id: currentUser.id,
-    p_emoji_id: emojiId
-  });
-
-  if (error || !data?.ok) {
-    const msgs = {
-      saldo_insuficiente:"No tenés suficientes puntos.",
-      ya_lo_tenes:"Ya tenés este emoji.",
-      no_disponible:"Este emoji ya no está disponible.",
-      agotado:"Esta edición limitada se agotó."
-    };
-    showToast(msgs[data?.error] || "No se pudo obtener el emoji");
+  const { data, error } = await sb.rpc("buy_emoji", { p_user_id: currentUser.id, p_emoji_id: emojiId });
+  if (error || !data.ok) {
+    const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", ya_lo_tenes: "Ya tenés este emoji." };
+    showToast(msgs[data?.error] || "No se pudo comprar");
     return;
   }
-
-  currentProfile.points_balance = Number(data.new_balance ?? currentProfile.points_balance);
+  await loadProfile();
   updateBalanceUI();
-
-  const serialText = data.serial_number && data.stock_total
-    ? ` · #${data.serial_number}/${data.stock_total}`
-    : "";
-
-  showToast(`¡Desbloqueaste ${data.emoji}!${serialText}`);
+  showToast(`¡Desbloqueaste ${data.emoji}!`);
   renderStore();
 }
 
@@ -8657,44 +3609,6 @@ async function handleBuyBoost() {
   await loadProfile();
   updateBalanceUI();
   showToast("¡Boost activado por 24hs!");
-  renderStore();
-}
-
-
-async function handleBuyStoreBadge(badgeId) {
-  const badgeCard = document.querySelector(`[onclick="handleBuyStoreBadge('${badgeId}')"]`);
-  const isFree = badgeCard?.textContent?.trim() === "GRATIS";
-
-  if (!confirm(isFree
-    ? "¿Reclamar esta medalla gratis? Quedará permanentemente en tu colección."
-    : "¿Comprar esta medalla? Quedará permanentemente en tu colección.")) return;
-
-  const { data, error } = await sb.rpc("buy_store_badge", {
-    p_badge_id: badgeId
-  });
-
-  if (error || !data?.ok) {
-    console.error("Compra de medalla falló:", error || data);
-    const code = data?.error || "";
-    const messages = {
-      saldo_insuficiente:"No tenés suficientes puntos.",
-      ya_la_tenes:"Ya tenés esta medalla.",
-      no_disponible:"Esta medalla ya no está disponible.",
-      agotada:"Esta edición limitada se agotó.",
-      not_authenticated:"Tu sesión necesita renovarse."
-    };
-    showToast(messages[code] || "No se pudo comprar la medalla");
-    return;
-  }
-
-  currentProfile.points_balance = Number(data.new_balance ?? currentProfile.points_balance);
-  updateBalanceUI();
-
-  // Forzamos refresco del perfil para que aparezca inmediatamente
-  // en la lista de medallas equipables.
-  lsPerfCache.profileVideos.at = 0;
-
-  showToast(`🏅 ¡${data.badge_name || "Medalla"} agregada a tu colección!`);
   renderStore();
 }
 

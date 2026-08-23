@@ -382,7 +382,7 @@ function closeMobileMenu() {
 // No cambia la experiencia normal: solo activa ajustes livianos cuando
 // el navegador/dispositivo parece antiguo o muy limitado.
 // ============================================================
-function initLegacyCompatibilityMode() {
+function detectLiveScrollExperience() {
   let legacy = false;
 
   try {
@@ -404,62 +404,159 @@ function initLegacyCompatibilityMode() {
     legacy = false;
   }
 
-  if (!legacy) return;
+  return legacy ? "legacy" : "nova";
+}
 
-  document.documentElement.classList.add("ls-legacy");
+function initLiveScrollExperienceMode() {
+  const mode = detectLiveScrollExperience();
+  window.__liveScrollExperienceMode = mode;
+  window.__liveScrollLegacyMode = mode === "legacy";
 
-  const style = document.createElement("style");
-  style.id = "lsLegacyCompatibilityStyles";
-  style.textContent = `
-    .ls-legacy *,
-    .ls-legacy *::before,
-    .ls-legacy *::after {
-      animation-duration:0.001ms !important;
-      animation-iteration-count:1 !important;
-      transition-duration:0.001ms !important;
-      scroll-behavior:auto !important;
-    }
+  document.documentElement.classList.toggle("ls-legacy", mode === "legacy");
+  document.documentElement.classList.toggle("ls-nova", mode === "nova");
 
-    .ls-legacy [style*="backdrop-filter"],
-    .ls-legacy .ls-action-sheet-overlay,
-    .ls-legacy .grid-menu-btn {
-      backdrop-filter:none !important;
-      -webkit-backdrop-filter:none !important;
-    }
+  if (!document.getElementById("lsExperienceStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsExperienceStyles";
+    style.textContent = `
+      .ls-experience-badge {
+        position:fixed;
+        right:12px;
+        bottom:max(12px, env(safe-area-inset-bottom));
+        z-index:190;
+        padding:7px 10px;
+        border-radius:999px;
+        border:1px solid var(--border);
+        background:rgba(13,16,20,.88);
+        color:var(--text-dim);
+        font-size:10px;
+        font-weight:700;
+        letter-spacing:.2px;
+        box-shadow:0 8px 24px rgba(0,0,0,.28);
+        pointer-events:none;
+      }
 
-    .ls-legacy .profile-hero,
-    .ls-legacy .form-card,
-    .ls-legacy .profile-section,
-    .ls-legacy .modal-box,
-    .ls-legacy .ls-action-sheet {
-      box-shadow:none !important;
-    }
+      .ls-experience-toast {
+        position:fixed;
+        left:50%;
+        bottom:max(24px, calc(env(safe-area-inset-bottom) + 24px));
+        transform:translateX(-50%);
+        width:min(390px, calc(100vw - 24px));
+        z-index:500;
+        box-sizing:border-box;
+        padding:14px 15px;
+        border-radius:16px;
+        background:var(--panel);
+        border:1px solid var(--border);
+        box-shadow:0 16px 45px rgba(0,0,0,.5);
+        color:var(--text);
+        font-size:13px;
+        line-height:1.4;
+        animation:lsExperienceIn .25s ease;
+      }
 
-    .ls-legacy video {
-      filter:none !important;
-    }
+      .ls-experience-toast strong {
+        display:block;
+        margin-bottom:3px;
+        color:var(--gold);
+      }
 
-    @media (max-width:420px) {
-      .ls-legacy #appView {
-        padding-left:7px !important;
-        padding-right:7px !important;
+      @keyframes lsExperienceIn {
+        from { opacity:0; transform:translate(-50%, 12px); }
+        to { opacity:1; transform:translate(-50%, 0); }
+      }
+
+      .ls-legacy *,
+      .ls-legacy *::before,
+      .ls-legacy *::after {
+        animation-duration:0.001ms !important;
+        animation-iteration-count:1 !important;
+        transition-duration:0.001ms !important;
+        scroll-behavior:auto !important;
+      }
+
+      .ls-legacy [style*="backdrop-filter"],
+      .ls-legacy .ls-action-sheet-overlay,
+      .ls-legacy .grid-menu-btn {
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
       }
 
       .ls-legacy .profile-hero,
+      .ls-legacy .form-card,
       .ls-legacy .profile-section,
-      .ls-legacy .form-card {
-        border-radius:12px !important;
+      .ls-legacy .modal-box,
+      .ls-legacy .ls-action-sheet {
+        box-shadow:none !important;
       }
-    }
-  `;
-  document.head.appendChild(style);
 
-  // Marcador interno útil para depuración; no molesta al usuario.
-  window.__liveScrollLegacyMode = true;
+      .ls-legacy video {
+        filter:none !important;
+      }
+
+      @media (max-width:420px) {
+        .ls-legacy #appView {
+          padding-left:7px !important;
+          padding-right:7px !important;
+        }
+
+        .ls-legacy .profile-hero,
+        .ls-legacy .profile-section,
+        .ls-legacy .form-card {
+          border-radius:12px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  let badge = document.getElementById("lsExperienceBadge");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "lsExperienceBadge";
+    badge.className = "ls-experience-badge";
+    document.body.appendChild(badge);
+  }
+
+  badge.textContent = mode === "legacy"
+    ? "🪶 LiveScroll Legacy"
+    : "✨ LiveScroll Nova";
+
+  const storageKey = `livescroll-experience-notice-${mode}-v1`;
+  let alreadyShown = false;
+
+  try {
+    alreadyShown = localStorage.getItem(storageKey) === "1";
+  } catch (_) {}
+
+  if (!alreadyShown) {
+    const toast = document.createElement("div");
+    toast.className = "ls-experience-toast";
+
+    if (mode === "legacy") {
+      toast.innerHTML = `
+        <strong>🪶 LiveScroll Legacy activado</strong>
+        Optimizamos automáticamente la experiencia para que LiveScroll funcione mejor en este dispositivo.
+      `;
+    } else {
+      toast.innerHTML = `
+        <strong>✨ LiveScroll Nova</strong>
+        Estás usando la experiencia completa de LiveScroll.
+      `;
+    }
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.remove(), mode === "legacy" ? 6000 : 4000);
+
+    try {
+      localStorage.setItem(storageKey, "1");
+    } catch (_) {}
+  }
 }
 
 async function renderApp() {
-  initLegacyCompatibilityMode();
+  initLiveScrollExperienceMode();
   ensureModernMobileStyles();
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");

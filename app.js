@@ -3047,6 +3047,76 @@ function ensureModernMobileStyles() {
       border-color:#fbbf24;
       box-shadow:0 0 0 2px rgba(251,191,36,.18), 0 0 20px rgba(251,191,36,.28), 0 5px 16px rgba(0,0,0,.24);
     }
+
+    .ls-equipped-medal.ls-medal-rarity-legendaria::before,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva::before {
+      content:"";
+      position:absolute;
+      inset:-7px;
+      border-radius:50%;
+      pointer-events:none;
+      opacity:.30;
+      filter:blur(6px);
+      background:currentColor;
+      animation:lsMedalHalo 2.8s ease-in-out infinite;
+      z-index:-1;
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      background:
+        radial-gradient(circle at 30% 22%, rgba(255,255,255,.16), transparent 28%),
+        linear-gradient(145deg, rgba(251,113,133,.10), rgba(192,132,252,.06)),
+        rgba(8,10,13,.78);
+    }
+
+    @keyframes lsMedalHalo {
+      0%,100% { opacity:.18; transform:scale(.92); }
+      50% { opacity:.42; transform:scale(1.08); }
+    }
+
+    .ls-public-medals-wrap {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:7px;
+      padding:4px 7px;
+      border-radius:999px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter:blur(5px);
+    }
+
+    .ls-public-medals-wrap .ls-equipped-medals {
+      margin:0 !important;
+      min-height:0 !important;
+      gap:6px !important;
+    }
+
+    .ls-public-medals-wrap .ls-equipped-medal {
+      width:28px;
+      height:28px;
+      font-size:15px;
+      margin:0;
+      flex:0 0 28px;
+    }
+
+    .ls-medal-detail-meta {
+      display:flex;
+      justify-content:center;
+      gap:7px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+    .ls-medal-detail-chip {
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      font-size:9px;
+      color:var(--text-dim);
+    }
+
     .ls-equipped-medal.ls-medal-rarity-exclusiva {
       border-color:#fb7185;
       box-shadow:0 0 0 2px rgba(251,113,133,.18), 0 0 22px rgba(251,113,133,.30), 0 5px 16px rgba(0,0,0,.24);
@@ -4625,17 +4695,43 @@ function initProfileNovaTilt() {
 async function getEquippedProfileMedals(userId) {
   if (!userId) return [];
 
-  const { data, error } = await sb.rpc("get_equipped_profile_badges", {
-    p_user_id: userId
-  });
+  const [{ data, error }, { data: owned }, { data: storeMeta }] = await Promise.all([
+    sb.rpc("get_equipped_profile_badges", { p_user_id:userId }),
+    sb.from("user_badges").select("badge_name,badge_icon,earned_at").eq("user_id", userId),
+    sb.from("store_badges").select("badge_name,rarity,description")
+  ]);
 
   if (error) {
     console.warn("No se pudieron cargar medallas equipadas:", error);
     return [];
   }
 
-  return (data || []).sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
+  const ownedByName = {};
+  (owned || []).forEach(b => {
+    ownedByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  const storeByName = {};
+  (storeMeta || []).forEach(b => {
+    storeByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  return (data || [])
+    .map(m => {
+      const key = String(m.badge_name || "").toLowerCase();
+      const ownedBadge = ownedByName[key] || {};
+      const storeBadge = storeByName[key] || {};
+      return {
+        ...m,
+        badge_icon: m.badge_icon || ownedBadge.badge_icon || "🏅",
+        earned_at: ownedBadge.earned_at || "",
+        rarity: m.rarity || storeBadge.rarity || "",
+        description: storeBadge.description || ""
+      };
+    })
+    .sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
 }
+
 
 function getProfileMedalRarityClass(rarity) {
   const safe = ["comun","rara","epica","legendaria","exclusiva"].includes(rarity)
@@ -4666,7 +4762,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
         <button type="button"
           class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}"
           title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
-          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}')">
+          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}')">
           ${medal.badge_icon || "🏅"}
         </button>`);
     } else if (ownProfile) {
@@ -4681,7 +4777,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
     </div>`;
 }
 
-function openMedalDetail(name, icon, rarity = "") {
+function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "") {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
@@ -4695,8 +4791,12 @@ function openMedalDetail(name, icon, rarity = "") {
             ${getProfileMedalRarityLabel(rarity) ? `MEDALLA ${getProfileMedalRarityLabel(rarity).toUpperCase()}` : "MEDALLA DE PERFIL"}
           </div>
           <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
-            Esta medalla forma parte de la identidad pública de este perfil.
+            ${escapeHtml(description || "Esta medalla forma parte de la identidad pública de este perfil.")}
           </p>
+          <div class="ls-medal-detail-meta">
+            ${getProfileMedalRarityLabel(rarity) ? `<span class="ls-medal-detail-chip">${getProfileMedalRarityLabel(rarity)}</span>` : ""}
+            ${earnedAt ? `<span class="ls-medal-detail-chip">Obtenida ${new Date(earnedAt).toLocaleDateString("es-AR")}</span>` : ""}
+          </div>
           <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
         </div>
       </div>
@@ -5449,7 +5549,7 @@ async function openMyMedalsPanel() {
 
     return `
       <button type="button"
-        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}')"
+        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}', '${escapeHtml(b.description || "")}', '${escapeHtml(b.earned_at || "")}')"
         style="position:relative;background:var(--panel-2);border:1px solid ${b.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
         ${b.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
         <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
@@ -5568,7 +5668,7 @@ async function viewPublicProfile(username) {
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle">Perfil público</div>
-            ${theirEquippedBadges.length ? renderEquippedMedalsInline(theirEquippedBadges, false) : ""}
+            ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
           </div>
         </div>
         ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}

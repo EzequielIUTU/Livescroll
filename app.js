@@ -1416,17 +1416,26 @@ function showChangelogModal(entries) {
     </div>`;
 }
 
+
+// ============================================================
+// NOVEDADES — CONGELADO DESDE 5.8.0
+// No modificar el comportamiento de historial/cartel durante la rama 5.8.x.
+// Solo tocarlo al publicar una nueva versión oficial posterior.
+// ============================================================
+
 async function openChangelogHistory() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">
-      <div class="modal-box" style="max-width:440px;">
+      <div class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
           <h2>📢 Novedades</h2>
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
-        <div class="modal-box-body">
-          <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Historial completo de las últimas 30 versiones publicadas de LiveScroll.</p>
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          <p style="color:var(--text-dim);font-size:12px;margin-top:0;margin-bottom:16px;">
+            Historial completo de las últimas versiones publicadas de LiveScroll.
+          </p>
           <div id="changelogHistoryList">Cargando...</div>
         </div>
       </div>
@@ -1440,39 +1449,84 @@ async function openChangelogHistory() {
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
 
-  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 30 });
+  // Pedimos más filas porque p_limit limita entradas, no versiones completas.
+  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 200 });
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
 
   if (error || !entries || !entries.length) {
-    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">Todavía no hay novedades publicadas.</p>`;
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">Todavía no hay novedades publicadas.</p>`;
     return;
   }
 
-  const byVersion = {};
-  entries.forEach(e => {
-    byVersion[e.version] = byVersion[e.version] || { display: null, cats: {} };
-    if (e.display_version && !byVersion[e.version].display) byVersion[e.version].display = e.display_version;
-    byVersion[e.version].cats[e.category] = byVersion[e.version].cats[e.category] || [];
-    byVersion[e.version].cats[e.category].push(e.content);
-  });
-  const versions = Object.keys(byVersion).map(Number).sort((a, b) => b - a);
-  const currentVersion = versions[0];
+  const semverParts = (value) => String(value || "0.0.0")
+    .split(".")
+    .map(n => Number.parseInt(n, 10) || 0);
 
-  list.innerHTML = versions.map(v => {
-    const label = byVersion[v].display || `${v}.0.0`;
+  const compareSemverDesc = (a, b) => {
+    const pa = semverParts(a);
+    const pb = semverParts(b);
+    const max = Math.max(pa.length, pb.length, 3);
+    for (let i = 0; i < max; i++) {
+      const av = pa[i] || 0;
+      const bv = pb[i] || 0;
+      if (av !== bv) return bv - av;
+    }
+    return 0;
+  };
+
+  // Agrupamos por la versión que ve el usuario, NO por el número interno.
+  const byDisplayVersion = {};
+  entries.forEach(e => {
+    const display = String(e.display_version || `${e.version}.0.0`);
+    if (!byDisplayVersion[display]) {
+      byDisplayVersion[display] = {
+        display,
+        internalVersions: new Set(),
+        cats: {}
+      };
+    }
+
+    byDisplayVersion[display].internalVersions.add(Number(e.version || 0));
+    byDisplayVersion[display].cats[e.category] =
+      byDisplayVersion[display].cats[e.category] || [];
+
+    // Evitamos líneas duplicadas si una versión tuvo más de una publicación interna.
+    if (!byDisplayVersion[display].cats[e.category].includes(e.content)) {
+      byDisplayVersion[display].cats[e.category].push(e.content);
+    }
+  });
+
+  const versions = Object.keys(byDisplayVersion).sort(compareSemverDesc);
+  const currentDisplayVersion = versions[0];
+
+  list.innerHTML = versions.map(display => {
+    const info = byDisplayVersion[display];
+
     return `
-    <div style="margin-bottom:18px; padding-bottom:16px; border-bottom:1px solid var(--border);">
-      <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
-        <div style="font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);">v${escapeHtml(label)}</div>
-        ${v === currentVersion ? `<span style="font-size:10px; font-weight:700; color:#12130f; background:var(--gold); padding:2px 8px; border-radius:20px; letter-spacing:0.04em;">ACTUAL</span>` : ""}
-      </div>
-      ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => byVersion[v].cats[cat] ? `
-        <div style="margin-bottom:10px;">
-          <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
-          ${byVersion[v].cats[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
-        </div>` : "").join("")}
-    </div>`;
+      <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);">
+            v${escapeHtml(display)}
+          </div>
+          ${display === currentDisplayVersion
+            ? `<span style="font-size:10px;font-weight:700;color:#12130f;background:var(--green);padding:2px 8px;border-radius:20px;letter-spacing:.04em;">ACTUAL</span>`
+            : ""}
+        </div>
+
+        ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat =>
+          info.cats[cat] ? `
+            <div style="margin-bottom:10px;">
+              <div style="font-weight:600;font-size:13px;color:${labels[cat].color};margin-bottom:6px;">
+                ${labels[cat].title}
+              </div>
+              ${info.cats[cat].map(c =>
+                `<div style="font-size:13px;color:var(--text-dim);margin-bottom:4px;">• ${escapeHtml(c)}</div>`
+              ).join("")}
+            </div>`
+          : ""
+        ).join("")}
+      </div>`;
   }).join("");
 }
 

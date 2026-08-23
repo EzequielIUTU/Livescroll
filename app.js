@@ -354,23 +354,13 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const [profileResult, statusResult] = await Promise.all([
-    sb.rpc("get_my_profile_data"),
-    sb.rpc("get_my_status")
-  ]);
+  const { data, error } = await sb.rpc("get_my_profile_data");
 
-  if (!profileResult.error && profileResult.data?.ok) {
-    currentProfile = profileResult.data.profile;
+  if (!error && data?.ok) {
+    currentProfile = data.profile;
   } else {
-    console.error("No se pudo cargar el perfil privado:", profileResult.error || profileResult.data?.error);
+    console.error("No se pudo cargar el perfil privado:", error || data?.error);
     currentProfile = null;
-    return;
-  }
-
-  const status = statusResult.data;
-  if (status && currentProfile) {
-    currentProfile.is_admin = status.is_admin;
-    currentProfile.is_blocked = status.is_blocked;
   }
 }
 

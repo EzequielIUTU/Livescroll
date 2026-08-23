@@ -5405,33 +5405,97 @@ async function loadUsersDirectory(term) {
 }
 
 
-function openMyMedalsPanel() {
+async function openMyMedalsPanel() {
   const badges = window.__myProfileBadges || [];
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
+  // Cargamos catálogo + equipadas para identificar rareza y estado.
+  const [{ data: storeBadges }, equipped] = await Promise.all([
+    sb.from("store_badges").select("badge_name, rarity, description"),
+    getEquippedProfileMedals(currentUser.id)
+  ]);
+
+  const storeByName = {};
+  (storeBadges || []).forEach(b => {
+    storeByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  const equippedSet = new Set((equipped || []).map(b => b.badge_name));
+
+  const normalized = badges.map(b => {
+    const storeMeta = storeByName[String(b.badge_name || "").toLowerCase()];
+    return {
+      ...b,
+      rarity: storeMeta?.rarity || null,
+      description: storeMeta?.description || "",
+      equipped: equippedSet.has(b.badge_name)
+    };
+  });
+
+  const exclusiveBadges = normalized.filter(b => b.rarity);
+  const earnedBadges = normalized.filter(b => !b.rarity);
+
+  const renderCard = (b) => {
+    const rarityClass = b.rarity ? getProfileMedalRarityClass(b.rarity) : "";
+    const rarityLabel = b.rarity ? getProfileMedalRarityLabel(b.rarity) : "Logro";
+    const rarityColor =
+      b.rarity === "rara" ? "#7dd3fc" :
+      b.rarity === "epica" ? "#c084fc" :
+      b.rarity === "legendaria" ? "#fbbf24" :
+      b.rarity === "exclusiva" ? "#fb7185" :
+      b.rarity === "comun" ? "#cbd5e1" :
+      "var(--text-dim)";
+
+    return `
+      <button type="button"
+        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}')"
+        style="position:relative;background:var(--panel-2);border:1px solid ${b.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
+        ${b.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
+        <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
+          ${b.badge_icon || "🏅"}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name || "Medalla")}</div>
+        <div style="font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${rarityColor};margin-top:5px;">
+          ${escapeHtml(rarityLabel)}
+        </div>
+        ${b.earned_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(b.earned_at).toLocaleDateString("es-AR")}</div>` : ""}
+      </button>`;
+  };
+
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
-      <div class="modal-box" style="max-width:430px;max-height:88dvh;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="modal-box" style="max-width:470px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
-            <h2 style="margin:0;font-size:19px;">🏅 Mis medallas</h2>
-            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">${badges.length} desbloqueada${badges.length === 1 ? "" : "s"}</div>
+            <h2 style="margin:0;font-size:19px;">🏅 Mi colección</h2>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
+              ${badges.length} medalla${badges.length === 1 ? "" : "s"} · ${equippedSet.size}/3 equipadas
+            </div>
           </div>
           <button type="button" onclick="closeManagedModal()"
             style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
         </div>
+
         <div class="modal-box-body" style="overflow-y:auto;">
           ${badges.length ? `
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-              ${badges.map(b => `
-                <div style="background:var(--panel-2);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;">
-                  <div style="font-size:34px;margin-bottom:7px;">${b.badge_icon || "🏅"}</div>
-                  <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name || "Medalla")}</div>
-                  ${b.earned_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(b.earned_at).toLocaleDateString("es-AR")}</div>` : ""}
-                </div>`).join("")}
-            </div>` :
-            `<div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:13px;">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+              <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
+            </div>
+
+            ${exclusiveBadges.length ? `
+              <div style="font-size:11px;font-weight:800;color:var(--gold);margin:4px 0 9px;">💎 Colección exclusiva</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px;">
+                ${exclusiveBadges.map(renderCard).join("")}
+              </div>` : ""}
+
+            ${earnedBadges.length ? `
+              <div style="font-size:11px;font-weight:800;color:var(--text-dim);margin:4px 0 9px;">🏆 Logros y recompensas</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
+                ${earnedBadges.map(renderCard).join("")}
+              </div>` : ""}
+          ` : `
+            <div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:13px;">
               <div style="font-size:42px;margin-bottom:8px;">🏅</div>
               Todavía no desbloqueaste medallas.
             </div>`}

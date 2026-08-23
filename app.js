@@ -2213,6 +2213,8 @@ function lsCacheFresh(entry, maxAgeMs) {
 }
 
 function switchTab(tab) {
+  stopConnectedLiveRefresh();
+
   clearAllWatchIntervals();
   currentTab = tab;
   const renderToken = ++lsTabRenderToken;
@@ -5738,7 +5740,26 @@ let usersDirectorySearchTimeout = null;
 // ============================================================
 // DIRECTOS (usuarios en vivo ahora)
 // ============================================================
+let lsConnectedLiveRefreshTimer = null;
+
+function stopConnectedLiveRefresh() {
+  if (lsConnectedLiveRefreshTimer) {
+    clearInterval(lsConnectedLiveRefreshTimer);
+    lsConnectedLiveRefreshTimer = null;
+  }
+}
+
+function startConnectedLiveRefresh() {
+  stopConnectedLiveRefresh();
+  lsConnectedLiveRefreshTimer = setInterval(() => {
+    if (document.hidden || currentTab !== "directos") return;
+    lsPerfCache.directos = { data:null, at:0 };
+    renderDirectos(lsTabRenderToken);
+  }, 60000);
+}
+
 async function renderDirectos(renderToken = lsTabRenderToken) {
+  startConnectedLiveRefresh();
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">🔴 Directos</h1>

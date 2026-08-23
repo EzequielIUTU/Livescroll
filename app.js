@@ -3226,6 +3226,23 @@ function ensureModernMobileStyles() {
     }
 
 
+
+    @media (max-width:520px) {
+      .ls-collection-filter {
+        flex:1 1 auto;
+        min-height:34px;
+      }
+
+      #collection568Grid > div {
+        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      }
+
+      #collection568Sort {
+        flex:1 1 150px;
+        min-height:36px;
+      }
+    }
+
     .ls-collection-filter.active {
       border-color:var(--gold) !important;
       color:var(--gold) !important;
@@ -5874,6 +5891,8 @@ async function openMyMedalsPanel() {
   });
 
   window.__collection568Items = [...normalizedBadges, ...normalizedEmojis];
+  // La colección se reconstruye desde Supabase cada vez que se abre,
+  // evitando mostrar stock/seriales viejos después de una compra.
   window.__collection568Filter = "all";
   window.__collection568Sort = "rarity";
 

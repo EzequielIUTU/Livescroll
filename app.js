@@ -779,8 +779,6 @@ function initLiveScrollExperienceMode() {
 
 async function renderApp() {
   initLiveScrollExperienceMode();
-  ensureLiveScrollNextUI();
-  ensureMobileBottomNav();
   ensureModernMobileStyles();
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
@@ -1237,371 +1235,9 @@ function showBoostBanner(expiresAt) {
     </div>`;
 }
 
-
-function ensureLiveScrollNextUI() {
-  if (document.getElementById("lsNextUiStyles")) return;
-
-  const style = document.createElement("style");
-  style.id = "lsNextUiStyles";
-  style.textContent = `
-    /* =======================================================
-       LiveScroll UI Upgrade
-       ======================================================= */
-
-    .ls-skeleton {
-      position:relative;
-      overflow:hidden;
-      background:var(--panel-2);
-      border:1px solid var(--border);
-    }
-
-    .ls-skeleton::after {
-      content:"";
-      position:absolute;
-      inset:0;
-      transform:translateX(-100%);
-      background:linear-gradient(90deg, transparent, rgba(255,255,255,.075), transparent);
-      animation:lsSkeleton 1.25s infinite;
-    }
-
-    .ls-legacy .ls-skeleton::after {
-      animation:none !important;
-      display:none;
-    }
-
-    @keyframes lsSkeleton {
-      100% { transform:translateX(100%); }
-    }
-
-    .ls-feed-skeleton {
-      width:min(100%, 430px);
-      height:min(72dvh, 680px);
-      min-height:440px;
-      margin:8px auto 18px;
-      border-radius:22px;
-    }
-
-    .ls-feed-skeleton-lines {
-      position:absolute;
-      left:18px;
-      right:85px;
-      bottom:22px;
-      display:grid;
-      gap:8px;
-      z-index:2;
-    }
-
-    .ls-feed-skeleton-lines span {
-      display:block;
-      height:11px;
-      border-radius:20px;
-      background:rgba(255,255,255,.07);
-    }
-
-    .ls-feed-skeleton-lines span:last-child {
-      width:62%;
-    }
-
-    .ls-mobile-nav {
-      display:none;
-    }
-
-    .ls-action-pop {
-      animation:lsActionPop .34s cubic-bezier(.2,.9,.2,1);
-    }
-
-    @keyframes lsActionPop {
-      0% { transform:scale(1); }
-      45% { transform:scale(1.36); }
-      100% { transform:scale(1); }
-    }
-
-    .ls-balance-pop {
-      animation:lsBalancePop .45s ease;
-    }
-
-    @keyframes lsBalancePop {
-      0%,100% { transform:scale(1); }
-      45% { transform:scale(1.08); color:var(--gold); }
-    }
-
-    .ls-upload-preview {
-      display:none;
-      position:relative;
-      width:100%;
-      aspect-ratio:16/10;
-      border-radius:14px;
-      overflow:hidden;
-      background:#050607;
-      border:1px solid var(--border);
-      margin-top:12px;
-    }
-
-    .ls-upload-preview.active {
-      display:block;
-    }
-
-    .ls-upload-preview video {
-      width:100%;
-      height:100%;
-      object-fit:contain;
-      background:#000;
-    }
-
-    .ls-upload-preview-label {
-      position:absolute;
-      left:10px;
-      top:10px;
-      z-index:2;
-      padding:5px 9px;
-      border-radius:999px;
-      background:rgba(0,0,0,.72);
-      color:#fff;
-      font-size:10px;
-      font-weight:700;
-    }
-
-    .ls-nova .feed-action-btn {
-      border:1px solid rgba(255,255,255,.13) !important;
-      background:rgba(8,10,14,.60) !important;
-      backdrop-filter:blur(9px);
-      -webkit-backdrop-filter:blur(9px);
-      box-shadow:0 5px 16px rgba(0,0,0,.18);
-    }
-
-    .ls-legacy .feed-action-btn {
-      backdrop-filter:none !important;
-      -webkit-backdrop-filter:none !important;
-      box-shadow:none !important;
-    }
-
-    @media (max-width:700px) {
-      body {
-        padding-bottom:max(78px, calc(66px + env(safe-area-inset-bottom))) !important;
-      }
-
-      #appView {
-        padding-bottom:max(88px, calc(76px + env(safe-area-inset-bottom))) !important;
-      }
-
-      .ls-mobile-nav {
-        position:fixed;
-        display:grid;
-        grid-template-columns:repeat(5, minmax(0,1fr));
-        align-items:end;
-        left:8px;
-        right:8px;
-        bottom:max(8px, env(safe-area-inset-bottom));
-        z-index:350;
-        min-height:61px;
-        padding:6px 5px;
-        border:1px solid var(--border);
-        border-radius:20px;
-        background:rgba(13,16,20,.93);
-        box-shadow:0 12px 35px rgba(0,0,0,.38);
-      }
-
-      .ls-nova .ls-mobile-nav {
-        backdrop-filter:blur(16px);
-        -webkit-backdrop-filter:blur(16px);
-      }
-
-      .ls-legacy .ls-mobile-nav {
-        backdrop-filter:none !important;
-        -webkit-backdrop-filter:none !important;
-        box-shadow:none;
-        background:var(--panel);
-      }
-
-      .ls-mobile-nav button {
-        appearance:none;
-        border:0;
-        background:none;
-        color:var(--text-dim);
-        min-width:0;
-        min-height:48px;
-        border-radius:13px;
-        font-family:inherit;
-        padding:4px 2px;
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:center;
-        gap:2px;
-        cursor:pointer;
-        touch-action:manipulation;
-      }
-
-      .ls-mobile-nav button .ic {
-        font-size:20px;
-        line-height:1;
-        transition:transform .18s ease;
-      }
-
-      .ls-mobile-nav button .lb {
-        font-size:9px;
-        font-weight:700;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
-        max-width:100%;
-      }
-
-      .ls-mobile-nav button.active {
-        color:var(--gold);
-        background:rgba(255,255,255,.045);
-      }
-
-      .ls-mobile-nav button.active .ic {
-        transform:translateY(-1px) scale(1.08);
-      }
-
-      .ls-mobile-nav button.upload {
-        position:relative;
-      }
-
-      .ls-mobile-nav button.upload .ic {
-        width:38px;
-        height:38px;
-        margin-top:-15px;
-        border-radius:14px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        background:var(--gold);
-        color:#10120f;
-        font-size:24px;
-        font-weight:900;
-        box-shadow:0 8px 20px rgba(0,0,0,.30);
-      }
-
-      .ls-legacy .ls-mobile-nav button.upload .ic {
-        box-shadow:none;
-      }
-
-      .feed-action-btn {
-        width:48px !important;
-        height:48px !important;
-        min-width:48px !important;
-        min-height:48px !important;
-        font-size:21px !important;
-        border-radius:50% !important;
-      }
-
-      .feed-actions {
-        gap:8px !important;
-        right:10px !important;
-      }
-
-      .feed-overlay .title {
-        font-size:clamp(15px, 4.8vw, 19px) !important;
-      }
-
-      .feed-overlay .author {
-        font-size:11px !important;
-      }
-
-      .page-title {
-        font-size:clamp(24px, 7vw, 34px) !important;
-      }
-
-      .page-sub {
-        font-size:12px !important;
-        line-height:1.45 !important;
-      }
-    }
-
-    @media (max-width:360px) {
-      .ls-mobile-nav {
-        left:5px;
-        right:5px;
-        padding-left:3px;
-        padding-right:3px;
-      }
-
-      .ls-mobile-nav button .lb {
-        font-size:8px;
-      }
-
-      .feed-action-btn {
-        width:44px !important;
-        height:44px !important;
-        min-width:44px !important;
-        min-height:44px !important;
-      }
-    }
-  `;
-
-  document.head.appendChild(style);
-}
-
-function ensureMobileBottomNav() {
-  ensureLiveScrollNextUI();
-
-  let nav = document.getElementById("lsMobileBottomNav");
-  if (!nav) {
-    nav = document.createElement("nav");
-    nav.id = "lsMobileBottomNav";
-    nav.className = "ls-mobile-nav";
-    nav.setAttribute("aria-label", "Navegación principal");
-
-    nav.innerHTML = `
-      <button type="button" data-tab="feed" onclick="switchTab('feed')" aria-label="Inicio">
-        <span class="ic">🏠</span><span class="lb">Inicio</span>
-      </button>
-      <button type="button" data-tab="foryou" onclick="switchTab('foryou')" aria-label="Para Ti">
-        <span class="ic">✨</span><span class="lb">Para Ti</span>
-      </button>
-      <button type="button" data-tab="upload" class="upload" onclick="switchTab('upload')" aria-label="Subir video">
-        <span class="ic">＋</span><span class="lb">Subir</span>
-      </button>
-      <button type="button" data-tab="directos" onclick="switchTab('directos')" aria-label="Directos">
-        <span class="ic">🔴</span><span class="lb">Directos</span>
-      </button>
-      <button type="button" data-tab="profile" onclick="switchTab('profile')" aria-label="Mi Perfil">
-        <span class="ic">👤</span><span class="lb">Perfil</span>
-      </button>`;
-
-    document.body.appendChild(nav);
-  }
-
-  updateMobileBottomNav();
-}
-
-function updateMobileBottomNav() {
-  const nav = document.getElementById("lsMobileBottomNav");
-  if (!nav) return;
-
-  nav.querySelectorAll("button[data-tab]").forEach(button => {
-    const active = button.dataset.tab === currentTab;
-    button.classList.toggle("active", active);
-    if (active) button.setAttribute("aria-current", "page");
-    else button.removeAttribute("aria-current");
-  });
-}
-
-function feedSkeletonHtml() {
-  return `
-    <div class="ls-feed-skeleton ls-skeleton">
-      <div class="ls-feed-skeleton-lines">
-        <span></span>
-        <span></span>
-      </div>
-    </div>`;
-}
-
-function pulseActionButton(button) {
-  if (!button) return;
-  button.classList.remove("ls-action-pop");
-  void button.offsetWidth;
-  button.classList.add("ls-action-pop");
-  setTimeout(() => button.classList.remove("ls-action-pop"), 380);
-}
-
 function switchTab(tab) {
   clearAllWatchIntervals();
   currentTab = tab;
-  updateMobileBottomNav();
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
   if (activeBtn) activeBtn.classList.add("active");
@@ -1621,13 +1257,7 @@ function switchTab(tab) {
 
 function updateBalanceUI() {
   const el = document.getElementById("navBalance");
-  if (el) {
-    el.textContent = currentProfile.points_balance + " pts";
-    el.classList.remove("ls-balance-pop");
-    void el.offsetWidth;
-    el.classList.add("ls-balance-pop");
-    setTimeout(() => el.classList.remove("ls-balance-pop"), 500);
-  }
+  if (el) el.textContent = currentProfile.points_balance + " pts";
 }
 
 function showToast(msg) {
@@ -1646,7 +1276,7 @@ async function renderFeed() {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="feedList">${feedSkeletonHtml()}</div>`;
+    <div id="feedList">Cargando videos...</div>`;
   checkAndShowLoginStreak();
 
   const { data: videos, error } = await sb
@@ -2486,10 +2116,6 @@ function renderUpload() {
             onchange="previewFileSize()"
             style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
           <div id="fileSizeInfo" style="font-size:12px;margin-top:6px;"></div>
-          <div id="uploadPreview" class="ls-upload-preview">
-            <div class="ls-upload-preview-label">Vista previa</div>
-            <video id="uploadPreviewVideo" controls muted playsinline preload="metadata"></video>
-          </div>
         </div>
         <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
           <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
@@ -2513,44 +2139,11 @@ function renderUpload() {
 const MAX_FILE_MB = 50;
 let rawSelectedFile = null;
 let trimmedFile = null;
-let uploadPreviewObjectUrl = null;
 
 function previewFileSize() {
   rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
   trimmedFile = null;
   refreshFileSizeUI();
-  refreshUploadVideoPreview();
-}
-
-function clearUploadVideoPreview() {
-  const preview = document.getElementById("uploadPreview");
-  const video = document.getElementById("uploadPreviewVideo");
-
-  if (uploadPreviewObjectUrl) {
-    URL.revokeObjectURL(uploadPreviewObjectUrl);
-    uploadPreviewObjectUrl = null;
-  }
-
-  if (video) {
-    video.removeAttribute("src");
-    video.load();
-  }
-
-  preview?.classList.remove("active");
-}
-
-function refreshUploadVideoPreview() {
-  const preview = document.getElementById("uploadPreview");
-  const video = document.getElementById("uploadPreviewVideo");
-  const file = trimmedFile || rawSelectedFile;
-
-  if (!preview || !video) return;
-  clearUploadVideoPreview();
-  if (!file) return;
-
-  uploadPreviewObjectUrl = URL.createObjectURL(file);
-  video.src = uploadPreviewObjectUrl;
-  preview.classList.add("active");
 }
 
 function refreshFileSizeUI() {
@@ -2582,7 +2175,6 @@ function refreshFileSizeUI() {
 function discardTrim() {
   trimmedFile = null;
   refreshFileSizeUI();
-  refreshUploadVideoPreview();
 }
 
 function formatTrimSeconds(s) {
@@ -2701,7 +2293,6 @@ async function confirmVideoTrim() {
 
     closeVideoTrimmer();
     refreshFileSizeUI();
-      refreshUploadVideoPreview();
     showToast("¡Video recortado!");
   } catch (e) {
     showToast("No se pudo recortar. Probá con otro navegador o un archivo distinto.");
@@ -2750,7 +2341,6 @@ async function setUploadMode(mode) {
   window.currentUploadMode = mode;
   rawSelectedFile = null;
   trimmedFile = null;
-  clearUploadVideoPreview();
   document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
   document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
   document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
@@ -3269,7 +2859,6 @@ async function handleLike(videoId) {
   }
 
   btn.classList.add("liked");
-  pulseActionButton(btn);
   currentProfile.points_balance += data.points;
   updateBalanceUI();
   showToast(`+${data.points} pt por el like`);
@@ -3411,7 +3000,7 @@ function logSocialClick(ownerId, platform) {
 // ============================================================
 async function renderForYou() {
   const main = document.getElementById("appView");
-  main.innerHTML = `<div id="foryouList">${feedSkeletonHtml()}</div>`;
+  main.innerHTML = `<div id="foryouList">Cargando destacados...</div>`;
 
   const { data: featured, error } = await sb.rpc("get_featured_videos");
   const list = document.getElementById("foryouList");

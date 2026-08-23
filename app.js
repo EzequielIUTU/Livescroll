@@ -5950,6 +5950,58 @@ function closeObsStreamingSetup() {
 window.openObsStreamingSetup = openObsStreamingSetup;
 window.closeObsStreamingSetup = closeObsStreamingSetup;
 
+
+function openLocalObsLive() {
+  stopConnectedLiveRefresh();
+
+  const main = document.getElementById("appView");
+  if (!main) return;
+
+  main.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <button class="btn-outline" style="padding:7px 10px;" onclick="renderDirectos()">← Directos</button>
+      <div>
+        <div style="font-size:10px;color:var(--green);font-weight:900;">● EN VIVO · OBS</div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:2px;">Prueba local con MediaMTX</div>
+      </div>
+    </div>
+
+    <div class="ls-live-viewer-layout">
+      <section class="ls-live-video-shell">
+        <div class="ls-live-video-area" style="background:#000;">
+          <iframe
+            src="http://localhost:8888/livescroll/"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen
+            scrolling="no"
+            style="display:block;width:100%;height:100%;min-height:520px;border:0;background:#000;"
+          ></iframe>
+        </div>
+
+        <div class="ls-live-details">
+          <div style="display:flex;justify-content:space-between;gap:10px;">
+            <div>
+              <div style="font-size:15px;font-weight:800;">Prueba de transmisión OBS</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:5px;">
+                OBS → MediaMTX → LiveScroll
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--green);">● EN VIVO</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="ls-live-chat">
+        <div class="ls-live-chat-head">💬 Chat del directo</div>
+        <div class="ls-live-chat-messages" style="display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--text-dim);font-size:11px;">
+          El reproductor OBS ya está conectado.<br><br>
+          En la siguiente etapa vinculamos este directo a tu usuario y al chat real de LiveScroll.
+        </div>
+      </aside>
+    </div>`;
+}
+window.openLocalObsLive = openLocalObsLive;
+
 async function renderDirectos(renderToken = lsTabRenderToken) {
   startConnectedLiveRefresh();
   const main = document.getElementById("appView");
@@ -5959,6 +6011,23 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
       <button class="btn" onclick="window.openObsStreamingSetup && window.openObsStreamingSetup()">🎥 Configurar OBS</button>
     </div>
     <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
+    <div class="ls-obs-local-test" style="
+      margin:14px 0;
+      padding:14px;
+      border:1px solid rgba(244,197,66,.25);
+      border-radius:14px;
+      background:var(--panel);
+    ">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900;">🎥 Prueba OBS local</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
+            MediaMTX · localhost · ruta livescroll
+          </div>
+        </div>
+        <button class="btn" type="button" onclick="openLocalObsLive()">🔴 Ver directo OBS</button>
+      </div>
+    </div>
     <div id="directosList">Cargando...</div>`;
 
   const [ext, studio] = await Promise.allSettled([

@@ -5738,6 +5738,70 @@ async function loadUsersDirectory(term) {
 }
 
 
+
+function openEmojiDetail(name, emoji, rarity = "", obtainedAt = "", serialNumber = "", stockTotal = "") {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const rarityLabel = rarity ? getProfileMedalRarityLabel(rarity) : "Emoji";
+  const rarityClass = rarity ? getProfileMedalRarityClass(rarity) : "";
+
+  const rarityColor =
+    rarity === "rara" ? "#7dd3fc" :
+    rarity === "epica" ? "#c084fc" :
+    rarity === "legendaria" ? "#fbbf24" :
+    rarity === "exclusiva" ? "#fb7185" :
+    rarity === "comun" ? "#cbd5e1" :
+    "var(--text-dim)";
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) openMyMedalsPanel()">
+      <div class="modal-box" style="max-width:390px;text-align:center;overflow:hidden;">
+        <div style="position:relative;padding:28px 22px 20px;background:
+          radial-gradient(circle at 50% 15%, ${rarityColor}18, transparent 48%),
+          var(--panel);">
+
+          <button type="button" onclick="openMyMedalsPanel()"
+            style="position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:17px;cursor:pointer;">✕</button>
+
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--text-dim);margin-bottom:17px;">
+            LIVESCROLL · COLLECTION
+          </div>
+
+          <div class="ls-equipped-medal ${rarityClass}"
+            style="width:92px;height:92px;margin:0 auto 15px;font-size:52px;pointer-events:none;">
+            ${emoji}
+          </div>
+
+          <h2 style="margin:0;font-size:22px;">${escapeHtml(name || "Emoji")}</h2>
+
+          <div style="font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:${rarityColor};margin-top:7px;">
+            ${escapeHtml(rarityLabel)}
+          </div>
+
+          ${serialNumber && stockTotal ? `
+            <div style="display:inline-flex;margin-top:13px;padding:6px 10px;border-radius:999px;border:1px solid rgba(250,204,21,.25);background:rgba(250,204,21,.05);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;color:var(--gold);">
+              LIMITED #${serialNumber}/${stockTotal}
+            </div>` : ""}
+
+          <div style="margin:18px auto 0;max-width:290px;padding:12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text-dim);line-height:1.55;">
+              Emoji desbloqueado para usar en tu perfil de LiveScroll.
+            </div>
+            ${obtainedAt ? `
+              <div style="font-size:10px;color:var(--text-dim);margin-top:8px;">
+                Obtenido el ${new Date(obtainedAt).toLocaleDateString("es-AR")}
+              </div>` : ""}
+          </div>
+        </div>
+
+        <div style="padding:0 22px 22px;">
+          <button class="btn-outline" style="width:100%;" onclick="openMyMedalsPanel()">Volver a Mi colección</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function openMyMedalsPanel() {
   const badges = window.__myProfileBadges || [];
   const wrap = document.getElementById("globalModalWrap");
@@ -5952,7 +6016,7 @@ function renderCollection568Grid() {
 
     const onclick = item.type === "badge"
       ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
-      : `showToast('${escapeHtml(item.icon)} ${escapeHtml(item.name)}')`;
+      : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
 
     return `
       <button type="button" onclick="${onclick}"

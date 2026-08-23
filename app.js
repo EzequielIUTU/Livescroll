@@ -350,8 +350,8 @@ function toggleMobileMenu() {
     <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
     <button onclick="switchTab('users'); closeMobileMenu();">👥 Usuarios</button>
     <button onclick="switchTab('directos'); closeMobileMenu();" style="color:var(--red)">🔴 Directos</button>
-    <button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>
-    <button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>
+    ${!window.__navWalletLocked ? `<button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>` : ""}
+    ${!window.__navPlansLocked ? `<button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>` : ""}
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
@@ -374,6 +374,15 @@ async function renderApp() {
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
 
+  const { data: visibilityRows } = await sb
+    .from("app_text_config")
+    .select("key, value")
+    .in("key", ["wallet_visibility", "plans_visibility"]);
+  const walletLocked = visibilityRows?.find(r => r.key === "wallet_visibility")?.value === "closed" && !currentProfile.is_admin;
+  const plansLocked = visibilityRows?.find(r => r.key === "plans_visibility")?.value === "closed" && !currentProfile.is_admin;
+  window.__navWalletLocked = walletLocked;
+  window.__navPlansLocked = plansLocked;
+
   document.getElementById("navLinks").innerHTML = `
     <button id="tab-feed" onclick="switchTab('feed')">Mirar</button>
     <button id="tab-foryou" onclick="switchTab('foryou')">✨ Para Ti</button>
@@ -381,8 +390,8 @@ async function renderApp() {
     <button id="tab-profile" onclick="switchTab('profile')">Mi Perfil</button>
     <button id="tab-users" onclick="switchTab('users')">👥 Usuarios</button>
     <button id="tab-directos" onclick="switchTab('directos')" style="color:var(--red)">🔴 Directos</button>
-    <button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>
-    <button id="tab-plans" onclick="switchTab('plans')">Planes</button>
+    ${!walletLocked ? `<button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>` : ""}
+    ${!plansLocked ? `<button id="tab-plans" onclick="switchTab('plans')">Planes</button>` : ""}
     <button id="tab-store" onclick="switchTab('store')">🛍️ Tienda</button>
     <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;

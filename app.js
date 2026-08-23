@@ -1040,69 +1040,110 @@ function showChangelogModal(entries) {
   (entries || []).forEach(e => {
     const version = Number(e.version || 0);
     if (!byVersion[version]) {
-      byVersion[version] = {
-        display: e.display_version || null,
-        cats: {}
-      };
+      byVersion[version] = { display:e.display_version || null, cats:{} };
     }
-
     if (e.display_version && !byVersion[version].display) {
       byVersion[version].display = e.display_version;
     }
-
     byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
     byVersion[version].cats[e.category].push(e.content);
   });
 
-  const versions = Object.keys(byVersion).map(Number).sort((a, b) => a - b);
+  const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
   const multipleVersions = versions.length > 1;
+  const newest = versions[versions.length - 1];
+  const newestLabel = byVersion[newest]?.display || "";
+  const isNextEra = versions.some(v => {
+    const label = byVersion[v]?.display || "";
+    const majorMinor = label.split(".").map(Number);
+    return (majorMinor[0] === 5 && majorMinor[1] >= 4) || majorMinor[0] >= 6;
+  });
 
+  // Versiones anteriores al camino a 6 conservan el modal clásico.
+  if (!isNextEra) {
+    const wrap = document.getElementById("globalModalWrap");
+    wrap.innerHTML = `
+      <div id="changelogOverlay" class="modal-overlay" style="transition:opacity .35s ease;">
+        <div id="changelogBox" class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;transition:transform .35s ease,opacity .35s ease;">
+          <div class="modal-box-header">
+            <div>
+              <h2 style="margin:0;">${multipleVersions ? "👋 Mientras no estabas..." : "✨ Novedades"}</h2>
+              ${multipleVersions ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Mirá todo lo que fuimos sumando desde tu última visita.</div>` : ""}
+            </div>
+          </div>
+          <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+            ${versions.map(v => {
+              const info=byVersion[v];
+              const label=info.display || `${v}.0.0`;
+              return `<div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll v${escapeHtml(label)}</div>
+                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
+                  <div style="margin-bottom:11px;">
+                    <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
+                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
+                  </div>`:"").join("")}
+              </div>`;
+            }).join("")}
+          </div>
+          <div class="modal-box-footer"><button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">${multipleVersions ? "Ya estoy al día ✓" : "Aceptar"}</button></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const stageNames = {
+    "5.4.6":"PERFORMANCE",
+    "5.5.7":"IDENTITY",
+    "5.6.8":"COLLECTION",
+    "5.7.9":"CONNECTED",
+    "5.8.0":"LIVE",
+    "5.9.0":"CORE",
+    "6.0.0":"NEW ERA"
+  };
+  const stage = stageNames[newestLabel] || "NEXT ERA";
   const wrap = document.getElementById("globalModalWrap");
 
   wrap.innerHTML = `
-    <div id="changelogOverlay" class="modal-overlay" style="transition:opacity 0.35s ease;">
-      <div id="changelogBox" class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
-        <div class="modal-box-header">
-          <div>
-            <h2 style="margin:0;">${multipleVersions ? "👋 Mientras no estabas..." : "✨ Novedades"}</h2>
-            ${multipleVersions ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Mirá todo lo que fuimos sumando desde tu última visita.</div>` : ""}
+    <div id="changelogOverlay" class="ls-next-era-changelog">
+      <div id="changelogBox" class="ls-next-era-box">
+        <div class="ls-next-era-scan"></div>
+
+        <div class="ls-next-era-head">
+          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
+          <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `v${escapeHtml(newestLabel)} · ${stage}`}</h2>
+          <div class="ls-next-era-sub">
+            ${multipleVersions
+              ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
+              : newestLabel === "6.0.0"
+                ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
+                : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
           </div>
         </div>
 
-        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-          ${versions.length ? versions.map(v => {
-            const info = byVersion[v];
-            const label = info.display || `${v}.0.0`;
-
+        <div class="ls-next-era-body">
+          ${versions.map(v => {
+            const info=byVersion[v];
+            const label=info.display || `${v}.0.0`;
             return `
-              <div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;">LiveScroll v${escapeHtml(label)}</span>
-                  ${v === versions[versions.length - 1] ? `<span style="font-size:9px;font-weight:800;color:#12130f;background:var(--gold);padding:2px 7px;border-radius:999px;">MÁS RECIENTE</span>` : ""}
+              <div class="ls-next-era-version">
+                <div class="ls-next-era-version-head">
+                  <div class="ls-next-era-version-name">LiveScroll v${escapeHtml(label)}</div>
+                  ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
                 </div>
-
-                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat =>
-                  info.cats[cat] ? `
-                    <div style="margin-bottom:11px;">
-                      <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">
-                        ${labels[cat]?.title || escapeHtml(cat)}
-                      </div>
-                      ${info.cats[cat].map(c => `
-                        <div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>
-                      `).join("")}
-                    </div>` : ""
-                ).join("")}
+                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
+                  <div class="ls-next-era-category">
+                    <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
+                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
+                  </div>`:"").join("")}
               </div>`;
-          }).join("") : `
-            <div style="font-size:13px;color:var(--text-dim);text-align:center;padding:20px;">
-              No hay novedades pendientes.
-            </div>`}
+          }).join("")}
         </div>
 
-        <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">
-            ${multipleVersions ? "Ya estoy al día ✓" : "Aceptar"}
+        <div class="ls-next-era-foot">
+          <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
+            ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.9.0 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -2585,6 +2626,170 @@ function ensureModernMobileStyles() {
       }
     }
 
+
+
+    /* NEXT ERA — carteles de versión 5.4.6 → 6.0.0 */
+    .ls-next-era-changelog {
+      position:fixed;
+      inset:0;
+      z-index:910;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      box-sizing:border-box;
+      background:
+        radial-gradient(circle at 50% 105%, rgba(250,204,21,.15), transparent 42%),
+        radial-gradient(circle at 12% 8%, rgba(125,211,252,.08), transparent 28%),
+        rgba(2,4,8,.95);
+      backdrop-filter:blur(13px);
+      animation:lsRoad6OverlayIn .45s ease both;
+    }
+    .ls-next-era-box {
+      position:relative;
+      width:min(455px,100%);
+      max-height:90vh;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      border-radius:24px;
+      border:1px solid rgba(250,204,21,.27);
+      background:linear-gradient(160deg, rgba(22,24,31,.99), rgba(7,9,13,.99) 66%);
+      box-shadow:0 30px 100px rgba(0,0,0,.74), 0 0 45px rgba(250,204,21,.07);
+      animation:lsRoad6CardIn .78s cubic-bezier(.16,1,.3,1) both;
+      transition:transform .35s ease, opacity .35s ease;
+    }
+    .ls-next-era-box::before {
+      content:"";
+      position:absolute;
+      width:180px;
+      height:180px;
+      top:-110px;
+      right:-65px;
+      border-radius:50%;
+      background:rgba(250,204,21,.14);
+      filter:blur(13px);
+      animation:lsRoad6Glow 3.2s ease-in-out infinite;
+      pointer-events:none;
+    }
+    .ls-next-era-scan {
+      position:absolute;
+      inset:0;
+      z-index:1;
+      pointer-events:none;
+      opacity:.20;
+      background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.12) 45%,transparent 70%);
+      transform:translateX(-120%);
+      animation:lsRoad6Scan 3s 1s ease-in-out infinite;
+    }
+    .ls-next-era-head {
+      position:relative;
+      z-index:2;
+      padding:25px 22px 15px;
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .ls-next-era-kicker {
+      font-family:'JetBrains Mono',monospace;
+      font-size:9px;
+      letter-spacing:.20em;
+      color:var(--gold);
+      text-transform:uppercase;
+    }
+    .ls-next-era-title {
+      margin:8px 0 0;
+      font-size:25px;
+      line-height:1.08;
+      letter-spacing:-.035em;
+      color:var(--text);
+    }
+    .ls-next-era-sub {
+      margin-top:7px;
+      color:var(--text-dim);
+      font-size:11px;
+      line-height:1.45;
+    }
+    .ls-next-era-body {
+      position:relative;
+      z-index:2;
+      overflow-y:auto;
+      min-height:0;
+      padding:17px 22px 4px;
+    }
+    .ls-next-era-version {
+      position:relative;
+      margin-bottom:16px;
+      padding:13px;
+      border:1px solid rgba(250,204,21,.11);
+      border-radius:14px;
+      background:rgba(255,255,255,.018);
+    }
+    .ls-next-era-version-head {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .ls-next-era-version-name {
+      font-family:'JetBrains Mono',monospace;
+      font-size:11px;
+      font-weight:800;
+      color:var(--gold);
+    }
+    .ls-next-era-latest {
+      padding:2px 7px;
+      border-radius:999px;
+      background:var(--gold);
+      color:#12130f;
+      font-size:8px;
+      font-weight:900;
+    }
+    .ls-next-era-category { margin-bottom:10px; }
+    .ls-next-era-category:last-child { margin-bottom:0; }
+    .ls-next-era-category-title {
+      margin-bottom:4px;
+      font-size:11px;
+      font-weight:700;
+    }
+    .ls-next-era-line {
+      color:var(--text-dim);
+      font-size:12px;
+      line-height:1.45;
+      margin:4px 0;
+    }
+    .ls-next-era-foot {
+      position:relative;
+      z-index:3;
+      padding:14px 22px 20px;
+      background:linear-gradient(to top,rgba(7,9,13,1),rgba(7,9,13,.94));
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .ls-next-era-btn {
+      width:100%;
+      min-height:46px;
+      border:0;
+      border-radius:13px;
+      cursor:pointer;
+      font-family:inherit;
+      font-weight:850;
+      color:#12130f;
+      background:linear-gradient(135deg,#fde047,#f59e0b);
+      box-shadow:0 10px 28px rgba(245,158,11,.14);
+    }
+    .ls-next-era-road {
+      margin-top:9px;
+      text-align:center;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      letter-spacing:.05em;
+      color:rgba(250,204,21,.66);
+    }
+    @media (max-width:420px) {
+      .ls-next-era-changelog { padding:8px; }
+      .ls-next-era-box { max-height:96vh; }
+      .ls-next-era-head { padding:21px 17px 13px; }
+      .ls-next-era-body { padding:14px 17px 2px; }
+      .ls-next-era-foot { padding:12px 17px 16px; }
+    }
 
     /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
     .ls-fast-skeleton {

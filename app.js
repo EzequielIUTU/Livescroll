@@ -887,7 +887,80 @@ async function checkPendingContent() {
     showChangelogModal(data.changelog_entries || []);
   } else if (data.road_to_6_teaser_pending) {
     showRoadTo6Teaser();
+  } else {
+    checkCollection568Launch();
   }
+}
+
+
+async function checkCollection568Launch() {
+  if (!currentUser?.id) return;
+
+  const { data, error } = await sb.rpc("get_collection_568_launch_pending");
+  if (error || !data?.pending) return;
+
+  showCollection568Launch();
+}
+
+function showCollection568Launch() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="ls-next-era-changelog">
+      <div class="ls-next-era-box" style="max-width:520px;text-align:center;">
+        <div class="ls-next-era-scan"></div>
+
+        <div class="ls-next-era-head">
+          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:.16em;margin:13px 0 5px;">NUEVA ETAPA</div>
+          <h2 class="ls-next-era-title" style="font-size:clamp(29px,7vw,48px);line-height:.98;margin-bottom:8px;">5.6.8</h2>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:900;color:var(--gold);letter-spacing:.12em;">COLLECTION</div>
+        </div>
+
+        <div class="ls-next-era-body" style="text-align:center;">
+          <div style="font-size:38px;margin:3px 0 10px;">🛍️</div>
+          <h3 style="margin:0 0 10px;font-size:18px;">Tu colección está por evolucionar.</h3>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.65;max-width:390px;margin:0 auto;">
+            Comenzamos oficialmente a trabajar en una nueva etapa de LiveScroll.
+            Nuevos coleccionables, ediciones especiales y nuevas formas de distinguir tu perfil.
+          </p>
+
+          <div style="margin:18px auto 4px;max-width:360px;padding:11px;border:1px solid rgba(250,204,21,.16);border-radius:12px;background:rgba(250,204,21,.035);">
+            <div style="font-size:10px;color:var(--text-dim);">ESTO RECIÉN EMPIEZA</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;color:var(--gold);margin-top:4px;">RUMBO A LIVESCROLL 6</div>
+          </div>
+        </div>
+
+        <div style="padding:0 22px 22px;">
+          <button class="ls-road6-btn" style="width:100%;" onclick="acknowledgeCollection568Launch(this)">
+            DESCUBRIR 5.6.8 →
+          </button>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:9px;">5.6.8 se encuentra actualmente en desarrollo.</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function acknowledgeCollection568Launch(btn) {
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "ENTRANDO A COLLECTION...";
+  }
+
+  const { data, error } = await sb.rpc("acknowledge_collection_568_launch");
+
+  if (error || !data?.ok) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "DESCUBRIR 5.6.8 →";
+    }
+    showToast("No se pudo guardar el aviso");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
 }
 
 function showRoadTo6Teaser() {

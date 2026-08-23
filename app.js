@@ -960,9 +960,58 @@ async function checkPendingContent() {
   } else if (data.tutorial_pending) {
     showTutorialModal();
   } else if (data.changelog_pending) {
-    // Si estuvo varios días afuera, primero ve "Mientras no estabas..."
-    // y recién al ponerse al día comprobamos el teaser.
-    showChangelogModal(data.changelog_entries || []);
+    // El backend decide si hay Novedades pendientes.
+    // Para el contenido visual, completamos con la versión visible más reciente
+    // del historial. Así el cartel nunca queda clavado en una versión anterior
+    // aunque el payload pendiente venga atrasado.
+    let pendingEntries = Array.isArray(data.changelog_entries)
+      ? [...data.changelog_entries]
+      : [];
+
+    try {
+      const { data: history } = await sb.rpc("get_changelog_history_v2", { p_limit: 200 });
+
+      if (Array.isArray(history) && history.length) {
+        const semverParts = (value) => String(value || "0.0.0")
+          .split(".")
+          .map(n => Number.parseInt(n, 10) || 0);
+
+        const compareSemver = (a, b) => {
+          const pa = semverParts(a);
+          const pb = semverParts(b);
+          const max = Math.max(pa.length, pb.length, 3);
+          for (let i = 0; i < max; i++) {
+            const av = pa[i] || 0;
+            const bv = pb[i] || 0;
+            if (av !== bv) return av - bv;
+          }
+          return 0;
+        };
+
+        const latestDisplay = history
+          .map(e => String(e.display_version || `${e.version}.0.0`))
+          .sort(compareSemver)
+          .at(-1);
+
+        if (latestDisplay) {
+          const alreadyHasLatest = pendingEntries.some(e =>
+            String(e.display_version || `${e.version}.0.0`) === latestDisplay
+          );
+
+          if (!alreadyHasLatest) {
+            const latestRows = history.filter(e =>
+              String(e.display_version || `${e.version}.0.0`) === latestDisplay
+            );
+            pendingEntries.push(...latestRows);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("No se pudo completar Novedades con el historial:", err);
+    }
+
+    // Si estuvo varios días afuera, conserva el flujo "Mientras no estabas...".
+    showChangelogModal(pendingEntries);
   } else if (data.road_to_6_teaser_pending) {
     showRoadTo6Teaser();
   } else {
@@ -1321,10 +1370,17 @@ function showChangelogModal(entries) {
   (entries || []).forEach(e => {
     const version = Number(e.version || 0);
     if (!byVersion[version]) {
-      byVersion[version] = { display:e.display_version || null, cats:{} };
+      byVersion[version] = {
+        display:e.display_version || null,
+        releaseDate:e.release_date || null,
+        cats:{}
+      };
     }
     if (e.display_version && !byVersion[version].display) {
       byVersion[version].display = e.display_version;
+    }
+    if (e.release_date && !byVersion[version].releaseDate) {
+      byVersion[version].releaseDate = e.release_date;
     }
     byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
     byVersion[version].cats[e.category].push(e.content);
@@ -1378,10 +1434,23 @@ function showChangelogModal(entries) {
     "5.6.8":"COLLECTION",
     "5.7.9":"CONNECTED",
     "5.8.0":"LIVE",
+    "5.8.1":"SECURITY",
     "5.9.0":"CORE",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "NEXT ERA";
+
+  const formatLaunchDate = (value) => {
+    if (!value) return "";
+    const d = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("es-AR", {
+      day:"2-digit",
+      month:"short",
+      year:"numeric"
+    });
+  };
+
   const wrap = document.getElementById("globalModalWrap");
 
   wrap.innerHTML = `
@@ -1397,7 +1466,9 @@ function showChangelogModal(entries) {
               ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
               : newestLabel === "6.0.0"
                 ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
-                : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
+                : newestLabel === "5.8.1"
+                  ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
+                  : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
           </div>
         </div>
 
@@ -1408,7 +1479,10 @@ function showChangelogModal(entries) {
             return `
               <div class="ls-next-era-version">
                 <div class="ls-next-era-version-head">
-                  <div class="ls-next-era-version-name">LiveScroll v${escapeHtml(label)}</div>
+                  <div>
+                    <div class="ls-next-era-version-name">LiveScroll v${escapeHtml(label)}</div>
+                    ${info.releaseDate ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:3px;">${escapeHtml(formatLaunchDate(info.releaseDate))}</div>` : ""}
+                  </div>
                   ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
                 </div>
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
@@ -1424,7 +1498,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.9.0 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.9.0 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -1432,9 +1506,9 @@ function showChangelogModal(entries) {
 
 
 // ============================================================
-// NOVEDADES — CONGELADO DESDE 5.8.0
-// No modificar el comportamiento de historial/cartel durante la rama 5.8.x.
-// Solo tocarlo al publicar una nueva versión oficial posterior.
+// NOVEDADES — SISTEMA DINÁMICO DESDE 5.8.1
+// El cartel toma la versión visible más reciente del historial cuando existe
+// una actualización pendiente, evitando quedar clavado en una versión anterior.
 // ============================================================
 
 async function openChangelogHistory() {

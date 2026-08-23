@@ -1464,7 +1464,7 @@ async function openChangelogHistory() {
   };
 
   // Pedimos más filas porque p_limit limita entradas, no versiones completas.
-  const { data: entries, error } = await sb.rpc("get_changelog_history", { p_limit: 200 });
+  const { data: entries, error } = await sb.rpc("get_changelog_history_v2", { p_limit: 200 });
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
 
@@ -1496,9 +1496,14 @@ async function openChangelogHistory() {
     if (!byDisplayVersion[display]) {
       byDisplayVersion[display] = {
         display,
+        releaseDate: e.release_date || null,
         internalVersions: new Set(),
         cats: {}
       };
+    }
+
+    if (!byDisplayVersion[display].releaseDate && e.release_date) {
+      byDisplayVersion[display].releaseDate = e.release_date;
     }
 
     byDisplayVersion[display].internalVersions.add(Number(e.version || 0));
@@ -1514,6 +1519,14 @@ async function openChangelogHistory() {
   const versions = Object.keys(byDisplayVersion).sort(compareSemverDesc);
   const currentDisplayVersion = versions[0];
 
+  const formatReleaseDate = (value) => {
+    if (!value) return "Fecha no registrada";
+    const d = new Date(`${value}T12:00:00`);
+    return Number.isNaN(d.getTime())
+      ? String(value)
+      : d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
+  };
+
   list.innerHTML = versions.map(display => {
     const info = byDisplayVersion[display];
 
@@ -1521,7 +1534,7 @@ async function openChangelogHistory() {
       <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
           <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);">
-            v${escapeHtml(display)}
+            v${escapeHtml(display)} · ${escapeHtml(formatReleaseDate(info.releaseDate))}
           </div>
           ${display === currentDisplayVersion
             ? `<span style="font-size:10px;font-weight:700;color:#12130f;background:var(--green);padding:2px 8px;border-radius:20px;letter-spacing:.04em;">ACTUAL</span>`

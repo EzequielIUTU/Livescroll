@@ -36,7 +36,12 @@ let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mism
 // ============================================================
 document.addEventListener("DOMContentLoaded", async () => {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
+    if ("requestIdleCallback" in window) {
+      requestIdleCallback(registerSW, { timeout: 2200 });
+    } else {
+      setTimeout(registerSW, 1200);
+    }
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -285,10 +290,17 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
-  if (!error) currentProfile = data;
+  const [profileResult, statusResult] = await Promise.all([
+    sb.from("profiles")
+      .select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform")
+      .eq("id", currentUser.id)
+      .single(),
+    sb.rpc("get_my_status")
+  ]);
 
-  const { data: status } = await sb.rpc("get_my_status");
+  if (!profileResult.error) currentProfile = profileResult.data;
+
+  const status = statusResult.data;
   if (status && currentProfile) {
     currentProfile.is_admin = status.is_admin;
     currentProfile.is_blocked = status.is_blocked;
@@ -788,15 +800,31 @@ function initLiveScrollExperienceMode() {
 async function renderApp() {
   initLiveScrollExperienceMode();
   ensureModernMobileStyles();
+
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
 
-  const { data: visibilityRows } = await sb
-    .from("app_text_config")
-    .select("key, value")
-    .in("key", ["wallet_visibility", "plans_visibility"]);
-  const walletLocked = visibilityRows?.find(r => r.key === "wallet_visibility")?.value === "closed" && !currentProfile.is_admin;
-  const plansLocked = visibilityRows?.find(r => r.key === "plans_visibility")?.value === "closed" && !currentProfile.is_admin;
+  // 5.4.6: mostramos respuesta inmediata mientras resolvemos
+  // las pocas cosas necesarias para construir la navegación.
+  const appView = document.getElementById("appView");
+  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
+
+  const [visibilityResult, plans] = await Promise.all([
+    sb.from("app_text_config")
+      .select("key, value")
+      .in("key", ["wallet_visibility", "plans_visibility"]),
+    loadPlans()
+  ]);
+
+  const visibilityRows = visibilityResult.data || [];
+  const walletLocked =
+    visibilityRows.find(r => r.key === "wallet_visibility")?.value === "closed" &&
+    !currentProfile.is_admin;
+
+  const plansLocked =
+    visibilityRows.find(r => r.key === "plans_visibility")?.value === "closed" &&
+    !currentProfile.is_admin;
+
   window.__navWalletLocked = walletLocked;
   window.__navPlansLocked = plansLocked;
 
@@ -813,12 +841,14 @@ async function renderApp() {
     <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;
 
-  const plans = await loadPlans();
-  const currentPlan = plans.find(p => p.id === currentProfile.plan_id) || plans[0];
+  const currentPlan =
+    plans.find(p => p.id === currentProfile.plan_id) ||
+    plans[0] ||
+    { name: currentProfile.plan_id || "Plan" };
 
   document.getElementById("navRight").innerHTML = `
     <div class="nav-plan-chip">
-      <span class="plan-name">${currentPlan.name}</span>
+      <span class="plan-name">${escapeHtml(currentPlan.name || "Plan")}</span>
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
@@ -828,14 +858,19 @@ async function renderApp() {
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
-  await loadNotifications();
+  // Lo visible primero.
+  checkBlockedStatus();
+  switchTab("feed");
+
+  // Lo secundario ya no bloquea la aparición del Feed.
+  // Realtime se conecta enseguida y el historial se carga en paralelo.
   subscribeToNotifications();
 
-  checkBoostStatus();
-  checkBlockedStatus();
-  checkPendingContent();
-  // La racha ahora se reclama a mano desde Mi Perfil, no automático al entrar
-  switchTab("feed");
+  Promise.allSettled([
+    loadNotifications(),
+    checkBoostStatus(),
+    checkPendingContent()
+  ]).catch(() => {});
 }
 
 async function checkPendingContent() {

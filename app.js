@@ -522,7 +522,7 @@ function initLiveScrollExperienceMode() {
 
       @media (max-width:700px) {
         .ls-experience-badge {
-          bottom:max(82px, calc(72px + env(safe-area-inset-bottom))) !important;
+          bottom:max(12px, env(safe-area-inset-bottom)) !important;
           right:10px !important;
           z-index:340 !important;
         }
@@ -790,7 +790,6 @@ function initLiveScrollExperienceMode() {
 async function renderApp() {
   initLiveScrollExperienceMode();
   ensureModernMobileStyles();
-  ensureSafeMobileBottomNav();
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
 
@@ -1306,7 +1305,7 @@ function ensureSafeMobileUpgradeStyles() {
   const style = document.createElement("style");
   style.id = "lsSafeMobileUpgradeStyles";
   style.textContent = `
-    .ls-mobile-nav-safe { display:none; }
+    .ls-mobile-nav-safe { display:none !important; }
 
     body,
     button,
@@ -1353,14 +1352,6 @@ function ensureSafeMobileUpgradeStyles() {
     }
 
     @media (max-width:700px) {
-      body {
-        padding-bottom:78px !important;
-      }
-
-      #appView {
-        padding-bottom:88px !important;
-      }
-
       .ls-mobile-nav-safe {
         position:fixed !important;
         left:8px !important;
@@ -1545,17 +1536,6 @@ function ensureSafeMobileUpgradeStyles() {
     }
 
     @media (max-width:700px) {
-      .feed-vertical,
-      #feedList,
-      #foryouList {
-        padding-bottom:84px !important;
-        box-sizing:border-box !important;
-      }
-
-      .feed-item:last-child {
-        margin-bottom:76px !important;
-      }
-
       .ls-profile-edit-modal {
         width:100% !important;
         max-width:100% !important;
@@ -1596,7 +1576,7 @@ function ensureSafeMobileUpgradeStyles() {
 
       .ls-comments-overlay-safe {
         align-items:flex-end !important;
-        padding:0 0 78px 0 !important;
+        padding:0 !important;
         box-sizing:border-box !important;
       }
 
@@ -1616,9 +1596,7 @@ function ensureSafeMobileUpgradeStyles() {
 }
 
 function setMobileBottomNavHidden(hidden) {
-  const nav = document.getElementById("lsMobileBottomNavSafe");
-  if (!nav) return;
-  nav.style.display = hidden ? "none" : "";
+  // Navegación inferior retirada. Se conserva el helper para no romper modales existentes.
 }
 
 function closeManagedModal() {
@@ -1628,46 +1606,11 @@ function closeManagedModal() {
 }
 
 function ensureSafeMobileBottomNav() {
-  ensureSafeMobileUpgradeStyles();
-
-  let nav = document.getElementById("lsMobileBottomNavSafe");
-
-  if (!nav) {
-    nav = document.createElement("nav");
-    nav.id = "lsMobileBottomNavSafe";
-    nav.className = "ls-mobile-nav-safe";
-    nav.setAttribute("aria-label", "Navegación móvil");
-
-    nav.innerHTML = `
-      <button type="button" data-tab="feed" onclick="switchTab('feed')">
-        <span class="ic">🏠</span><span class="lb">Inicio</span>
-      </button>
-      <button type="button" data-tab="foryou" onclick="switchTab('foryou')">
-        <span class="ic">✨</span><span class="lb">Para Ti</span>
-      </button>
-      <button type="button" data-tab="upload" onclick="switchTab('upload')">
-        <span class="ic">＋</span><span class="lb">Subir</span>
-      </button>
-      <button type="button" data-tab="directos" onclick="switchTab('directos')">
-        <span class="ic">🔴</span><span class="lb">Directos</span>
-      </button>
-      <button type="button" data-tab="profile" onclick="switchTab('profile')">
-        <span class="ic">👤</span><span class="lb">Perfil</span>
-      </button>`;
-
-    document.body.appendChild(nav);
-  }
-
-  updateSafeMobileBottomNav();
+  document.getElementById("lsMobileBottomNavSafe")?.remove();
 }
 
 function updateSafeMobileBottomNav() {
-  const nav = document.getElementById("lsMobileBottomNavSafe");
-  if (!nav) return;
-
-  nav.querySelectorAll("button[data-tab]").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.tab === currentTab);
-  });
+  // Barra inferior retirada.
 }
 
 function safePulseElement(el, className) {

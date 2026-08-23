@@ -7156,12 +7156,15 @@ async function handleBuyStoreBadge(badgeId) {
   });
 
   if (error || !data?.ok) {
+    console.error("Compra de medalla falló:", error || data);
+    const code = data?.error || "";
     const messages = {
       saldo_insuficiente:"No tenés suficientes puntos.",
       ya_la_tenes:"Ya tenés esta medalla.",
-      no_disponible:"Esta medalla ya no está disponible."
+      no_disponible:"Esta medalla ya no está disponible.",
+      not_authenticated:"Tu sesión necesita renovarse."
     };
-    showToast(messages[data?.error] || "No se pudo comprar");
+    showToast(messages[code] || "No se pudo comprar la medalla");
     return;
   }
 

@@ -3092,6 +3092,14 @@ function ensureModernMobileStyles() {
       gap:6px !important;
     }
 
+
+    .ls-public-medals-wrap .ls-equipped-medal.ls-medal-favorite {
+      width:32px;
+      height:32px;
+      flex-basis:32px;
+      font-size:18px;
+    }
+
     .ls-public-medals-wrap .ls-equipped-medal {
       width:28px;
       height:28px;
@@ -3150,6 +3158,60 @@ function ensureModernMobileStyles() {
       .ls-equipped-medal {
         animation:none !important;
       }
+    }
+
+
+    .ls-equipped-medal.ls-medal-favorite {
+      width:36px;
+      height:36px;
+      font-size:20px;
+      box-shadow:
+        0 0 0 2px rgba(250,204,21,.16),
+        0 0 22px rgba(250,204,21,.18),
+        0 8px 20px rgba(0,0,0,.28);
+    }
+
+    .ls-equipped-medal.ls-medal-favorite::before {
+      content:"★";
+      position:absolute;
+      top:-7px;
+      right:-5px;
+      z-index:3;
+      font-size:10px;
+      line-height:1;
+      color:var(--gold);
+      text-shadow:0 0 8px rgba(250,204,21,.55);
+      pointer-events:none;
+    }
+
+    .ls-favorite-note {
+      margin:8px 0 13px;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid rgba(250,204,21,.16);
+      background:rgba(250,204,21,.035);
+      color:var(--text-dim);
+      font-size:10px;
+      line-height:1.45;
+    }
+
+    .ls-medal-order-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .ls-medal-order-btn {
+      min-width:31px;
+      height:28px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      cursor:pointer;
+      font-size:12px;
     }
 
     .ls-equipped-medal {
@@ -4760,7 +4822,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
     if (medal) {
       slots.push(`
         <button type="button"
-          class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}"
+          class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}${Number(medal.slot_number) === 1 ? " ls-medal-favorite" : ""}"
           title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
           onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}')">
           ${medal.badge_icon || "🏅"}
@@ -4819,24 +4881,32 @@ async function openEquipMedalsPanel() {
         <div class="modal-box-header">
           <div>
             <h2 style="margin:0;">🏅 Tu identidad</h2>
-            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Elegí hasta 3 medallas para mostrar debajo de tu nombre.</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Elegí hasta 3 medallas. La primera queda como tu favorita ★.</div>
           </div>
           <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
         </div>
 
         <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-          <div id="medalSelectionCount" style="font-size:11px;color:var(--gold);margin-bottom:12px;">${window.__selectedProfileMedals.length}/3 seleccionadas</div>
+          <div id="medalSelectionCount" style="font-size:11px;color:var(--gold);margin-bottom:8px;">${window.__selectedProfileMedals.length}/3 seleccionadas</div>
+          <div class="ls-favorite-note">★ La medalla que quede primera será tu favorita y tendrá un destaque especial en tu perfil.</div>
 
           ${badges.length ? `
             <div class="ls-medal-picker-grid">
               ${badges.map(b => `
-                <button type="button"
+                <div
                   class="ls-medal-picker-item ${window.__selectedProfileMedals.includes(b.badge_name) ? "selected" : ""}"
                   data-medal-name="${escapeHtml(b.badge_name)}"
                   onclick="toggleProfileMedalSelection(this, '${escapeHtml(b.badge_name)}')">
                   <div class="ls-medal-picker-icon">${b.badge_icon || "🏅"}</div>
                   <div class="ls-medal-picker-name">${escapeHtml(b.badge_name)}</div>
-                </button>
+                  <div class="ls-medal-order-row" onclick="event.stopPropagation();">
+                    <button type="button" class="ls-medal-order-btn" title="Mover antes"
+                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', -1)">←</button>
+                    <span class="mono" style="font-size:9px;color:var(--text-dim);" id="medalOrder-${escapeHtml(b.badge_name)}"></span>
+                    <button type="button" class="ls-medal-order-btn" title="Mover después"
+                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', 1)">→</button>
+                  </div>
+                </div>
               `).join("")}
             </div>` :
             `<div style="padding:24px 8px;text-align:center;color:var(--text-dim);font-size:12px;">Todavía no tenés medallas para equipar.</div>`
@@ -4849,6 +4919,44 @@ async function openEquipMedalsPanel() {
         </div>
       </div>
     </div>`;
+
+  setTimeout(() => refreshProfileMedalOrderUI(), 0);
+}
+
+
+function refreshProfileMedalOrderUI() {
+  const list = window.__selectedProfileMedals || [];
+
+  document.querySelectorAll(".ls-medal-picker-item").forEach(el => {
+    const name = el.dataset.medalName;
+    const idx = list.indexOf(name);
+    el.classList.toggle("selected", idx >= 0);
+
+    const orderEl = el.querySelector("[id^='medalOrder-']");
+    if (orderEl) {
+      orderEl.textContent = idx >= 0 ? (idx === 0 ? "★ 1" : `${idx + 1}`) : "";
+    }
+  });
+
+  const count = document.getElementById("medalSelectionCount");
+  if (count) count.textContent = `${list.length}/3 seleccionadas`;
+}
+
+function moveSelectedProfileMedal(badgeName, direction) {
+  const list = window.__selectedProfileMedals || [];
+  const idx = list.indexOf(badgeName);
+
+  if (idx < 0) {
+    showToast("Primero seleccioná esa medalla");
+    return;
+  }
+
+  const next = idx + Number(direction);
+  if (next < 0 || next >= list.length) return;
+
+  [list[idx], list[next]] = [list[next], list[idx]];
+  window.__selectedProfileMedals = list;
+  refreshProfileMedalOrderUI();
 }
 
 function toggleProfileMedalSelection(button, badgeName) {
@@ -4868,15 +4976,12 @@ function toggleProfileMedalSelection(button, badgeName) {
   }
 
   window.__selectedProfileMedals = list;
-  const count = document.getElementById("medalSelectionCount");
-  if (count) count.textContent = `${list.length}/3 seleccionadas`;
+  refreshProfileMedalOrderUI();
 }
 
 function clearProfileMedalSelection() {
   window.__selectedProfileMedals = [];
-  document.querySelectorAll(".ls-medal-picker-item.selected").forEach(el => el.classList.remove("selected"));
-  const count = document.getElementById("medalSelectionCount");
-  if (count) count.textContent = "0/3 seleccionadas";
+  refreshProfileMedalOrderUI();
 }
 
 async function saveEquippedProfileMedals() {

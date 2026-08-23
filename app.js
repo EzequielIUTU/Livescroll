@@ -1424,6 +1424,7 @@ async function handlePinVideo(videoId) {
     return;
   }
   showToast("¡Video anclado en Para Ti por 24hs!");
+  lsPerfCache.profileVideos.at = 0;
   renderProfile();
 }
 
@@ -1432,6 +1433,8 @@ async function handleDeleteOwnVideo(videoId) {
   const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
   if (error || !data.ok) { showToast("No se pudo eliminar el video"); return; }
   showToast("Video eliminado");
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
   renderProfile();
 }
 
@@ -1954,11 +1957,31 @@ function showFloatingPointsSafe(amount, anchorEl = null) {
 
 const lsPerfCache = {
   feed: { data:null, at:0 },
-  directos: { data:null, at:0 }
+  directos: { data:null, at:0 },
+  profileVideos: { data:null, at:0 },
+  profileViewsLedger: { data:null, at:0 }
 };
 let lsTabRenderToken = 0;
 
-function renderFastSkeleton(lines = 5) {
+function renderFastSkeleton(lines = 5, type = "generic") {
+  if (type === "feed") {
+    return `<div style="display:grid;place-items:center;min-height:58vh;">
+      <div style="width:min(390px,100%);height:58vh;border-radius:18px;background:var(--panel-2);overflow:hidden;position:relative;">
+        <div class="ls-fast-shimmer" style="position:absolute;inset:0;"></div>
+      </div>
+    </div>`;
+  }
+  if (type === "profile") {
+    return `<div class="ls-fast-profile-skeleton">
+      <div class="ls-fast-profile-hero">
+        <span class="ls-fast-avatar"></span>
+        <div style="flex:1;display:grid;gap:9px;"><i style="width:44%;"></i><i style="width:64%;"></i></div>
+      </div>
+      <div class="ls-fast-stats">${"<i></i>".repeat(3)}</div>
+      <div class="ls-fast-skeleton">${"<i></i>".repeat(3)}</div>
+    </div>`;
+  }
+  if (type === "directos") return `<div class="ls-fast-skeleton">${'<i style="height:78px;"></i>'.repeat(3)}</div>`;
   return `<div class="ls-fast-skeleton">${Array.from({length:lines}, () => "<i></i>").join("")}</div>`;
 }
 
@@ -1979,7 +2002,8 @@ function switchTab(tab) {
 
   // Feedback visual en el mismo frame del toque.
   if (main && ["feed","foryou","profile","users","directos","wallet","plans","store","ranking","admin"].includes(tab)) {
-    main.innerHTML = renderFastSkeleton(tab === "feed" || tab === "foryou" ? 7 : 5);
+    const skeletonType = (tab === "feed" || tab === "foryou") ? "feed" : tab === "profile" ? "profile" : tab === "directos" ? "directos" : "generic";
+    main.innerHTML = renderFastSkeleton(5, skeletonType);
   }
 
   if (tab === "feed") renderFeed(renderToken);
@@ -2026,7 +2050,7 @@ async function renderFeed(renderToken = lsTabRenderToken) {
 
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="feedList">${renderFastSkeleton(7)}</div>`;
+    <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
   checkAndShowLoginStreak();
 
   let videos = null;
@@ -2234,28 +2258,64 @@ function setupSwipeNavigation(fromTab, targets) {
   }, { passive: true });
 }
 
+function preloadFeedVideo(video) {
+  if (!video || loadedEmbeds.has(video.id)) return;
+  const el = document.getElementById(`embed-${video.id}`);
+  if (!el || video.platform !== "upload" || !isSafeUrl(video.video_url)) return;
+  el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;">
+    <video src="${escapeHtml(video.video_url)}" controls muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+  </div>`;
+  loadedEmbeds.add(video.id);
+}
+
+function activateLoadedEmbed(video) {
+  if (!video) return;
+  const player = document.querySelector(`#embed-${video.id} video`);
+  if (player) {
+    player.autoplay = true;
+    player.play().catch(() => {});
+  }
+}
+
 function setupFeedObserver(videos) {
-  const videoMap = Object.fromEntries(videos.map(v => [v.id, v]));
+  const videoMap = Object.fromEntries(videos.map(v => [String(v.id), v]));
+  const orderedIds = videos.map(v => String(v.id));
   loadedEmbeds.clear();
+
+  const keepWarmAround = (videoId) => {
+    const idx = orderedIds.indexOf(String(videoId));
+    if (idx < 0) return;
+    const keep = new Set([orderedIds[idx - 1], orderedIds[idx], orderedIds[idx + 1]].filter(Boolean));
+    const nextId = orderedIds[idx + 1];
+    if (nextId && videoMap[nextId]) preloadFeedVideo(videoMap[nextId]);
+
+    Array.from(loadedEmbeds).forEach(id => {
+      if (!keep.has(String(id))) unloadEmbed(id, videoMap[String(id)]);
+    });
+  };
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      const videoId = entry.target.dataset.videoId;
-      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+      const videoId = String(entry.target.dataset.videoId);
+      if (entry.isIntersecting && entry.intersectionRatio > 0.58) {
         loadEmbed(videoMap[videoId]);
+        activateLoadedEmbed(videoMap[videoId]);
+        keepWarmAround(videoId);
         startWatching(videoMap[videoId]);
-      } else {
+      } else if (!entry.isIntersecting) {
         stopWatching(videoId);
-        unloadEmbed(videoId, videoMap[videoId]);
       }
     });
-  }, { threshold: [0, 0.6, 1] });
+  }, { threshold:[0,.25,.58,1], rootMargin:"18% 0px 18% 0px" });
 
   document.querySelectorAll(".feed-item").forEach(el => observer.observe(el));
   feedObserverInstance = observer;
 
-  // Cargamos el primero de una, sin esperar a que el observer dispare
-  if (videos[0]) loadEmbed(videos[0]);
+  if (videos[0]) {
+    loadEmbed(videos[0]);
+    activateLoadedEmbed(videos[0]);
+    if (videos[1]) preloadFeedVideo(videos[1]);
+  }
 }
 
 function isSafeUrl(url) {
@@ -2307,7 +2367,7 @@ function getEmbedHtml(video) {
   }
   if (video.platform === "upload") {
     return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%;">
-      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline style="width:100%;height:100%;object-fit:contain;"></video>
+      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
     </div>`;
   }
   if (video.platform === "youtube") {
@@ -2792,6 +2852,23 @@ function ensureModernMobileStyles() {
     }
 
     /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
+    .ls-fast-shimmer,
+    .ls-fast-profile-skeleton i,
+    .ls-fast-avatar {
+      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
+      background-size:220% 100%;
+      animation:lsSkeleton 1.05s linear infinite;
+    }
+    .ls-fast-profile-skeleton { display:grid; gap:12px; }
+    .ls-fast-profile-hero {
+      min-height:128px; display:flex; align-items:center; gap:14px; padding:18px;
+      border-radius:16px; background:var(--panel); border:1px solid var(--border);
+    }
+    .ls-fast-profile-hero i { display:block; height:13px; border-radius:999px; }
+    .ls-fast-avatar { width:66px; height:66px; flex:0 0 66px; border-radius:50%; }
+    .ls-fast-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .ls-fast-stats i { display:block; height:54px; border-radius:13px; }
+
     .ls-fast-skeleton {
       display:grid;
       gap:10px;
@@ -4203,20 +4280,28 @@ async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
 
-  const { data: videos, error } = await sb
-    .from("videos")
-    .select("*")
-    .eq("user_id", currentUser.id)
-    .order("created_at", { ascending: false });
+  let videos = null;
+  let error = null;
+
+  if (lsCacheFresh(lsPerfCache.profileVideos, 30000)) {
+    videos = lsPerfCache.profileVideos.data;
+  } else {
+    const result = await sb.from("videos").select("*").eq("user_id", currentUser.id).order("created_at", { ascending:false });
+    videos = result.data;
+    error = result.error;
+    if (!error && videos) lsPerfCache.profileVideos = { data:videos, at:Date.now() };
+  }
 
   if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${error.message}</p>`; return; }
 
-  // Puntos totales generados por ser visto (no incluye el 25 fijo de subir)
-  const { data: watchedByOther } = await sb
-    .from("points_ledger")
-    .select("amount")
-    .eq("user_id", currentUser.id)
-    .eq("reason", "watched_by_other");
+  let watchedByOther = null;
+  if (lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
+    watchedByOther = lsPerfCache.profileViewsLedger.data;
+  } else {
+    const result = await sb.from("points_ledger").select("amount").eq("user_id", currentUser.id).eq("reason", "watched_by_other");
+    watchedByOther = result.data || [];
+    lsPerfCache.profileViewsLedger = { data:watchedByOther, at:Date.now() };
+  }
 
   const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
 

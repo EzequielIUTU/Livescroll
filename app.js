@@ -5214,7 +5214,7 @@ async function renderProfile() {
         <h3>Medallas</h3>
         <div class="sub" style="display:flex;gap:9px;align-items:center;">
           <button onclick="openEquipMedalsPanel()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;">Equipar 3</button>
-          <button onclick="openMyMedalsPanel()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Ver todas →</button>
+          <button onclick="openMyMedalsPanel()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Mi colección →</button>
         </div>
       </div>
       <div class="form-card">
@@ -5736,75 +5736,125 @@ async function openMyMedalsPanel() {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
-  // Cargamos catálogo + equipadas para identificar rareza y estado.
-  const [{ data: storeBadges }, equipped, { data: serialClaims }] = await Promise.all([
+  const [
+    { data: storeBadges },
+    equipped,
+    { data: badgeClaims },
+    { data: unlockedEmojis },
+    { data: storeEmojis },
+    { data: emojiClaims }
+  ] = await Promise.all([
     sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
     getEquippedProfileMedals(currentUser.id),
-    sb.from("user_store_badge_claims").select("badge_id,serial_number").eq("user_id", currentUser.id)
+    sb.from("user_store_badge_claims").select("badge_id,serial_number,claimed_at").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+    sb.from("store_emojis").select("id,emoji,name,rarity,is_limited,stock_total"),
+    sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id)
   ]);
 
-  const storeByName = {};
+  const storeBadgeByName = {};
   (storeBadges || []).forEach(b => {
-    storeByName[String(b.badge_name || "").toLowerCase()] = b;
+    storeBadgeByName[String(b.badge_name || "").toLowerCase()] = b;
   });
 
-  const serialByBadgeId = {};
-  (serialClaims || []).forEach(c => { serialByBadgeId[c.badge_id] = c.serial_number; });
+  const badgeClaimById = {};
+  (badgeClaims || []).forEach(c => {
+    badgeClaimById[c.badge_id] = c;
+  });
 
   const equippedSet = new Set((equipped || []).map(b => b.badge_name));
 
-  const normalized = badges.map(b => {
-    const storeMeta = storeByName[String(b.badge_name || "").toLowerCase()];
+  const normalizedBadges = badges.map(b => {
+    const meta = storeBadgeByName[String(b.badge_name || "").toLowerCase()] || {};
+    const claim = badgeClaimById[meta.id] || {};
     return {
-      ...b,
-      rarity: storeMeta?.rarity || null,
-      description: storeMeta?.description || "",
-      is_limited: !!storeMeta?.is_limited,
-      stock_total: storeMeta?.stock_total || null,
-      serial_number: storeMeta?.id ? (serialByBadgeId[storeMeta.id] || null) : null,
-      equipped: equippedSet.has(b.badge_name)
+      type:"badge",
+      icon:b.badge_icon || "🏅",
+      name:b.badge_name || "Medalla",
+      rarity:meta.rarity || null,
+      description:meta.description || "",
+      is_limited:!!meta.is_limited,
+      stock_total:meta.stock_total || null,
+      serial_number:claim.serial_number || null,
+      obtained_at:claim.claimed_at || b.earned_at || null,
+      equipped:equippedSet.has(b.badge_name)
     };
   });
 
-  const exclusiveBadges = normalized.filter(b => b.rarity);
-  const earnedBadges = normalized.filter(b => !b.rarity);
+  const emojiMetaByChar = {};
+  (storeEmojis || []).forEach(e => { emojiMetaByChar[e.emoji] = e; });
 
-  const renderCard = (b) => {
-    const rarityClass = b.rarity ? getProfileMedalRarityClass(b.rarity) : "";
-    const rarityLabel = b.rarity ? getProfileMedalRarityLabel(b.rarity) : "Logro";
+  const emojiClaimById = {};
+  (emojiClaims || []).forEach(c => { emojiClaimById[c.emoji_id] = c; });
+
+  const normalizedEmojis = (unlockedEmojis || []).map(e => {
+    const meta = emojiMetaByChar[e.emoji] || {};
+    const claim = emojiClaimById[meta.id] || {};
+    return {
+      type:"emoji",
+      icon:e.emoji,
+      name:meta.name || "Emoji",
+      rarity:meta.rarity || null,
+      description:"Emoji desbloqueado para usar en tu perfil.",
+      is_limited:!!meta.is_limited,
+      stock_total:meta.stock_total || null,
+      serial_number:claim.serial_number || null,
+      obtained_at:claim.claimed_at || null,
+      equipped:false
+    };
+  });
+
+  const allItems = [...normalizedBadges, ...normalizedEmojis];
+
+  const rarityRank = { exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
+  allItems.sort((a,b) => {
+    const rarityDiff=(rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
+    if (rarityDiff) return rarityDiff;
+    return new Date(b.obtained_at || 0) - new Date(a.obtained_at || 0);
+  });
+
+  const renderItem = (item) => {
+    const rarityClass=item.rarity ? getProfileMedalRarityClass(item.rarity) : "";
+    const rarityLabel=item.rarity ? getProfileMedalRarityLabel(item.rarity) : (item.type==="emoji" ? "Emoji" : "Logro");
     const rarityColor =
-      b.rarity === "rara" ? "#7dd3fc" :
-      b.rarity === "epica" ? "#c084fc" :
-      b.rarity === "legendaria" ? "#fbbf24" :
-      b.rarity === "exclusiva" ? "#fb7185" :
-      b.rarity === "comun" ? "#cbd5e1" :
+      item.rarity === "rara" ? "#7dd3fc" :
+      item.rarity === "epica" ? "#c084fc" :
+      item.rarity === "legendaria" ? "#fbbf24" :
+      item.rarity === "exclusiva" ? "#fb7185" :
+      item.rarity === "comun" ? "#cbd5e1" :
       "var(--text-dim)";
 
+    const onclick = item.type === "badge"
+      ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
+      : `showToast('${escapeHtml(item.icon)} ${escapeHtml(item.name)}')`;
+
     return `
-      <button type="button"
-        onclick="openMedalDetail('${escapeHtml(b.badge_name || "")}', '${escapeHtml(b.badge_icon || "🏅")}', '${escapeHtml(b.rarity || "")}', '${escapeHtml(b.description || "")}', '${escapeHtml(b.earned_at || "")}', '${escapeHtml(b.serial_number || "")}', '${escapeHtml(b.stock_total || "")}')"
-        style="position:relative;background:var(--panel-2);border:1px solid ${b.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
-        ${b.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
+      <button type="button" onclick="${onclick}"
+        style="position:relative;background:var(--panel-2);border:1px solid ${item.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
+        ${item.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
         <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
-          ${b.badge_icon || "🏅"}
+          ${item.icon}
         </div>
-        <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(b.badge_name || "Medalla")}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(item.name)}</div>
         <div style="font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${rarityColor};margin-top:5px;">
           ${escapeHtml(rarityLabel)}
         </div>
-        ${b.serial_number && b.stock_total ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);font-weight:900;margin-top:5px;">LIMITED #${b.serial_number}/${b.stock_total}</div>` : ""}
-        ${b.earned_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(b.earned_at).toLocaleDateString("es-AR")}</div>` : ""}
+        ${item.serial_number && item.stock_total ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);font-weight:900;margin-top:5px;">LIMITED #${item.serial_number}/${item.stock_total}</div>` : ""}
+        ${item.obtained_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(item.obtained_at).toLocaleDateString("es-AR")}</div>` : ""}
       </button>`;
   };
 
-  wrap.innerHTML = `
+  const badgeItems=allItems.filter(i=>i.type==="badge");
+  const emojiItems=allItems.filter(i=>i.type==="emoji");
+
+  wrap.innerHTML=`
     <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
-      <div class="modal-box" style="max-width:470px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="modal-box" style="max-width:500px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
-            <h2 style="margin:0;font-size:19px;">🏅 Mi colección</h2>
+            <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
             <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
-              ${badges.length} medalla${badges.length === 1 ? "" : "s"} · ${equippedSet.size}/3 equipadas
+              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${badgeItems.length} medallas · ${emojiItems.length} emojis
             </div>
           </div>
           <button type="button" onclick="closeManagedModal()"
@@ -5812,27 +5862,27 @@ async function openMyMedalsPanel() {
         </div>
 
         <div class="modal-box-body" style="overflow-y:auto;">
-          ${badges.length ? `
-            <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-              <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
-            </div>
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
+          </div>
 
-            ${exclusiveBadges.length ? `
-              <div style="font-size:11px;font-weight:800;color:var(--gold);margin:4px 0 9px;">💎 Colección exclusiva</div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px;">
-                ${exclusiveBadges.map(renderCard).join("")}
-              </div>` : ""}
+          ${badgeItems.length ? `
+            <div style="font-size:11px;font-weight:800;color:var(--gold);margin:4px 0 9px;">🏅 Medallas</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px;">
+              ${badgeItems.map(renderItem).join("")}
+            </div>` : ""}
 
-            ${earnedBadges.length ? `
-              <div style="font-size:11px;font-weight:800;color:var(--text-dim);margin:4px 0 9px;">🏆 Logros y recompensas</div>
-              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
-                ${earnedBadges.map(renderCard).join("")}
-              </div>` : ""}
-          ` : `
-            <div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:13px;">
-              <div style="font-size:42px;margin-bottom:8px;">🏅</div>
-              Todavía no desbloqueaste medallas.
-            </div>`}
+          ${emojiItems.length ? `
+            <div style="font-size:11px;font-weight:800;color:var(--text-dim);margin:4px 0 9px;">😎 Emojis</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
+              ${emojiItems.map(renderItem).join("")}
+            </div>` : ""}
+
+          ${!allItems.length ? `
+            <div style="text-align:center;padding:30px 10px;color:var(--text-dim);font-size:13px;">
+              <div style="font-size:42px;margin-bottom:8px;">💎</div>
+              Todavía no tenés objetos en tu colección.
+            </div>` : ""}
         </div>
       </div>
     </div>`;

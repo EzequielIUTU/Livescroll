@@ -3225,6 +3225,13 @@ function ensureModernMobileStyles() {
       margin-top:10px;
     }
 
+
+    .ls-collection-filter.active {
+      border-color:var(--gold) !important;
+      color:var(--gold) !important;
+      background:rgba(250,204,21,.045) !important;
+    }
+
     .ls-medal-detail-chip {
       padding:4px 8px;
       border-radius:999px;
@@ -5758,9 +5765,7 @@ async function openMyMedalsPanel() {
   });
 
   const badgeClaimById = {};
-  (badgeClaims || []).forEach(c => {
-    badgeClaimById[c.badge_id] = c;
-  });
+  (badgeClaims || []).forEach(c => { badgeClaimById[c.badge_id] = c; });
 
   const equippedSet = new Set((equipped || []).map(b => b.badge_name));
 
@@ -5804,14 +5809,135 @@ async function openMyMedalsPanel() {
     };
   });
 
-  const allItems = [...normalizedBadges, ...normalizedEmojis];
+  window.__collection568Items = [...normalizedBadges, ...normalizedEmojis];
+  window.__collection568Filter = "all";
+  window.__collection568Sort = "rarity";
+
+  const allItems = window.__collection568Items;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
+      <div class="modal-box" style="max-width:520px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
+              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${normalizedBadges.length} medallas · ${normalizedEmojis.length} emojis
+            </div>
+          </div>
+          <button type="button" onclick="closeManagedModal()"
+            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;">
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="btn-outline ls-collection-filter active" data-filter="all" onclick="setCollection568Filter('all',this)" style="padding:6px 9px;font-size:10px;">Todos</button>
+            <button class="btn-outline ls-collection-filter" data-filter="badge" onclick="setCollection568Filter('badge',this)" style="padding:6px 9px;font-size:10px;">Medallas</button>
+            <button class="btn-outline ls-collection-filter" data-filter="emoji" onclick="setCollection568Filter('emoji',this)" style="padding:6px 9px;font-size:10px;">Emojis</button>
+            <button class="btn-outline ls-collection-filter" data-filter="limited" onclick="setCollection568Filter('limited',this)" style="padding:6px 9px;font-size:10px;">Limitados</button>
+            <button class="btn-outline ls-collection-filter" data-filter="top" onclick="setCollection568Filter('top',this)" style="padding:6px 9px;font-size:10px;">Legendarios+</button>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
+            <select id="collection568Sort" onchange="setCollection568Sort(this.value)"
+              style="padding:8px 10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:10px;">
+              <option value="rarity">Más raros</option>
+              <option value="newest">Más nuevos</option>
+              <option value="serial">Nº de edición</option>
+              <option value="name">Nombre A-Z</option>
+            </select>
+
+            <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
+          </div>
+
+          <div id="collection568Summary" style="font-size:10px;color:var(--text-dim);margin-bottom:10px;"></div>
+          <div id="collection568Grid"></div>
+        </div>
+      </div>
+    </div>`;
+
+  renderCollection568Grid();
+}
+
+function setCollection568Filter(filter, button) {
+  window.__collection568Filter = filter || "all";
+
+  document.querySelectorAll(".ls-collection-filter").forEach(btn => {
+    btn.classList.toggle("active", btn === button);
+    btn.style.borderColor = btn === button ? "var(--gold)" : "";
+    btn.style.color = btn === button ? "var(--gold)" : "";
+  });
+
+  renderCollection568Grid();
+}
+
+function setCollection568Sort(sort) {
+  window.__collection568Sort = sort || "rarity";
+  renderCollection568Grid();
+}
+
+function renderCollection568Grid() {
+  const grid = document.getElementById("collection568Grid");
+  const summary = document.getElementById("collection568Summary");
+  if (!grid) return;
 
   const rarityRank = { exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
-  allItems.sort((a,b) => {
-    const rarityDiff=(rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
-    if (rarityDiff) return rarityDiff;
-    return new Date(b.obtained_at || 0) - new Date(a.obtained_at || 0);
-  });
+  const filter = window.__collection568Filter || "all";
+  const sort = window.__collection568Sort || "rarity";
+
+  let items = [...(window.__collection568Items || [])];
+
+  if (filter === "badge") items = items.filter(i => i.type === "badge");
+  if (filter === "emoji") items = items.filter(i => i.type === "emoji");
+  if (filter === "limited") items = items.filter(i => i.is_limited);
+  if (filter === "top") items = items.filter(i => ["legendaria","exclusiva"].includes(i.rarity));
+
+  if (sort === "rarity") {
+    items.sort((a,b) => {
+      const rarityDiff=(rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
+      if (rarityDiff) return rarityDiff;
+      return new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0);
+    });
+  }
+
+  if (sort === "newest") {
+    items.sort((a,b) => new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0));
+  }
+
+  if (sort === "serial") {
+    items.sort((a,b) => {
+      const aHas = Number.isFinite(Number(a.serial_number)) && Number(a.serial_number) > 0;
+      const bHas = Number.isFinite(Number(b.serial_number)) && Number(b.serial_number) > 0;
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      if (aHas && bHas) return Number(a.serial_number)-Number(b.serial_number);
+      return (rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
+    });
+  }
+
+  if (sort === "name") {
+    items.sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
+  }
+
+  if (summary) {
+    const labels = {
+      all:"Todos",
+      badge:"Medallas",
+      emoji:"Emojis",
+      limited:"Limitados",
+      top:"Legendarios y exclusivos"
+    };
+    summary.textContent = `${labels[filter] || "Todos"} · ${items.length} resultado${items.length===1?"":"s"}`;
+  }
+
+  if (!items.length) {
+    grid.innerHTML = `
+      <div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:12px;">
+        <div style="font-size:36px;margin-bottom:8px;">💎</div>
+        No hay objetos que coincidan con este filtro.
+      </div>`;
+    return;
+  }
 
   const renderItem = (item) => {
     const rarityClass=item.rarity ? getProfileMedalRarityClass(item.rarity) : "";
@@ -5844,47 +5970,9 @@ async function openMyMedalsPanel() {
       </button>`;
   };
 
-  const badgeItems=allItems.filter(i=>i.type==="badge");
-  const emojiItems=allItems.filter(i=>i.type==="emoji");
-
-  wrap.innerHTML=`
-    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
-      <div class="modal-box" style="max-width:500px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
-        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-          <div>
-            <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
-            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
-              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${badgeItems.length} medallas · ${emojiItems.length} emojis
-            </div>
-          </div>
-          <button type="button" onclick="closeManagedModal()"
-            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
-        </div>
-
-        <div class="modal-box-body" style="overflow-y:auto;">
-          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
-            <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
-          </div>
-
-          ${badgeItems.length ? `
-            <div style="font-size:11px;font-weight:800;color:var(--gold);margin:4px 0 9px;">🏅 Medallas</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-bottom:18px;">
-              ${badgeItems.map(renderItem).join("")}
-            </div>` : ""}
-
-          ${emojiItems.length ? `
-            <div style="font-size:11px;font-weight:800;color:var(--text-dim);margin:4px 0 9px;">😎 Emojis</div>
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
-              ${emojiItems.map(renderItem).join("")}
-            </div>` : ""}
-
-          ${!allItems.length ? `
-            <div style="text-align:center;padding:30px 10px;color:var(--text-dim);font-size:13px;">
-              <div style="font-size:42px;margin-bottom:8px;">💎</div>
-              Todavía no tenés objetos en tu colección.
-            </div>` : ""}
-        </div>
-      </div>
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
+      ${items.map(renderItem).join("")}
     </div>`;
 }
 

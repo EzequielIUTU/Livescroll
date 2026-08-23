@@ -407,6 +407,81 @@ function detectLiveScrollExperience() {
   return legacy ? "legacy" : "nova";
 }
 
+
+function closeLiveScrollModeInfo() {
+  document.getElementById("lsModeInfoOverlay")?.remove();
+}
+
+function openLiveScrollModeInfo() {
+  const mode = window.__liveScrollExperienceMode || "nova";
+  closeLiveScrollModeInfo();
+
+  const overlay = document.createElement("div");
+  overlay.id = "lsModeInfoOverlay";
+  overlay.className = "ls-mode-overlay";
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeLiveScrollModeInfo();
+  });
+
+  const isLegacy = mode === "legacy";
+
+  overlay.innerHTML = `
+    <div class="ls-mode-panel" role="dialog" aria-modal="true" aria-label="Modo de experiencia LiveScroll">
+      <div class="ls-mode-handle"></div>
+
+      <div class="ls-mode-head">
+        <div class="ls-mode-icon">${isLegacy ? "🪶" : "✨"}</div>
+        <div class="ls-mode-title">
+          <strong>LiveScroll ${isLegacy ? "Legacy" : "Nova"}</strong>
+          <span>${isLegacy ? "Experiencia optimizada" : "Experiencia completa"}</span>
+        </div>
+      </div>
+
+      <div class="ls-mode-current">
+        <strong>Este dispositivo está usando ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
+        LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo.
+      </div>
+
+      ${isLegacy ? `
+        <div class="ls-mode-feature">
+          <div class="ico">⚡</div>
+          <div><strong>Menos carga visual</strong><span>Reduce animaciones, desenfoques y efectos pesados.</span></div>
+        </div>
+        <div class="ls-mode-feature">
+          <div class="ico">📱</div>
+          <div><strong>Mejor compatibilidad</strong><span>Está pensado para celulares antiguos o con recursos limitados.</span></div>
+        </div>
+        <div class="ls-mode-feature">
+          <div class="ico">❤️</div>
+          <div><strong>Mismo LiveScroll</strong><span>Tu cuenta, contenido, puntos y funciones siguen siendo los mismos.</span></div>
+        </div>
+      ` : `
+        <div class="ls-mode-feature">
+          <div class="ico">✨</div>
+          <div><strong>Experiencia visual completa</strong><span>Animaciones, efectos y detalles modernos activos.</span></div>
+        </div>
+        <div class="ls-mode-feature">
+          <div class="ico">🚀</div>
+          <div><strong>Interfaz avanzada</strong><span>LiveScroll aprovecha las capacidades del dispositivo para ofrecer la experiencia completa.</span></div>
+        </div>
+        <div class="ls-mode-feature">
+          <div class="ico">🔄</div>
+          <div><strong>Adaptación automática</strong><span>Si LiveScroll detecta un dispositivo limitado, puede activar Legacy automáticamente.</span></div>
+        </div>
+      `}
+
+      <div class="ls-mode-note">
+        No necesitás configurar nada. El modo se selecciona automáticamente para priorizar una buena experiencia.
+      </div>
+
+      <button type="button" class="ls-mode-close">Entendido</button>
+    </div>
+  `;
+
+  overlay.querySelector(".ls-mode-close")?.addEventListener("click", closeLiveScrollModeInfo);
+  document.body.appendChild(overlay);
+}
+
 function initLiveScrollExperienceMode() {
   const mode = detectLiveScrollExperience();
   window.__liveScrollExperienceMode = mode;
@@ -433,7 +508,139 @@ function initLiveScrollExperienceMode() {
         font-weight:700;
         letter-spacing:.2px;
         box-shadow:0 8px 24px rgba(0,0,0,.28);
-        pointer-events:none;
+        pointer-events:auto;
+        cursor:pointer;
+        user-select:none;
+        touch-action:manipulation;
+      }
+
+      .ls-experience-badge:active {
+        transform:scale(.96);
+      }
+
+      .ls-mode-overlay {
+        position:fixed;
+        inset:0;
+        z-index:520;
+        background:rgba(0,0,0,.72);
+        display:flex;
+        align-items:flex-end;
+        justify-content:center;
+        padding:12px;
+        padding-bottom:max(12px, env(safe-area-inset-bottom));
+      }
+
+      .ls-mode-panel {
+        width:min(460px, 100%);
+        box-sizing:border-box;
+        background:var(--panel);
+        border:1px solid var(--border);
+        border-radius:22px;
+        padding:16px;
+        color:var(--text);
+        box-shadow:0 -18px 50px rgba(0,0,0,.48);
+      }
+
+      .ls-mode-handle {
+        width:42px;
+        height:4px;
+        border-radius:10px;
+        background:rgba(255,255,255,.2);
+        margin:0 auto 14px;
+      }
+
+      .ls-mode-head {
+        display:flex;
+        gap:12px;
+        align-items:center;
+        margin-bottom:14px;
+      }
+
+      .ls-mode-icon {
+        width:48px;
+        height:48px;
+        border-radius:14px;
+        background:var(--panel-2);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:25px;
+        flex:0 0 48px;
+      }
+
+      .ls-mode-title {
+        min-width:0;
+      }
+
+      .ls-mode-title strong {
+        display:block;
+        font-size:17px;
+        color:var(--gold);
+      }
+
+      .ls-mode-title span {
+        display:block;
+        margin-top:2px;
+        font-size:11px;
+        color:var(--text-dim);
+      }
+
+      .ls-mode-current {
+        border:1px solid var(--gold-dim);
+        background:rgba(255,255,255,.025);
+        border-radius:14px;
+        padding:12px;
+        margin-bottom:12px;
+        font-size:12px;
+        line-height:1.5;
+      }
+
+      .ls-mode-feature {
+        display:flex;
+        gap:10px;
+        align-items:flex-start;
+        padding:9px 4px;
+        font-size:12px;
+        line-height:1.4;
+      }
+
+      .ls-mode-feature .ico {
+        width:24px;
+        flex:0 0 24px;
+        text-align:center;
+        font-size:17px;
+      }
+
+      .ls-mode-feature strong {
+        display:block;
+        font-size:12px;
+        margin-bottom:1px;
+      }
+
+      .ls-mode-feature span {
+        color:var(--text-dim);
+      }
+
+      .ls-mode-note {
+        margin-top:10px;
+        padding-top:10px;
+        border-top:1px solid var(--border);
+        color:var(--text-dim);
+        font-size:10px;
+        line-height:1.45;
+      }
+
+      .ls-mode-close {
+        width:100%;
+        min-height:46px;
+        margin-top:14px;
+        border:0;
+        border-radius:12px;
+        background:var(--gold);
+        color:#10120f;
+        font-family:inherit;
+        font-weight:800;
+        cursor:pointer;
       }
 
       .ls-experience-toast {
@@ -521,6 +728,21 @@ function initLiveScrollExperienceMode() {
   badge.textContent = mode === "legacy"
     ? "🪶 LiveScroll Legacy"
     : "✨ LiveScroll Nova";
+
+  badge.setAttribute("role", "button");
+  badge.setAttribute("tabindex", "0");
+  badge.setAttribute("aria-label", `Ver información sobre LiveScroll ${mode === "legacy" ? "Legacy" : "Nova"}`);
+
+  if (!badge.dataset.modeInfoBound) {
+    badge.dataset.modeInfoBound = "1";
+    badge.addEventListener("click", openLiveScrollModeInfo);
+    badge.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openLiveScrollModeInfo();
+      }
+    });
+  }
 
   const storageKey = `livescroll-experience-notice-${mode}-v1`;
   let alreadyShown = false;

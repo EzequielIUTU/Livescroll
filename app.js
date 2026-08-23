@@ -68,6 +68,33 @@ document.addEventListener("DOMContentLoaded", () => {
   document.head.appendChild(style);
 });
 
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsNoTextSelectionStyle")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsNoTextSelectionStyle";
+  style.textContent = `
+    html, body, #appView, #landingView, nav, header, main, section, article,
+    div, span, p, h1, h2, h3, h4, button, a, img, video {
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    input, textarea, [contenteditable="true"], .allow-select {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default;
+    }
+
+    button, a, [onclick] {
+      -webkit-tap-highlight-color: transparent;
+    }
+  `;
+  document.head.appendChild(style);
+});
+
 // ============================================================
 // ARRANQUE
 // ============================================================

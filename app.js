@@ -377,6 +377,7 @@ function closeMobileMenu() {
 }
 
 async function renderApp() {
+  ensureModernMobileStyles();
   document.getElementById("landingView").classList.add("hidden");
   document.getElementById("appView").classList.remove("hidden");
 
@@ -1182,7 +1183,404 @@ function getGridCoverHtml(video) {
   return `<div class="grid-fallback">${thumb}</div>`;
 }
 
+function ensureModernMobileStyles() {
+  if (document.getElementById("livescrollModernMobileStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "livescrollModernMobileStyles";
+  style.textContent = `
+    /* LiveScroll Mobile/UI Upgrade */
+    html, body {
+      max-width:100%;
+      overflow-x:hidden;
+    }
+
+    #appView,
+    .profile-section,
+    .profile-hero,
+    .form-card,
+    .modal-box {
+      box-sizing:border-box;
+      max-width:100%;
+    }
+
+    .grid-menu-btn {
+      width:42px !important;
+      height:42px !important;
+      min-width:42px !important;
+      min-height:42px !important;
+      border-radius:50% !important;
+      display:flex !important;
+      align-items:center !important;
+      justify-content:center !important;
+      font-size:25px !important;
+      line-height:1 !important;
+      background:rgba(8,10,14,.78) !important;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,.16) !important;
+      color:#fff !important;
+      padding:0 0 7px !important;
+      z-index:12 !important;
+      box-shadow:0 6px 18px rgba(0,0,0,.28);
+      touch-action:manipulation;
+    }
+
+    .grid-menu-btn:active {
+      transform:scale(.94);
+    }
+
+    .ls-action-sheet-overlay {
+      position:fixed;
+      inset:0;
+      z-index:400;
+      background:rgba(0,0,0,.66);
+      backdrop-filter:blur(3px);
+      -webkit-backdrop-filter:blur(3px);
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      padding:12px;
+      padding-bottom:max(12px, env(safe-area-inset-bottom));
+      animation:lsFadeIn .16s ease;
+    }
+
+    .ls-action-sheet {
+      width:min(520px, 100%);
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:10px;
+      box-shadow:0 -18px 55px rgba(0,0,0,.55);
+      animation:lsSheetUp .22s cubic-bezier(.2,.8,.2,1);
+      overflow:hidden;
+    }
+
+    .ls-action-sheet-handle {
+      width:42px;
+      height:4px;
+      border-radius:10px;
+      background:rgba(255,255,255,.22);
+      margin:3px auto 10px;
+    }
+
+    .ls-action-sheet-title {
+      padding:6px 10px 13px;
+      border-bottom:1px solid var(--border);
+      margin-bottom:6px;
+    }
+
+    .ls-action-sheet-title strong {
+      display:block;
+      font-size:14px;
+      color:var(--text);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .ls-action-sheet-title span {
+      display:block;
+      margin-top:3px;
+      color:var(--text-dim);
+      font-size:11px;
+    }
+
+    .ls-sheet-action {
+      width:100%;
+      min-height:52px;
+      border:0;
+      border-radius:13px;
+      background:transparent;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 13px;
+      font-family:inherit;
+      font-size:14px;
+      text-align:left;
+      cursor:pointer;
+      touch-action:manipulation;
+    }
+
+    .ls-sheet-action:hover,
+    .ls-sheet-action:active {
+      background:var(--panel-2);
+    }
+
+    .ls-sheet-action .ico {
+      width:34px;
+      height:34px;
+      flex:0 0 34px;
+      border-radius:10px;
+      background:rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+    }
+
+    .ls-sheet-action .txt {
+      min-width:0;
+      flex:1;
+    }
+
+    .ls-sheet-action .txt strong {
+      display:block;
+      font-size:14px;
+    }
+
+    .ls-sheet-action .txt small {
+      display:block;
+      color:var(--text-dim);
+      font-size:11px;
+      margin-top:2px;
+    }
+
+    .ls-sheet-action.danger {
+      color:var(--red);
+    }
+
+    .ls-sheet-action[disabled] {
+      opacity:.46;
+      cursor:not-allowed;
+    }
+
+    @keyframes lsSheetUp {
+      from { transform:translateY(28px); opacity:0; }
+      to { transform:translateY(0); opacity:1; }
+    }
+
+    @keyframes lsFadeIn {
+      from { opacity:0; }
+      to { opacity:1; }
+    }
+
+    @media (max-width:700px) {
+      #appView {
+        width:100% !important;
+        padding-left:10px !important;
+        padding-right:10px !important;
+      }
+
+      .profile-hero,
+      .profile-section,
+      .form-card {
+        border-radius:16px !important;
+      }
+
+      .profile-hero {
+        overflow:hidden !important;
+      }
+
+      .profile-stats-row {
+        display:grid !important;
+        grid-template-columns:repeat(3, minmax(0,1fr)) !important;
+        gap:7px !important;
+        width:100% !important;
+      }
+
+      .stat-pill {
+        min-width:0 !important;
+        padding:10px 5px !important;
+      }
+
+      .stat-pill .num {
+        font-size:clamp(18px, 6vw, 24px) !important;
+      }
+
+      .stat-pill .lbl {
+        font-size:10px !important;
+        white-space:normal !important;
+        line-height:1.15 !important;
+      }
+
+      .profile-name-block h1 {
+        font-size:clamp(20px, 6vw, 28px) !important;
+        overflow-wrap:anywhere;
+      }
+
+      .profile-section-head {
+        gap:8px !important;
+        align-items:center !important;
+      }
+
+      .profile-section-head h3 {
+        min-width:0;
+        font-size:15px !important;
+      }
+
+      .profile-section-head .sub {
+        font-size:10px !important;
+        text-align:right;
+      }
+
+      .video-grid {
+        gap:7px !important;
+      }
+
+      .video-grid-tile {
+        min-width:0 !important;
+        overflow:hidden !important;
+      }
+
+      .grid-menu-btn {
+        width:46px !important;
+        height:46px !important;
+        min-width:46px !important;
+        min-height:46px !important;
+        font-size:28px !important;
+        top:8px !important;
+        right:8px !important;
+      }
+
+      .video-grid-menu {
+        display:none !important;
+      }
+
+      .modal-overlay {
+        padding:10px !important;
+        align-items:flex-end !important;
+      }
+
+      .modal-box,
+      .auth-box {
+        width:100% !important;
+        max-width:100% !important;
+        max-height:92dvh !important;
+        overflow-y:auto !important;
+        border-radius:20px !important;
+      }
+
+      button,
+      .btn,
+      .btn-outline {
+        touch-action:manipulation;
+      }
+
+      input,
+      textarea,
+      select {
+        max-width:100% !important;
+        box-sizing:border-box !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+function closeVideoActionSheet() {
+  document.getElementById("videoActionSheetOverlay")?.remove();
+}
+
+function openVideoActionSheet(videoId) {
+  const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
+  if (!video) return;
+
+  const pin = window.__profilePinContext || {};
+  const isPinned = Array.isArray(pin.pinnedIds) && pin.pinnedIds.includes(videoId);
+  const canPin = !!pin.canPin;
+  const limitReached = canPin && !isPinned && (pin.pinsUsed >= pin.maxPinned);
+
+  closeVideoActionSheet();
+
+  const overlay = document.createElement("div");
+  overlay.id = "videoActionSheetOverlay";
+  overlay.className = "ls-action-sheet-overlay";
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeVideoActionSheet();
+  };
+
+  let pinAction = "";
+  if (isPinned) {
+    pinAction = `
+      <button class="ls-sheet-action" disabled>
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Video anclado</strong>
+          <small>Ya está destacado en Para Ti</small>
+        </span>
+      </button>`;
+  } else if (canPin) {
+    pinAction = `
+      <button class="ls-sheet-action" ${limitReached ? "disabled" : ""}
+        onclick="closeVideoActionSheet(); handlePinVideo('${videoId}')">
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Anclar 24 h</strong>
+          <small>${limitReached
+            ? `Ya usaste ${pin.pinsUsed}/${pin.maxPinned} espacios disponibles`
+            : `Destacalo en Para Ti · ${pin.pinsUsed}/${pin.maxPinned} usados`}</small>
+        </span>
+      </button>`;
+  } else {
+    pinAction = `
+      <button class="ls-sheet-action" disabled>
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Anclar 24 h</strong>
+          <small>Tu plan actual no incluye videos anclados</small>
+        </span>
+      </button>`;
+  }
+
+  overlay.innerHTML = `
+    <div class="ls-action-sheet">
+      <div class="ls-action-sheet-handle"></div>
+
+      <div class="ls-action-sheet-title">
+        <strong>${escapeHtml(video.title || "Video")}</strong>
+        <span>Opciones del video</span>
+      </div>
+
+      ${pinAction}
+
+      <button class="ls-sheet-action"
+        onclick="closeVideoActionSheet(); openProfileVideoFeed(window.__profileFeedVideos, '${videoId}', window.__profileFeedAuthor)">
+        <span class="ico">▶️</span>
+        <span class="txt">
+          <strong>Ver video</strong>
+          <small>Abrir dentro de LiveScroll</small>
+        </span>
+      </button>
+
+      <button class="ls-sheet-action"
+        onclick="closeVideoActionSheet(); window.open('${escapeHtml(video.video_url)}', '_blank', 'noopener')">
+        <span class="ico">🔗</span>
+        <span class="txt">
+          <strong>Abrir enlace</strong>
+          <small>Ver el archivo o plataforma original</small>
+        </span>
+      </button>
+
+      <button class="ls-sheet-action danger"
+        onclick="closeVideoActionSheet(); handleDeleteOwnVideo('${videoId}')">
+        <span class="ico">🗑️</span>
+        <span class="txt">
+          <strong>Eliminar video</strong>
+          <small>Esta acción no se puede deshacer</small>
+        </span>
+      </button>
+
+      <button class="ls-sheet-action" onclick="closeVideoActionSheet()">
+        <span class="ico">✕</span>
+        <span class="txt"><strong>Cancelar</strong></span>
+      </button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
 function toggleVideoTileMenu(videoId) {
+  ensureModernMobileStyles();
+
+  if (window.matchMedia("(max-width: 700px)").matches) {
+    openVideoActionSheet(videoId);
+    return;
+  }
+
   document.querySelectorAll(".video-grid-menu").forEach(el => {
     if (el.id !== `menu-${videoId}`) el.classList.add("hidden");
   });
@@ -1930,6 +2328,12 @@ async function renderProfile() {
 
   window.__profileFeedVideos = videos;
   window.__profileFeedAuthor = { username: currentProfile.username, plan_id: currentProfile.plan_id };
+  window.__profilePinContext = {
+    canPin,
+    pinsUsed,
+    maxPinned: myPlan?.max_pinned_videos || 0,
+    pinnedIds: Array.from(pinnedIds)
+  };
 
   const videosSectionHtml = `
     <div class="profile-section">
@@ -1944,7 +2348,7 @@ async function renderProfile() {
             <div class="video-grid-tile" id="tile-${v.id}">
               ${getGridCoverHtml(v)}
               ${pinnedIds.has(v.id) ? `<div class="pinned-badge">📌</div>` : ""}
-              <button class="grid-menu-btn" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
+              <button class="grid-menu-btn" aria-label="Opciones del video" title="Opciones" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
               <div class="grid-overlay" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
                 <div class="grid-stats">
                   <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>

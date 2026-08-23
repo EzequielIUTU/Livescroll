@@ -2317,6 +2317,13 @@ function preloadFeedVideo(video) {
   if (!video || loadedEmbeds.has(video.id)) return;
   const el = document.getElementById(`embed-${video.id}`);
   if (!el || video.platform !== "upload" || !isSafeUrl(video.video_url)) return;
+
+  const saveData = navigator.connection?.saveData === true;
+  const slowNetwork = ["slow-2g", "2g"].includes(navigator.connection?.effectiveType);
+  const isLegacyMode = document.body.classList.contains("ls-legacy");
+
+  if (saveData || slowNetwork || isLegacyMode) return;
+
   el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;">
     <video src="${escapeHtml(video.video_url)}" controls muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
   </div>`;
@@ -2330,6 +2337,42 @@ function activateLoadedEmbed(video) {
     player.autoplay = true;
     player.play().catch(() => {});
   }
+}
+
+function pauseFeedMedia(videoId = null) {
+  const selector = videoId
+    ? `#embed-${videoId} video, #embed-${videoId} audio`
+    : ".feed-item video, .feed-item audio";
+
+  document.querySelectorAll(selector).forEach(media => {
+    try { media.pause(); } catch (_) {}
+  });
+}
+
+function pauseAllFeedMediaExcept(videoId) {
+  document.querySelectorAll(".feed-item video, .feed-item audio").forEach(media => {
+    const host = media.closest("[id^='embed-']");
+    const hostId = host?.id?.replace("embed-", "");
+    if (String(hostId) !== String(videoId)) {
+      try { media.pause(); } catch (_) {}
+    }
+  });
+}
+
+function releaseFeedMediaElement(el) {
+  if (!el) return;
+
+  el.querySelectorAll("video, audio").forEach(media => {
+    try { media.pause(); } catch (_) {}
+    try {
+      media.removeAttribute("src");
+      media.load();
+    } catch (_) {}
+  });
+
+  el.querySelectorAll("iframe").forEach(frame => {
+    try { frame.src = "about:blank"; } catch (_) {}
+  });
 }
 
 function setupFeedObserver(videos) {
@@ -2353,11 +2396,13 @@ function setupFeedObserver(videos) {
     entries.forEach(entry => {
       const videoId = String(entry.target.dataset.videoId);
       if (entry.isIntersecting && entry.intersectionRatio > 0.58) {
+        pauseAllFeedMediaExcept(videoId);
         loadEmbed(videoMap[videoId]);
         activateLoadedEmbed(videoMap[videoId]);
         keepWarmAround(videoId);
         startWatching(videoMap[videoId]);
-      } else if (!entry.isIntersecting) {
+      } else if (entry.intersectionRatio < 0.25) {
+        pauseFeedMedia(videoId);
         stopWatching(videoId);
       }
     });
@@ -2411,6 +2456,8 @@ function unloadEmbed(videoId, video) {
   if (!loadedEmbeds.has(videoId)) return;
   const el = document.getElementById(`embed-${videoId}`);
   if (!el) return;
+
+  releaseFeedMediaElement(el);
   el.innerHTML = video ? getEmbedPlaceholderHtml(video) : "";
   loadedEmbeds.delete(videoId);
 }
@@ -3566,7 +3613,13 @@ function clearAllWatchIntervals() {
   Object.values(watchIntervals).forEach(clearInterval);
   watchIntervals = {};
   watchSeconds = {};
+
+  // 5.4.6 FINAL: nada del Feed queda reproduciéndose detrás de otra pantalla.
+  document.querySelectorAll(".feed-item [id^='embed-'], [id^='embed-'].feed-embed-frame").forEach(releaseFeedMediaElement);
+  pauseFeedMedia();
+
   loadedEmbeds.clear();
+
   if (feedObserverInstance) {
     feedObserverInstance.disconnect();
     feedObserverInstance = null;

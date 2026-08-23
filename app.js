@@ -285,7 +285,7 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
+  const { data, error } = await sb.from("profiles").select("id, username, points_balance, plan_id, created_at, bio, avatar_emoji, avatar_url, cover_url, profile_side_image_url, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, streak_current_day, streak_last_login_date, is_live, live_platform").eq("id", currentUser.id).single();
   if (!error) currentProfile = data;
 
   const { data: status } = await sb.rpc("get_my_status");
@@ -1060,13 +1060,9 @@ function isSafeUrl(url) {
 
 function getEmbedPlaceholderHtml(video) {
   const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣", youtube: "🔴", upload: "🎬" };
-  const thumb = (video.platform === "youtube" || video.platform === "upload") ? getThumbnailHtml(video) : "";
+  const thumb = video.platform === "youtube" ? getThumbnailHtml(video) : "";
   return `<div class="feed-fallback">
-    ${thumb && (thumb.startsWith("<img") || thumb.startsWith("<video"))
-      ? (thumb.startsWith("<img")
-          ? thumb.replace('alt="miniatura"', 'alt="miniatura" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.55;"')
-          : thumb.replace('<video ', '<video style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.55;" '))
-      : ""}
+    ${thumb && thumb.startsWith("<img") ? thumb.replace('alt="miniatura"', 'alt="miniatura" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.5;"') : ""}
     <div class="platform-icon" style="position:relative;">${icons[video.platform] || "▶️"}</div>
   </div>`;
 }
@@ -1183,9 +1179,6 @@ function getGridCoverHtml(video) {
   if (thumb.startsWith("<img")) {
     return thumb.replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;" `);
   }
-  if (thumb.startsWith("<video")) {
-    return thumb.replace("<video ", `<video style="width:100%;height:100%;object-fit:cover;pointer-events:none;" `);
-  }
   return `<div class="grid-fallback">${thumb}</div>`;
 }
 
@@ -1203,16 +1196,11 @@ document.addEventListener("click", (e) => {
 });
 
 function getThumbnailHtml(video) {
-  if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
-    return `<img src="${escapeHtml(video.thumbnail_url)}" alt="miniatura" loading="lazy">`;
-  }
   if (video.platform === "youtube") {
     const id = extractYoutubeId(video.video_url);
     if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy">`;
   }
-  if (video.platform === "upload" && isSafeUrl(video.video_url)) {
-    return `<video src="${escapeHtml(video.video_url)}#t=0.5" muted playsinline preload="metadata" aria-label="carátula del video"></video>`;
-  }
+  if (video.platform === "upload") return "🎬";
   const icons = { kick: "🟢", twitch: "🟣", tiktok: "🎵" };
   return icons[video.platform] || "▶️";
 }
@@ -1595,72 +1583,6 @@ async function handleUploadLink() {
   switchTab("feed");
 }
 
-async function createVideoThumbnailBlob(file) {
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    const url = URL.createObjectURL(file);
-    let finished = false;
-
-    const finish = (blob = null) => {
-      if (finished) return;
-      finished = true;
-      URL.revokeObjectURL(url);
-      video.remove();
-      resolve(blob);
-    };
-
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "metadata";
-    video.src = url;
-
-    const capture = () => {
-      try {
-        const maxWidth = 720;
-        const scale = Math.min(1, maxWidth / Math.max(video.videoWidth || maxWidth, 1));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.max(1, Math.round((video.videoWidth || 720) * scale));
-        canvas.height = Math.max(1, Math.round((video.videoHeight || 1280) * scale));
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => finish(blob), "image/jpeg", 0.82);
-      } catch (_) {
-        finish(null);
-      }
-    };
-
-    video.addEventListener("loadedmetadata", () => {
-      const target = Math.min(1.2, Math.max(0, (video.duration || 0) * 0.15));
-      if (target > 0.05) {
-        video.currentTime = target;
-      } else {
-        capture();
-      }
-    }, { once: true });
-
-    video.addEventListener("seeked", capture, { once: true });
-    video.addEventListener("error", () => finish(null), { once: true });
-    setTimeout(() => finish(null), 8000);
-  });
-}
-
-async function uploadGeneratedThumbnail(file) {
-  const blob = await createVideoThumbnailBlob(file);
-  if (!blob) return null;
-
-  const thumbPath = `${currentUser.id}/thumbnails/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-  const { error } = await sb.storage.from("clip-videos").upload(thumbPath, blob, {
-    contentType: "image/jpeg",
-    cacheControl: "86400",
-    upsert: false
-  });
-  if (error) {
-    console.warn("No se pudo crear la carátula automática:", error.message);
-    return null;
-  }
-  return sb.storage.from("clip-videos").getPublicUrl(thumbPath).data.publicUrl;
-}
-
 async function handleUploadFile() {
   const title = document.getElementById("uploadTitle").value.trim();
   const file = trimmedFile || rawSelectedFile;
@@ -1690,14 +1612,12 @@ async function handleUploadFile() {
   }
 
   const { data: publicUrlData } = sb.storage.from("clip-videos").getPublicUrl(path);
-  const thumbnailUrl = await uploadGeneratedThumbnail(file);
 
   const { error: insertError } = await sb.from("videos").insert({
     user_id: currentUser.id,
     platform: "upload",
     title,
-    video_url: publicUrlData.publicUrl,
-    thumbnail_url: thumbnailUrl
+    video_url: publicUrlData.publicUrl
   });
 
   btn.disabled = false;
@@ -1899,50 +1819,6 @@ async function handleRedeem() {
 // ============================================================
 // MI PERFIL — videos propios y cuánto generaron
 // ============================================================
-async function openMyMedalsPanel() {
-  const [{ data: earned }, { data: possible }] = await Promise.all([
-    sb.from("user_badges").select("badge_name, badge_icon, earned_at").eq("user_id", currentUser.id).order("earned_at", { ascending: false }),
-    sb.from("streak_rewards").select("badge_name, badge_icon, day_number").not("badge_name", "is", null).order("day_number", { ascending: true })
-  ]);
-
-  const earnedMap = new Map((earned || []).map(b => [b.badge_name, b]));
-  const uniquePossible = [];
-  const seen = new Set();
-  (possible || []).forEach(b => {
-    if (!b.badge_name || seen.has(b.badge_name)) return;
-    seen.add(b.badge_name);
-    uniquePossible.push(b);
-  });
-
-  const allNames = new Set([...uniquePossible.map(b => b.badge_name), ...(earned || []).map(b => b.badge_name)]);
-  const medals = [...allNames].map(name => {
-    const won = earnedMap.get(name);
-    const base = uniquePossible.find(b => b.badge_name === name);
-    return { name, icon: won?.badge_icon || base?.badge_icon || "🏅", earned: !!won, earned_at: won?.earned_at, day_number: base?.day_number };
-  });
-
-  const wrap = document.getElementById("globalModalWrap");
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:145;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
-      <div class="modal-box" style="max-width:520px;">
-        <div class="modal-box-header">
-          <h2>🏅 Mis medallas</h2>
-          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
-        </div>
-        <div class="modal-box-body">
-          <p style="font-size:12px;color:var(--text-dim);margin-top:0;">Conseguidas: <strong style="color:var(--gold);">${(earned || []).length}</strong>${medals.length ? ` de ${medals.length}` : ""}. Las bloqueadas se desbloquean participando en las rachas y eventos de LiveScroll.</p>
-          ${medals.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;">
-            ${medals.map(m => `<div style="padding:14px 10px;border:1px solid ${m.earned ? "var(--gold-dim)" : "var(--border)"};border-radius:12px;text-align:center;background:${m.earned ? "var(--panel-2)" : "rgba(255,255,255,0.015)"};opacity:${m.earned ? "1" : ".45"};">
-              <div style="font-size:34px;filter:${m.earned ? "none" : "grayscale(1)"};">${m.earned ? m.icon : "🔒"}</div>
-              <div style="font-size:12px;font-weight:700;margin-top:7px;color:${m.earned ? "var(--gold)" : "var(--text-dim)"};">${escapeHtml(m.name)}</div>
-              <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">${m.earned ? `Conseguida${m.earned_at ? " · " + new Date(m.earned_at).toLocaleDateString("es-AR") : ""}` : (m.day_number ? `Premio de racha · Día ${m.day_number}` : "Todavía bloqueada")}</div>
-            </div>`).join("")}
-          </div>` : `<p style="color:var(--text-dim);">Todavía no hay medallas configuradas.</p>`}
-        </div>
-      </div>
-    </div>`;
-}
-
 async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
@@ -2023,7 +1899,7 @@ async function renderProfile() {
       <div class="profile-section-head">
         <div class="ico">🏅</div>
         <h3>Medallas</h3>
-        <div class="sub"><button onclick="openMyMedalsPanel()" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver mis medallas →</button></div>
+        <div class="sub"><button onclick="switchTab('feed')" style="background:none; border:none; color:var(--gold); cursor:pointer; font-family:inherit; font-size:12px;">Ver Inicio de Sesión →</button></div>
       </div>
       <div class="form-card">
         <div class="streak-badges">
@@ -2091,27 +1967,73 @@ async function renderProfile() {
     </div>`;
 
   main.innerHTML = `
-    <div class="profile-hero" style="position:relative;overflow:hidden;">
-      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner" style="${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}');background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
+    <div class="profile-hero" style="position:relative; overflow:hidden;">
+      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
+        style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}');` : ""}">
         <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
       </div>
-      ${currentProfile.profile_side_image_url ? `<div style="position:absolute;right:12px;top:92px;width:88px;height:150px;border-radius:14px;overflow:hidden;border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.35);opacity:.92;pointer-events:none;"><img src="${escapeHtml(currentProfile.profile_side_image_url)}" alt="decoración del perfil" style="width:100%;height:100%;object-fit:cover;"></div>` : ""}
-      <div class="profile-hero-top">
-        <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
-        <div class="profile-name-block">
-          <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
-          <div class="handle">Tu perfil en LiveScroll</div>
+
+      ${currentProfile.profile_side_image_url ? `
+        <div aria-hidden="true" style="
+          position:absolute;
+          left:0;
+          right:0;
+          top:150px;
+          bottom:0;
+          z-index:1;
+          overflow:hidden;
+          pointer-events:none;
+        ">
+          <img
+            src="${escapeHtml(currentProfile.profile_side_image_url)}"
+            alt=""
+            style="
+              position:absolute;
+              right:-2%;
+              top:0;
+              width:min(58%, 360px);
+              height:100%;
+              object-fit:cover;
+              object-position:center top;
+              opacity:0.34;
+              filter:saturate(0.95) contrast(1.06);
+            "
+          >
+          <div style="
+            position:absolute;
+            inset:0;
+            background:
+              linear-gradient(90deg,
+                rgba(13,16,20,0.98) 0%,
+                rgba(13,16,20,0.88) 30%,
+                rgba(13,16,20,0.52) 62%,
+                rgba(13,16,20,0.22) 100%),
+              linear-gradient(180deg,
+                rgba(13,16,20,0.18) 0%,
+                rgba(13,16,20,0.38) 72%,
+                rgba(13,16,20,0.92) 100%);
+          "></div>
         </div>
-      </div>
-      ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
-      ${renderSocialIcons(currentProfile)}
-      <div class="profile-stats-row">
-        <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
-        <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
-        <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
-      </div>
-      <div class="profile-hero-actions">
-        <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+      ` : ""}
+
+      <div style="position:relative; z-index:2;">
+        <div class="profile-hero-top">
+          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
+          <div class="profile-name-block">
+            <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
+            <div class="handle">Tu perfil en LiveScroll</div>
+          </div>
+        </div>
+        ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
+        ${renderSocialIcons(currentProfile)}
+        <div class="profile-stats-row">
+          <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
+          <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
+          <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
+        </div>
+        <div class="profile-hero-actions">
+          <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+        </div>
       </div>
     </div>
 
@@ -2444,7 +2366,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -2476,9 +2398,8 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
-    <div class="profile-hero" style="position:relative;overflow:hidden;">
-      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}"></div>
-      ${profile.profile_side_image_url ? `<div style="position:absolute;right:12px;top:92px;width:88px;height:150px;border-radius:14px;overflow:hidden;border:1px solid var(--border);box-shadow:0 8px 28px rgba(0,0,0,.35);opacity:.92;pointer-events:none;"><img src="${escapeHtml(profile.profile_side_image_url)}" alt="decoración del perfil" style="width:100%;height:100%;object-fit:cover;"></div>` : ""}
+    <div class="profile-hero">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}" style="${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}');` : ""}"></div>
       <div class="profile-hero-top">
         <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
         <div class="profile-name-block">
@@ -2775,21 +2696,59 @@ async function openEditProfile() {
         </div>
         <div class="field">
           <label>Portada del perfil</label>
-          <div id="coverPositionPreview" style="border-radius:10px; overflow:hidden; height:90px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center ${Number(currentProfile.cover_position_y ?? 50)}%/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
+          <div style="border-radius:10px; overflow:hidden; height:70px; background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center/cover` : "var(--panel-2)"}; margin-bottom:10px;"></div>
           <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
-          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Después podés elegir qué parte de la foto queda visible.</div>
-          ${currentProfile.cover_url ? `<div style="margin-top:12px;"><label style="font-size:11px;color:var(--text-dim);">Posición de la portada</label><input id="coverPositionRange" type="range" min="0" max="100" value="${Number(currentProfile.cover_position_y ?? 50)}" oninput="previewCoverPosition(this.value)" style="width:100%;"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);"><span>Arriba</span><span>Abajo</span></div></div><button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
+          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Se ve mejor en formato horizontal (ancha).</div>
+          ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
         </div>
         <div class="field">
-          <label>Imagen vertical decorativa</label>
-          <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px;">
-            <div style="width:62px;height:105px;border-radius:10px;overflow:hidden;background:var(--panel-2);border:1px solid var(--border);flex:0 0 auto;">${currentProfile.profile_side_image_url ? `<img src="${escapeHtml(currentProfile.profile_side_image_url)}" style="width:100%;height:100%;object-fit:cover;">` : `<div style="height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;">🖼️</div>`}</div>
-            <div style="font-size:11px;color:var(--text-dim);">Opcional. Se muestra como una foto vertical decorativa en tu perfil para darle más personalidad.</div>
+          <label>Imagen de fondo del perfil</label>
+          <div style="
+            position:relative;
+            height:150px;
+            border-radius:12px;
+            overflow:hidden;
+            background:var(--panel-2);
+            margin-bottom:10px;
+            border:1px solid var(--border);
+          ">
+            ${currentProfile.profile_side_image_url
+              ? `
+                <img
+                  src="${escapeHtml(currentProfile.profile_side_image_url)}"
+                  alt="Fondo decorativo"
+                  style="
+                    width:100%;
+                    height:100%;
+                    object-fit:cover;
+                    object-position:center top;
+                    opacity:0.55;
+                  "
+                >
+                <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(13,16,20,.9), rgba(13,16,20,.2));"></div>
+                <div style="position:absolute; left:12px; bottom:10px; font-size:12px; color:#fff; font-weight:600;">Vista previa · queda detrás del contenido</div>
+              `
+              : `
+                <div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:12px; text-align:center; padding:16px;">
+                  Subí una imagen vertical o temática.<br>Se mostrará detrás del contenido, no reemplaza la portada.
+                </div>
+              `}
           </div>
-          <input type="file" id="profileSidePhotoInput" accept="image/*" onchange="handleProfileSidePhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
-          <div id="profileSideUploadStatus" style="font-size:11px;color:var(--text-dim);margin-top:6px;">Máximo 5MB. Recomendado: formato vertical.</div>
-          ${currentProfile.profile_side_image_url ? `<button type="button" class="btn-outline" style="margin-top:10px;padding:9px 14px;font-size:13px;width:100%;color:var(--red);border-color:var(--red);font-weight:600;" onclick="handleRemoveProfileSidePhoto()">🗑️ Quitar imagen vertical</button>` : ""}
+          <input
+            type="file"
+            id="profileSideImageInput"
+            accept="image/*"
+            onchange="handleProfileSideImageUpload()"
+            style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;"
+          >
+          <div id="profileSideImageStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">
+            Máximo 5MB. Recomendado: imagen vertical. Se usa como fondo decorativo en segundo plano.
+          </div>
+          ${currentProfile.profile_side_image_url
+            ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveProfileSideImage()">🗑️ Quitar imagen de fondo</button>`
+            : ""}
         </div>
+
         <div class="field">
           <label>Avatar (si no tenés foto)</label>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -2899,41 +2858,6 @@ async function handleRemoveAvatarPhoto() {
   openEditProfile();
 }
 
-function previewCoverPosition(value) {
-  const preview = document.getElementById("coverPositionPreview");
-  if (preview && currentProfile.cover_url) preview.style.backgroundPosition = `center ${Number(value)}%`;
-}
-
-async function handleProfileSidePhotoUpload() {
-  const file = document.getElementById("profileSidePhotoInput")?.files?.[0];
-  const statusEl = document.getElementById("profileSideUploadStatus");
-  if (!file || !statusEl) return;
-  if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
-  if (file.size > 5 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 5MB."; statusEl.style.color = "var(--red)"; return; }
-
-  statusEl.textContent = "Subiendo...";
-  statusEl.style.color = "var(--text-dim)";
-  const ext = (file.name.split(".").pop() || "jpg").replace(/[^a-zA-Z0-9]/g, "");
-  const path = `${currentUser.id}/profile-side.${ext}`;
-  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: true });
-  if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
-
-  const freshUrl = sb.storage.from("avatars").getPublicUrl(path).data.publicUrl + "?t=" + Date.now();
-  const { error } = await sb.from("profiles").update({ profile_side_image_url: freshUrl }).eq("id", currentUser.id);
-  if (error) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
-  currentProfile.profile_side_image_url = freshUrl;
-  showToast("Imagen vertical actualizada");
-  openEditProfile();
-}
-
-async function handleRemoveProfileSidePhoto() {
-  const { error } = await sb.from("profiles").update({ profile_side_image_url: null }).eq("id", currentUser.id);
-  if (error) { showToast("No se pudo quitar la imagen"); return; }
-  currentProfile.profile_side_image_url = null;
-  showToast("Imagen vertical quitada");
-  openEditProfile();
-}
-
 async function handleCoverPhotoUpload() {
   const fileInput = document.getElementById("coverPhotoInput");
   const file = fileInput.files[0];
@@ -2964,11 +2888,80 @@ async function handleCoverPhotoUpload() {
 }
 
 async function handleRemoveCoverPhoto() {
-  const { error } = await sb.from("profiles").update({ cover_url: null, cover_position_y: 50 }).eq("id", currentUser.id);
+  const { error } = await sb.from("profiles").update({ cover_url: null }).eq("id", currentUser.id);
   if (error) { showToast("No se pudo quitar la portada"); return; }
   currentProfile.cover_url = null;
-  currentProfile.cover_position_y = 50;
   showToast("Portada quitada");
+  openEditProfile();
+}
+
+
+async function handleProfileSideImageUpload() {
+  const fileInput = document.getElementById("profileSideImageInput");
+  const file = fileInput?.files?.[0];
+  const statusEl = document.getElementById("profileSideImageStatus");
+  if (!file || !statusEl) return;
+
+  if (!file.type.startsWith("image/")) {
+    statusEl.textContent = "Tiene que ser una imagen.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = "El archivo supera los 5MB.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  statusEl.textContent = "Subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg";
+  const path = `${currentUser.id}/profile-background.${ext}`;
+
+  const { error: uploadError } = await sb.storage
+    .from("avatars")
+    .upload(path, file, { cacheControl: "3600", upsert: true });
+
+  if (uploadError) {
+    statusEl.textContent = "Error al subir: " + uploadError.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
+
+  const { error: updateError } = await sb
+    .from("profiles")
+    .update({ profile_side_image_url: freshUrl })
+    .eq("id", currentUser.id);
+
+  if (updateError) {
+    statusEl.textContent = "No se pudo guardar.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  currentProfile.profile_side_image_url = freshUrl;
+  showToast("¡Fondo del perfil actualizado!");
+  openEditProfile();
+}
+
+async function handleRemoveProfileSideImage() {
+  const { error } = await sb
+    .from("profiles")
+    .update({ profile_side_image_url: null })
+    .eq("id", currentUser.id);
+
+  if (error) {
+    showToast("No se pudo quitar la imagen de fondo");
+    return;
+  }
+
+  currentProfile.profile_side_image_url = null;
+  showToast("Imagen de fondo quitada");
   openEditProfile();
 }
 
@@ -2992,12 +2985,9 @@ async function saveProfileEdits() {
     currentProfile.username = newUsername;
   }
 
-  const coverPositionY = Number(document.getElementById("coverPositionRange")?.value ?? currentProfile.cover_position_y ?? 50);
-
   const { error: updateError } = await sb.from("profiles").update({
     bio,
     avatar_emoji: window.selectedAvatarEmoji,
-    cover_position_y: Math.max(0, Math.min(100, coverPositionY)),
     social_kick: document.getElementById("socialKick").value.trim() || null,
     social_twitch: document.getElementById("socialTwitch").value.trim() || null,
     social_youtube: document.getElementById("socialYoutube").value.trim() || null,
@@ -3009,7 +2999,6 @@ async function saveProfileEdits() {
 
   currentProfile.bio = bio;
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
-  currentProfile.cover_position_y = Math.max(0, Math.min(100, coverPositionY));
   currentProfile.social_kick = document.getElementById("socialKick").value.trim();
   currentProfile.social_twitch = document.getElementById("socialTwitch").value.trim();
   currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
@@ -3158,16 +3147,13 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
-    <h3 style="margin-top:32px;">🔒 Accesos de Planes y Billetera</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:14px;">
-      <div class="form-card" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div><div style="font-size:13px;font-weight:700;">💎 Planes</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Abrí o cerrá la pestaña de Planes para los usuarios.</div></div>
-        <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
+    <h3 style="margin-top:32px;">🔒 Candado de Planes</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Controla si el resto de los usuarios puede ver la pestaña de Planes.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre ves todo, esto no te afecta.</div>
       </div>
-      <div class="form-card" style="margin-bottom:0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-        <div><div style="font-size:13px;font-weight:700;">💰 Billetera</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">Abrí o pausá el acceso a la Billetera/canjes.</div></div>
-        <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
-      </div>
+      <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
     </div>
 
     <h3 style="margin-top:32px;">💵 Precios de la tienda</h3>
@@ -3231,6 +3217,14 @@ async function renderAdmin() {
       </div>
     </div>
 
+    <h3 style="margin-top:32px;">🔒 Candado de Billetera</h3>
+    <div class="form-card" style="margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-size:13px;">Pausa que cualquiera pueda pedir un canje, sin tocar los puntos de nadie.</div>
+        <div style="font-size:12px; color:var(--text-dim); margin-top:2px;">Vos (admin) siempre podés retirar igual, esto no te afecta.</div>
+      </div>
+      <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
+    </div>
 
     <h3 style="margin-top:32px;">🔥 Racha semanal — cargar premios</h3>
     <div class="form-card" style="margin-bottom:14px;">

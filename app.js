@@ -354,14 +354,35 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const { data, error } = await sb.rpc("get_my_profile_data");
+  const [profileResult, statusResult] = await Promise.all([
+    sb.rpc("get_my_profile_data"),
+    sb.rpc("get_my_status")
+  ]);
 
-  if (!error && data?.ok) {
-    currentProfile = data.profile;
+  if (!profileResult.error && profileResult.data?.ok) {
+    currentProfile = profileResult.data.profile;
   } else {
-    console.error("No se pudo cargar el perfil privado:", error || data?.error);
+    console.error("No se pudo cargar el perfil privado:", profileResult.error || profileResult.data?.error);
     currentProfile = null;
+    return;
   }
+
+  const status = statusResult?.data;
+
+  // Doble verificación de permisos:
+  // - get_my_profile_data trae is_admin/is_blocked de forma privada.
+  // - get_my_status queda como respaldo.
+  if (status && currentProfile) {
+    currentProfile.is_admin =
+      currentProfile.is_admin === true || status.is_admin === true;
+
+    if (typeof status.is_blocked === "boolean") {
+      currentProfile.is_blocked = status.is_blocked;
+    }
+  }
+
+  currentProfile.is_admin = currentProfile.is_admin === true;
+  currentProfile.is_blocked = currentProfile.is_blocked === true;
 }
 
 // ============================================================

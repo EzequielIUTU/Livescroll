@@ -33,6 +33,235 @@ const LIVESCROLL_CODE_VERSION = "5.3.5";
 let liveScrollReleaseTimer = null;
 let liveScrollPreviewEnabled = false;
 
+const STATUS_FEATURE_VERSION = "5.3.6";
+let liveScrollReleaseConfigCache = null;
+
+async function isStatusFeatureEnabled() {
+  if (currentProfile?.is_admin && liveScrollPreviewEnabled) return true;
+
+  if (!liveScrollReleaseConfigCache) {
+    liveScrollReleaseConfigCache = await getLiveScrollReleaseConfig();
+  }
+
+  const stable = liveScrollReleaseConfigCache?.stable_version || LIVESCROLL_CODE_VERSION;
+  return compareLiveScrollVersions(stable, STATUS_FEATURE_VERSION) >= 0;
+}
+
+async function getActiveStatusForUser(userId) {
+  if (!userId) return null;
+
+  const { data, error } = await sb
+    .from("profile_statuses")
+    .select("*")
+    .eq("user_id", userId)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("No se pudo cargar el estado activo:", error);
+    return null;
+  }
+
+  return data || null;
+}
+
+async function getHighlightedStatuses(userId) {
+  if (!userId) return [];
+
+  const { data, error } = await sb
+    .from("profile_statuses")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_highlight", true)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  if (error) {
+    console.warn("No se pudieron cargar las destacadas:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+function renderStatusAuraClass(hasStatus) {
+  return hasStatus ? " status-aura-active" : "";
+}
+
+function renderProfileStatusCard(status, ownProfile = false) {
+  if (!status) return "";
+
+  const remainingMs = new Date(status.expires_at).getTime() - Date.now();
+  const remainingHours = Math.max(1, Math.ceil(remainingMs / 3600000));
+
+  return `
+    <div class="profile-section ls-status-section">
+      <div class="profile-section-head">
+        <div class="ico">✨</div>
+        <h3>Estado</h3>
+        <div class="sub">${remainingHours} h restantes</div>
+      </div>
+      <div class="form-card ls-status-card">
+        <div class="ls-status-emoji">${escapeHtml(status.emoji || "✨")}</div>
+        <div style="min-width:0;flex:1;">
+          <div class="ls-status-text">${escapeHtml(status.content || "")}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
+            Visible durante 24 horas${status.is_highlight ? " · ⭐ Guardado en Destacadas" : ""}
+          </div>
+        </div>
+        ${ownProfile ? `<button class="btn-outline" style="padding:7px 10px;font-size:11px;" onclick="openStatusComposer()">Editar</button>` : ""}
+      </div>
+    </div>`;
+}
+
+function renderHighlightsSection(statuses) {
+  if (!statuses?.length) return "";
+
+  return `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">⭐</div>
+        <h3>Destacadas</h3>
+        <div class="sub">${statuses.length}</div>
+      </div>
+      <div class="form-card">
+        <div class="ls-highlights-row">
+          ${statuses.map(s => `
+            <button type="button" class="ls-highlight-chip" onclick="showHighlightedStatus('${s.id}')">
+              <span>${escapeHtml(s.emoji || "✨")}</span>
+              <small>${escapeHtml((s.content || "Estado").slice(0, 18))}</small>
+            </button>`).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function showHighlightedStatus(statusId) {
+  const { data } = await sb.from("profile_statuses").select("*").eq("id", statusId).maybeSingle();
+  if (!data) return;
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) this.innerHTML=''">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-body" style="text-align:center;padding:26px;">
+          <div style="font-size:52px;margin-bottom:10px;">${escapeHtml(data.emoji || "✨")}</div>
+          <div style="font-size:17px;line-height:1.45;">${escapeHtml(data.content || "")}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:12px;">⭐ Destacada</div>
+          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function openStatusComposer() {
+  if (!(await isStatusFeatureEnabled())) {
+    showToast("Esta función todavía está en prueba");
+    return;
+  }
+
+  const active = await getActiveStatusForUser(currentUser.id);
+  const wrap = document.getElementById("globalModalWrap");
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:250;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:410px;">
+        <div class="modal-box-header">
+          <h2 style="margin:0;">✨ Estado de 24 horas</h2>
+        </div>
+        <div class="modal-box-body">
+          <div style="display:grid;grid-template-columns:76px 1fr;gap:10px;">
+            <div>
+              <label style="font-size:11px;color:var(--text-dim);">Emoji</label>
+              <input id="statusEmoji" maxlength="4" value="${escapeHtml(active?.emoji || "✨")}"
+                style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);text-align:center;font-size:22px;">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text-dim);">Tu estado</label>
+              <input id="statusContent" maxlength="120" value="${escapeHtml(active?.content || "")}"
+                placeholder="¿Qué estás haciendo?"
+                style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);">
+            </div>
+          </div>
+
+          <label style="display:flex;gap:9px;align-items:center;margin-top:15px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="statusHighlight" ${active?.is_highlight ? "checked" : ""}>
+            ⭐ Guardar también en Destacadas
+          </label>
+
+          <div style="font-size:10px;color:var(--text-dim);line-height:1.45;margin-top:10px;">
+            El estado activo desaparece del aura a las 24 horas. Si lo guardás en Destacadas, seguirá visible en tu perfil.
+          </div>
+        </div>
+        <div class="modal-box-footer" style="display:flex;gap:9px;">
+          ${active ? `<button class="btn-outline" style="color:var(--red);" onclick="deleteMyStatus('${active.id}')">Eliminar</button>` : ""}
+          <button class="btn-outline" style="flex:1;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="saveMyStatus('${active?.id || ""}')">Publicar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function saveMyStatus(existingId = "") {
+  const content = document.getElementById("statusContent")?.value.trim();
+  const emoji = document.getElementById("statusEmoji")?.value.trim() || "✨";
+  const isHighlight = !!document.getElementById("statusHighlight")?.checked;
+
+  if (!content) {
+    showToast("Escribí algo para tu estado");
+    return;
+  }
+
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  let error;
+  if (existingId) {
+    ({ error } = await sb.from("profile_statuses").update({
+      content,
+      emoji,
+      is_highlight: isHighlight,
+      expires_at: expiresAt,
+      updated_at: new Date().toISOString()
+    }).eq("id", existingId).eq("user_id", currentUser.id));
+  } else {
+    ({ error } = await sb.from("profile_statuses").insert({
+      user_id: currentUser.id,
+      content,
+      emoji,
+      is_highlight: isHighlight,
+      expires_at: expiresAt
+    }));
+  }
+
+  if (error) {
+    console.error(error);
+    showToast("No se pudo publicar el estado");
+    return;
+  }
+
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast("✨ Estado publicado por 24 h");
+  renderProfile();
+}
+
+async function deleteMyStatus(statusId) {
+  const { error } = await sb.from("profile_statuses").delete()
+    .eq("id", statusId)
+    .eq("user_id", currentUser.id);
+
+  if (error) {
+    showToast("No se pudo eliminar el estado");
+    return;
+  }
+
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast("Estado eliminado");
+  renderProfile();
+}
+
+
 function compareLiveScrollVersions(a, b) {
   const pa = String(a || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
   const pb = String(b || "0").replace(/^v/i, "").split(".").map(n => parseInt(n, 10) || 0);
@@ -46,13 +275,18 @@ function compareLiveScrollVersions(a, b) {
 }
 
 async function getLiveScrollReleaseConfig() {
-  const { data, error } = await sb.from("app_config")
-    .select("key,value")
-    .in("key", ["stable_version","preview_version","release_message"]);
-  if (error) return null;
-  const map = {};
-  (data || []).forEach(r => { map[r.key] = r.value; });
-  return map;
+  const { data, error } = await sb
+    .from("app_release_config")
+    .select("stable_version, preview_version, release_message")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("No se pudo cargar configuración de versiones:", error);
+    return null;
+  }
+
+  return data || null;
 }
 
 async function checkLiveScrollRelease() {
@@ -1553,6 +1787,120 @@ function ensureSafeMobileUpgradeStyles() {
         padding-left:7px !important;
         padding-right:7px !important;
       }
+    }
+
+
+    .status-aura-active {
+      position:relative;
+      isolation:isolate;
+      cursor:pointer;
+    }
+
+    .status-aura-active::before,
+    .status-aura-active::after {
+      content:"";
+      position:absolute;
+      inset:-5px;
+      border-radius:50%;
+      pointer-events:none;
+      z-index:-1;
+    }
+
+    .status-aura-active::before {
+      background:conic-gradient(from 0deg, #22c55e, #7dd3fc, #a78bfa, #facc15, #22c55e);
+      animation:lsStatusAuraSpin 3.2s linear infinite;
+      filter:blur(1px);
+    }
+
+    .status-aura-active::after {
+      inset:-10px;
+      background:radial-gradient(circle, rgba(34,197,94,.20), rgba(125,211,252,.10), transparent 68%);
+      filter:blur(7px);
+      animation:lsStatusAuraPulse 2.1s ease-in-out infinite;
+    }
+
+    @keyframes lsStatusAuraSpin {
+      to { transform:rotate(360deg); }
+    }
+
+    @keyframes lsStatusAuraPulse {
+      0%,100% { opacity:.52; transform:scale(.96); }
+      50% { opacity:1; transform:scale(1.07); }
+    }
+
+    .ls-status-card {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      border-color:rgba(125,211,252,.35) !important;
+      background:linear-gradient(135deg, rgba(34,197,94,.07), rgba(125,211,252,.055), rgba(167,139,250,.05)) !important;
+    }
+
+    .ls-status-emoji {
+      width:46px;
+      height:46px;
+      flex:0 0 46px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:14px;
+      font-size:25px;
+      background:rgba(255,255,255,.055);
+      border:1px solid var(--border);
+    }
+
+    .ls-status-text {
+      font-size:14px;
+      line-height:1.4;
+      color:var(--text);
+      overflow-wrap:anywhere;
+    }
+
+    .ls-highlights-row {
+      display:flex;
+      gap:10px;
+      overflow-x:auto;
+      padding-bottom:4px;
+      scrollbar-width:thin;
+    }
+
+    .ls-highlight-chip {
+      width:82px;
+      min-width:82px;
+      border:0;
+      background:transparent;
+      color:var(--text);
+      font-family:inherit;
+      cursor:pointer;
+      text-align:center;
+    }
+
+    .ls-highlight-chip span {
+      width:54px;
+      height:54px;
+      margin:0 auto 6px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      font-size:26px;
+      background:var(--panel-2);
+      border:2px solid var(--gold-dim);
+    }
+
+    .ls-highlight-chip small {
+      display:block;
+      font-size:9px;
+      color:var(--text-dim);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    .ls-legacy .status-aura-active::before,
+    .ls-legacy .status-aura-active::after {
+      animation:none !important;
+      filter:none !important;
     }
 
     .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
@@ -3383,6 +3731,10 @@ async function renderProfile() {
     }
   }
 
+  const statusFeatureEnabled = await isStatusFeatureEnabled();
+  const activeProfileStatus = statusFeatureEnabled ? await getActiveStatusForUser(currentUser.id) : null;
+  const highlightedProfileStatuses = statusFeatureEnabled ? await getHighlightedStatuses(currentUser.id) : [];
+
   const { count: followersCount } = await sb
     .from("follows")
     .select("follower_id", { count: "exact", head: true })
@@ -3541,7 +3893,10 @@ async function renderProfile() {
 
       <div style="position:relative; z-index:2;">
         <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
+          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${renderStatusAuraClass(!!activeProfileStatus)}"
+            ${activeProfileStatus ? `onclick="openStatusComposer()" title="Tenés un estado activo"` : ""}>
+            ${renderAvatarHtml(currentProfile, 60)}
+          </div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
             <div class="handle">Tu perfil en LiveScroll</div>
@@ -3554,12 +3909,15 @@ async function renderProfile() {
           <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
           <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
         </div>
-        <div class="profile-hero-actions">
+        <div class="profile-hero-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
           <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+          ${statusFeatureEnabled ? `<button class="btn-outline" onclick="openStatusComposer()">✨ ${activeProfileStatus ? "Mi estado" : "Crear estado"}</button>` : ""}
         </div>
       </div>
     </div>
 
+    ${statusFeatureEnabled ? renderProfileStatusCard(activeProfileStatus, true) : ""}
+    ${statusFeatureEnabled ? renderHighlightsSection(highlightedProfileStatuses) : ""}
     ${socialClicksHtml}
     ${streakSectionHtml}
     ${referralSectionHtml}
@@ -3918,6 +4276,30 @@ function openMyMedalsPanel() {
     </div>`;
 }
 
+
+async function showPublicActiveStatus(userId) {
+  const status = await getActiveStatusForUser(userId);
+  if (!status) {
+    showToast("Este estado ya venció");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  const remainingHours = Math.max(1, Math.ceil((new Date(status.expires_at).getTime() - Date.now()) / 3600000));
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:245;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-body" style="text-align:center;padding:28px;">
+          <div style="font-size:54px;margin-bottom:10px;">${escapeHtml(status.emoji || "✨")}</div>
+          <div style="font-size:18px;line-height:1.45;">${escapeHtml(status.content || "")}</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:12px;">⏳ ${remainingHours} h restantes</div>
+          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
 async function viewPublicProfile(username) {
   if (!username) return;
   if (username === currentProfile.username) { switchTab("profile"); return; }
@@ -3958,6 +4340,10 @@ async function viewPublicProfile(username) {
 
   const isFollowing = !!amIFollowing;
 
+  const publicStatusFeatureEnabled = await isStatusFeatureEnabled();
+  const publicActiveStatus = publicStatusFeatureEnabled ? await getActiveStatusForUser(profile.id) : null;
+  const publicHighlightedStatuses = publicStatusFeatureEnabled ? await getHighlightedStatuses(profile.id) : [];
+
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
@@ -3977,7 +4363,10 @@ async function viewPublicProfile(username) {
 
       <div style="position:relative;z-index:2;">
         <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}${renderStatusAuraClass(!!publicActiveStatus)}"
+            ${publicActiveStatus ? `onclick="showPublicActiveStatus('${profile.id}')" title="Ver estado"` : ""}>
+            ${renderAvatarHtml(profile, 60)}
+          </div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle">Perfil público</div>
@@ -3994,6 +4383,9 @@ async function viewPublicProfile(username) {
         </div>
       </div>
     </div>
+
+    ${publicStatusFeatureEnabled ? renderProfileStatusCard(publicActiveStatus, false) : ""}
+    ${publicStatusFeatureEnabled ? renderHighlightsSection(publicHighlightedStatuses) : ""}
 
     ${theirBadges && theirBadges.length ? `
       <div class="profile-section">
@@ -4640,6 +5032,7 @@ async function loadVersionLab() {
 
 function toggleAdminPreview() {
   liveScrollPreviewEnabled = !liveScrollPreviewEnabled;
+  liveScrollReleaseConfigCache = null;
   document.body.classList.toggle("ls-admin-preview", liveScrollPreviewEnabled);
   const btn = document.getElementById("lsPreviewToggleBtn");
   if (btn) btn.textContent = liveScrollPreviewEnabled ? "✓ Modo prueba activo" : "🧪 Probar versión";
@@ -4650,11 +5043,12 @@ async function savePreviewVersion() {
   const version = document.getElementById("lsPreviewVersion")?.value.trim().replace(/^v/i, "");
   const message = document.getElementById("lsReleaseMessage")?.value.trim() || "";
   if (!version) { showToast("Escribí una versión de prueba"); return; }
-  const { error } = await sb.from("app_config").upsert([
-    { key:"preview_version", value:version },
-    { key:"release_message", value:message }
-  ], { onConflict:"key" });
-  if (error) { showToast("No se pudo guardar la versión de prueba"); return; }
+  const { data, error } = await sb.rpc("admin_save_preview_version", {
+    p_version: version,
+    p_message: message
+  });
+  if (error || !data?.ok) { showToast("No se pudo guardar la versión de prueba"); return; }
+  liveScrollReleaseConfigCache = null;
   showToast(`v${version} guardada como versión de prueba`);
   loadVersionLab();
 }
@@ -4681,13 +5075,13 @@ async function launchPreviewVersion() {
 
 async function confirmLaunchVersion(version) {
   const message = document.getElementById("lsReleaseMessage")?.value.trim() || "";
-  const { error } = await sb.from("app_config").upsert([
-    { key:"stable_version", value:version },
-    { key:"preview_version", value:version },
-    { key:"release_message", value:message }
-  ], { onConflict:"key" });
-  if (error) { showToast("No se pudo lanzar la versión"); return; }
+  const { data, error } = await sb.rpc("admin_launch_version", {
+    p_version: version,
+    p_message: message
+  });
+  if (error || !data?.ok) { showToast("No se pudo lanzar la versión"); return; }
   document.getElementById("globalModalWrap").innerHTML = "";
+  liveScrollReleaseConfigCache = null;
   showToast(`🚀 LiveScroll v${version} lanzada`);
   loadVersionLab();
 }
@@ -4752,6 +5146,10 @@ async function renderAdmin() {
         <button class="btn" style="flex:1;min-width:130px;" onclick="launchPreviewVersion()">🚀 Lanzar versión</button>
       </div>
       <div style="font-size:10px;color:var(--text-dim);margin-top:10px;">El modo prueba es local a tu sesión de administrador. Lanzar cambia la versión estable para todos.</div>
+      <div style="margin-top:12px;padding:11px;border-radius:10px;border:1px solid var(--gold-dim);background:rgba(255,255,255,.025);font-size:11px;">
+        <strong style="color:var(--gold);">🧪 Experimento v5.3.6</strong>
+        <div style="color:var(--text-dim);margin-top:4px;">Estados de 24 h + aura de perfil + Destacadas. Activá “Probar versión” y entrá a Mi Perfil.</div>
+      </div>
     </div>
 
     ${stats && !stats.error ? `

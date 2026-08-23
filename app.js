@@ -1249,17 +1249,37 @@ function closeChangelogHistory() {
 }
 
 async function handleAcceptChangelog() {
-  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "changelog" });
+  const { error } = await sb.rpc("acknowledge_content", {
+    p_user_id: currentUser.id,
+    p_content_key: "changelog"
+  });
+
+  if (error) {
+    console.error("No se pudo marcar Novedades como vistas:", error);
+    showToast("No se pudo guardar todavía");
+    return;
+  }
 
   const box = document.getElementById("changelogBox");
   const overlay = document.getElementById("changelogOverlay");
+
+  const continuePendingFlow = () => {
+    const wrap = document.getElementById("globalModalWrap");
+    if (wrap) wrap.innerHTML = "";
+
+    // Importante: volvemos a consultar inmediatamente.
+    // Así, si el usuario ya se puso al día pero todavía no vio
+    // el teaser del camino a LiveScroll 6, aparece en esta misma sesión.
+    setTimeout(() => checkPendingContent(), 120);
+  };
+
   if (box && overlay) {
     box.style.transform = "translate(140%, 140%) scale(0.15)";
     box.style.opacity = "0";
     overlay.style.opacity = "0";
-    setTimeout(() => { document.getElementById("globalModalWrap").innerHTML = ""; }, 350);
+    setTimeout(continuePendingFlow, 350);
   } else {
-    document.getElementById("globalModalWrap").innerHTML = "";
+    continuePendingFlow();
   }
 }
 

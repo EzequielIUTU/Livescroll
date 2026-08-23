@@ -410,11 +410,9 @@ function detectLiveScrollExperience() {
 
 function closeLiveScrollModeInfo() {
   document.getElementById("lsModeInfoOverlay")?.remove();
-  setMobileBottomNavHidden(false);
 }
 
 function openLiveScrollModeInfo() {
-  setMobileBottomNavHidden(true);
   const mode = window.__liveScrollExperienceMode || "nova";
   closeLiveScrollModeInfo();
 
@@ -1079,11 +1077,9 @@ async function checkAndShowLoginStreak() {
 function closeLoginStreakModal() {
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
-  setMobileBottomNavHidden(false);
 }
 
 function showLoginStreakModal() {
-  setMobileBottomNavHidden(true);
   const data = window.__loginStreakData;
   if (!data) return;
   const claimedToday = data.claimed_today;
@@ -1210,11 +1206,9 @@ async function claimDailyStreak() {
 function closeStreakRewardModal() {
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
-  setMobileBottomNavHidden(false);
 }
 
 function showStreakModal(data) {
-  setMobileBottomNavHidden(true);
   const wrap = document.getElementById("globalModalWrap");
   const wasCompleted = data.completed_week;
 
@@ -1305,8 +1299,6 @@ function ensureSafeMobileUpgradeStyles() {
   const style = document.createElement("style");
   style.id = "lsSafeMobileUpgradeStyles";
   style.textContent = `
-    .ls-mobile-nav-safe { display:none !important; }
-
     body,
     button,
     a,
@@ -1477,93 +1469,7 @@ function ensureSafeMobileUpgradeStyles() {
     }
 
     @media (max-width:700px) {
-      .ls-mobile-nav-safe {
-        position:fixed !important;
-        left:8px !important;
-        right:8px !important;
-        top:auto !important;
-        bottom:max(8px, env(safe-area-inset-bottom)) !important;
-        z-index:320 !important;
 
-        display:grid !important;
-        grid-template-columns:repeat(5, minmax(0,1fr)) !important;
-        align-items:center !important;
-        align-content:center !important;
-
-        width:auto !important;
-        height:64px !important;
-        min-height:64px !important;
-        max-height:64px !important;
-
-        margin:0 !important;
-        gap:2px !important;
-        padding:5px 6px !important;
-        box-sizing:border-box !important;
-
-        border:1px solid var(--border) !important;
-        border-radius:18px !important;
-        background:rgba(13,16,20,.97) !important;
-        overflow:visible !important;
-      }
-
-      .ls-nova .ls-mobile-nav-safe {
-        box-shadow:0 10px 28px rgba(0,0,0,.34);
-      }
-
-      .ls-mobile-nav-safe button {
-        border:0 !important;
-        background:none;
-        color:var(--text-dim);
-        width:auto !important;
-        height:52px !important;
-        min-width:0 !important;
-        min-height:52px !important;
-        max-height:52px !important;
-        margin:0 !important;
-        border-radius:12px;
-        padding:4px 2px;
-        font-family:inherit;
-        display:flex;
-        flex-direction:column;
-        align-items:center;
-        justify-content:center;
-        gap:3px;
-        cursor:pointer;
-        touch-action:manipulation;
-      }
-
-      .ls-mobile-nav-safe button.active {
-        color:var(--gold);
-        background:rgba(255,255,255,.045);
-      }
-
-      .ls-mobile-nav-safe .ic {
-        font-size:19px;
-        line-height:1;
-      }
-
-      .ls-mobile-nav-safe .lb {
-        font-size:9px;
-        font-weight:700;
-        white-space:nowrap;
-        overflow:hidden;
-        text-overflow:ellipsis;
-        max-width:100%;
-      }
-
-      .ls-mobile-nav-safe button[data-tab="upload"] .ic {
-        width:36px;
-        height:36px;
-        margin-top:-13px;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        border-radius:13px;
-        background:var(--gold);
-        color:#10120f;
-        font-size:23px;
-        font-weight:900;
-      }
     }
 
     .ls-view-enter-safe {
@@ -1648,17 +1554,6 @@ function ensureSafeMobileUpgradeStyles() {
       animation:none !important;
     }
 
-    @media (max-width:360px) {
-      .ls-mobile-nav-safe {
-        left:5px;
-        right:5px;
-        padding:5px 3px;
-      }
-
-      .ls-mobile-nav-safe .lb {
-        font-size:8px;
-      }
-    }
 
     @media (max-width:700px) {
       .ls-profile-edit-modal {
@@ -1720,22 +1615,9 @@ function ensureSafeMobileUpgradeStyles() {
   document.head.appendChild(style);
 }
 
-function setMobileBottomNavHidden(hidden) {
-  // Navegación inferior retirada. Se conserva el helper para no romper modales existentes.
-}
-
 function closeManagedModal() {
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
-  setMobileBottomNavHidden(false);
-}
-
-function ensureSafeMobileBottomNav() {
-  document.getElementById("lsMobileBottomNavSafe")?.remove();
-}
-
-function updateSafeMobileBottomNav() {
-  // Barra inferior retirada.
 }
 
 function safePulseElement(el, className) {
@@ -1787,8 +1669,6 @@ function showFloatingPointsSafe(amount, anchorEl = null) {
 function switchTab(tab) {
   clearAllWatchIntervals();
   currentTab = tab;
-  setMobileBottomNavHidden(false);
-  updateSafeMobileBottomNav();
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
   if (activeBtn) activeBtn.classList.add("active");
@@ -2090,7 +1970,6 @@ async function openSharedVideo(videoId) {
 }
 
 async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
-  setMobileBottomNavHidden(true);
   const { data: myLikes } = await sb
     .from("video_likes")
     .select("video_id")
@@ -2446,11 +2325,9 @@ function ensureModernMobileStyles() {
 
 function closeVideoActionSheet() {
   document.getElementById("videoActionSheetOverlay")?.remove();
-  setMobileBottomNavHidden(false);
 }
 
 function openVideoActionSheet(videoId) {
-  setMobileBottomNavHidden(true);
   const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
   if (!video) return;
 
@@ -3624,7 +3501,6 @@ async function handleShare(videoId, url) {
 }
 
 async function openComments(videoId, focusCommentId = null) {
-  setMobileBottomNavHidden(false);
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
@@ -3696,7 +3572,6 @@ async function submitComment(videoId) {
 function closeComments() {
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
-  setMobileBottomNavHidden(false);
 }
 
 function renderAvatarHtml(profile, size) {
@@ -3905,7 +3780,6 @@ async function loadUsersDirectory(term) {
 
 
 function openMyMedalsPanel() {
-  setMobileBottomNavHidden(true);
   const badges = window.__myProfileBadges || [];
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
@@ -4272,7 +4146,6 @@ function copyReferralLink() {
 }
 
 async function openEditProfile() {
-  setMobileBottomNavHidden(true);
   const baseEmojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
   const { data: unlocked } = await sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id);
   const emojis = [...baseEmojis, ...(unlocked || []).map(u => u.emoji).filter(e => !baseEmojis.includes(e))];

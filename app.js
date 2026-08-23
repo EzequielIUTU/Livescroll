@@ -3030,6 +3030,58 @@ function ensureModernMobileStyles() {
       flex-wrap:wrap;
     }
 
+
+    .ls-equipped-medal.ls-medal-rarity-comun {
+      border-color:#cbd5e1;
+      box-shadow:0 0 0 2px rgba(203,213,225,.12), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-rara {
+      border-color:#7dd3fc;
+      box-shadow:0 0 0 2px rgba(125,211,252,.16), 0 0 16px rgba(125,211,252,.20), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-epica {
+      border-color:#c084fc;
+      box-shadow:0 0 0 2px rgba(192,132,252,.16), 0 0 18px rgba(192,132,252,.24), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-legendaria {
+      border-color:#fbbf24;
+      box-shadow:0 0 0 2px rgba(251,191,36,.18), 0 0 20px rgba(251,191,36,.28), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      border-color:#fb7185;
+      box-shadow:0 0 0 2px rgba(251,113,133,.18), 0 0 22px rgba(251,113,133,.30), 0 5px 16px rgba(0,0,0,.24);
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-rara::after,
+    .ls-equipped-medal.ls-medal-rarity-epica::after,
+    .ls-equipped-medal.ls-medal-rarity-legendaria::after,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva::after {
+      content:"";
+      position:absolute;
+      inset:-4px;
+      border-radius:50%;
+      border:1px solid currentColor;
+      opacity:.18;
+      pointer-events:none;
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-epica,
+    .ls-equipped-medal.ls-medal-rarity-legendaria,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      animation:lsMedalRarePulse 2.6s ease-in-out infinite;
+    }
+
+    @keyframes lsMedalRarePulse {
+      0%,100% { transform:translateZ(0) scale(1); }
+      50% { transform:translateZ(0) scale(1.055); }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-equipped-medal {
+        animation:none !important;
+      }
+    }
+
     .ls-equipped-medal {
       position:relative;
       width:31px;
@@ -4585,6 +4637,23 @@ async function getEquippedProfileMedals(userId) {
   return (data || []).sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
 }
 
+function getProfileMedalRarityClass(rarity) {
+  const safe = ["comun","rara","epica","legendaria","exclusiva"].includes(rarity)
+    ? rarity
+    : "";
+  return safe ? `ls-medal-rarity-${safe}` : "";
+}
+
+function getProfileMedalRarityLabel(rarity) {
+  return ({
+    comun:"Común",
+    rara:"Rara",
+    epica:"Épica",
+    legendaria:"Legendaria",
+    exclusiva:"Exclusiva"
+  })[rarity] || "";
+}
+
 function renderEquippedMedalsInline(medals, ownProfile = false) {
   const safe = Array.isArray(medals) ? medals.slice(0,3) : [];
   const slots = [];
@@ -4595,9 +4664,9 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
     if (medal) {
       slots.push(`
         <button type="button"
-          class="ls-equipped-medal"
-          title="${escapeHtml(medal.badge_name || "Medalla")}"
-          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}')">
+          class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}"
+          title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
+          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}')">
           ${medal.badge_icon || "🏅"}
         </button>`);
     } else if (ownProfile) {
@@ -4612,7 +4681,7 @@ function renderEquippedMedalsInline(medals, ownProfile = false) {
     </div>`;
 }
 
-function openMedalDetail(name, icon) {
+function openMedalDetail(name, icon, rarity = "") {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
@@ -4622,7 +4691,9 @@ function openMedalDetail(name, icon) {
         <div class="modal-box-body" style="padding:26px;text-align:center;">
           <div class="ls-medal-detail-icon">${icon || "🏅"}</div>
           <h2 style="margin:0 0 6px;">${escapeHtml(name || "Medalla")}</h2>
-          <div style="font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">MEDALLA DE PERFIL</div>
+          <div style="font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">
+            ${getProfileMedalRarityLabel(rarity) ? `MEDALLA ${getProfileMedalRarityLabel(rarity).toUpperCase()}` : "MEDALLA DE PERFIL"}
+          </div>
           <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
             Esta medalla forma parte de la identidad pública de este perfil.
           </p>

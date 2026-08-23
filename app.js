@@ -953,23 +953,75 @@ function showChangelogModal(entries) {
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
-  const byCategory = {};
-  entries.forEach(e => { byCategory[e.category] = byCategory[e.category] || []; byCategory[e.category].push(e.content); });
+
+  const byVersion = {};
+
+  (entries || []).forEach(e => {
+    const version = Number(e.version || 0);
+    if (!byVersion[version]) {
+      byVersion[version] = {
+        display: e.display_version || null,
+        cats: {}
+      };
+    }
+
+    if (e.display_version && !byVersion[version].display) {
+      byVersion[version].display = e.display_version;
+    }
+
+    byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
+    byVersion[version].cats[e.category].push(e.content);
+  });
+
+  const versions = Object.keys(byVersion).map(Number).sort((a, b) => a - b);
+  const multipleVersions = versions.length > 1;
 
   const wrap = document.getElementById("globalModalWrap");
+
   wrap.innerHTML = `
     <div id="changelogOverlay" class="modal-overlay" style="transition:opacity 0.35s ease;">
-      <div id="changelogBox" class="modal-box" style="transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
-        <div class="modal-box-header"><h2>✨ Novedades</h2></div>
-        <div class="modal-box-body">
-          ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => byCategory[cat] ? `
-            <div style="margin-bottom:14px;">
-              <div style="font-weight:600; font-size:13px; color:${labels[cat].color}; margin-bottom:6px;">${labels[cat].title}</div>
-              ${byCategory[cat].map(c => `<div style="font-size:13px; color:var(--text-dim); margin-bottom:4px;">• ${escapeHtml(c)}</div>`).join("")}
-            </div>` : "").join("")}
+      <div id="changelogBox" class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;transition:transform 0.35s cubic-bezier(0.4,0,1,1), opacity 0.35s ease;">
+        <div class="modal-box-header">
+          <div>
+            <h2 style="margin:0;">${multipleVersions ? "👋 Mientras no estabas..." : "✨ Novedades"}</h2>
+            ${multipleVersions ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Mirá todo lo que fuimos sumando desde tu última visita.</div>` : ""}
+          </div>
         </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          ${versions.length ? versions.map(v => {
+            const info = byVersion[v];
+            const label = info.display || `${v}.0.0`;
+
+            return `
+              <div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;">LiveScroll v${escapeHtml(label)}</span>
+                  ${v === versions[versions.length - 1] ? `<span style="font-size:9px;font-weight:800;color:#12130f;background:var(--gold);padding:2px 7px;border-radius:999px;">MÁS RECIENTE</span>` : ""}
+                </div>
+
+                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat =>
+                  info.cats[cat] ? `
+                    <div style="margin-bottom:11px;">
+                      <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">
+                        ${labels[cat]?.title || escapeHtml(cat)}
+                      </div>
+                      ${info.cats[cat].map(c => `
+                        <div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>
+                      `).join("")}
+                    </div>` : ""
+                ).join("")}
+              </div>`;
+          }).join("") : `
+            <div style="font-size:13px;color:var(--text-dim);text-align:center;padding:20px;">
+              No hay novedades pendientes.
+            </div>`}
+        </div>
+
         <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">Aceptar</button>
+          <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">
+            ${multipleVersions ? "Ya estoy al día ✓" : "Aceptar"}
+          </button>
         </div>
       </div>
     </div>`;
@@ -985,7 +1037,7 @@ async function openChangelogHistory() {
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div class="modal-box-body">
-          <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Todo lo que fuimos sumando y mejorando en LiveScroll.</p>
+          <p style="color:var(--text-dim); font-size:12px; margin-top:0; margin-bottom:16px;">Historial completo de las últimas 30 versiones publicadas de LiveScroll.</p>
           <div id="changelogHistoryList">Cargando...</div>
         </div>
       </div>

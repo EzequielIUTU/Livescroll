@@ -5310,7 +5310,7 @@ async function renderFeed(renderToken = lsTabRenderToken) {
       ${videos.map((v, i) => {
         const isMine = v.user_id === currentUser.id;
         return `
-        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}" style="content-visibility:auto;contain-intrinsic-size:1px var(--ls-mobile-feed-height,720px);">
           <div class="feed-phone">
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
@@ -5589,7 +5589,9 @@ function getEmbedPlaceholderHtml(video) {
 
   if (video.platform === "upload" && thumb.startsWith("<video")) {
     return `<div class="feed-fallback" style="position:relative;overflow:hidden;">
-      ${thumb.replace("<video ", `<video style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7;pointer-events:none;" `)}
+      ${thumb
+        .replace('preload="metadata"', 'preload="none"')
+        .replace("<video ", `<video style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7;pointer-events:none;" `)}
       <div class="platform-icon" style="position:relative;z-index:2;">▶️</div>
     </div>`;
   }
@@ -5673,7 +5675,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
         ${videos.map((v) => {
           const isMine = v.user_id === currentUser.id;
           return `
-          <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+          <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}" style="content-visibility:auto;contain-intrinsic-size:1px var(--ls-mobile-feed-height,720px);">
             <div class="feed-phone">
               <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
               ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}

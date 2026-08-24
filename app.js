@@ -10957,6 +10957,40 @@ async function saveProfileEdits() {
   renderProfile();
 }
 
+function openLiveScroll590AdminPreview() {
+  if (!currentProfile?.is_admin) {
+    showToast("Esta prueba está disponible solo para administradores");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:9998;padding:0;background:#000;">
+      <button
+        type="button"
+        aria-label="Cerrar previsualización"
+        onclick="closeLiveScroll590AdminPreview()"
+        style="position:fixed;z-index:10002;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));width:42px;height:42px;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(5,6,8,.82);color:#fff;font-size:20px;cursor:pointer;backdrop-filter:blur(10px);"
+      >✕</button>
+      <iframe
+        title="Prueba privada ROAD TO 5.9"
+        src="PREVIEW-INTRO-LIVESCROLL-6.html?v=5.8.9-road-to-59"
+        allow="autoplay"
+        style="display:block;width:100%;height:100%;height:100dvh;border:0;background:#050608;"
+      ></iframe>
+    </div>`;
+}
+
+function closeLiveScroll590AdminPreview() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+window.openLiveScroll590AdminPreview = openLiveScroll590AdminPreview;
+window.closeLiveScroll590AdminPreview = closeLiveScroll590AdminPreview;
+
 
 async function renderAdmin() {
   const main = document.getElementById("appView");
@@ -11029,6 +11063,19 @@ async function renderAdmin() {
 
   main.innerHTML = `
     <h1 class="page-title">🛠 Panel de Admin</h1>
+
+    <div class="form-card" style="margin-bottom:18px;border-color:rgba(250,204,21,.32);background:linear-gradient(135deg,rgba(250,204,21,.09),rgba(59,130,246,.055));overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
+            <strong style="color:var(--gold);">🧪 Preparación privada 5.9.0</strong>
+            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">SOLO ADMIN</span>
+          </div>
+          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">Probá la experiencia visual futura sin activarla para los usuarios.</div>
+        </div>
+        <button class="btn" type="button" onclick="openLiveScroll590AdminPreview()">▶ Previsualizar</button>
+      </div>
+    </div>
 
     ${stats && !stats.error ? `
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:24px;">

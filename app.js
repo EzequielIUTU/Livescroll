@@ -9394,6 +9394,7 @@ let previousTabBeforeProfile = "feed";
 // DIRECTORIO DE USUARIOS
 // ============================================================
 let usersDirectorySearchTimeout = null;
+let usersDirectoryRequestToken = 0;
 
 // ============================================================
 // DIRECTOS (usuarios en vivo ahora)
@@ -9872,6 +9873,7 @@ function handleUserSearchInput() {
 }
 
 async function loadUsersDirectory(term) {
+  const requestToken = ++usersDirectoryRequestToken;
   const list = document.getElementById("usersDirectoryList");
   if (!list) return;
   list.innerHTML = "Buscando...";
@@ -9889,6 +9891,7 @@ async function loadUsersDirectory(term) {
   else query = query.eq("is_creator", false);
 
   const { data: users, error } = await query;
+  if (requestToken !== usersDirectoryRequestToken) return;
   if (!document.getElementById("usersDirectoryList")) return; // el usuario ya cambió de pestaña
   if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar la lista de usuarios.</p>`; return; }
   if (!users || !users.length) {
@@ -10353,21 +10356,35 @@ async function viewPublicProfile(username) {
   const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
-  const { data: videos } = await sb
-    .from("videos")
-    .select("*")
-    .eq("user_id", profile.id)
-    .order("created_at", { ascending: false });
+  const [
+    videosResult,
+    followersResult,
+    followingResult,
+    badgesResult,
+    theirEquippedBadges,
+    theirTitle
+  ] = await Promise.all([
+    sb.from("videos").select("*").eq("user_id", profile.id).order("created_at", { ascending:false }),
+    sb.from("follows").select("follower_id").eq("followed_id", profile.id),
+    sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle(),
+    sb.from("user_badges").select("*").eq("user_id", profile.id).order("earned_at", { ascending:false }),
+    getEquippedProfileMedals(profile.id),
+    getPublicProfileTitle(profile.id)
+  ]);
+
+  const videos = videosResult?.data || [];
+  const followers = followersResult?.data || [];
+  const amIFollowing = followingResult?.data || null;
+  const theirBadges = badgesResult?.data || [];
 
   const videoIds = (videos || []).map(v => v.id);
 
-  const [{ data: sessions }, { data: likes }, { data: followers }, { data: amIFollowing }, { data: theirBadges }] = await Promise.all([
-    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
-    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : { data: [] },
-    sb.from("follows").select("follower_id").eq("followed_id", profile.id),
-    sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle(),
-    sb.from("user_badges").select("*").eq("user_id", profile.id).order("earned_at", { ascending: false })
+  const [sessionsResult, likesResult] = await Promise.all([
+    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : Promise.resolve({ data:[] })
   ]);
+  const sessions = sessionsResult?.data || [];
+  const likes = likesResult?.data || [];
 
   const viewsByVideo = {};
   (sessions || []).forEach(s => {
@@ -10378,10 +10395,6 @@ async function viewPublicProfile(username) {
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
   const isFollowing = !!amIFollowing;
-  const [theirEquippedBadges, theirTitle] = await Promise.all([
-    getEquippedProfileMedals(profile.id),
-    getPublicProfileTitle(profile.id)
-  ]);
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>

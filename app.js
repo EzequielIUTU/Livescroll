@@ -9888,3 +9888,247 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
   document.head.appendChild(style);
 });
+
+
+// ============================================================
+// LIVESCROLL · UI VIVA V1
+// Mejora visual global: más contraste, saturación y profundidad.
+// No cambia lógica, tamaños críticos del feed ni comportamiento.
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsUiVivaV1")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsUiVivaV1";
+  style.textContent = `
+    :root {
+      --ls-glow-gold: rgba(250,204,21,.18);
+      --ls-glow-green: rgba(34,197,94,.15);
+      --ls-glow-red: rgba(239,68,68,.15);
+      --ls-panel-shine: rgba(255,255,255,.025);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 18% -8%, rgba(250,204,21,.07), transparent 28%),
+        radial-gradient(circle at 92% 12%, rgba(34,197,94,.045), transparent 24%),
+        var(--ink) !important;
+    }
+
+    #appView {
+      position:relative;
+    }
+
+    /* Navegación más presente sin cambiar estructura */
+    nav,
+    .top-nav,
+    .navbar {
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    #navLinks button,
+    #navRight button {
+      transition:
+        transform .16s ease,
+        border-color .16s ease,
+        background .16s ease,
+        color .16s ease,
+        box-shadow .16s ease;
+    }
+
+    #navLinks button:hover,
+    #navRight button:hover {
+      transform:translateY(-1px);
+    }
+
+    #navLinks button.active,
+    #navLinks button[aria-current="page"] {
+      border-color:rgba(250,204,21,.42) !important;
+      background:rgba(250,204,21,.08) !important;
+      color:var(--gold) !important;
+      box-shadow:0 0 18px rgba(250,204,21,.08);
+    }
+
+    /* Paneles: mejor separación del fondo */
+    .form-card,
+    .modal-box,
+    .ledger-row,
+    .profile-card,
+    .plan-card,
+    .store-card,
+    .notification-panel {
+      background:
+        linear-gradient(145deg, var(--ls-panel-shine), transparent 50%),
+        var(--panel) !important;
+    }
+
+    .form-card,
+    .profile-card,
+    .plan-card,
+    .store-card {
+      box-shadow:
+        0 14px 38px rgba(0,0,0,.20),
+        inset 0 1px 0 rgba(255,255,255,.018);
+    }
+
+    /* Inputs más legibles */
+    input,
+    textarea,
+    select {
+      border-color:rgba(255,255,255,.11) !important;
+      transition:
+        border-color .16s ease,
+        box-shadow .16s ease,
+        background .16s ease;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline:none !important;
+      border-color:rgba(250,204,21,.52) !important;
+      box-shadow:0 0 0 3px rgba(250,204,21,.07) !important;
+      background:rgba(255,255,255,.025) !important;
+    }
+
+    /* Botones principales con un poco más de vida */
+    .btn {
+      box-shadow:0 8px 22px rgba(250,204,21,.10);
+      transition:
+        transform .15s ease,
+        box-shadow .15s ease,
+        filter .15s ease;
+    }
+
+    .btn:hover {
+      transform:translateY(-1px);
+      box-shadow:0 10px 28px rgba(250,204,21,.16);
+      filter:saturate(1.08);
+    }
+
+    .btn:active {
+      transform:translateY(0) scale(.985);
+    }
+
+    .btn-outline {
+      transition:
+        transform .15s ease,
+        border-color .15s ease,
+        background .15s ease;
+    }
+
+    .btn-outline:hover {
+      transform:translateY(-1px);
+      border-color:rgba(250,204,21,.34) !important;
+      background:rgba(250,204,21,.035) !important;
+    }
+
+    /* Títulos y chips */
+    .page-title {
+      letter-spacing:-.025em;
+      text-shadow:0 0 28px rgba(255,255,255,.025);
+    }
+
+    .tag,
+    .nav-plan-chip {
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    /* Feed: no tocamos medidas ni object-fit */
+    .feed-phone {
+      box-shadow:
+        0 22px 56px rgba(0,0,0,.28),
+        0 0 0 1px rgba(255,255,255,.018);
+    }
+
+    .feed-action-btn {
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+    }
+
+    /* Perfil: un toque más vivo alrededor de la identidad */
+    .profile-avatar,
+    .avatar-circle {
+      box-shadow:
+        0 0 0 1px rgba(250,204,21,.16),
+        0 0 24px rgba(250,204,21,.06);
+    }
+
+    /* Tienda / colección */
+    .ls-collection-filter.active,
+    .ls-collection-rarity-filter.active {
+      background:rgba(250,204,21,.08) !important;
+      box-shadow:0 0 14px rgba(250,204,21,.07);
+    }
+
+    /* Modales más nítidos */
+    .modal-overlay {
+      backdrop-filter:blur(8px);
+      -webkit-backdrop-filter:blur(8px);
+    }
+
+    .modal-box {
+      box-shadow:
+        0 28px 90px rgba(0,0,0,.52),
+        0 0 0 1px rgba(255,255,255,.018);
+    }
+
+    /* Scrollbar desktop */
+    @media (min-width:701px) {
+      * {
+        scrollbar-width:thin;
+        scrollbar-color:rgba(250,204,21,.30) transparent;
+      }
+
+      *::-webkit-scrollbar {
+        width:8px;
+        height:8px;
+      }
+
+      *::-webkit-scrollbar-thumb {
+        background:rgba(250,204,21,.24);
+        border-radius:999px;
+      }
+
+      *::-webkit-scrollbar-track {
+        background:transparent;
+      }
+    }
+
+    /* Mobile: conservar fluidez y no alterar layout */
+    @media (max-width:700px) {
+      body {
+        background:
+          radial-gradient(circle at 50% -5%, rgba(250,204,21,.055), transparent 25%),
+          var(--ink) !important;
+      }
+
+      .form-card,
+      .modal-box {
+        box-shadow:0 12px 34px rgba(0,0,0,.24);
+      }
+
+      .btn:hover,
+      .btn-outline:hover,
+      #navLinks button:hover,
+      #navRight button:hover {
+        transform:none;
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .btn,
+      .btn-outline,
+      #navLinks button,
+      #navRight button,
+      input,
+      textarea,
+      select {
+        transition:none !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+});

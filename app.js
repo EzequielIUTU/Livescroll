@@ -7915,6 +7915,45 @@ async function renderAdmin() {
       <div id="storeBadgesAdminList" style="margin-top:14px;">Cargando...</div>
     </div>
 
+    <h3 style="margin-top:32px;">🏷️ Títulos de perfil</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px;color:var(--text-dim);margin-top:0;line-height:1.5;">
+        Creá títulos que los usuarios pueden comprar, guardar en Mi colección y equipar debajo de su nombre.
+        La categoría se asigna automáticamente como <code>title</code>.
+      </p>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input
+          type="text"
+          id="newProfileTitleIcon"
+          placeholder="👑"
+          maxlength="4"
+          style="width:62px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);text-align:center;"
+        >
+        <button type="button" class="btn-outline" onclick="openEmojiPicker('newProfileTitleIcon', FACE_EMOJIS)">Elegir</button>
+
+        <input
+          type="text"
+          id="newProfileTitleName"
+          placeholder="Ej: Leyenda"
+          maxlength="40"
+          style="flex:1;min-width:160px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+        >
+
+        <input
+          type="number"
+          id="newProfileTitlePrice"
+          min="0"
+          placeholder="Precio pts"
+          style="width:125px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+        >
+
+        <button class="btn" onclick="handleAddProfileTitleAdmin()">Crear título</button>
+      </div>
+
+      <div id="profileTitlesAdminList" style="margin-top:14px;">Cargando...</div>
+    </div>
+
     <h3 style="margin-top:32px;">✨ Otros artículos de la tienda</h3>
     <div class="form-card" style="margin-bottom:14px;">
       <p style="font-size:12px; color:var(--text-dim); margin-top:0;">Cualquier cosa nueva que quieras vender: insignias, marcos, lo que se te ocurra. Vos elegís la categoría (el texto), el ícono, el nombre y el precio.</p>
@@ -7985,6 +8024,7 @@ async function renderAdmin() {
   loadStorePrices();
   loadStoreBadgesAdminList();
   loadStoreItemsList();
+  loadProfileTitlesAdminList();
 }
 
 async function handleDeleteVideo(videoId) {
@@ -8516,6 +8556,78 @@ async function loadStoreItemsList() {
       </div>
     </div>
   `).join("");
+}
+
+async function loadProfileTitlesAdminList() {
+  const el = document.getElementById("profileTitlesAdminList");
+  if (!el) return;
+
+  const { data, error } = await sb.rpc("admin_get_store_items");
+  if (error) {
+    el.innerHTML = `<p class="error-msg">No se pudieron cargar los títulos.</p>`;
+    return;
+  }
+
+  const titles = (data || []).filter(it => String(it.category || "").toLowerCase() === "title");
+
+  if (!titles.length) {
+    el.innerHTML = `<p style="color:var(--text-dim);font-size:12px;">Todavía no creaste títulos de perfil.</p>`;
+    return;
+  }
+
+  el.innerHTML = titles.map(it => `
+    <div class="ledger-row">
+      <span>
+        ${it.icon || "🏷️"} ${escapeHtml(it.name)}
+        · <span class="mono">${it.price_points} pts</span>
+        ${!it.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
+      </span>
+      <div style="display:flex;gap:6px;">
+        <button
+          class="btn-outline"
+          style="padding:4px 8px;font-size:11px;"
+          onclick="handleToggleStoreItem('${it.item_id}', ${!it.active}); setTimeout(loadProfileTitlesAdminList,250);"
+        >${it.active ? "Desactivar" : "Activar"}</button>
+        <button
+          class="btn-outline"
+          style="padding:4px 8px;font-size:11px;color:var(--red);"
+          onclick="handleDeleteStoreItem('${it.item_id}'); setTimeout(loadProfileTitlesAdminList,250);"
+        >🗑</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleAddProfileTitleAdmin() {
+  const icon = document.getElementById("newProfileTitleIcon")?.value.trim();
+  const name = document.getElementById("newProfileTitleName")?.value.trim();
+  const rawPrice = document.getElementById("newProfileTitlePrice")?.value;
+  const price = Number.parseInt(rawPrice, 10);
+
+  if (!icon || !name || Number.isNaN(price) || price < 0) {
+    showToast("Completá ícono, nombre y precio");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_add_store_item", {
+    p_category:"title",
+    p_icon:icon,
+    p_name:name,
+    p_price:price
+  });
+
+  if (error || !data?.ok) {
+    showToast("No se pudo crear el título");
+    return;
+  }
+
+  document.getElementById("newProfileTitleIcon").value = "";
+  document.getElementById("newProfileTitleName").value = "";
+  document.getElementById("newProfileTitlePrice").value = "";
+
+  showToast("🏷️ Título creado");
+  await loadProfileTitlesAdminList();
+  loadStoreItemsList();
 }
 
 async function handleAddStoreItem() {

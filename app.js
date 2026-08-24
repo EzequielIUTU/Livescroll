@@ -2062,6 +2062,42 @@ function installLiveScrollLockedModalUX() {
 
 document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 
+
+// ============================================================
+// LIVESCROLL 5.8.5 · NOVEDADES SOLO PC — FIX DEFINITIVO
+// No dependemos del momento en que se construye navRight.
+// ============================================================
+
+function syncTopNewsButtonVisibility() {
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+  document.querySelectorAll("#navRight .nav-changelog-btn").forEach(btn => {
+    btn.style.setProperty(
+      "display",
+      isMobile ? "none" : "inline-block",
+      "important"
+    );
+  });
+}
+
+(function installTopNewsVisibilityGuard() {
+  if (window.__lsTopNewsVisibilityGuardInstalled) return;
+  window.__lsTopNewsVisibilityGuardInstalled = true;
+
+  const run = () => requestAnimationFrame(syncTopNewsButtonVisibility);
+
+  window.addEventListener("resize", run);
+  window.addEventListener("orientationchange", run);
+
+  const navRight = document.getElementById("navRight");
+  if (navRight) {
+    const observer = new MutationObserver(run);
+    observer.observe(navRight, { childList:true, subtree:true });
+  }
+
+  document.addEventListener("DOMContentLoaded", run);
+})();
+
 // ============================================================
 // APP SHELL
 // ============================================================
@@ -2582,6 +2618,8 @@ async function renderApp() {
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
+
+  syncTopNewsButtonVisibility();
 
   // Lo visible primero.
   checkBlockedStatus();

@@ -109,7 +109,14 @@ function isLiveScrollSecurityReportLink() {
   return params.get("security") === "password-changed";
 }
 
+function getLiveScrollSecurityReportEmail() {
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get("email") || "").trim().replace(/ /g, "+").toLowerCase();
+}
+
 function renderSecurityReportScreen() {
+  const reportEmail = getLiveScrollSecurityReportEmail();
+
   const landing = document.getElementById("landingView");
   const app = document.getElementById("appView");
 
@@ -168,14 +175,39 @@ function renderSecurityReportScreen() {
           </p>
         </div>
 
+        ${reportEmail ? "" : `
+          <div style="
+            margin:0 0 14px;
+            padding:11px 12px;
+            border:1px solid rgba(248,113,113,.28);
+            border-radius:11px;
+            background:rgba(239,68,68,.06);
+            color:#fca5a5;
+            font-size:10px;
+            line-height:1.5;
+          ">
+            Este enlace no contiene una cuenta válida. Volvé al correo de seguridad
+            de LiveScroll y usá el botón “No fui yo”.
+          </div>
+        `}
+
         <div class="field">
           <label>Correo de la cuenta afectada</label>
           <input
             id="securityReportEmail"
             type="email"
-            autocomplete="email"
-            placeholder="tu@email.com"
+            value="${escapeHtml(reportEmail)}"
+            readonly
+            aria-readonly="true"
+            style="
+              opacity:.92;
+              cursor:not-allowed;
+              background:var(--panel-2);
+            "
           >
+          <div style="font-size:9px;color:var(--text-dim);margin-top:5px;">
+            🔒 Este correo viene del aviso de seguridad y no puede editarse.
+          </div>
         </div>
 
         <div class="field">
@@ -239,6 +271,7 @@ function renderSecurityReportScreen() {
 
         <button id="securityReportSubmitBtn" class="btn"
           style="width:100%;min-height:48px;"
+          ${reportEmail ? "" : "disabled"}
           onclick="submitSecurityIncidentReport()">
           Enviar reporte de seguridad
         </button>

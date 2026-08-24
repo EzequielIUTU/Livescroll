@@ -1946,6 +1946,26 @@ function openLiveScrollSettings() {
                 onclick="resetLiveScrollSettings()"
               >Restablecer valores</button>
             </div>
+
+            <div style="
+              border:1px solid rgba(250,204,21,.28);
+              border-radius:14px;
+              padding:13px;
+              background:linear-gradient(135deg,rgba(250,204,21,.07),rgba(72,221,242,.045));
+            ">
+              <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:var(--gold);">
+                ✨ Presentación ROAD TO 6
+              </div>
+              <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">
+                Volvé a reproducir la presentación de LiveScroll 6. En dispositivos Legacy se abrirá la versión liviana.
+              </div>
+              <button
+                type="button"
+                class="btn-outline"
+                style="width:100%;min-height:44px;"
+                onclick="replayLiveScrollRoadTo6Intro()"
+              >▶ Volver a ver presentación</button>
+            </div>
           </div>
         </div>
 
@@ -1967,6 +1987,13 @@ function openLiveScrollSettings() {
 
   refreshLiveScrollSettingsUI();
 }
+
+function replayLiveScrollRoadTo6Intro() {
+  try { localStorage.removeItem("livescroll_intro_590_seen"); } catch (_) {}
+  window.location.reload();
+}
+
+window.replayLiveScrollRoadTo6Intro = replayLiveScrollRoadTo6Intro;
 
 function setLiveScrollDraft(key, value) {
   if (!lsSettingsDraft) lsSettingsDraft = { ...getLiveScrollSettings() };
@@ -11068,12 +11095,12 @@ async function renderAdmin() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
         <div style="min-width:0;flex:1;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
-            <strong style="color:var(--gold);">🧪 Preparación privada 5.9.0</strong>
-            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">SOLO ADMIN</span>
+            <strong style="color:var(--gold);">✨ Presentación ROAD TO 6</strong>
+            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">5.9.0</span>
           </div>
-          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">Probá la experiencia visual futura sin activarla para los usuarios.</div>
+          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">Volvé a reproducir la presentación oficial que reciben los usuarios.</div>
         </div>
-        <button class="btn" type="button" onclick="openLiveScroll590AdminPreview()">▶ Previsualizar</button>
+        <button class="btn" type="button" onclick="replayLiveScrollRoadTo6Intro()">▶ Volver a verla</button>
       </div>
     </div>
 

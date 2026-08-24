@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#0B0D10">
+<meta name="theme-color" content="#061014">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -24,35 +24,198 @@
 </head>
 <body>
 
-<div id="introOverlay" role="presentation" aria-label="LiveScroll" onclick="closeLiveScrollIntro()">
-  <div class="intro-ambient intro-ambient-a"></div>
-  <div class="intro-ambient intro-ambient-b"></div>
-  <div class="intro-stage">
-    <div class="intro-orbit intro-orbit-back"></div>
-    <div class="intro-orbit intro-orbit-mid"></div>
-    <div class="intro-orbit intro-orbit-front"></div>
-    <div class="intro-phone">
-      <div class="intro-phone-camera"></div>
-      <div class="intro-phone-line intro-phone-line-a"></div>
-      <div class="intro-phone-line intro-phone-line-b"></div>
-      <div class="intro-phone-play">▶</div>
-      <div class="intro-phone-scroll"></div>
+<div id="introOverlay" class="ls6-cinematic" data-scene="0" role="dialog" aria-label="Presentación de LiveScroll 6">
+  <div class="ls6-stars"></div>
+  <div class="ls6-gold-seed"></div>
+
+  <section class="ls6-scene ls6-scene-welcome">
+    <div class="ls6-kicker">UNA NUEVA ETAPA ESTÁ POR COMENZAR</div>
+    <div class="ls6-gold-interface">
+      <span></span><span></span><span></span><span></span>
+      <div class="ls6-interface-core">LS</div>
     </div>
-  </div>
-  <div class="intro-word">Live<span>Scroll</span></div>
-  <div class="intro-tagline">MIRÁ · CONECTÁ · CREÁ</div>
-  <div class="intro-skip">Tocá para entrar</div>
+    <h1>El futuro de LiveScroll<br><em>empieza acá.</em></h1>
+  </section>
+
+  <section class="ls6-scene ls6-scene-year">
+    <div class="ls6-impact-text">ESTE AÑO</div>
+  </section>
+
+  <section class="ls6-scene ls6-scene-influencer">
+    <div class="ls6-small">TU HISTORIA PUEDE CAMBIAR</div>
+    <div class="ls6-message">PODÉS SER EL PRÓXIMO<br><strong>INFLUENCER ARGENTINO</strong></div>
+  </section>
+
+  <section class="ls6-scene ls6-scene-six">
+    <div class="ls6-six">6</div>
+    <div class="ls6-six-caption">LA PRÓXIMA GENERACIÓN</div>
+  </section>
+
+  <section class="ls6-scene ls6-scene-path">
+    <div class="ls6-path-line"></div>
+    <div class="ls6-message">PREPARATE PARA RECORRER<br><strong>ESTE CAMINO JUNTOS</strong></div>
+  </section>
+
+  <section class="ls6-scene ls6-scene-union">
+    <div class="ls6-brand-union" aria-label="LiveScroll 6">
+      <span class="ls6-live">Live</span><span class="ls6-scroll">Scroll</span><span class="ls6-brand-six">6</span>
+    </div>
+    <div class="ls6-sparkles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="ls6-coming">PRÓXIMAMENTE</div>
+  </section>
+
+  <button id="ls6NextButton" class="ls6-next" type="button" onclick="advanceLiveScroll6Intro(event)">Siguiente <span>→</span></button>
+  <div id="ls6SoundStatus" class="ls6-sound-status">🔇 El sonido se activa al continuar</div>
+  <div class="ls6-progress"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <audio id="ls6Music" src="violet-sky-livescroll.mp3" preload="none" loop></audio>
 </div>
 <script>
-  function closeLiveScrollIntro() {
+  var LS6_INTRO_KEY = 'livescroll_intro_590_seen';
+  var ls6Scene = 0;
+  var ls6AudioContext = null;
+  var ls6MusicStarted = false;
+
+  function ls6IsLegacyDevice() {
+    try {
+      var ua = navigator.userAgent || '';
+      var androidMatch = ua.match(/Android\s([0-9]+)/i);
+      var androidMajor = androidMatch ? parseInt(androidMatch[1], 10) : null;
+      var chromeMatch = ua.match(/(?:Chrome|CriOS)\/([0-9]+)/i);
+      var chromeMajor = chromeMatch ? parseInt(chromeMatch[1], 10) : null;
+      var lowMemory = typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 2;
+      var lowCpu = typeof navigator.hardwareConcurrency === 'number' && navigator.hardwareConcurrency <= 4;
+      var narrowOldAndroid = androidMajor !== null && androidMajor <= 8 && window.innerWidth <= 420;
+      return (androidMajor !== null && androidMajor <= 7) ||
+        (chromeMajor !== null && chromeMajor < 80) ||
+        lowMemory ||
+        (narrowOldAndroid && lowCpu);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function ls6UseLegacyIntro() {
+    var el = document.getElementById('introOverlay');
+    if (!el) return;
+    el.className = 'ls6-legacy-intro';
+    el.removeAttribute('data-scene');
+    el.setAttribute('aria-label', 'Presentación liviana de LiveScroll');
+    el.innerHTML =
+      '<div class="intro-ambient intro-ambient-a"></div>' +
+      '<div class="intro-ambient intro-ambient-b"></div>' +
+      '<div class="intro-stage">' +
+        '<div class="intro-orbit intro-orbit-back"></div>' +
+        '<div class="intro-orbit intro-orbit-mid"></div>' +
+        '<div class="intro-orbit intro-orbit-front"></div>' +
+        '<div class="intro-phone">' +
+          '<div class="intro-phone-camera"></div>' +
+          '<div class="intro-phone-line intro-phone-line-a"></div>' +
+          '<div class="intro-phone-line intro-phone-line-b"></div>' +
+          '<div class="intro-phone-play">▶</div>' +
+          '<div class="intro-phone-scroll"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="intro-word">Live<span>Scroll</span></div>' +
+      '<div class="intro-tagline">MIRÁ · CONECTÁ · CREÁ</div>' +
+      '<div class="intro-skip">Tocá para entrar · Modo Legacy</div>';
+    el.onclick = function () { closeLiveScrollIntro(true); };
+    setTimeout(function () { closeLiveScrollIntro(true); }, 1900);
+  }
+
+  function ls6StartMusic() {
+    try {
+      if (ls6MusicStarted) return;
+      var music = document.getElementById('ls6Music');
+      if (!music) return;
+      music.volume = .48;
+      var playResult = music.play();
+      if (playResult && typeof playResult.catch === 'function') {
+        playResult.catch(function () {
+          var statusBlocked = document.getElementById('ls6SoundStatus');
+          if (statusBlocked) statusBlocked.textContent = '🔇 Tocá nuevamente para activar el sonido';
+          ls6MusicStarted = false;
+        });
+      }
+      ls6MusicStarted = true;
+      var status = document.getElementById('ls6SoundStatus');
+      if (status) status.textContent = '🔊 Violet Sky · FiftySounds';
+    } catch (_) {}
+  }
+
+  function ls6PlaySound(kind) {
+    try {
+      var AudioEngine = window.AudioContext || window.webkitAudioContext;
+      if (!AudioEngine) return;
+      ls6AudioContext = ls6AudioContext || new AudioEngine();
+      var ctx = ls6AudioContext;
+      if (ctx.state === 'suspended') ctx.resume();
+      var now = ctx.currentTime;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = kind === 'impact' ? 'sawtooth' : 'sine';
+      osc.frequency.setValueAtTime(kind === 'impact' ? 115 : kind === 'shine' ? 880 : 430, now);
+      osc.frequency.exponentialRampToValueAtTime(kind === 'impact' ? 42 : kind === 'shine' ? 1760 : 120, now + (kind === 'impact' ? .28 : .22));
+      gain.gain.setValueAtTime(.0001, now);
+      gain.gain.exponentialRampToValueAtTime(kind === 'impact' ? .13 : .055, now + .018);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + (kind === 'impact' ? .34 : .22));
+      osc.start(now); osc.stop(now + .36);
+    } catch (_) {}
+  }
+
+  function closeLiveScrollIntro(markSeen) {
     var el = document.getElementById('introOverlay');
     if (!el || el.classList.contains('fade-out')) return;
+    if (markSeen) {
+      try { localStorage.setItem(LS6_INTRO_KEY, '1'); } catch (_) {}
+    }
+    var music = document.getElementById('ls6Music');
+    if (music && !music.paused) {
+      var fadeMusic = setInterval(function () {
+        music.volume = Math.max(0, music.volume - .08);
+        if (music.volume <= .01) {
+          clearInterval(fadeMusic);
+          music.pause();
+          music.currentTime = 0;
+        }
+      }, 55);
+    }
     el.classList.add('fade-out');
     setTimeout(function () { if (el && el.parentNode) el.remove(); }, 420);
   }
-  setTimeout(function () {
-    closeLiveScrollIntro();
-  }, 1900);
+
+  function advanceLiveScroll6Intro(event) {
+    if (event) event.stopPropagation();
+    var el = document.getElementById('introOverlay');
+    if (!el) return;
+    ls6StartMusic();
+    ls6Scene += 1;
+    if (ls6Scene > 5) {
+      ls6PlaySound('impact');
+      closeLiveScrollIntro(true);
+      return;
+    }
+    el.dataset.scene = String(ls6Scene);
+    ls6PlaySound(ls6Scene === 5 ? 'shine' : ls6Scene === 1 || ls6Scene === 3 ? 'impact' : 'whoosh');
+    var btn = document.getElementById('ls6NextButton');
+    if (btn) btn.innerHTML = ls6Scene === 5 ? 'Entrar a LiveScroll <span>→</span>' : 'Siguiente <span>→</span>';
+  }
+
+  (function () {
+    var el = document.getElementById('introOverlay');
+    var seen = false;
+    try { seen = localStorage.getItem(LS6_INTRO_KEY) === '1'; } catch (_) {}
+    if (ls6IsLegacyDevice()) {
+      ls6UseLegacyIntro();
+      return;
+    }
+    if (!seen) return;
+    el.classList.add('ls6-returning');
+    el.dataset.scene = '5';
+    var button = document.getElementById('ls6NextButton');
+    if (button) button.remove();
+    setTimeout(function () { closeLiveScrollIntro(false); }, 1350);
+  })();
 </script>
 
 <nav>
@@ -127,6 +290,7 @@
     <footer class="landing-footer">
       <span>© LiveScroll 2026</span>
       <a href="terminos.html">Términos y Condiciones</a>
+      <a href="https://www.fiftysounds.com" target="_blank" rel="noopener">Música: “Violet Sky” — FiftySounds</a>
     </footer>
   </div>
 </div>
@@ -141,6 +305,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.9-road-to-59"></script>
+<script src="app.js?v=5.9.0-road-to-6"></script>
 </body>
 </html>

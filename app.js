@@ -682,7 +682,6 @@ async function animateLandingOdometer() {
 // LIVESCROLL 5.8.4 · CONFIGURACIÓN + ACCESIBILIDAD V1
 // - Zoom completamente bloqueado (pinch/doble toque/ctrl+wheel)
 // - Configuración en menú hamburguesa
-// - Idioma base: Español / English / Português
 // - Visión cómoda
 // - Contraste
 // - Peso de fuente
@@ -691,754 +690,8 @@ async function animateLandingOdometer() {
 // ============================================================
 
 
-// ============================================================
-// LIVESCROLL 5.8.4 · IDIOMAS V1
-// Traducción segura de textos de interfaz conocidos.
-// No traduce publicaciones, comentarios, nombres ni contenido del usuario.
-// ============================================================
-
-const LS_I18N = {
-  en: {
-    "Mirar":"Watch",
-    "✨ Para Ti":"✨ For You",
-    "Subir video":"Upload video",
-    "Mi Perfil":"My Profile",
-    "👥 Usuarios":"👥 Users",
-    "🔴 Directos":"🔴 Live",
-    "Billetera":"Wallet",
-    "Planes":"Plans",
-    "🛍️ Tienda":"🛍️ Store",
-    "🏆 Ranking":"🏆 Ranking",
-    "📢 Novedades":"📢 What's New",
-    "❓ Cómo funciona":"❓ How it works",
-    "⚙️ Configuración":"⚙️ Settings",
-    "Salir":"Log out",
-    "Iniciar sesión":"Sign in",
-    "Crear cuenta":"Create account",
-    "Entrar":"Sign in",
-    "Email":"Email",
-    "Contraseña":"Password",
-    "Nombre de usuario":"Username",
-    "Recordar mi correo":"Remember my email",
-    "La contraseña la guarda tu dispositivo":"Your device saves the password",
-    "¿Olvidaste tu contraseña?":"Forgot your password?",
-    "Configuración":"Settings",
-    "Apariencia y accesibilidad":"Appearance and accessibility",
-    "Idioma":"Language",
-    "Visión cómoda":"Comfort view",
-    "Contraste":"Contrast",
-    "Fuerza de texto":"Text strength",
-    "VISTA PREVIA":"PREVIEW",
-    "Normal":"Normal",
-    "Grande":"Large",
-    "Extra grande":"Extra large",
-    "Alto":"High",
-    "Medio":"Medium",
-    "Fuerte":"Strong",
-    "Cancelar":"Cancel",
-    "Aplicar cambios":"Apply changes",
-    "Configuración aplicada ✓":"Settings applied ✓",
-    "Español":"Spanish",
-    "English":"English",
-    "Português":"Portuguese",
-    "Elegí el idioma de la interfaz. La traducción completa se incorporará progresivamente durante 5.8.4.":"Choose the interface language.",
-    "Agranda texto, botones y controles de forma ordenada sin usar zoom.":"Enlarges text, buttons and controls without using zoom.",
-    "Aumenta la diferencia entre texto, fondos y bordes.":"Increases contrast between text, backgrounds and borders.",
-    "Elegí qué tan marcada querés ver la letra.":"Choose how bold you want the text to appear.",
-    "Así vas a ver los textos, botones y elementos principales de la interfaz.":"This is how text, buttons and main interface elements will look.",
-    "Botón de ejemplo":"Example button",
-    "🔒 El zoom de la página está desactivado. Visión cómoda permite agrandar la interfaz sin deformarla.":"🔒 Page zoom is disabled. Comfort view enlarges the interface without distorting it.",
-    "Novedades":"What's New",
-    "Versiones y revisiones publicadas":"Published versions and revisions",
-    "Seguridad revisada y aprobada":"Security reviewed and approved",
-    "REVISIÓN SECUNDARIA":"SECONDARY REVIEW",
-    "Revisión secundaria":"Secondary review",
-    "APROBADA":"APPROVED",
-    "Seguridad y protección":"Security and protection",
-    "Sin cambios necesarios de tu parte.":"No action is required from you.",
-    "Entendido ✓":"Got it ✓",
-    "Nuevo":"New",
-    "Mejoras":"Improvements",
-    "Reparado":"Fixed",
-    "Próximamente":"Coming soon",
-    "Cargando...":"Loading...",
-    "Cargando novedades...":"Loading updates...",
-    "Cargando perfil...":"Loading profile...",
-    "Cargando tienda...":"Loading store...",
-    "Cargando ranking...":"Loading ranking...",
-    "No hay directos públicos ahora":"There are no public live streams right now",
-    "Cuando un creador inicie una transmisión, va a aparecer acá.":"When a creator starts streaming, it will appear here.",
-    "Tienda de puntos":"Points Store",
-    "Balance":"Balance",
-    "Planes":"Plans",
-    "Boost":"Boost",
-    "Medallas":"Badges",
-    "Emojis":"Emojis",
-    "Extras":"Extras",
-    "Tu plan":"Your plan",
-    "Activo":"Active",
-    "Mejorar":"Upgrade",
-    "Plan inferior":"Lower plan",
-    "Gratis":"Free",
-    "Mi colección":"My collection",
-    "Explorar →":"Explore →",
-    "En tu perfil":"On your profile",
-    "Tus 3 medallas destacadas":"Your 3 featured badges",
-    "Editar":"Edit",
-    "Objetos":"Items",
-    "Títulos":"Titles",
-    "Todos":"All",
-    "Cerrar":"Close",
-    "Guardar":"Save",
-    "Guardar cambios":"Save changes",
-    "Editar perfil":"Edit profile",
-    "Bio":"Bio",
-    "Avatar":"Avatar",
-    "Portada":"Cover",
-    "Redes sociales":"Social links",
-    "Usuarios":"Users",
-    "Directos":"Live",
-    "Ranking semanal":"Weekly ranking",
-    "Los que más puntos generaron en los últimos 7 días.":"Users who earned the most points in the last 7 days.",
-    "Todavía no hay actividad esta semana.":"There is no activity this week yet.",
-    "Subí tus clips":"Upload your clips",
-    "Mirá y ganá":"Watch and earn",
-    "Cómo funciona":"How it works",
-    "Siguiente":"Next",
-    "Anterior":"Back",
-    "Finalizar":"Finish",
-    "Aceptar":"Accept",
-    "Abrir":"Open",
-    "Publicar":"Publish",
-    "Seleccionar archivo":"Choose file",
-    "Descripción":"Description",
-    "Título":"Title"
-    ,"Inicio":"Home"
-    ,"Para Ti":"For You"
-    ,"Siguiendo":"Following"
-    ,"Buscar":"Search"
-    ,"Buscar usuarios":"Search users"
-    ,"Buscar usuarios...":"Search users..."
-    ,"Seguidores":"Followers"
-    ,"Siguiendo":"Following"
-    ,"Seguir":"Follow"
-    ,"Dejar de seguir":"Unfollow"
-    ,"Mensaje":"Message"
-    ,"Compartir":"Share"
-    ,"Me gusta":"Like"
-    ,"Comentar":"Comment"
-    ,"Comentarios":"Comments"
-    ,"Ver comentarios":"View comments"
-    ,"Escribí un comentario...":"Write a comment..."
-    ,"Enviar":"Send"
-    ,"Copiar enlace":"Copy link"
-    ,"Enlace copiado ✓":"Link copied ✓"
-    ,"Reportar":"Report"
-    ,"Reportar video":"Report video"
-    ,"Reportar usuario":"Report user"
-    ,"Bloquear":"Block"
-    ,"Eliminar":"Delete"
-    ,"Eliminar video":"Delete video"
-    ,"¿Eliminar video?":"Delete video?"
-    ,"Esta acción no se puede deshacer.":"This action cannot be undone."
-    ,"Sí, eliminar":"Yes, delete"
-    ,"Volver":"Back"
-    ,"Continuar":"Continue"
-    ,"Confirmar":"Confirm"
-    ,"Listo":"Done"
-    ,"Hecho":"Done"
-    ,"Error":"Error"
-    ,"Reintentar":"Try again"
-    ,"Actualizar":"Refresh"
-    ,"No se pudo cargar":"Could not load"
-    ,"No se pudo completar la acción.":"The action could not be completed."
-    ,"Video publicado ✓":"Video published ✓"
-    ,"Publicando...":"Publishing..."
-    ,"Subiendo...":"Uploading..."
-    ,"Procesando...":"Processing..."
-    ,"Elegir video":"Choose video"
-    ,"Cambiar video":"Change video"
-    ,"Vista previa":"Preview"
-    ,"Privacidad":"Privacy"
-    ,"Público":"Public"
-    ,"Privado":"Private"
-    ,"Solo seguidores":"Followers only"
-    ,"Duración":"Duration"
-    ,"Categoría":"Category"
-    ,"Etiquetas":"Tags"
-    ,"Opcional":"Optional"
-    ,"Tu perfil":"Your profile"
-    ,"Mis videos":"My videos"
-    ,"Videos":"Videos"
-    ,"Puntos":"Points"
-    ,"Puntos disponibles":"Available points"
-    ,"Historial":"History"
-    ,"Actividad":"Activity"
-    ,"Canjear":"Redeem"
-    ,"Canjes":"Redemptions"
-    ,"Solicitar canje":"Request redemption"
-    ,"Monto":"Amount"
-    ,"Mínimo":"Minimum"
-    ,"Estado":"Status"
-    ,"Pendiente":"Pending"
-    ,"Aprobado":"Approved"
-    ,"Rechazado":"Rejected"
-    ,"Pagado":"Paid"
-    ,"Notificaciones":"Notifications"
-    ,"No tenés notificaciones.":"You have no notifications."
-    ,"Marcar como leídas":"Mark as read"
-    ,"Plan actual":"Current plan"
-    ,"Elegir plan":"Choose plan"
-    ,"Activar plan":"Activate plan"
-    ,"Solicitar plan":"Request plan"
-    ,"Código de pago":"Payment code"
-    ,"Enviar solicitud":"Send request"
-    ,"Solicitud enviada ✓":"Request sent ✓"
-    ,"Comprar":"Buy"
-    ,"Comprado":"Purchased"
-    ,"Equipar":"Equip"
-    ,"Equipado":"Equipped"
-    ,"Desequipar":"Unequip"
-    ,"Precio":"Price"
-    ,"Saldo insuficiente":"Insufficient balance"
-    ,"Compra realizada ✓":"Purchase completed ✓"
-    ,"Boost activo":"Boost active"
-    ,"Activar boost":"Activate boost"
-    ,"Horas":"Hours"
-    ,"Días":"Days"
-    ,"Hoy":"Today"
-    ,"Esta semana":"This week"
-    ,"Posición":"Position"
-    ,"Usuario":"User"
-    ,"Sin resultados":"No results"
-    ,"No encontramos usuarios.":"We couldn't find any users."
-    ,"No hay videos todavía.":"There are no videos yet."
-    ,"No hay comentarios todavía.":"There are no comments yet."
-    ,"Sé el primero en comentar.":"Be the first to comment."
-    ,"Editar datos":"Edit details"
-    ,"Cambiar avatar":"Change avatar"
-    ,"Cambiar portada":"Change cover"
-    ,"Nombre":"Name"
-    ,"Sitio web":"Website"
-    ,"Ubicación":"Location"
-    ,"Fecha de nacimiento":"Date of birth"
-    ,"Cambios guardados ✓":"Changes saved ✓"
-    ,"Descartar cambios":"Discard changes"
-    ,"¿Descartar los cambios?":"Discard changes?"
-    ,"Tenés cambios sin guardar.":"You have unsaved changes."
-    ,"Sí, descartar":"Yes, discard"
-    ,"Mantener editando":"Keep editing"
-    ,"Cuenta":"Account"
-    ,"Seguridad":"Security"
-    ,"Apariencia":"Appearance"
-    ,"Accesibilidad":"Accessibility"
-    ,"Cerrar sesión":"Log out"
-    ,"Idioma de la interfaz":"Interface language"
-    ,"Texto":"Text"
-    ,"Tamaño":"Size"
-    ,"Contraste alto":"High contrast"
-    ,"Revisión adicional":"Additional review"
-    ,"ACTUAL":"CURRENT"
-    ,"Reparación de emergencia":"Emergency fix"
-    ,"Todavía no hay novedades publicadas.":"There are no published updates yet."
-    ,"Completamos una nueva revisión interna enfocada en protección, permisos y funcionamiento seguro.":"We completed a new internal review focused on protection, permissions and secure operation."
-    ,"La revisión fue realizada sin modificar la experiencia principal de LiveScroll.":"The review was completed without changing the main LiveScroll experience."
-    ,"Se completaron las etapas de revisión de seguridad S1 a S6-C.":"Security review stages S1 through S6-C were completed."
-    ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"We strengthened session controls, permissions and access to internal information."
-    ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Points, views, plans and sensitive functions were reviewed to reduce unnecessary exposure."
-    ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"Critical logic remains protected server-side and important access requires identity and permission validation."
-    ,"Todavía no hay videos destacados":"There are no featured videos yet"
-    ,"Todavía no hay videos destacados.":"There are no featured videos yet."
-    ,"No hay videos destacados todavía":"There are no featured videos yet"
-    ,"No hay videos destacados todavía.":"There are no featured videos yet."
-    ,"Bienvenido a LiveScroll":"Welcome to LiveScroll"
-    ,"Descubrí videos":"Discover videos"
-    ,"Deslizá para descubrir nuevos videos.":"Swipe to discover new videos."
-    ,"Interactuá con la comunidad":"Interact with the community"
-    ,"Podés dar Me gusta, comentar y compartir videos.":"You can like, comment and share videos."
-    ,"Ganás puntos usando LiveScroll":"Earn points by using LiveScroll"
-    ,"Tus acciones pueden generar puntos según las reglas vigentes.":"Your actions can earn points according to the current rules."
-    ,"Personalizá tu experiencia":"Customize your experience"
-    ,"Usá Configuración para adaptar idioma, visión, contraste y texto.":"Use Settings to adjust language, view, contrast and text."
-    ,"Empezar":"Get started"
-    ,"Saltar":"Skip"
-    ,"Paso":"Step"
-    ,"de":"of"
-    ,"Revisión secundaria de LiveScroll 5.8.3 completada y aprobada.":"LiveScroll 5.8.3 secondary review completed and approved."
-
-  },
-  pt: {
-    "Mirar":"Assistir",
-    "✨ Para Ti":"✨ Para Você",
-    "Subir video":"Enviar vídeo",
-    "Mi Perfil":"Meu Perfil",
-    "👥 Usuarios":"👥 Usuários",
-    "🔴 Directos":"🔴 Ao Vivo",
-    "Billetera":"Carteira",
-    "Planes":"Planos",
-    "🛍️ Tienda":"🛍️ Loja",
-    "🏆 Ranking":"🏆 Ranking",
-    "📢 Novedades":"📢 Novidades",
-    "❓ Cómo funciona":"❓ Como funciona",
-    "⚙️ Configuración":"⚙️ Configurações",
-    "Salir":"Sair",
-    "Iniciar sesión":"Entrar",
-    "Crear cuenta":"Criar conta",
-    "Entrar":"Entrar",
-    "Email":"Email",
-    "Contraseña":"Senha",
-    "Nombre de usuario":"Nome de usuário",
-    "Recordar mi correo":"Lembrar meu email",
-    "La contraseña la guarda tu dispositivo":"Seu dispositivo salva a senha",
-    "¿Olvidaste tu contraseña?":"Esqueceu sua senha?",
-    "Configuración":"Configurações",
-    "Apariencia y accesibilidad":"Aparência e acessibilidade",
-    "Idioma":"Idioma",
-    "Visión cómoda":"Visão confortável",
-    "Contraste":"Contraste",
-    "Fuerza de texto":"Peso do texto",
-    "VISTA PREVIA":"PRÉVIA",
-    "Normal":"Normal",
-    "Grande":"Grande",
-    "Extra grande":"Extra grande",
-    "Alto":"Alto",
-    "Medio":"Médio",
-    "Fuerte":"Forte",
-    "Cancelar":"Cancelar",
-    "Aplicar cambios":"Aplicar alterações",
-    "Configuración aplicada ✓":"Configurações aplicadas ✓",
-    "Español":"Espanhol",
-    "English":"Inglês",
-    "Português":"Português",
-    "Elegí el idioma de la interfaz. La traducción completa se incorporará progresivamente durante 5.8.4.":"Escolha o idioma da interface.",
-    "Agranda texto, botones y controles de forma ordenada sin usar zoom.":"Aumenta textos, botões e controles sem usar zoom.",
-    "Aumenta la diferencia entre texto, fondos y bordes.":"Aumenta o contraste entre texto, fundos e bordas.",
-    "Elegí qué tan marcada querés ver la letra.":"Escolha o peso do texto.",
-    "Así vas a ver los textos, botones y elementos principales de la interfaz.":"Assim os textos, botões e principais elementos da interface serão exibidos.",
-    "Botón de ejemplo":"Botão de exemplo",
-    "🔒 El zoom de la página está desactivado. Visión cómoda permite agrandar la interfaz sin deformarla.":"🔒 O zoom da página está desativado. A visão confortável aumenta a interface sem deformá-la.",
-    "Novedades":"Novidades",
-    "Versiones y revisiones publicadas":"Versões e revisões publicadas",
-    "Seguridad revisada y aprobada":"Segurança revisada e aprovada",
-    "REVISIÓN SECUNDARIA":"REVISÃO SECUNDÁRIA",
-    "Revisión secundaria":"Revisão secundária",
-    "APROBADA":"APROVADA",
-    "Seguridad y protección":"Segurança e proteção",
-    "Sin cambios necesarios de tu parte.":"Nenhuma ação é necessária da sua parte.",
-    "Entendido ✓":"Entendi ✓",
-    "Nuevo":"Novo",
-    "Mejoras":"Melhorias",
-    "Reparado":"Corrigido",
-    "Próximamente":"Em breve",
-    "Cargando...":"Carregando...",
-    "Cargando novedades...":"Carregando novidades...",
-    "Cargando perfil...":"Carregando perfil...",
-    "Cargando tienda...":"Carregando loja...",
-    "Cargando ranking...":"Carregando ranking...",
-    "No hay directos públicos ahora":"Não há transmissões públicas ao vivo agora",
-    "Cuando un creador inicie una transmisión, va a aparecer acá.":"Quando um criador iniciar uma transmissão, ela aparecerá aqui.",
-    "Tienda de puntos":"Loja de pontos",
-    "Balance":"Saldo",
-    "Boost":"Boost",
-    "Medallas":"Medalhas",
-    "Emojis":"Emojis",
-    "Extras":"Extras",
-    "Tu plan":"Seu plano",
-    "Activo":"Ativo",
-    "Mejorar":"Melhorar",
-    "Plan inferior":"Plano inferior",
-    "Gratis":"Grátis",
-    "Mi colección":"Minha coleção",
-    "Explorar →":"Explorar →",
-    "En tu perfil":"No seu perfil",
-    "Tus 3 medallas destacadas":"Suas 3 medalhas em destaque",
-    "Editar":"Editar",
-    "Objetos":"Itens",
-    "Títulos":"Títulos",
-    "Todos":"Todos",
-    "Cerrar":"Fechar",
-    "Guardar":"Salvar",
-    "Guardar cambios":"Salvar alterações",
-    "Editar perfil":"Editar perfil",
-    "Bio":"Bio",
-    "Avatar":"Avatar",
-    "Portada":"Capa",
-    "Redes sociales":"Redes sociais",
-    "Usuarios":"Usuários",
-    "Directos":"Ao vivo",
-    "Ranking semanal":"Ranking semanal",
-    "Los que más puntos generaron en los últimos 7 días.":"Quem mais gerou pontos nos últimos 7 dias.",
-    "Todavía no hay actividad esta semana.":"Ainda não há atividade nesta semana.",
-    "Subí tus clips":"Envie seus clipes",
-    "Mirá y ganá":"Assista e ganhe",
-    "Cómo funciona":"Como funciona",
-    "Siguiente":"Próximo",
-    "Anterior":"Anterior",
-    "Finalizar":"Finalizar",
-    "Aceptar":"Aceitar",
-    "Abrir":"Abrir",
-    "Publicar":"Publicar",
-    "Seleccionar archivo":"Selecionar arquivo",
-    "Descripción":"Descrição",
-    "Título":"Título"
-    ,"Inicio":"Início"
-    ,"Para Ti":"Para Você"
-    ,"Siguiendo":"Seguindo"
-    ,"Buscar":"Buscar"
-    ,"Buscar usuarios":"Buscar usuários"
-    ,"Buscar usuarios...":"Buscar usuários..."
-    ,"Seguidores":"Seguidores"
-    ,"Seguir":"Seguir"
-    ,"Dejar de seguir":"Deixar de seguir"
-    ,"Mensaje":"Mensagem"
-    ,"Compartir":"Compartilhar"
-    ,"Me gusta":"Curtir"
-    ,"Comentar":"Comentar"
-    ,"Comentarios":"Comentários"
-    ,"Ver comentarios":"Ver comentários"
-    ,"Escribí un comentario...":"Escreva um comentário..."
-    ,"Enviar":"Enviar"
-    ,"Copiar enlace":"Copiar link"
-    ,"Enlace copiado ✓":"Link copiado ✓"
-    ,"Reportar":"Denunciar"
-    ,"Reportar video":"Denunciar vídeo"
-    ,"Reportar usuario":"Denunciar usuário"
-    ,"Bloquear":"Bloquear"
-    ,"Eliminar":"Excluir"
-    ,"Eliminar video":"Excluir vídeo"
-    ,"¿Eliminar video?":"Excluir vídeo?"
-    ,"Esta acción no se puede deshacer.":"Esta ação não pode ser desfeita."
-    ,"Sí, eliminar":"Sim, excluir"
-    ,"Volver":"Voltar"
-    ,"Continuar":"Continuar"
-    ,"Confirmar":"Confirmar"
-    ,"Listo":"Pronto"
-    ,"Hecho":"Concluído"
-    ,"Error":"Erro"
-    ,"Reintentar":"Tentar novamente"
-    ,"Actualizar":"Atualizar"
-    ,"No se pudo cargar":"Não foi possível carregar"
-    ,"No se pudo completar la acción.":"Não foi possível concluir a ação."
-    ,"Video publicado ✓":"Vídeo publicado ✓"
-    ,"Publicando...":"Publicando..."
-    ,"Subiendo...":"Enviando..."
-    ,"Procesando...":"Processando..."
-    ,"Elegir video":"Escolher vídeo"
-    ,"Cambiar video":"Trocar vídeo"
-    ,"Vista previa":"Prévia"
-    ,"Privacidad":"Privacidade"
-    ,"Público":"Público"
-    ,"Privado":"Privado"
-    ,"Solo seguidores":"Somente seguidores"
-    ,"Duración":"Duração"
-    ,"Categoría":"Categoria"
-    ,"Etiquetas":"Tags"
-    ,"Opcional":"Opcional"
-    ,"Tu perfil":"Seu perfil"
-    ,"Mis videos":"Meus vídeos"
-    ,"Videos":"Vídeos"
-    ,"Puntos":"Pontos"
-    ,"Puntos disponibles":"Pontos disponíveis"
-    ,"Historial":"Histórico"
-    ,"Actividad":"Atividade"
-    ,"Canjear":"Resgatar"
-    ,"Canjes":"Resgates"
-    ,"Solicitar canje":"Solicitar resgate"
-    ,"Monto":"Valor"
-    ,"Mínimo":"Mínimo"
-    ,"Estado":"Status"
-    ,"Pendiente":"Pendente"
-    ,"Aprobado":"Aprovado"
-    ,"Rechazado":"Rejeitado"
-    ,"Pagado":"Pago"
-    ,"Notificaciones":"Notificações"
-    ,"No tenés notificaciones.":"Você não tem notificações."
-    ,"Marcar como leídas":"Marcar como lidas"
-    ,"Plan actual":"Plano atual"
-    ,"Elegir plan":"Escolher plano"
-    ,"Activar plan":"Ativar plano"
-    ,"Solicitar plan":"Solicitar plano"
-    ,"Código de pago":"Código de pagamento"
-    ,"Enviar solicitud":"Enviar solicitação"
-    ,"Solicitud enviada ✓":"Solicitação enviada ✓"
-    ,"Comprar":"Comprar"
-    ,"Comprado":"Comprado"
-    ,"Equipar":"Equipar"
-    ,"Equipado":"Equipado"
-    ,"Desequipar":"Desequipar"
-    ,"Precio":"Preço"
-    ,"Saldo insuficiente":"Saldo insuficiente"
-    ,"Compra realizada ✓":"Compra realizada ✓"
-    ,"Boost activo":"Boost ativo"
-    ,"Activar boost":"Ativar boost"
-    ,"Horas":"Horas"
-    ,"Días":"Dias"
-    ,"Hoy":"Hoje"
-    ,"Esta semana":"Esta semana"
-    ,"Posición":"Posição"
-    ,"Usuario":"Usuário"
-    ,"Sin resultados":"Sem resultados"
-    ,"No encontramos usuarios.":"Não encontramos usuários."
-    ,"No hay videos todavía.":"Ainda não há vídeos."
-    ,"No hay comentarios todavía.":"Ainda não há comentários."
-    ,"Sé el primero en comentar.":"Seja o primeiro a comentar."
-    ,"Editar datos":"Editar dados"
-    ,"Cambiar avatar":"Trocar avatar"
-    ,"Cambiar portada":"Trocar capa"
-    ,"Nombre":"Nome"
-    ,"Sitio web":"Site"
-    ,"Ubicación":"Localização"
-    ,"Fecha de nacimiento":"Data de nascimento"
-    ,"Cambios guardados ✓":"Alterações salvas ✓"
-    ,"Descartar cambios":"Descartar alterações"
-    ,"¿Descartar los cambios?":"Descartar alterações?"
-    ,"Tenés cambios sin guardar.":"Você tem alterações não salvas."
-    ,"Sí, descartar":"Sim, descartar"
-    ,"Mantener editando":"Continuar editando"
-    ,"Cuenta":"Conta"
-    ,"Seguridad":"Segurança"
-    ,"Apariencia":"Aparência"
-    ,"Accesibilidad":"Acessibilidade"
-    ,"Cerrar sesión":"Sair"
-    ,"Idioma de la interfaz":"Idioma da interface"
-    ,"Texto":"Texto"
-    ,"Tamaño":"Tamanho"
-    ,"Contraste alto":"Alto contraste"
-    ,"Revisión adicional":"Revisão adicional"
-    ,"ACTUAL":"ATUAL"
-    ,"Reparación de emergencia":"Correção de emergência"
-    ,"Todavía no hay novedades publicadas.":"Ainda não há novidades publicadas."
-    ,"Completamos una nueva revisión interna enfocada en protección, permisos y funcionamiento seguro.":"Concluímos uma nova revisão interna focada em proteção, permissões e funcionamento seguro."
-    ,"La revisión fue realizada sin modificar la experiencia principal de LiveScroll.":"A revisão foi realizada sem alterar a experiência principal do LiveScroll."
-    ,"Se completaron las etapas de revisión de seguridad S1 a S6-C.":"As etapas de revisão de segurança S1 a S6-C foram concluídas."
-    ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"Reforçamos controles de sessão, permissões e acesso a informações internas."
-    ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Os sistemas de pontos, visualizações, planos e funções sensíveis foram revisados para reduzir exposição desnecessária."
-    ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"A lógica crítica continua protegida no servidor e acessos importantes exigem validação de identidade e permissões."
-    ,"Todavía no hay videos destacados":"Ainda não há vídeos em destaque"
-    ,"Todavía no hay videos destacados.":"Ainda não há vídeos em destaque."
-    ,"No hay videos destacados todavía":"Ainda não há vídeos em destaque"
-    ,"No hay videos destacados todavía.":"Ainda não há vídeos em destaque."
-    ,"Bienvenido a LiveScroll":"Bem-vindo ao LiveScroll"
-    ,"Descubrí videos":"Descubra vídeos"
-    ,"Deslizá para descubrir nuevos videos.":"Deslize para descobrir novos vídeos."
-    ,"Interactuá con la comunidad":"Interaja com a comunidade"
-    ,"Podés dar Me gusta, comentar y compartir videos.":"Você pode curtir, comentar e compartilhar vídeos."
-    ,"Ganás puntos usando LiveScroll":"Ganhe pontos usando o LiveScroll"
-    ,"Tus acciones pueden generar puntos según las reglas vigentes.":"Suas ações podem gerar pontos de acordo com as regras atuais."
-    ,"Personalizá tu experiencia":"Personalize sua experiência"
-    ,"Usá Configuración para adaptar idioma, visión, contraste y texto.":"Use Configurações para ajustar idioma, visão, contraste e texto."
-    ,"Empezar":"Começar"
-    ,"Saltar":"Pular"
-    ,"Paso":"Etapa"
-    ,"de":"de"
-    ,"Revisión secundaria de LiveScroll 5.8.3 completada y aprobada.":"Revisão secundária do LiveScroll 5.8.3 concluída e aprovada."
-
-  }
-};
-
-function getLiveScrollLanguage() {
-  return getLiveScrollSettings?.().language || "es";
-}
-
-function lsTranslateExact(value, lang = getLiveScrollLanguage()) {
-  if (!value || lang === "es") return value;
-
-  const dict = LS_I18N[lang] || {};
-  if (dict[value]) return dict[value];
-
-  // Frases del sistema con valores dinámicos frecuentes.
-  let out = String(value);
-
-  const dynamicRules = lang === "en" ? [
-    [/^Ganaste\s+(\d+)\s+puntos?\.?$/i, "You earned $1 points."],
-    [/^Tenés\s+(\d+)\s+puntos?\.?$/i, "You have $1 points."],
-    [/^(\d+)\s+puntos$/i, "$1 points"],
-    [/^Hace\s+(\d+)\s+minutos?$/i, "$1 minutes ago"],
-    [/^Hace\s+(\d+)\s+horas?$/i, "$1 hours ago"],
-    [/^Hace\s+(\d+)\s+días?$/i, "$1 days ago"],
-    [/^v([0-9.]+)\s+·\s+revisión adicional$/i, "v$1 · additional review"]
-  ] : [
-    [/^Ganaste\s+(\d+)\s+puntos?\.?$/i, "Você ganhou $1 pontos."],
-    [/^Tenés\s+(\d+)\s+puntos?\.?$/i, "Você tem $1 pontos."],
-    [/^(\d+)\s+puntos$/i, "$1 pontos"],
-    [/^Hace\s+(\d+)\s+minutos?$/i, "Há $1 minutos"],
-    [/^Hace\s+(\d+)\s+horas?$/i, "Há $1 horas"],
-    [/^Hace\s+(\d+)\s+días?$/i, "Há $1 dias"],
-    [/^v([0-9.]+)\s+·\s+revisión adicional$/i, "v$1 · revisão adicional"]
-  ];
-
-  for (const [regex, replacement] of dynamicRules) {
-    if (regex.test(out)) return out.replace(regex, replacement);
-  }
-
-  return out;
-}
-
-
-function translateLiveScrollSystemText(value, lang = getLiveScrollLanguage()) {
-  if (!value || lang === "es") return value;
-
-  const direct = lsTranslateExact(String(value).trim(), lang);
-  if (direct !== String(value).trim()) return direct;
-
-  const rules = lang === "en" ? [
-    ["Configuración llega al menú principal con nuevas opciones de apariencia, accesibilidad e idioma.",
-     "Settings arrives in the main menu with new appearance, accessibility and language options."],
-    ["Visión cómoda permite usar tamaños Normal, Grande y Extra grande sin depender del zoom de la página.",
-     "Comfort view offers Normal, Large and Extra large sizes without relying on page zoom."],
-    ["Se agregaron opciones de Contraste y Fuerza de texto con vista previa antes de aplicar los cambios.",
-     "Contrast and Text strength options were added with a preview before applying changes."],
-    ["La interfaz incorpora selección de idioma con Español, English y Português.",
-     "The interface now includes language selection with Spanish, English and Portuguese."],
-    ["Las preferencias de accesibilidad también se aplican a Novedades, carteles, formularios y ventanas emergentes.",
-     "Accessibility preferences also apply to What's New, notices, forms and pop-up windows."],
-    ["Las opciones elegidas quedan guardadas en el dispositivo para conservar la misma experiencia al volver a abrir la app.",
-     "Selected options are saved on the device to preserve the same experience when reopening the app."],
-    ["Los cuadros importantes ahora evitan cierres accidentales al tocar fuera de la ventana.",
-     "Important dialogs now prevent accidental closing when tapping outside the window."],
-    ["Se bloqueó el zoom de página para mantener una interfaz estable y utilizar los nuevos controles de accesibilidad integrados.",
-     "Page zoom was disabled to keep the interface stable and use the new built-in accessibility controls."],
-    ["La traducción de la interfaz comienza a extenderse por navegación, Configuración, Novedades y pantallas principales.",
-     "Interface translation is expanding across navigation, Settings, What's New and main screens."],
-    ["La interfaz ahora puede adaptarse ampliamente a Español, English y Português en navegación, pantallas, carteles y mensajes del sistema.",
-     "The interface can now broadly adapt to Spanish, English and Portuguese across navigation, screens, notices and system messages."]
-  ] : [
-    ["Configuración llega al menú principal con nuevas opciones de apariencia, accesibilidad e idioma.",
-     "Configurações chega ao menu principal com novas opções de aparência, acessibilidade e idioma."],
-    ["Visión cómoda permite usar tamaños Normal, Grande y Extra grande sin depender del zoom de la página.",
-     "A visão confortável oferece tamanhos Normal, Grande e Extra grande sem depender do zoom da página."],
-    ["Se agregaron opciones de Contraste y Fuerza de texto con vista previa antes de aplicar los cambios.",
-     "Foram adicionadas opções de Contraste e Peso do texto com prévia antes de aplicar as alterações."],
-    ["La interfaz incorpora selección de idioma con Español, English y Português.",
-     "A interface agora inclui seleção de idioma com Espanhol, Inglês e Português."],
-    ["Las preferencias de accesibilidad también se aplican a Novedades, carteles, formularios y ventanas emergentes.",
-     "As preferências de acessibilidade também se aplicam a Novidades, avisos, formulários e janelas pop-up."],
-    ["Las opciones elegidas quedan guardadas en el dispositivo para conservar la misma experiencia al volver a abrir la app.",
-     "As opções escolhidas ficam salvas no dispositivo para manter a mesma experiência ao reabrir o app."],
-    ["Los cuadros importantes ahora evitan cierres accidentales al tocar fuera de la ventana.",
-     "As janelas importantes agora evitam fechamentos acidentais ao tocar fora delas."],
-    ["Se bloqueó el zoom de página para mantener una interfaz estable y utilizar los nuevos controles de accesibilidad integrados.",
-     "O zoom da página foi bloqueado para manter a interface estável e usar os novos controles de acessibilidade integrados."],
-    ["La traducción de la interfaz comienza a extenderse por navegación, Configuración, Novedades y pantallas principales.",
-     "A tradução da interface está sendo ampliada na navegação, Configurações, Novidades e telas principais."],
-    ["La interfaz ahora puede adaptarse ampliamente a Español, English y Português en navegación, pantallas, carteles y mensajes del sistema.",
-     "A interface agora pode se adaptar amplamente a Espanhol, Inglês e Português na navegação, telas, avisos e mensagens do sistema."]
-  ];
-
-  const found = rules.find(([source]) => source === String(value).trim());
-  return found ? found[1] : value;
-}
-
-function shouldSkipLiveScrollTranslation(el) {
-  if (!el || !el.closest) return false;
-
-  return !!el.closest(
-    [
-      ".video-caption",
-      ".video-description",
-      ".comment-text",
-      ".comments-list",
-      ".user-content",
-      ".profile-bio",
-      "[data-user-content]",
-      "pre",
-      "code"
-    ].join(",")
-  );
-}
-
-function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
-  if (!el || shouldSkipLiveScrollTranslation(el)) return;
-
-  // Texto exacto de controles simples.
-  if (
-    ["BUTTON","LABEL","OPTION","H1","H2","H3","H4","P","SPAN","DIV"].includes(el.tagName) &&
-    el.childElementCount === 0
-  ) {
-    const original = el.dataset.lsI18nOriginal || el.textContent?.trim();
-
-    if (original) {
-      if (!el.dataset.lsI18nOriginal) el.dataset.lsI18nOriginal = original;
-      el.textContent = lang === "es"
-        ? el.dataset.lsI18nOriginal
-        : translateLiveScrollSystemText(el.dataset.lsI18nOriginal, lang);
-    }
-  }
-
-  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-    if (el.placeholder) {
-      const original = el.dataset.lsI18nPlaceholder || el.placeholder;
-      if (!el.dataset.lsI18nPlaceholder) el.dataset.lsI18nPlaceholder = original;
-      el.placeholder = lang === "es"
-        ? el.dataset.lsI18nPlaceholder
-        : translateLiveScrollSystemText(el.dataset.lsI18nPlaceholder, lang);
-    }
-  }
-
-  if (el.title) {
-    const original = el.dataset.lsI18nTitle || el.title;
-    if (!el.dataset.lsI18nTitle) el.dataset.lsI18nTitle = original;
-    el.title = lang === "es"
-      ? el.dataset.lsI18nTitle
-      : translateLiveScrollSystemText(el.dataset.lsI18nTitle, lang);
-  }
-
-  if (el.getAttribute && el.getAttribute("aria-label")) {
-    const current = el.getAttribute("aria-label");
-    const original = el.dataset.lsI18nAria || current;
-    if (!el.dataset.lsI18nAria) el.dataset.lsI18nAria = original;
-    el.setAttribute(
-      "aria-label",
-      lang === "es" ? el.dataset.lsI18nAria : translateLiveScrollSystemText(el.dataset.lsI18nAria, lang)
-    );
-  }
-}
-
-function applyLiveScrollTranslations(root = document) {
-  const lang = getLiveScrollLanguage();
-
-  translateLiveScrollElement(root, lang);
-
-  root.querySelectorAll?.(
-    "button,label,option,h1,h2,h3,h4,h5,h6,p,span,div,small,a,input,textarea,[title],[aria-label]"
-  ).forEach(el => translateLiveScrollElement(el, lang));
-
-  document.documentElement.lang =
-    lang === "en" ? "en" :
-    lang === "pt" ? "pt-BR" : "es";
-}
-
-function installLiveScrollTranslationObserver() {
-  if (window.__lsTranslationObserverInstalled || !document.body) return;
-  window.__lsTranslationObserverInstalled = true;
-
-  let queued = false;
-
-  const observer = new MutationObserver(mutations => {
-    if (queued) return;
-    queued = true;
-
-    requestAnimationFrame(() => {
-      queued = false;
-      for (const mutation of mutations) {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE) {
-            applyLiveScrollTranslations(node);
-          }
-        });
-      }
-    });
-  });
-
-  observer.observe(document.body, {
-    childList:true,
-    subtree:true
-  });
-}
-
 const LS_SETTINGS_KEY = "livescroll_ui_settings_v584";
 const LS_SETTINGS_DEFAULTS = {
-  language: "es",
   vision: "normal",
   contrast: "normal",
   fontWeight: "normal"
@@ -1893,12 +1146,10 @@ function applyLiveScrollSettings(settings = getLiveScrollSettings()) {
   window.__lsLanguage = settings.language;
 
   // La elección de idioma ahora sí se refleja inmediatamente en la interfaz.
-  setTimeout(() => applyLiveScrollTranslations(document), 0);
 }
 
 function lsSettingsLabel(group, value) {
   const labels = {
-    language:{ es:"Español", en:"English", pt:"Português" },
     vision:{ normal:"Normal", large:"Grande", xlarge:"Extra grande" },
     contrast:{ normal:"Normal", high:"Alto" },
     fontWeight:{ normal:"Normal", medium:"Medio", strong:"Fuerte" }
@@ -1949,23 +1200,6 @@ function openLiveScrollSettings() {
 
         <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
           <div class="ls-settings-grid">
-
-            <div class="ls-settings-section">
-              <div class="ls-settings-title">🌐 Idioma</div>
-              <div class="ls-settings-help">
-                Elegí el idioma de la interfaz. La traducción completa se incorporará
-                progresivamente durante 5.8.4.
-              </div>
-              <div class="ls-settings-options" id="lsLanguageOptions">
-                ${["es","en","pt"].map(v => `
-                  <button class="ls-settings-option"
-                    data-setting="language" data-value="${v}"
-                    onclick="setLiveScrollDraft('language','${v}')">
-                    ${lsSettingsLabel("language",v)}
-                  </button>
-                `).join("")}
-              </div>
-            </div>
 
             <div class="ls-settings-section">
               <div class="ls-settings-title">👁️ Visión cómoda</div>
@@ -2123,7 +1357,6 @@ function applyLiveScrollSettingsDraft() {
   showToast("Configuración aplicada ✓");
 
   // Fuerza actualización inmediata de la pantalla actual.
-  setTimeout(() => applyLiveScrollTranslations(document), 0);
 }
 
 function resetLiveScrollSettings() {
@@ -2154,8 +1387,6 @@ document.addEventListener("DOMContentLoaded", () => {
   installLiveScrollZoomLock();
   applyLiveScrollSettings();
   installLiveScrollModalAccessibilityBridge();
-  installLiveScrollTranslationObserver();
-  applyLiveScrollTranslations(document);
 });
 
 
@@ -2186,7 +1417,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
-    <button onclick="showTutorialModal(); closeMobileMenu(); setTimeout(() => applyLiveScrollTranslations(document.getElementById("globalModalWrap") || document), 30);">❓ Cómo funciona</button>
+    <button onclick="showTutorialModal(); closeMobileMenu();">❓ Cómo funciona</button>
     <button onclick="openLiveScrollSettings(); closeMobileMenu();">⚙️ Configuración</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
@@ -2195,7 +1426,6 @@ function toggleMobileMenu() {
 
   document.body.appendChild(overlay);
   document.body.appendChild(panel);
-  setTimeout(() => applyLiveScrollTranslations(panel), 0);
 }
 
 function closeMobileMenu() {
@@ -3230,7 +2460,7 @@ function showChangelogModal(entries) {
       "";
 
     const cleaned = secondaryEntries
-      .map(e => translateLiveScrollSystemText(cleanChangelogContent(e.content)))
+      .map(e => cleanChangelogContent(e.content))
       .filter(Boolean)
       // El encabezado ya comunica que la revisión fue aprobada.
       .filter(c => !/^completada y aprobada\.?$/i.test(c))
@@ -3305,7 +2535,7 @@ function showChangelogModal(entries) {
                   margin:${cleaned.indexOf(c) === cleaned.length - 1 ? "0" : "0 0 9px"};
                 ">
                   <span style="color:#60a5fa;font-weight:900;">✓</span>
-                  <span>${escapeHtml(translateLiveScrollSystemText(c))}</span>
+                  <span>${escapeHtml(c)}</span>
                 </div>
               `).join("")}
             </div>
@@ -3391,7 +2621,7 @@ function showChangelogModal(entries) {
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
                   <div style="margin-bottom:11px;">
                     <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>`).join("")}
+                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
             }).join("")}
@@ -3465,7 +2695,7 @@ function showChangelogModal(entries) {
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
                   <div class="ls-next-era-category">
                     <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>`).join("")}
+                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
           }).join("")}
@@ -3655,7 +2885,7 @@ async function openChangelogHistory() {
             margin-bottom:7px;
           ">
             <span style="color:#60a5fa;font-weight:900;">✓</span>
-            <span>${escapeHtml(translateLiveScrollSystemText(c))}</span>
+            <span>${escapeHtml(c)}</span>
           </div>
         `).join("")}
       </div>`;
@@ -3683,7 +2913,7 @@ async function openChangelogHistory() {
               color:var(--text-dim);
               margin-bottom:5px;
               line-height:1.48;
-            ">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>
+            ">• ${escapeHtml(c)}</div>
           `).join("")}
         </div>`;
     }).join("");
@@ -4636,7 +3866,6 @@ function switchTab(tab) {
     setTimeout(syncSeasonalAdminControls, 250);
   }
 
-  setTimeout(() => applyLiveScrollTranslations(document.getElementById("appView") || document), 0);
 }
 
 function updateBalanceUI() {

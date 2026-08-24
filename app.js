@@ -148,6 +148,190 @@ document.addEventListener("DOMContentLoaded", async () => {
   animateLandingOdometer();
 });
 
+
+
+// ============================================================
+// LIVESCROLL · POST LOGIN INTRO V1
+// Transición breve entre iniciar sesión y entrar al Feed.
+// No aparece al recargar una sesión ya iniciada.
+// ============================================================
+
+function showPostLoginIntro() {
+  return new Promise(resolve => {
+    const wrap = document.getElementById("globalModalWrap");
+    if (!wrap) {
+      resolve();
+      return;
+    }
+
+    const username = currentProfile?.username || currentUser?.email?.split("@")[0] || "";
+    const seasonalKey = typeof getSeasonalThemeKey === "function"
+      ? getSeasonalThemeKey()
+      : "normal";
+
+    const seasonal = typeof LS_SEASONAL_THEMES !== "undefined"
+      ? (LS_SEASONAL_THEMES[seasonalKey] || LS_SEASONAL_THEMES.normal)
+      : null;
+
+    const accent = seasonal?.accent || "var(--gold)";
+    const seasonEmoji = seasonal?.emoji || "✦";
+
+    const reducedMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ||
+      document.body?.classList.contains("ls-legacy");
+
+    wrap.innerHTML = `
+      <div id="lsPostLoginIntro" style="
+        position:fixed;
+        inset:0;
+        z-index:220;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        padding:22px;
+        background:
+          radial-gradient(circle at 50% 36%, color-mix(in srgb, ${accent} 14%, transparent), transparent 32%),
+          rgba(7,10,14,.96);
+        backdrop-filter:blur(12px);
+        -webkit-backdrop-filter:blur(12px);
+      ">
+        <div class="ls-login-intro-card" style="
+          width:min(420px,92vw);
+          text-align:center;
+          position:relative;
+        ">
+          <div class="ls-login-intro-mark" style="
+            width:64px;
+            height:64px;
+            margin:0 auto 16px;
+            border-radius:20px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:29px;
+            border:1px solid color-mix(in srgb, ${accent} 38%, var(--border));
+            background:
+              linear-gradient(145deg,color-mix(in srgb, ${accent} 11%, var(--panel)),var(--panel));
+            box-shadow:0 0 38px color-mix(in srgb, ${accent} 16%, transparent);
+          ">${seasonEmoji}</div>
+
+          <div style="
+            font-size:10px;
+            text-transform:uppercase;
+            letter-spacing:.18em;
+            color:${accent};
+            font-weight:900;
+            margin-bottom:8px;
+          ">LiveScroll</div>
+
+          <div style="
+            font-size:clamp(23px,6vw,34px);
+            font-weight:950;
+            letter-spacing:-.035em;
+            line-height:1.05;
+          ">
+            ${username ? `Hola, @${escapeHtml(username)}` : "Bienvenido"}
+          </div>
+
+          <div style="
+            font-size:12px;
+            color:var(--text-dim);
+            margin-top:8px;
+          ">Preparando tu LiveScroll…</div>
+
+          <div style="
+            width:min(230px,68vw);
+            height:3px;
+            margin:22px auto 0;
+            border-radius:999px;
+            overflow:hidden;
+            background:rgba(255,255,255,.07);
+          ">
+            <div class="ls-login-intro-progress" style="
+              width:0;
+              height:100%;
+              border-radius:999px;
+              background:${accent};
+              box-shadow:0 0 14px color-mix(in srgb, ${accent} 45%, transparent);
+            "></div>
+          </div>
+        </div>
+      </div>`;
+
+    const style = document.createElement("style");
+    style.id = "lsPostLoginIntroStyle";
+    style.textContent = `
+      @keyframes lsLoginIntroCardIn {
+        from { opacity:0; transform:translateY(12px) scale(.975); }
+        to { opacity:1; transform:translateY(0) scale(1); }
+      }
+
+      @keyframes lsLoginIntroMark {
+        0% { transform:scale(.88) rotate(-5deg); opacity:0; }
+        60% { transform:scale(1.05) rotate(2deg); opacity:1; }
+        100% { transform:scale(1) rotate(0); opacity:1; }
+      }
+
+      @keyframes lsLoginIntroProgress {
+        from { width:0; }
+        to { width:100%; }
+      }
+
+      @keyframes lsLoginIntroOut {
+        from { opacity:1; }
+        to { opacity:0; }
+      }
+
+      #lsPostLoginIntro .ls-login-intro-card {
+        animation:lsLoginIntroCardIn .34s cubic-bezier(.2,.8,.2,1) both;
+      }
+
+      #lsPostLoginIntro .ls-login-intro-mark {
+        animation:lsLoginIntroMark .42s cubic-bezier(.2,.8,.2,1) both;
+      }
+
+      #lsPostLoginIntro .ls-login-intro-progress {
+        animation:lsLoginIntroProgress .95s cubic-bezier(.2,.75,.25,1) .08s both;
+      }
+
+      #lsPostLoginIntro.ls-closing {
+        animation:lsLoginIntroOut .18s ease forwards;
+      }
+
+      @media (prefers-reduced-motion:reduce) {
+        #lsPostLoginIntro *,
+        #lsPostLoginIntro {
+          animation:none !important;
+        }
+
+        #lsPostLoginIntro .ls-login-intro-progress {
+          width:100% !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    const duration = reducedMotion ? 320 : 1120;
+
+    setTimeout(() => {
+      const intro = document.getElementById("lsPostLoginIntro");
+      if (!intro) {
+        style.remove();
+        resolve();
+        return;
+      }
+
+      intro.classList.add("ls-closing");
+
+      setTimeout(() => {
+        wrap.innerHTML = "";
+        style.remove();
+        resolve();
+      }, reducedMotion ? 20 : 190);
+    }, duration);
+  });
+}
+
 // ============================================================
 // AUTH
 // ============================================================
@@ -265,6 +449,10 @@ async function handleSignup() {
   }
 
   closeAuthModal();
+
+  // La primera entrada de una cuenta nueva también recibe la transición.
+  await showPostLoginIntro();
+
   renderApp();
 }
 
@@ -338,6 +526,10 @@ async function handleLogin() {
   currentUser = data.user;
   await loadProfile();
   closeAuthModal();
+
+  // Intro breve SOLO después de un inicio de sesión explícito.
+  await showPostLoginIntro();
+
   renderApp();
   if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
 }

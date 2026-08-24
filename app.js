@@ -2064,41 +2064,6 @@ document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 
 
 // ============================================================
-// LIVESCROLL 5.8.5 · NOVEDADES SOLO PC — FIX DEFINITIVO
-// No dependemos del momento en que se construye navRight.
-// ============================================================
-
-function syncTopNewsButtonVisibility() {
-  const isMobile = window.matchMedia("(max-width: 768px)").matches;
-
-  document.querySelectorAll("#navRight .nav-changelog-btn").forEach(btn => {
-    btn.style.setProperty(
-      "display",
-      isMobile ? "none" : "inline-block",
-      "important"
-    );
-  });
-}
-
-(function installTopNewsVisibilityGuard() {
-  if (window.__lsTopNewsVisibilityGuardInstalled) return;
-  window.__lsTopNewsVisibilityGuardInstalled = true;
-
-  const run = () => requestAnimationFrame(syncTopNewsButtonVisibility);
-
-  window.addEventListener("resize", run);
-  window.addEventListener("orientationchange", run);
-
-  const navRight = document.getElementById("navRight");
-  if (navRight) {
-    const observer = new MutationObserver(run);
-    observer.observe(navRight, { childList:true, subtree:true });
-  }
-
-  document.addEventListener("DOMContentLoaded", run);
-})();
-
-// ============================================================
 // APP SHELL
 // ============================================================
 function toggleMobileMenu() {
@@ -2611,7 +2576,7 @@ async function renderApp() {
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
-    ${window.innerWidth > 768 ? `<button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>` : ""}
+    <button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
     <button class="ls-pc-settings-gear" onclick="openLiveScrollSettings()" title="Configuración" aria-label="Configuración" style="background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">⚙️</button>
     <button class="ls-pc-tutorial-btn" onclick="showTutorialModal()" title="Cómo funciona" aria-label="Cómo funciona" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:4px;">❓</button>
     <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">
@@ -2619,7 +2584,6 @@ async function renderApp() {
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
-  syncTopNewsButtonVisibility();
 
   // Lo visible primero.
   checkBlockedStatus();
@@ -2645,6 +2609,12 @@ window.__lsStartupOptionalModalShown = window.__lsStartupOptionalModalShown || f
 
 async function checkPendingContent() {
   if (!currentUser?.id) return;
+
+  // En celular Novedades sigue disponible manualmente desde el menú ☰,
+  // pero NO interrumpe al usuario automáticamente al abrir/reiniciar la app.
+  // Términos y Tutorial sí conservan su comportamiento normal.
+  const allowAutomaticChangelog =
+    !window.matchMedia("(max-width: 780px)").matches;
 
   const seenKey = `livescroll_changelog_seen_${currentUser.id}`;
 
@@ -2733,7 +2703,11 @@ async function checkPendingContent() {
 
   // 2) Backend normal: si marca Novedades pendientes, mostramos eso
   // y completamos con la versión visible más reciente si hiciera falta.
-  if (pendingData?.changelog_pending && !window.__lsStartupOptionalModalShown) {
+  if (
+    allowAutomaticChangelog &&
+    pendingData?.changelog_pending &&
+    !window.__lsStartupOptionalModalShown
+  ) {
     let entries = Array.isArray(pendingData.changelog_entries)
       ? [...pendingData.changelog_entries]
       : [];
@@ -2766,6 +2740,7 @@ async function checkPendingContent() {
   // que este dispositivo todavía no vio, el cartel aparece aunque
   // get_pending_content() haya fallado o devuelva false.
   if (
+    allowAutomaticChangelog &&
     !window.__lsStartupOptionalModalShown &&
     latestInternal > CHANGELOG_AUTO_BASELINE_VERSION &&
     latestInternal > locallySeen &&

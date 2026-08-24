@@ -6680,7 +6680,7 @@ async function openMyMedalsPanel() {
     sb.from("store_emojis").select("id,emoji,name,rarity,is_limited,stock_total"),
     sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id),
     sb.from("user_unlocked_items").select("item_id,unlocked_at").eq("user_id", currentUser.id),
-    sb.from("store_items").select("id,category,icon,name").eq("category", "title"),
+    sb.from("store_items").select("id,category,icon,name,rarity").eq("category", "title"),
     getMyProfileTitle()
   ]);
 
@@ -6744,7 +6744,7 @@ async function openMyMedalsPanel() {
       item_id:t.id,
       icon:t.icon || "🏷️",
       name:t.name || "Título",
-      rarity:null,
+      rarity:t.rarity || "comun",
       description:"Título equipable para mostrar debajo de tu nombre.",
       is_limited:false,
       stock_total:null,
@@ -7940,6 +7940,17 @@ async function renderAdmin() {
           style="flex:1;min-width:160px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);"
         >
 
+        <select
+          id="newProfileTitleRarity"
+          style="width:145px;padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);"
+        >
+          <option value="comun">Común</option>
+          <option value="rara">Rara</option>
+          <option value="epica">Épica</option>
+          <option value="legendaria">Legendaria</option>
+          <option value="exclusiva">Exclusiva</option>
+        </select>
+
         <input
           type="number"
           id="newProfileTitlePrice"
@@ -8579,6 +8590,7 @@ async function loadProfileTitlesAdminList() {
     <div class="ledger-row">
       <span>
         ${it.icon || "🏷️"} ${escapeHtml(it.name)}
+        · <span style="font-size:10px;font-weight:900;color:var(--gold);text-transform:uppercase;">${escapeHtml(it.rarity || "comun")}</span>
         · <span class="mono">${it.price_points} pts</span>
         ${!it.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
       </span>
@@ -8601,6 +8613,7 @@ async function loadProfileTitlesAdminList() {
 async function handleAddProfileTitleAdmin() {
   const icon = document.getElementById("newProfileTitleIcon")?.value.trim();
   const name = document.getElementById("newProfileTitleName")?.value.trim();
+  const rarity = document.getElementById("newProfileTitleRarity")?.value || "comun";
   const rawPrice = document.getElementById("newProfileTitlePrice")?.value;
   const price = Number.parseInt(rawPrice, 10);
 
@@ -8621,8 +8634,29 @@ async function handleAddProfileTitleAdmin() {
     return;
   }
 
+  // admin_add_store_item conserva el sistema existente.
+  // Luego asignamos la rareza al título recién creado buscando el registro exacto.
+  const { data: createdRows } = await sb
+    .from("store_items")
+    .select("id")
+    .eq("category", "title")
+    .eq("name", name)
+    .eq("icon", icon)
+    .eq("price_points", price)
+    .order("created_at", { ascending:false })
+    .limit(1);
+
+  const createdId = createdRows?.[0]?.id;
+  if (createdId) {
+    await sb.rpc("admin_set_store_item_rarity", {
+      p_item_id: createdId,
+      p_rarity: rarity
+    });
+  }
+
   document.getElementById("newProfileTitleIcon").value = "";
   document.getElementById("newProfileTitleName").value = "";
+  document.getElementById("newProfileTitleRarity").value = "comun";
   document.getElementById("newProfileTitlePrice").value = "";
 
   showToast("🏷️ Título creado");

@@ -2575,7 +2575,7 @@ async function renderApp() {
       <span class="divider"></span>
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
-    <button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
+    ${window.innerWidth > 768 ? `<button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>` : ""}
     <button class="ls-pc-settings-gear" onclick="openLiveScrollSettings()" title="Configuración" aria-label="Configuración" style="background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">⚙️</button>
     <button class="ls-pc-tutorial-btn" onclick="showTutorialModal()" title="Cómo funciona" aria-label="Cómo funciona" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:4px;">❓</button>
     <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">

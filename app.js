@@ -4717,9 +4717,49 @@ async function renderUpload() {
               LiveScroll te ofrecerá recortarlo antes de subirlo.
             </p>
 
-            <div id="uploadPreviewSafe" class="ls-upload-preview-safe" style="margin-top:12px;width:100%;max-width:100%;min-width:0;">
+            <div
+              id="uploadPreviewSafe"
+              class="ls-upload-preview-safe"
+              style="
+                display:none;
+                position:relative !important;
+                width:100% !important;
+                max-width:100% !important;
+                min-width:0 !important;
+                aspect-ratio:16 / 9 !important;
+                height:auto !important;
+                margin:12px 0 0 !important;
+                overflow:hidden !important;
+                box-sizing:border-box !important;
+                border-radius:12px;
+                border:1px solid var(--border);
+                background:#000;
+              "
+            >
               <div class="tag">Vista previa</div>
-              <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
+              <video
+                id="uploadPreviewVideoSafe"
+                controls
+                muted
+                playsinline
+                preload="metadata"
+                style="
+                  position:absolute !important;
+                  inset:0 !important;
+                  display:block !important;
+                  width:100% !important;
+                  height:100% !important;
+                  max-width:none !important;
+                  max-height:none !important;
+                  min-width:0 !important;
+                  object-fit:contain !important;
+                  object-position:center center !important;
+                  margin:0 !important;
+                  padding:0 !important;
+                  background:#000 !important;
+                  box-sizing:border-box !important;
+                "
+              ></video>
               <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
             </div>
           </div>
@@ -4802,7 +4842,9 @@ function clearUploadPreviewSafe() {
 
   if (preview) {
     preview.classList.remove("active", "landscape", "portrait", "square");
-    preview.style.aspectRatio = "";
+    preview.style.setProperty("display", "none", "important");
+    preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+    preview.style.setProperty("height", "auto", "important");
     delete preview.dataset.detectedRatio;
   }
 }
@@ -4820,6 +4862,12 @@ function refreshUploadPreviewSafe() {
 
   uploadPreviewUrlSafe = URL.createObjectURL(file);
   preview.classList.add("active");
+  preview.style.setProperty("display", "block", "important");
+  preview.style.setProperty("width", "100%", "important");
+  preview.style.setProperty("max-width", "100%", "important");
+  preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+  preview.style.setProperty("height", "auto", "important");
+  preview.style.setProperty("overflow", "hidden", "important");
   video.src = uploadPreviewUrlSafe;
 
   video.onerror = () => {
@@ -4829,26 +4877,18 @@ function refreshUploadPreviewSafe() {
   };
 
   video.onloadedmetadata = () => {
-    video.style.display = "";
+    video.style.setProperty("display", "block", "important");
     msg.classList.remove("active");
 
-    const vw = Number(video.videoWidth || 0);
-    const vh = Number(video.videoHeight || 0);
-
-    // Algunos celulares informan dimensiones "codificadas" distintas
-    // de la orientación visual cuando el MP4 trae metadata de rotación.
-    // Por eso NO usamos videoWidth/videoHeight para forzar una caja.
-    // Dejamos que <video> conserve su relación visual real y solo limitamos
-    // la altura para que nunca ocupe media pantalla.
-    preview.classList.remove("landscape", "portrait", "square");
-    preview.style.aspectRatio = "";
-
-    if (vw > 0 && vh > 0) {
-      const ratio = vw / vh;
-      preview.dataset.detectedRatio = ratio.toFixed(3);
-    } else {
-      delete preview.dataset.detectedRatio;
-    }
+    // Caja fija responsive 16:9:
+    // horizontales llenan el ancho;
+    // verticales quedan centrados con barras laterales;
+    // nunca se modifica el tamaño del contenedor según metadata del MP4.
+    preview.style.setProperty("display", "block", "important");
+    preview.style.setProperty("width", "100%", "important");
+    preview.style.setProperty("max-width", "100%", "important");
+    preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+    preview.style.setProperty("height", "auto", "important");
   };
 }
 
@@ -9690,3 +9730,52 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+
+// ============================================================
+// UPLOAD PREVIEW HARD LAYOUT FIX
+// La preview siempre usa un frame 16:9 dentro del ancho del formulario.
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsUploadPreviewHardFix")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsUploadPreviewHardFix";
+  style.textContent = `
+    #fileFields,
+    #fileFields .field,
+    #uploadPreviewSafe {
+      min-width:0 !important;
+      max-width:100% !important;
+      box-sizing:border-box !important;
+    }
+
+    #uploadPreviewSafe.active {
+      display:block !important;
+      width:100% !important;
+      aspect-ratio:16 / 9 !important;
+      height:auto !important;
+      overflow:hidden !important;
+    }
+
+    #uploadPreviewVideoSafe {
+      position:absolute !important;
+      inset:0 !important;
+      width:100% !important;
+      height:100% !important;
+      max-width:none !important;
+      max-height:none !important;
+      object-fit:contain !important;
+      object-position:center !important;
+    }
+
+    @media (max-width:700px) {
+      #uploadPreviewSafe.active {
+        width:100% !important;
+        aspect-ratio:16 / 9 !important;
+        height:auto !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+});

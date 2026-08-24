@@ -5266,6 +5266,111 @@ function initProfileNovaTilt() {
 }
 
 
+async function getMyProfileTitle() {
+  const { data, error } = await sb.rpc("get_my_profile_title");
+  if (error) {
+    console.warn("No se pudo cargar el título propio:", error);
+    return null;
+  }
+  return data?.item_id ? data : null;
+}
+
+async function getPublicProfileTitle(userId) {
+  if (!userId) return null;
+  const { data, error } = await sb.rpc("get_profile_title", { p_user_id:userId });
+  if (error) {
+    console.warn("No se pudo cargar el título público:", error);
+    return null;
+  }
+  return data?.item_id ? data : null;
+}
+
+function renderProfileTitleInline(title) {
+  if (!title?.item_id) return "";
+  return `
+    <div style="
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:5px;
+      padding:4px 9px;
+      border-radius:999px;
+      border:1px solid rgba(250,204,21,.22);
+      background:rgba(250,204,21,.06);
+      color:var(--gold);
+      font-family:'JetBrains Mono',monospace;
+      font-size:9px;
+      font-weight:900;
+      letter-spacing:.04em;
+      text-transform:uppercase;
+    ">
+      <span style="font-size:13px;">${title.icon || "🏷️"}</span>
+      ${escapeHtml(title.name || "Título")}
+    </div>`;
+}
+
+async function handleEquipProfileTitle(itemId) {
+  const { data, error } = await sb.rpc("equip_profile_title", { p_item_id:itemId });
+
+  if (error || !data?.ok) {
+    const msgs = {
+      titulo_no_disponible:"Este título ya no está disponible.",
+      titulo_no_desbloqueado:"Primero tenés que conseguir este título.",
+      not_authenticated:"Volvé a iniciar sesión."
+    };
+    showToast(msgs[data?.error] || "No se pudo equipar el título");
+    return;
+  }
+
+  showToast(`🏷️ Título equipado: ${data.title || "listo"}`);
+  window.__myProfileTitle = data;
+  closeManagedModal();
+  await renderProfile();
+}
+
+async function handleUnequipProfileTitle() {
+  const { data, error } = await sb.rpc("unequip_profile_title");
+
+  if (error || !data?.ok) {
+    showToast("No se pudo quitar el título");
+    return;
+  }
+
+  window.__myProfileTitle = null;
+  showToast("Título quitado");
+  closeManagedModal();
+  await renderProfile();
+}
+
+function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "") {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) openMyMedalsPanel()">
+      <div class="modal-box" style="max-width:350px;">
+        <div class="modal-box-body" style="padding:26px;text-align:center;">
+          <div style="font-size:50px;margin-bottom:8px;">${icon || "🏷️"}</div>
+          <h2 style="margin:0 0 6px;">${escapeHtml(name || "Título")}</h2>
+          <div style="font-size:10px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:900;">
+            TÍTULO DE PERFIL
+          </div>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
+            Mostralo debajo de tu nombre para darle una identidad extra a tu perfil.
+          </p>
+          ${obtainedAt ? `<div style="font-size:9px;color:var(--text-dim);margin-top:10px;">Obtenido ${new Date(obtainedAt).toLocaleDateString("es-AR")}</div>` : ""}
+          <div style="display:flex;gap:8px;margin-top:18px;">
+            <button class="btn-outline" style="flex:1;" onclick="openMyMedalsPanel()">Volver</button>
+            ${equipped
+              ? `<button class="btn" style="flex:1;" onclick="handleUnequipProfileTitle()">Quitar</button>`
+              : `<button class="btn" style="flex:1;" onclick="handleEquipProfileTitle('${itemId}')">Equipar</button>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+
 async function getEquippedProfileMedals(userId) {
   if (!userId) return [];
 
@@ -5588,7 +5693,11 @@ async function renderProfile() {
     .eq("followed_id", currentUser.id);
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
-  const equippedBadges = await getEquippedProfileMedals(currentUser.id);
+  const [equippedBadges, equippedTitle] = await Promise.all([
+    getEquippedProfileMedals(currentUser.id),
+    getMyProfileTitle()
+  ]);
+  window.__myProfileTitle = equippedTitle;
 
   const videoIds = videos.map(v => v.id);
   const [{ data: sessions }, { data: likes }] = await Promise.all([
@@ -5775,6 +5884,7 @@ async function renderProfile() {
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
             <div class="handle">Tu perfil en LiveScroll</div>
+            ${renderProfileTitleInline(equippedTitle)}
             ${renderEquippedMedalsInline(equippedBadges, true)}
           </div>
         </div>
@@ -6558,14 +6668,20 @@ async function openMyMedalsPanel() {
     { data: badgeClaims },
     { data: unlockedEmojis },
     { data: storeEmojis },
-    { data: emojiClaims }
+    { data: emojiClaims },
+    { data: unlockedItems },
+    { data: titleItems },
+    equippedTitle
   ] = await Promise.all([
     sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
     getEquippedProfileMedals(currentUser.id),
     sb.from("user_store_badge_claims").select("badge_id,serial_number,claimed_at").eq("user_id", currentUser.id),
     sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
     sb.from("store_emojis").select("id,emoji,name,rarity,is_limited,stock_total"),
-    sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id)
+    sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_items").select("item_id,unlocked_at").eq("user_id", currentUser.id),
+    sb.from("store_items").select("id,category,icon,name").eq("category", "title"),
+    getMyProfileTitle()
   ]);
 
   const storeBadgeByName = {};
@@ -6618,7 +6734,26 @@ async function openMyMedalsPanel() {
     };
   });
 
-  window.__collection568Items = [...normalizedBadges, ...normalizedEmojis];
+  const unlockedItemById = {};
+  (unlockedItems || []).forEach(i => { unlockedItemById[i.item_id] = i; });
+
+  const normalizedTitles = (titleItems || [])
+    .filter(t => unlockedItemById[t.id])
+    .map(t => ({
+      type:"title",
+      item_id:t.id,
+      icon:t.icon || "🏷️",
+      name:t.name || "Título",
+      rarity:null,
+      description:"Título equipable para mostrar debajo de tu nombre.",
+      is_limited:false,
+      stock_total:null,
+      serial_number:null,
+      obtained_at:unlockedItemById[t.id]?.unlocked_at || null,
+      equipped:equippedTitle?.item_id === t.id
+    }));
+
+  window.__collection568Items = [...normalizedBadges, ...normalizedEmojis, ...normalizedTitles];
   // La colección se reconstruye desde Supabase cada vez que se abre,
   // evitando mostrar stock/seriales viejos después de una compra.
   window.__collection568Filter = "all";
@@ -6633,7 +6768,7 @@ async function openMyMedalsPanel() {
           <div>
             <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
             <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
-              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${normalizedBadges.length} medallas · ${normalizedEmojis.length} emojis
+              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${normalizedBadges.length} medallas · ${normalizedEmojis.length} emojis · ${normalizedTitles.length} títulos
             </div>
           </div>
           <button type="button" onclick="closeManagedModal()"
@@ -6645,6 +6780,7 @@ async function openMyMedalsPanel() {
             <button class="btn-outline ls-collection-filter active" data-filter="all" onclick="setCollection568Filter('all',this)" style="padding:6px 9px;font-size:10px;">Todos</button>
             <button class="btn-outline ls-collection-filter" data-filter="badge" onclick="setCollection568Filter('badge',this)" style="padding:6px 9px;font-size:10px;">Medallas</button>
             <button class="btn-outline ls-collection-filter" data-filter="emoji" onclick="setCollection568Filter('emoji',this)" style="padding:6px 9px;font-size:10px;">Emojis</button>
+            <button class="btn-outline ls-collection-filter" data-filter="title" onclick="setCollection568Filter('title',this)" style="padding:6px 9px;font-size:10px;">Títulos</button>
             <button class="btn-outline ls-collection-filter" data-filter="limited" onclick="setCollection568Filter('limited',this)" style="padding:6px 9px;font-size:10px;">Limitados</button>
             <button class="btn-outline ls-collection-filter" data-filter="top" onclick="setCollection568Filter('top',this)" style="padding:6px 9px;font-size:10px;">Legendarios+</button>
           </div>
@@ -6700,6 +6836,7 @@ function renderCollection568Grid() {
 
   if (filter === "badge") items = items.filter(i => i.type === "badge");
   if (filter === "emoji") items = items.filter(i => i.type === "emoji");
+  if (filter === "title") items = items.filter(i => i.type === "title");
   if (filter === "limited") items = items.filter(i => i.is_limited);
   if (filter === "top") items = items.filter(i => ["legendaria","exclusiva"].includes(i.rarity));
 
@@ -6735,6 +6872,7 @@ function renderCollection568Grid() {
       all:"Todos",
       badge:"Medallas",
       emoji:"Emojis",
+      title:"Títulos",
       limited:"Limitados",
       top:"Legendarios y exclusivos"
     };
@@ -6752,7 +6890,13 @@ function renderCollection568Grid() {
 
   const renderItem = (item) => {
     const rarityClass=item.rarity ? getProfileMedalRarityClass(item.rarity) : "";
-    const rarityLabel=item.rarity ? getProfileMedalRarityLabel(item.rarity) : (item.type==="emoji" ? "Emoji" : "Logro");
+    const rarityLabel=item.rarity
+      ? getProfileMedalRarityLabel(item.rarity)
+      : item.type==="emoji"
+        ? "Emoji"
+        : item.type==="title"
+          ? "Título"
+          : "Logro";
     const rarityColor =
       item.rarity === "rara" ? "#7dd3fc" :
       item.rarity === "epica" ? "#c084fc" :
@@ -6763,12 +6907,14 @@ function renderCollection568Grid() {
 
     const onclick = item.type === "badge"
       ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
-      : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
+      : item.type === "title"
+        ? `openTitleDetail('${item.item_id}','${escapeHtml(item.name)}','${escapeHtml(item.icon)}',${item.equipped ? "true" : "false"},'${escapeHtml(item.obtained_at || "")}')`
+        : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
 
     return `
       <button type="button" onclick="${onclick}"
         style="position:relative;background:var(--panel-2);border:1px solid ${item.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
-        ${item.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">EQUIPADA</div>` : ""}
+        ${item.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">${item.type === "title" ? "EQUIPADO" : "EQUIPADA"}</div>` : ""}
         <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
           ${item.icon}
         </div>
@@ -6826,7 +6972,10 @@ async function viewPublicProfile(username) {
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
   const isFollowing = !!amIFollowing;
-  const theirEquippedBadges = await getEquippedProfileMedals(profile.id);
+  const [theirEquippedBadges, theirTitle] = await Promise.all([
+    getEquippedProfileMedals(profile.id),
+    getPublicProfileTitle(profile.id)
+  ]);
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
@@ -6851,6 +7000,7 @@ async function viewPublicProfile(username) {
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle">Perfil público</div>
+            ${renderProfileTitleInline(theirTitle)}
             ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
           </div>
         </div>
@@ -8761,7 +8911,7 @@ async function renderStore() {
     </div>
 
     ${itemsByCategory.length ? itemsByCategory.map(([category, items]) => `
-      <h3 style="margin-top:24px;">✨ ${escapeHtml(category)}</h3>
+      <h3 style="margin-top:24px;">${String(category).toLowerCase() === "title" ? "🏷️ Títulos de perfil" : `✨ ${escapeHtml(category)}`}</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
         ${items.map(it => `
           <div class="form-card" style="text-align:center;">
@@ -8871,7 +9021,7 @@ async function handleBuyStoreItem(itemId) {
   }
   await loadProfile();
   updateBalanceUI();
-  showToast("¡Compra realizada!");
+  showToast("¡Compra realizada! Revisá Mi colección para equiparlo.");
   renderStore();
 }
 

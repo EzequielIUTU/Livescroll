@@ -2295,12 +2295,13 @@ function ensureSafeMobileUpgradeStyles() {
     .ls-upload-preview-safe {
       display:none;
       position:relative;
-      margin:12px auto 0;
+      margin:12px 0 0;
       width:100%;
       max-width:100%;
-      min-height:110px;
-      max-height:460px;
+      min-width:0;
+      height:clamp(190px, 34vw, 340px);
       overflow:hidden;
+      box-sizing:border-box;
       border-radius:12px;
       border:1px solid var(--border);
       background:#050607;
@@ -2312,27 +2313,35 @@ function ensureSafeMobileUpgradeStyles() {
       display:flex;
     }
 
-    /* No forzamos 9:16, 16:9 ni ninguna caja fija.
-       El VIDEO conserva su proporción real y la caja solo lo centra. */
+    /* Preview estable:
+       la CAJA aprovecha todo el ancho disponible y nunca se sale del formulario.
+       El video se adapta dentro sin recortarse. */
     .ls-upload-preview-safe video {
       display:block;
-      width:auto;
-      height:auto;
+      width:100%;
+      height:100%;
+      min-width:0;
       max-width:100%;
-      max-height:460px;
+      max-height:100%;
       object-fit:contain;
+      object-position:center center;
       background:#000;
-      margin:auto;
+      margin:0;
+      box-sizing:border-box;
     }
 
     @media (max-width:700px) {
       .ls-upload-preview-safe {
-        max-height:320px;
+        width:100%;
+        height:190px;
+        max-height:190px;
+        margin-left:0;
+        margin-right:0;
       }
 
       .ls-upload-preview-safe video {
-        max-width:100%;
-        max-height:320px;
+        width:100%;
+        height:100%;
       }
     }
 
@@ -4642,6 +4651,9 @@ async function renderUpload() {
         border-radius:16px;
         border:1px solid var(--border);
         padding:18px;
+        min-width:0;
+        overflow:hidden;
+        box-sizing:border-box;
       ">
         <div id="linkFields">
           <div style="font-size:11px;font-weight:800;margin-bottom:12px;">🔗 Video desde plataforma</div>
@@ -4705,7 +4717,7 @@ async function renderUpload() {
               LiveScroll te ofrecerá recortarlo antes de subirlo.
             </p>
 
-            <div id="uploadPreviewSafe" class="ls-upload-preview-safe" style="margin-top:12px;">
+            <div id="uploadPreviewSafe" class="ls-upload-preview-safe" style="margin-top:12px;width:100%;max-width:100%;min-width:0;">
               <div class="tag">Vista previa</div>
               <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
               <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>

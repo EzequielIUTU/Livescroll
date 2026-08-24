@@ -10810,13 +10810,17 @@ async function openAdminSecurityIncidentDetail(caseCode) {
     return;
   }
 
+  const canReview = incident.status === "pending";
+  const canAuthorize = ["pending", "reviewing"].includes(incident.status);
+  const canReject = ["pending", "reviewing"].includes(incident.status);
+
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
   wrap.innerHTML = `
     <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:320;">
       <div class="modal-box" style="
-        max-width:540px;
+        max-width:560px;
         max-height:90dvh;
         overflow:hidden;
         display:flex;
@@ -10866,26 +10870,124 @@ async function openAdminSecurityIncidentDetail(caseCode) {
             Estado actual: ${escapeHtml(getAdminSecurityStatusLabel(incident.status))}
           </div>
 
-          <div style="
-            margin-top:14px;
-            padding:11px 12px;
-            border:1px solid rgba(250,204,21,.20);
-            background:rgba(250,204,21,.04);
-            border-radius:11px;
-            color:var(--text-dim);
-            font-size:10px;
-            line-height:1.5;
-          ">
-            🔐 La autorización de recuperación con código de 6 dígitos se conecta en el próximo paso.
-            Por ahora este panel es de revisión y lectura segura.
-          </div>
+          ${incident.status === "recovery_authorized" ? `
+            <div style="
+              margin-top:14px;
+              padding:12px;
+              border:1px solid rgba(34,197,94,.22);
+              background:rgba(34,197,94,.05);
+              border-radius:11px;
+              color:var(--text-dim);
+              font-size:10px;
+              line-height:1.5;
+            ">
+              🔐 Recuperación autorizada. El código temporal fue generado por el servidor,
+              vence en 5 minutos y tiene un máximo de 5 intentos.
+            </div>
+          ` : ""}
         </div>
 
-        <div class="modal-box-footer">
-          <button class="btn-outline" style="width:100%;" onclick="closeManagedModal()">Cerrar</button>
+        <div class="modal-box-footer" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;">
+          ${canReview ? `
+            <button class="btn-outline"
+              onclick="adminSetSecurityIncidentStatus('${escapeHtml(incident.case_code)}','reviewing')">
+              🔎 En revisión
+            </button>
+          ` : ""}
+
+          ${canAuthorize ? `
+            <button class="btn"
+              onclick="adminAuthorizeSecurityRecovery('${escapeHtml(incident.case_code)}')">
+              🔐 Autorizar recuperación
+            </button>
+          ` : ""}
+
+          ${canReject ? `
+            <button class="btn-outline"
+              style="color:var(--red);border-color:rgba(248,113,113,.35);"
+              onclick="adminRejectSecurityIncident('${escapeHtml(incident.case_code)}')">
+              ✕ Rechazar
+            </button>
+          ` : ""}
+
+          <button class="btn-outline" onclick="closeManagedModal()">Cerrar</button>
         </div>
       </div>
     </div>`;
+}
+
+async function adminSetSecurityIncidentStatus(caseCode, status) {
+  const { data, error } = await sb.rpc("admin_set_security_incident_status", {
+    p_case_code: caseCode,
+    p_status: status,
+    p_admin_notes: null
+  });
+
+  if (error || !data?.ok) {
+    showToast("No pudimos actualizar el caso");
+    return;
+  }
+
+  showToast(status === "reviewing" ? "Caso marcado En revisión" : "Caso actualizado");
+  closeManagedModal();
+  await renderAdmin();
+}
+
+async function adminRejectSecurityIncident(caseCode) {
+  if (!confirm("¿Rechazar este reporte de seguridad?")) return;
+
+  const note = prompt("Motivo interno del rechazo (opcional):", "") ?? null;
+
+  const { data, error } = await sb.rpc("admin_set_security_incident_status", {
+    p_case_code: caseCode,
+    p_status: "rejected",
+    p_admin_notes: note
+  });
+
+  if (error || !data?.ok) {
+    showToast("No pudimos rechazar el caso");
+    return;
+  }
+
+  showToast("Reporte rechazado");
+  closeManagedModal();
+  await renderAdmin();
+}
+
+async function adminAuthorizeSecurityRecovery(caseCode) {
+  if (!confirm(
+    "¿Autorizar recuperación para este caso?\\n\\n" +
+    "Se generará un código temporal de 6 dígitos, válido por 5 minutos, " +
+    "y se enviará al correo de la cuenta."
+  )) return;
+
+  showToast("Generando código temporal...");
+
+  const { data, error } = await sb.functions.invoke("security-recovery", {
+    body: {
+      action: "issue_code",
+      case_code: caseCode
+    }
+  });
+
+  if (error || !data?.ok) {
+    console.error("security-recovery:", error, data);
+
+    const msg =
+      data?.error === "no_autorizado" ? "La función no reconoció tu cuenta como Admin" :
+      data?.error === "case_not_found" ? "No encontramos ese caso" :
+      data?.error === "case_not_recoverable" ? "Ese caso ya no admite recuperación" :
+      data?.error === "email_send_failed" ? "Se generó el código pero falló el envío del correo" :
+      data?.error === "resend_not_configured" ? "Falta configurar Resend en la función" :
+      "No pudimos autorizar la recuperación";
+
+    showToast(msg);
+    return;
+  }
+
+  showToast("Código temporal enviado ✓");
+  closeManagedModal();
+  await renderAdmin();
 }
 
 function organizeAdminPanel() {

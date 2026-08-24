@@ -4105,10 +4105,13 @@ function showChangelogModal(entries) {
     "5.8.1":"SECURITY",
     "5.8.2":"FINANCIAL",
     "5.8.6":"CREATOR ACCESS",
-    "5.9.0":"CORE",
+    "5.8.7":"DIRECTOS CLEANUP",
+    "5.8.8":"MOBILE STABILITY",
+    "5.8.9":"ROAD TO 5.9",
+    "5.9.0":"ROAD TO 6",
     "6.0.0":"NEW ERA"
   };
-  const stage = stageNames[newestLabel] || "NEXT ERA";
+  const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
 
   const formatLaunchDate = (value) => {
     if (!value) return "";
@@ -4129,7 +4132,7 @@ function showChangelogModal(entries) {
         <div class="ls-next-era-scan"></div>
 
         <div class="ls-next-era-head">
-          <div class="ls-next-era-kicker">LIVE SCROLL · NEXT ERA</div>
+          <div class="ls-next-era-kicker">LIVE SCROLL · ACTUALIZACIÓN</div>
           <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `v${escapeHtml(newestLabel)} · ${stage}`}</h2>
           <div class="ls-next-era-sub">
             ${multipleVersions
@@ -4142,6 +4145,10 @@ function showChangelogModal(entries) {
                     ? "Los puntos evolucionan: más recompensas, Boost más accesible y una economía más clara."
                     : newestLabel === "5.8.6"
                       ? "Usuarios y Creadores ahora tienen accesos, perfiles y herramientas claramente diferenciados."
+                    : newestLabel === "5.8.7"
+                      ? "Directos se simplifica y queda enfocado en las integraciones de Kick y Twitch."
+                    : newestLabel === "5.8.8"
+                      ? "Una actualización enfocada en estabilidad móvil, pantallas verticales y navegación más segura."
                     : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
           </div>
         </div>

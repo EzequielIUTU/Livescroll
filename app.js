@@ -5288,7 +5288,7 @@ function switchTab(tab) {
   if (tab === "users") renderUsersDirectory();
   if (tab === "directos") renderDirectos(renderToken);
   if (tab === "wallet") renderWallet();
-  if (tab === "plans") renderPlans();
+  if (tab === "plans") renderPlans(renderToken);
   if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
@@ -13513,11 +13513,28 @@ async function loadPlans() {
   return plansCache;
 }
 
-async function renderPlans() {
+async function renderPlans(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando planes...</p>`;
 
-  const { data: paymentInfo } = await sb.from("app_text_config").select("*");
+  // Planes, datos de pago y solicitudes no dependen entre sí. Al cargarlos
+  // juntos evitamos tres esperas consecutivas cada vez que se abre la sección.
+  const [paymentResult, plans, requestsResult] = await Promise.all([
+    sb.from("app_text_config")
+      .select("key,value")
+      .in("key", ["plans_visibility", "payment_cvu", "payment_alias"]),
+    loadPlans(),
+    sb.from("subscription_requests")
+      .select("*")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending: false })
+      .limit(5)
+  ]);
+
+  // Una respuesta vieja no debe reemplazar la pestaña que el usuario abrió después.
+  if (renderToken !== lsTabRenderToken || currentTab !== "plans") return;
+
+  const paymentInfo = paymentResult?.data || [];
   const plansVisibility = paymentInfo?.find(c => c.key === "plans_visibility")?.value || "open";
 
   if (plansVisibility === "closed" && !currentProfile.is_admin) {
@@ -13530,16 +13547,9 @@ async function renderPlans() {
     return;
   }
 
-  const plans = await loadPlans();
   const cvu = paymentInfo?.find(c => c.key === "payment_cvu")?.value || "—";
   const alias = paymentInfo?.find(c => c.key === "payment_alias")?.value || "—";
-
-  const { data: myRequests } = await sb
-    .from("subscription_requests")
-    .select("*")
-    .eq("user_id", currentUser.id)
-    .order("created_at", { ascending: false })
-    .limit(5);
+  const myRequests = requestsResult?.data || [];
 
   main.innerHTML = `
     <h1 class="page-title">Planes</h1>

@@ -2988,65 +2988,47 @@ async function acknowledgeRoadTo6Teaser() {
 
 
 const tutorialSteps = [
-  { icon: "👋", title: "¡Bienvenido a LiveScroll!", text: "Acá subís y mirás clips de Kick, Twitch, YouTube y TikTok, y ganás puntos por cada cosa que hacés." },
-  { icon: "🎬", title: "Subí tus clips", text: "Compartí el link de tu video favorito o subí tu propio archivo. Ganás puntos al instante." },
-  { icon: "👀", title: "Mirá y ganá", text: "Cada minuto que mirás contenido de otros usuarios suma puntos — y si ellos miran el tuyo, también ganás vos." },
-  { icon: "🔴", title: "Directos", text: "Fijate quién de la comunidad está transmitiendo ahora mismo en Kick o Twitch, en el apartado Directos." },
-  { icon: "🛍️", title: "Tienda y racha diaria", text: "Entrá todos los días para sumar tu racha, y usá tus puntos en la Tienda para desbloquear emojis y beneficios." },
-  { icon: "🚀", title: "¡Listo, a explorar!", text: "Eso es todo lo básico. El resto lo vas descubriendo scrolleando. ¡Que lo disfrutes!" },
+  {icon:"👋",tag:"BIENVENIDA",title:"Tu LiveScroll, en pocos pasos",text:"Te mostramos lo esencial para empezar sin llenarte de información.",demo:"feed"},
+  {icon:"✨",tag:"DESCUBRIR",title:"Para ti",text:"Deslizá para descubrir clips y creadores de la comunidad.",demo:"feed"},
+  {icon:"❤️",tag:"COMUNIDAD",title:"Participá a tu manera",text:"Dale Me gusta, comentá, seguí perfiles y compartí lo que te interese.",demo:"actions"},
+  {icon:"👤",tag:"TU ESPACIO",title:"Perfil y notificaciones",text:"Administrá tu perfil y usá la campanita para enterarte de lo importante.",demo:"profile"},
+  {icon:"⚙️",tag:"A TU MEDIDA",title:"Configuración y accesibilidad",text:"Ajustá Visión cómoda, contraste y fuerza del texto. También se aplica a Novedades y carteles.",demo:"settings"},
+  {icon:"🚀",tag:"TODO LISTO",title:"Empezá a explorar",text:"Ya conocés lo principal. Podés volver a abrir este tutorial desde el menú cuando quieras.",demo:"ready"}
 ];
 let tutorialStepIndex = 0;
 
-function showTutorialModal() {
-  tutorialStepIndex = 0;
-  const wrap = document.getElementById("globalModalWrap");
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:135;">
-      <div class="modal-box" id="tutorialBox" style="max-width:380px;">
-        <div class="modal-box-header"><h2 id="tutorialStepTitle"></h2></div>
-        <div class="modal-box-body" id="tutorialStepBody" style="text-align:center;"></div>
-        <div class="modal-box-footer">
-          <div style="display:flex; justify-content:center; gap:6px; margin-bottom:12px;" id="tutorialDots"></div>
-          <div style="display:flex; gap:10px;">
-            <button class="btn-outline" id="tutorialSkipBtn" onclick="handleAcceptTutorial()" style="flex:1;">Saltear</button>
-            <button class="btn" id="tutorialNextBtn" onclick="tutorialNextStep()" style="flex:1;">Siguiente</button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  renderTutorialStep();
+function installTutorialV2Styles(){
+  if(document.getElementById("lsTutorialV2Styles")) return;
+  const s=document.createElement("style"); s.id="lsTutorialV2Styles";
+  s.textContent=`
+  .ls-tut-overlay{z-index:135;background:rgba(3,5,9,.78);backdrop-filter:blur(9px)}
+  .ls-tut-card{width:min(92vw,470px);max-width:470px!important;overflow:hidden;border:1px solid rgba(255,255,255,.11);box-shadow:0 28px 80px rgba(0,0,0,.46)}
+  .ls-tut-head{padding:18px 20px 8px;display:flex;justify-content:space-between;gap:12px}.ls-tut-tag{color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.16em;margin-bottom:5px}.ls-tut-head h2{margin:0;font-size:20px}.ls-tut-count{height:max-content;border:1px solid var(--border);border-radius:999px;padding:6px 9px;color:var(--text-dim);font-size:9px;font-weight:850}
+  .ls-tut-body{padding:8px 20px 15px}.ls-tut-demo{min-height:180px;border:1px solid var(--border);border-radius:18px;background:radial-gradient(circle at 50% 10%,rgba(218,165,32,.12),transparent 40%),rgba(255,255,255,.012);display:grid;place-items:center;padding:18px;margin-bottom:14px}.ls-tut-icon{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:23px;margin:0 auto 10px;background:rgba(218,165,32,.09);border:1px solid rgba(218,165,32,.20)}.ls-tut-copy{text-align:center;color:var(--text-dim);font-size:13px;line-height:1.6;margin:0}
+  .ls-tut-footer{padding:13px 20px 18px;border-top:1px solid var(--border)}.ls-tut-progress{display:flex;gap:5px;margin-bottom:12px}.ls-tut-progress i{height:5px;flex:1;border-radius:99px;background:var(--border)}.ls-tut-progress i.on{background:var(--gold)}.ls-tut-buttons{display:grid;grid-template-columns:1fr 1.2fr;gap:8px}.ls-tut-buttons.one{grid-template-columns:1fr}.ls-tut-skip{width:100%;margin-top:9px;border:0;background:transparent;color:var(--text-dim);font:inherit;font-size:10px;cursor:pointer}
+  .ls-demo-phone{width:min(235px,72vw);padding:12px;border-radius:17px;background:#090b10;border:1px solid rgba(255,255,255,.1)}.ls-demo-top{display:flex;justify-content:space-between;font-size:10px;margin-bottom:9px}.ls-demo-top b:last-child{color:var(--gold)}.ls-demo-video{height:105px;border-radius:11px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,rgba(218,165,32,.22),rgba(129,92,246,.12)),#121620}.ls-demo-row{text-align:right;padding-top:9px;font-size:16px}
+  .ls-demo-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}.ls-demo-actions div{padding:14px 4px;border:1px solid var(--border);border-radius:12px;text-align:center;font-size:22px}.ls-demo-actions small{display:block;font-size:8px;color:var(--text-dim);margin-top:6px}.ls-demo-profile{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:1px solid var(--border);border-radius:14px}.ls-demo-avatar{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#111;font-weight:950}.ls-demo-profile span{flex:1;font-size:11px}.ls-demo-profile small{display:block;color:var(--text-dim);margin-top:4px}.ls-demo-settings{width:100%;display:grid;gap:9px}.ls-demo-settings div{padding:10px 12px;border:1px solid var(--border);border-radius:11px;font-size:9px}.ls-demo-settings b{display:block;color:var(--gold);margin-top:4px}.ls-demo-settings i{display:block;height:6px;background:var(--border);border-radius:99px;margin-top:7px;overflow:hidden}.ls-demo-settings em{display:block;height:100%;background:var(--gold)}.ls-demo-ready{text-align:center}.ls-demo-ready strong{width:68px;height:68px;border-radius:21px;display:grid;place-items:center;margin:0 auto 12px;background:var(--gold);color:#111;font-size:21px}.ls-demo-ready small{display:block;color:var(--text-dim);margin-top:4px}
+  @media(max-width:520px){.ls-tut-card{width:calc(100vw - 22px);max-height:92dvh}.ls-tut-head{padding:15px 15px 7px}.ls-tut-body{padding:7px 15px 12px}.ls-tut-footer{padding:11px 15px 15px}.ls-tut-demo{min-height:160px;padding:13px}.ls-demo-actions{grid-template-columns:repeat(2,1fr)}}`;
+  document.head.appendChild(s);
 }
-
-function renderTutorialStep() {
-  const step = tutorialSteps[tutorialStepIndex];
-  const isLast = tutorialStepIndex === tutorialSteps.length - 1;
-
-  document.getElementById("tutorialStepTitle").textContent = step.title;
-  document.getElementById("tutorialStepBody").innerHTML = `
-    <div style="font-size:56px; margin:10px 0 18px;">${step.icon}</div>
-    <p style="color:var(--text-dim); font-size:14px; line-height:1.6; margin:0 0 8px;">${escapeHtml(step.text)}</p>`;
-  document.getElementById("tutorialDots").innerHTML = tutorialSteps.map((_, i) =>
-    `<div style="width:${i === tutorialStepIndex ? 18 : 6}px; height:6px; border-radius:4px; background:${i === tutorialStepIndex ? "var(--gold)" : "var(--border)"}; transition:width 0.2s ease;"></div>`
-  ).join("");
-  document.getElementById("tutorialSkipBtn").classList.toggle("hidden", isLast);
-  document.getElementById("tutorialNextBtn").textContent = isLast ? "¡Empezar!" : "Siguiente";
-  document.getElementById("tutorialNextBtn").style.flex = isLast ? "1 1 100%" : "1";
+function tutorialDemo(type){
+  if(type==="actions") return `<div class="ls-demo-actions"><div>♡<small>Me gusta</small></div><div>💬<small>Comentar</small></div><div>＋<small>Seguir</small></div><div>↗<small>Compartir</small></div></div>`;
+  if(type==="profile") return `<div class="ls-demo-profile"><div class="ls-demo-avatar">LS</div><span><b>Tu perfil</b><small>Clips · Medallas · Actividad</small></span><b>🔔</b></div>`;
+  if(type==="settings") return `<div class="ls-demo-settings"><div>Visión cómoda<b>Grande</b></div><div>Contraste<i><em style="width:76%"></em></i></div><div>Fuerza del texto<i><em style="width:62%"></em></i></div></div>`;
+  if(type==="ready") return `<div class="ls-demo-ready"><strong>LS</strong><b>Todo preparado</b><small>Tu experiencia empieza acá.</small></div>`;
+  return `<div class="ls-demo-phone"><div class="ls-demo-top"><b>LiveScroll</b><b>Para ti</b></div><div class="ls-demo-video">▶</div><div class="ls-demo-row">♡　💬　↗</div></div>`;
 }
-
-function tutorialNextStep() {
-  if (tutorialStepIndex < tutorialSteps.length - 1) {
-    tutorialStepIndex++;
-    renderTutorialStep();
-  } else {
-    handleAcceptTutorial();
-  }
+function showTutorialModal(){
+  tutorialStepIndex=0; installTutorialV2Styles(); const wrap=document.getElementById("globalModalWrap"); if(!wrap)return;
+  wrap.innerHTML=`<div class="modal-overlay ls-tut-overlay ls-modal-locked" data-modal-locked="1"><div class="modal-box ls-tut-card"><div class="ls-tut-head"><div><div id="tutorialTag" class="ls-tut-tag"></div><h2 id="tutorialStepTitle"></h2></div><div id="tutorialCount" class="ls-tut-count"></div></div><div class="ls-tut-body"><div id="tutorialDemo" class="ls-tut-demo"></div><div id="tutorialIcon" class="ls-tut-icon"></div><p id="tutorialText" class="ls-tut-copy"></p></div><div class="ls-tut-footer"><div id="tutorialProgress" class="ls-tut-progress"></div><div id="tutorialButtons" class="ls-tut-buttons"><button id="tutorialBack" class="btn-outline" onclick="tutorialPreviousStep()">Anterior</button><button id="tutorialNext" class="btn" onclick="tutorialNextStep()">Siguiente</button></div><button id="tutorialSkip" class="ls-tut-skip" onclick="handleAcceptTutorial()">Omitir tutorial</button></div></div></div>`; renderTutorialStep();
 }
-
-async function handleAcceptTutorial() {
-  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "tutorial" });
-  document.getElementById("globalModalWrap").innerHTML = "";
-  checkPendingContent(); // por si también hay changelog pendiente, se muestra después
+function renderTutorialStep(){
+  const x=tutorialSteps[tutorialStepIndex],first=tutorialStepIndex===0,last=tutorialStepIndex===tutorialSteps.length-1;
+  tutorialTag.textContent=x.tag; tutorialStepTitle.textContent=x.title; tutorialCount.textContent=`${tutorialStepIndex+1} de ${tutorialSteps.length}`; tutorialDemo.innerHTML=window.tutorialDemo(x.demo); tutorialIcon.textContent=x.icon; tutorialText.textContent=x.text; tutorialProgress.innerHTML=tutorialSteps.map((_,i)=>`<i class="${i<=tutorialStepIndex?'on':''}"></i>`).join(""); tutorialBack.style.display=first?"none":""; tutorialNext.textContent=last?"Empezar a explorar":"Siguiente"; tutorialSkip.style.display=last?"none":""; tutorialButtons.classList.toggle("one",first||last);
 }
+function tutorialPreviousStep(){if(tutorialStepIndex>0){tutorialStepIndex--;renderTutorialStep();}}
+function tutorialNextStep(){if(tutorialStepIndex<tutorialSteps.length-1){tutorialStepIndex++;renderTutorialStep();}else handleAcceptTutorial();}
+async function handleAcceptTutorial(){if(currentUser?.id)await sb.rpc("acknowledge_content",{p_user_id:currentUser.id,p_content_key:"tutorial"});const wrap=document.getElementById("globalModalWrap");if(wrap)wrap.innerHTML="";checkPendingContent();}
 
 function showTermsUpdateModal() {
   const wrap = document.getElementById("globalModalWrap");

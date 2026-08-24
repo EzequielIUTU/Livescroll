@@ -3317,9 +3317,9 @@ function installTutorialV31Styles() {
       padding:10px 11px;
       border-radius:10px;
       border:1px solid var(--border);
-      color:var(--text-dim);
-      font-size:11px;
-      line-height:1.45;
+      color:var(--text);
+      font-size:14px;
+      line-height:1.55;
       background:rgba(255,255,255,.02);
     }
 

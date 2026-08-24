@@ -11671,7 +11671,12 @@ async function adminAuthorizeSecurityRecovery(caseCode) {
 
 function organizeAdminPanel() {
   const main = document.getElementById("appView");
-  if (!main || main.dataset.adminOrganized === "1") return;
+  if (!main) return;
+
+  // renderAdmin() reemplaza todo el innerHTML cada vez que se actualiza el panel.
+  // El atributo data-admin-organized queda en appView, por lo que NO debemos
+  // usarlo para impedir una nueva organización: si lo hacemos, después de una
+  // acción Admin el contenido vuelve a quedar todo apilado.
   main.dataset.adminOrganized = "1";
 
   if (!document.getElementById("lsAdminOrganizationStyles")) {

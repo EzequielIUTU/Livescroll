@@ -5285,28 +5285,73 @@ async function getPublicProfileTitle(userId) {
   return data?.item_id ? data : null;
 }
 
-function renderProfileTitleInline(title) {
-  if (!title?.item_id) return "";
+function renderProfileTitleInline(title, isOwnProfile = false) {
+  if (!title?.item_id) {
+    if (!isOwnProfile) return "";
+
+    return `
+      <button
+        type="button"
+        onclick="openMyTitlesFromProfile()"
+        title="Equipar un título"
+        style="
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          width:30px;
+          height:30px;
+          margin-top:5px;
+          border-radius:999px;
+          border:1px solid rgba(34,197,94,.45);
+          background:rgba(34,197,94,.10);
+          color:var(--green);
+          font-size:20px;
+          font-weight:900;
+          cursor:pointer;
+          box-shadow:0 0 14px rgba(34,197,94,.16);
+        "
+      >+</button>`;
+  }
+
   return `
-    <div style="
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      margin-top:5px;
-      padding:4px 9px;
-      border-radius:999px;
-      border:1px solid rgba(250,204,21,.22);
-      background:rgba(250,204,21,.06);
-      color:var(--gold);
-      font-family:'JetBrains Mono',monospace;
-      font-size:9px;
-      font-weight:900;
-      letter-spacing:.04em;
-      text-transform:uppercase;
-    ">
+    <button
+      type="button"
+      ${isOwnProfile ? 'onclick="openMyTitlesFromProfile()"' : ""}
+      title="${isOwnProfile ? "Cambiar título" : "Título de perfil"}"
+      style="
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        margin-top:5px;
+        padding:4px 9px;
+        border-radius:999px;
+        border:1px solid rgba(250,204,21,.22);
+        background:rgba(250,204,21,.06);
+        color:var(--gold);
+        font-family:'JetBrains Mono',monospace;
+        font-size:9px;
+        font-weight:900;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+        ${isOwnProfile ? "cursor:pointer;" : "cursor:default;"}
+      "
+    >
       <span style="font-size:13px;">${title.icon || "🏷️"}</span>
       ${escapeHtml(title.name || "Título")}
-    </div>`;
+    </button>`;
+}
+
+function openMyTitlesFromProfile() {
+  openMyMedalsPanel();
+
+  // Esperamos a que el modal de colección termine de renderizar
+  // y seleccionamos automáticamente la pestaña Títulos.
+  setTimeout(() => {
+    const btn = document.querySelector('.ls-collection-filter[data-filter="title"]');
+    if (btn) {
+      setCollection568Filter("title", btn);
+    }
+  }, 120);
 }
 
 async function handleEquipProfileTitle(itemId) {
@@ -5356,7 +5401,7 @@ function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "") 
             TÍTULO DE PERFIL
           </div>
           <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
-            Mostralo debajo de tu nombre para darle una identidad extra a tu perfil.
+            Este título se muestra debajo de tu nombre tanto en tu perfil como cuando otras personas visitan tu perfil.
           </p>
           ${obtainedAt ? `<div style="font-size:9px;color:var(--text-dim);margin-top:10px;">Obtenido ${new Date(obtainedAt).toLocaleDateString("es-AR")}</div>` : ""}
           <div style="display:flex;gap:8px;margin-top:18px;">
@@ -5884,7 +5929,7 @@ async function renderProfile() {
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
             <div class="handle">Tu perfil en LiveScroll</div>
-            ${renderProfileTitleInline(equippedTitle)}
+            ${renderProfileTitleInline(equippedTitle, true)}
             ${renderEquippedMedalsInline(equippedBadges, true)}
           </div>
         </div>
@@ -7000,7 +7045,7 @@ async function viewPublicProfile(username) {
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle">Perfil público</div>
-            ${renderProfileTitleInline(theirTitle)}
+            ${renderProfileTitleInline(theirTitle, false)}
             ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
           </div>
         </div>

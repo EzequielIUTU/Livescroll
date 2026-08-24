@@ -2558,6 +2558,10 @@ async function renderApp() {
   const appView = document.getElementById("appView");
   if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
 
+  // Empezamos a preparar el Feed mientras resolvemos navegación y planes.
+  // renderFeed reutiliza esta misma promesa, por lo que nunca duplica la consulta.
+  loadFeedVideosCached().catch(() => {});
+
   const [visibilityResult, plans] = await Promise.all([
     sb.rpc("get_app_visibility"),
     loadPlans()
@@ -2612,14 +2616,25 @@ async function renderApp() {
   switchTab("feed");
 
   // Lo secundario ya no bloquea la aparición del Feed.
-  // Realtime se conecta enseguida y el historial se carga en paralelo.
+  // Realtime se conecta enseguida. El resto espera a que el navegador tenga
+  // un pequeño espacio libre para no competir con el primer video.
   subscribeToNotifications();
 
-  Promise.allSettled([
-    loadNotifications(),
-    checkBoostStatus(),
-    checkPendingContent()
-  ]).catch(() => {});
+  const startupUserId = currentUser?.id;
+  const loadSecondaryStartupData = () => {
+    if (!startupUserId || currentUser?.id !== startupUserId) return;
+    Promise.allSettled([
+      loadNotifications(),
+      checkBoostStatus(),
+      checkPendingContent()
+    ]).catch(() => {});
+  };
+
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(loadSecondaryStartupData, { timeout:900 });
+  } else {
+    setTimeout(loadSecondaryStartupData, 250);
+  }
 }
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
@@ -5163,7 +5178,33 @@ const lsPerfCache = {
   profileVideos: { data:null, at:0 },
   profileViewsLedger: { data:null, at:0 }
 };
+let lsFeedLoadPromise = null;
 let lsTabRenderToken = 0;
+
+async function loadFeedVideosCached() {
+  if (lsCacheFresh(lsPerfCache.feed, 45000)) {
+    return { data:lsPerfCache.feed.data, error:null };
+  }
+
+  if (lsFeedLoadPromise) return lsFeedLoadPromise;
+
+  lsFeedLoadPromise = sb
+    .from("videos")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+    .order("created_at", { ascending:false })
+    .limit(20)
+    .then(result => {
+      if (!result.error && result.data) {
+        lsPerfCache.feed = { data:result.data, at:Date.now() };
+      }
+      return result;
+    })
+    .finally(() => {
+      lsFeedLoadPromise = null;
+    });
+
+  return lsFeedLoadPromise;
+}
 
 function renderFastSkeleton(lines = 5, type = "generic") {
   if (type === "feed") {
@@ -5264,25 +5305,9 @@ async function renderFeed(renderToken = lsTabRenderToken) {
     <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
   checkAndShowLoginStreak();
 
-  let videos = null;
-  let error = null;
-
-  if (lsCacheFresh(lsPerfCache.feed, 45000)) {
-    videos = lsPerfCache.feed.data;
-  } else {
-    const result = await sb
-      .from("videos")
-      .select("*, profiles!videos_user_id_fkey(username, plan_id)")
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    videos = result.data;
-    error = result.error;
-
-    if (!error && videos) {
-      lsPerfCache.feed = { data:videos, at:Date.now() };
-    }
-  }
+  const feedResult = await loadFeedVideosCached();
+  const videos = feedResult?.data || [];
+  const error = feedResult?.error;
 
   // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
   if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;

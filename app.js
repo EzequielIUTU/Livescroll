@@ -813,6 +813,141 @@ const LS_I18N = {
     "Seleccionar archivo":"Choose file",
     "Descripción":"Description",
     "Título":"Title"
+    ,"Inicio":"Home"
+    ,"Para Ti":"For You"
+    ,"Siguiendo":"Following"
+    ,"Buscar":"Search"
+    ,"Buscar usuarios":"Search users"
+    ,"Buscar usuarios...":"Search users..."
+    ,"Seguidores":"Followers"
+    ,"Siguiendo":"Following"
+    ,"Seguir":"Follow"
+    ,"Dejar de seguir":"Unfollow"
+    ,"Mensaje":"Message"
+    ,"Compartir":"Share"
+    ,"Me gusta":"Like"
+    ,"Comentar":"Comment"
+    ,"Comentarios":"Comments"
+    ,"Ver comentarios":"View comments"
+    ,"Escribí un comentario...":"Write a comment..."
+    ,"Enviar":"Send"
+    ,"Copiar enlace":"Copy link"
+    ,"Enlace copiado ✓":"Link copied ✓"
+    ,"Reportar":"Report"
+    ,"Reportar video":"Report video"
+    ,"Reportar usuario":"Report user"
+    ,"Bloquear":"Block"
+    ,"Eliminar":"Delete"
+    ,"Eliminar video":"Delete video"
+    ,"¿Eliminar video?":"Delete video?"
+    ,"Esta acción no se puede deshacer.":"This action cannot be undone."
+    ,"Sí, eliminar":"Yes, delete"
+    ,"Volver":"Back"
+    ,"Continuar":"Continue"
+    ,"Confirmar":"Confirm"
+    ,"Listo":"Done"
+    ,"Hecho":"Done"
+    ,"Error":"Error"
+    ,"Reintentar":"Try again"
+    ,"Actualizar":"Refresh"
+    ,"No se pudo cargar":"Could not load"
+    ,"No se pudo completar la acción.":"The action could not be completed."
+    ,"Video publicado ✓":"Video published ✓"
+    ,"Publicando...":"Publishing..."
+    ,"Subiendo...":"Uploading..."
+    ,"Procesando...":"Processing..."
+    ,"Elegir video":"Choose video"
+    ,"Cambiar video":"Change video"
+    ,"Vista previa":"Preview"
+    ,"Privacidad":"Privacy"
+    ,"Público":"Public"
+    ,"Privado":"Private"
+    ,"Solo seguidores":"Followers only"
+    ,"Duración":"Duration"
+    ,"Categoría":"Category"
+    ,"Etiquetas":"Tags"
+    ,"Opcional":"Optional"
+    ,"Tu perfil":"Your profile"
+    ,"Mis videos":"My videos"
+    ,"Videos":"Videos"
+    ,"Puntos":"Points"
+    ,"Puntos disponibles":"Available points"
+    ,"Historial":"History"
+    ,"Actividad":"Activity"
+    ,"Canjear":"Redeem"
+    ,"Canjes":"Redemptions"
+    ,"Solicitar canje":"Request redemption"
+    ,"Monto":"Amount"
+    ,"Mínimo":"Minimum"
+    ,"Estado":"Status"
+    ,"Pendiente":"Pending"
+    ,"Aprobado":"Approved"
+    ,"Rechazado":"Rejected"
+    ,"Pagado":"Paid"
+    ,"Notificaciones":"Notifications"
+    ,"No tenés notificaciones.":"You have no notifications."
+    ,"Marcar como leídas":"Mark as read"
+    ,"Plan actual":"Current plan"
+    ,"Elegir plan":"Choose plan"
+    ,"Activar plan":"Activate plan"
+    ,"Solicitar plan":"Request plan"
+    ,"Código de pago":"Payment code"
+    ,"Enviar solicitud":"Send request"
+    ,"Solicitud enviada ✓":"Request sent ✓"
+    ,"Comprar":"Buy"
+    ,"Comprado":"Purchased"
+    ,"Equipar":"Equip"
+    ,"Equipado":"Equipped"
+    ,"Desequipar":"Unequip"
+    ,"Precio":"Price"
+    ,"Saldo insuficiente":"Insufficient balance"
+    ,"Compra realizada ✓":"Purchase completed ✓"
+    ,"Boost activo":"Boost active"
+    ,"Activar boost":"Activate boost"
+    ,"Horas":"Hours"
+    ,"Días":"Days"
+    ,"Hoy":"Today"
+    ,"Esta semana":"This week"
+    ,"Posición":"Position"
+    ,"Usuario":"User"
+    ,"Sin resultados":"No results"
+    ,"No encontramos usuarios.":"We couldn't find any users."
+    ,"No hay videos todavía.":"There are no videos yet."
+    ,"No hay comentarios todavía.":"There are no comments yet."
+    ,"Sé el primero en comentar.":"Be the first to comment."
+    ,"Editar datos":"Edit details"
+    ,"Cambiar avatar":"Change avatar"
+    ,"Cambiar portada":"Change cover"
+    ,"Nombre":"Name"
+    ,"Sitio web":"Website"
+    ,"Ubicación":"Location"
+    ,"Fecha de nacimiento":"Date of birth"
+    ,"Cambios guardados ✓":"Changes saved ✓"
+    ,"Descartar cambios":"Discard changes"
+    ,"¿Descartar los cambios?":"Discard changes?"
+    ,"Tenés cambios sin guardar.":"You have unsaved changes."
+    ,"Sí, descartar":"Yes, discard"
+    ,"Mantener editando":"Keep editing"
+    ,"Cuenta":"Account"
+    ,"Seguridad":"Security"
+    ,"Apariencia":"Appearance"
+    ,"Accesibilidad":"Accessibility"
+    ,"Cerrar sesión":"Log out"
+    ,"Idioma de la interfaz":"Interface language"
+    ,"Texto":"Text"
+    ,"Tamaño":"Size"
+    ,"Contraste alto":"High contrast"
+    ,"Revisión adicional":"Additional review"
+    ,"ACTUAL":"CURRENT"
+    ,"Reparación de emergencia":"Emergency fix"
+    ,"Todavía no hay novedades publicadas.":"There are no published updates yet."
+    ,"Completamos una nueva revisión interna enfocada en protección, permisos y funcionamiento seguro.":"We completed a new internal review focused on protection, permissions and secure operation."
+    ,"La revisión fue realizada sin modificar la experiencia principal de LiveScroll.":"The review was completed without changing the main LiveScroll experience."
+    ,"Se completaron las etapas de revisión de seguridad S1 a S6-C.":"Security review stages S1 through S6-C were completed."
+    ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"We strengthened session controls, permissions and access to internal information."
+    ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Points, views, plans and sensitive functions were reviewed to reduce unnecessary exposure."
+    ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"Critical logic remains protected server-side and important access requires identity and permission validation."
+
   },
   pt: {
     "Mirar":"Assistir",
@@ -928,6 +1063,140 @@ const LS_I18N = {
     "Seleccionar archivo":"Selecionar arquivo",
     "Descripción":"Descrição",
     "Título":"Título"
+    ,"Inicio":"Início"
+    ,"Para Ti":"Para Você"
+    ,"Siguiendo":"Seguindo"
+    ,"Buscar":"Buscar"
+    ,"Buscar usuarios":"Buscar usuários"
+    ,"Buscar usuarios...":"Buscar usuários..."
+    ,"Seguidores":"Seguidores"
+    ,"Seguir":"Seguir"
+    ,"Dejar de seguir":"Deixar de seguir"
+    ,"Mensaje":"Mensagem"
+    ,"Compartir":"Compartilhar"
+    ,"Me gusta":"Curtir"
+    ,"Comentar":"Comentar"
+    ,"Comentarios":"Comentários"
+    ,"Ver comentarios":"Ver comentários"
+    ,"Escribí un comentario...":"Escreva um comentário..."
+    ,"Enviar":"Enviar"
+    ,"Copiar enlace":"Copiar link"
+    ,"Enlace copiado ✓":"Link copiado ✓"
+    ,"Reportar":"Denunciar"
+    ,"Reportar video":"Denunciar vídeo"
+    ,"Reportar usuario":"Denunciar usuário"
+    ,"Bloquear":"Bloquear"
+    ,"Eliminar":"Excluir"
+    ,"Eliminar video":"Excluir vídeo"
+    ,"¿Eliminar video?":"Excluir vídeo?"
+    ,"Esta acción no se puede deshacer.":"Esta ação não pode ser desfeita."
+    ,"Sí, eliminar":"Sim, excluir"
+    ,"Volver":"Voltar"
+    ,"Continuar":"Continuar"
+    ,"Confirmar":"Confirmar"
+    ,"Listo":"Pronto"
+    ,"Hecho":"Concluído"
+    ,"Error":"Erro"
+    ,"Reintentar":"Tentar novamente"
+    ,"Actualizar":"Atualizar"
+    ,"No se pudo cargar":"Não foi possível carregar"
+    ,"No se pudo completar la acción.":"Não foi possível concluir a ação."
+    ,"Video publicado ✓":"Vídeo publicado ✓"
+    ,"Publicando...":"Publicando..."
+    ,"Subiendo...":"Enviando..."
+    ,"Procesando...":"Processando..."
+    ,"Elegir video":"Escolher vídeo"
+    ,"Cambiar video":"Trocar vídeo"
+    ,"Vista previa":"Prévia"
+    ,"Privacidad":"Privacidade"
+    ,"Público":"Público"
+    ,"Privado":"Privado"
+    ,"Solo seguidores":"Somente seguidores"
+    ,"Duración":"Duração"
+    ,"Categoría":"Categoria"
+    ,"Etiquetas":"Tags"
+    ,"Opcional":"Opcional"
+    ,"Tu perfil":"Seu perfil"
+    ,"Mis videos":"Meus vídeos"
+    ,"Videos":"Vídeos"
+    ,"Puntos":"Pontos"
+    ,"Puntos disponibles":"Pontos disponíveis"
+    ,"Historial":"Histórico"
+    ,"Actividad":"Atividade"
+    ,"Canjear":"Resgatar"
+    ,"Canjes":"Resgates"
+    ,"Solicitar canje":"Solicitar resgate"
+    ,"Monto":"Valor"
+    ,"Mínimo":"Mínimo"
+    ,"Estado":"Status"
+    ,"Pendiente":"Pendente"
+    ,"Aprobado":"Aprovado"
+    ,"Rechazado":"Rejeitado"
+    ,"Pagado":"Pago"
+    ,"Notificaciones":"Notificações"
+    ,"No tenés notificaciones.":"Você não tem notificações."
+    ,"Marcar como leídas":"Marcar como lidas"
+    ,"Plan actual":"Plano atual"
+    ,"Elegir plan":"Escolher plano"
+    ,"Activar plan":"Ativar plano"
+    ,"Solicitar plan":"Solicitar plano"
+    ,"Código de pago":"Código de pagamento"
+    ,"Enviar solicitud":"Enviar solicitação"
+    ,"Solicitud enviada ✓":"Solicitação enviada ✓"
+    ,"Comprar":"Comprar"
+    ,"Comprado":"Comprado"
+    ,"Equipar":"Equipar"
+    ,"Equipado":"Equipado"
+    ,"Desequipar":"Desequipar"
+    ,"Precio":"Preço"
+    ,"Saldo insuficiente":"Saldo insuficiente"
+    ,"Compra realizada ✓":"Compra realizada ✓"
+    ,"Boost activo":"Boost ativo"
+    ,"Activar boost":"Ativar boost"
+    ,"Horas":"Horas"
+    ,"Días":"Dias"
+    ,"Hoy":"Hoje"
+    ,"Esta semana":"Esta semana"
+    ,"Posición":"Posição"
+    ,"Usuario":"Usuário"
+    ,"Sin resultados":"Sem resultados"
+    ,"No encontramos usuarios.":"Não encontramos usuários."
+    ,"No hay videos todavía.":"Ainda não há vídeos."
+    ,"No hay comentarios todavía.":"Ainda não há comentários."
+    ,"Sé el primero en comentar.":"Seja o primeiro a comentar."
+    ,"Editar datos":"Editar dados"
+    ,"Cambiar avatar":"Trocar avatar"
+    ,"Cambiar portada":"Trocar capa"
+    ,"Nombre":"Nome"
+    ,"Sitio web":"Site"
+    ,"Ubicación":"Localização"
+    ,"Fecha de nacimiento":"Data de nascimento"
+    ,"Cambios guardados ✓":"Alterações salvas ✓"
+    ,"Descartar cambios":"Descartar alterações"
+    ,"¿Descartar los cambios?":"Descartar alterações?"
+    ,"Tenés cambios sin guardar.":"Você tem alterações não salvas."
+    ,"Sí, descartar":"Sim, descartar"
+    ,"Mantener editando":"Continuar editando"
+    ,"Cuenta":"Conta"
+    ,"Seguridad":"Segurança"
+    ,"Apariencia":"Aparência"
+    ,"Accesibilidad":"Acessibilidade"
+    ,"Cerrar sesión":"Sair"
+    ,"Idioma de la interfaz":"Idioma da interface"
+    ,"Texto":"Texto"
+    ,"Tamaño":"Tamanho"
+    ,"Contraste alto":"Alto contraste"
+    ,"Revisión adicional":"Revisão adicional"
+    ,"ACTUAL":"ATUAL"
+    ,"Reparación de emergencia":"Correção de emergência"
+    ,"Todavía no hay novedades publicadas.":"Ainda não há novidades publicadas."
+    ,"Completamos una nueva revisión interna enfocada en protección, permisos y funcionamiento seguro.":"Concluímos uma nova revisão interna focada em proteção, permissões e funcionamento seguro."
+    ,"La revisión fue realizada sin modificar la experiencia principal de LiveScroll.":"A revisão foi realizada sem alterar a experiência principal do LiveScroll."
+    ,"Se completaron las etapas de revisión de seguridad S1 a S6-C.":"As etapas de revisão de segurança S1 a S6-C foram concluídas."
+    ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"Reforçamos controles de sessão, permissões e acesso a informações internas."
+    ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Os sistemas de pontos, visualizações, planos e funções sensíveis foram revisados para reduzir exposição desnecessária."
+    ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"A lógica crítica continua protegida no servidor e acessos importantes exigem validação de identidade e permissões."
+
   }
 };
 
@@ -937,7 +1206,36 @@ function getLiveScrollLanguage() {
 
 function lsTranslateExact(value, lang = getLiveScrollLanguage()) {
   if (!value || lang === "es") return value;
-  return LS_I18N[lang]?.[value] || value;
+
+  const dict = LS_I18N[lang] || {};
+  if (dict[value]) return dict[value];
+
+  // Frases del sistema con valores dinámicos frecuentes.
+  let out = String(value);
+
+  const dynamicRules = lang === "en" ? [
+    [/^Ganaste\s+(\d+)\s+puntos?\.?$/i, "You earned $1 points."],
+    [/^Tenés\s+(\d+)\s+puntos?\.?$/i, "You have $1 points."],
+    [/^(\d+)\s+puntos$/i, "$1 points"],
+    [/^Hace\s+(\d+)\s+minutos?$/i, "$1 minutes ago"],
+    [/^Hace\s+(\d+)\s+horas?$/i, "$1 hours ago"],
+    [/^Hace\s+(\d+)\s+días?$/i, "$1 days ago"],
+    [/^v([0-9.]+)\s+·\s+revisión adicional$/i, "v$1 · additional review"]
+  ] : [
+    [/^Ganaste\s+(\d+)\s+puntos?\.?$/i, "Você ganhou $1 pontos."],
+    [/^Tenés\s+(\d+)\s+puntos?\.?$/i, "Você tem $1 pontos."],
+    [/^(\d+)\s+puntos$/i, "$1 pontos"],
+    [/^Hace\s+(\d+)\s+minutos?$/i, "Há $1 minutos"],
+    [/^Hace\s+(\d+)\s+horas?$/i, "Há $1 horas"],
+    [/^Hace\s+(\d+)\s+días?$/i, "Há $1 dias"],
+    [/^v([0-9.]+)\s+·\s+revisión adicional$/i, "v$1 · revisão adicional"]
+  ];
+
+  for (const [regex, replacement] of dynamicRules) {
+    if (regex.test(out)) return out.replace(regex, replacement);
+  }
+
+  return out;
 }
 
 function shouldSkipLiveScrollTranslation(el) {
@@ -993,6 +1291,16 @@ function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
       ? el.dataset.lsI18nTitle
       : lsTranslateExact(el.dataset.lsI18nTitle, lang);
   }
+
+  if (el.getAttribute && el.getAttribute("aria-label")) {
+    const current = el.getAttribute("aria-label");
+    const original = el.dataset.lsI18nAria || current;
+    if (!el.dataset.lsI18nAria) el.dataset.lsI18nAria = original;
+    el.setAttribute(
+      "aria-label",
+      lang === "es" ? el.dataset.lsI18nAria : lsTranslateExact(el.dataset.lsI18nAria, lang)
+    );
+  }
 }
 
 function applyLiveScrollTranslations(root = document) {
@@ -1001,7 +1309,7 @@ function applyLiveScrollTranslations(root = document) {
   translateLiveScrollElement(root, lang);
 
   root.querySelectorAll?.(
-    "button,label,option,h1,h2,h3,h4,p,span,div,input,textarea,[title]"
+    "button,label,option,h1,h2,h3,h4,h5,h6,p,span,div,small,a,input,textarea,[title],[aria-label]"
   ).forEach(el => translateLiveScrollElement(el, lang));
 
   document.documentElement.lang =

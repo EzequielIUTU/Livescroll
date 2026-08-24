@@ -2614,13 +2614,10 @@ window.__lsStartupOptionalModalShown = window.__lsStartupOptionalModalShown || f
 async function checkPendingContent() {
   if (!currentUser?.id) return;
 
-  // En celular Novedades sigue disponible manualmente desde el menú ☰,
-  // pero NO interrumpe al usuario automáticamente al abrir/reiniciar la app.
-  // Términos y Tutorial sí conservan su comportamiento normal.
-  // 5.8.5: Novedades queda SOLO bajo demanda.
-  // Nunca aparece automáticamente al iniciar/reiniciar la app.
-  // El usuario puede abrirla manualmente desde 📢 Novedades.
-  const allowAutomaticChangelog = false;
+  // 5.8.6: Novedades vuelve a aparecer automáticamente cuando existe
+  // una versión pendiente. El sistema de confirmación y la marca local
+  // garantizan que cada versión se muestre una sola vez por usuario.
+  const allowAutomaticChangelog = true;
 
   const seenKey = `livescroll_changelog_seen_${currentUser.id}`;
 
@@ -2708,7 +2705,7 @@ async function checkPendingContent() {
     return;
   }
 
-  // 2) Backend normal: si marca Novedades pendientes, mostramos eso
+  // 2) Backend normal: si marca Novedades pendientes, mostramos eso.
   // y completamos con la versión visible más reciente si hiciera falta.
   if (
     allowAutomaticChangelog &&

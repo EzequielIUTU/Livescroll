@@ -8790,37 +8790,67 @@ async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
 
-  let videos = null;
-  let error = null;
+  const videosPromise = lsCacheFresh(lsPerfCache.profileVideos, 30000)
+    ? Promise.resolve({ data:lsPerfCache.profileVideos.data, error:null })
+    : sb.from("videos").select("*").eq("user_id", currentUser.id).order("created_at", { ascending:false });
 
-  if (lsCacheFresh(lsPerfCache.profileVideos, 30000)) {
-    videos = lsPerfCache.profileVideos.data;
-  } else {
-    const result = await sb.from("videos").select("*").eq("user_id", currentUser.id).order("created_at", { ascending:false });
-    videos = result.data;
-    error = result.error;
-    if (!error && videos) lsPerfCache.profileVideos = { data:videos, at:Date.now() };
+  const viewsLedgerPromise = lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)
+    ? Promise.resolve({ data:lsPerfCache.profileViewsLedger.data, error:null })
+    : sb.from("points_ledger").select("amount").eq("user_id", currentUser.id).eq("reason", "watched_by_other");
+
+  const [videosResult, viewsLedgerResult] = await Promise.all([videosPromise, viewsLedgerPromise]);
+  const videos = videosResult?.data || [];
+  const error = videosResult?.error;
+
+  if (!error && !lsCacheFresh(lsPerfCache.profileVideos, 30000)) {
+    lsPerfCache.profileVideos = { data:videos, at:Date.now() };
   }
 
   if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${error.message}</p>`; return; }
 
-  let watchedByOther = null;
-  if (lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
-    watchedByOther = lsPerfCache.profileViewsLedger.data;
-  } else {
-    const result = await sb.from("points_ledger").select("amount").eq("user_id", currentUser.id).eq("reason", "watched_by_other");
-    watchedByOther = result.data || [];
+  const watchedByOther = viewsLedgerResult?.data || [];
+  if (!viewsLedgerResult?.error && !lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
     lsPerfCache.profileViewsLedger = { data:watchedByOther, at:Date.now() };
   }
 
   const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
 
-  const { data: myPins } = await sb.rpc("get_my_pinned_videos", { p_user_id: currentUser.id });
+  const videoIds = videos.map(v => v.id);
+  const [
+    pinsResult,
+    plans,
+    followersResult,
+    badgesResult,
+    equippedBadges,
+    equippedTitle,
+    collectionSummary,
+    sessionsResult,
+    likesResult,
+    referralResult
+  ] = await Promise.all([
+    sb.rpc("get_my_pinned_videos", { p_user_id:currentUser.id }),
+    loadPlans(),
+    sb.from("follows").select("follower_id", { count:"exact", head:true }).eq("followed_id", currentUser.id),
+    sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending:false }),
+    getEquippedProfileMedals(currentUser.id),
+    getMyProfileTitle(),
+    getMyCollectionSummary(),
+    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    sb.from("app_config").select("key, value").in("key", ["referral_referrer_pts", "referral_referred_pts"])
+  ]);
+
+  const myPins = pinsResult?.data || [];
   const pinnedIds = new Set((myPins || []).map(p => p.video_id));
-  const plans = await loadPlans();
   const myPlan = plans.find(p => p.id === currentProfile.plan_id);
   const canPin = myPlan && myPlan.max_pinned_videos > 0;
   const pinsUsed = pinnedIds.size;
+  const followersCount = followersResult?.count || 0;
+  const badges = badgesResult?.data || [];
+  const sessions = sessionsResult?.data || [];
+  const likes = likesResult?.data || [];
+  const referralConfig = referralResult?.data || [];
+  window.__myProfileTitle = equippedTitle;
 
   let socialClicksHtml = "";
   if (myPlan && myPlan.id !== "standard") {
@@ -8842,24 +8872,6 @@ async function renderProfile() {
     }
   }
 
-  const { count: followersCount } = await sb
-    .from("follows")
-    .select("follower_id", { count: "exact", head: true })
-    .eq("followed_id", currentUser.id);
-
-  const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
-  const [equippedBadges, equippedTitle, collectionSummary] = await Promise.all([
-    getEquippedProfileMedals(currentUser.id),
-    getMyProfileTitle(),
-    getMyCollectionSummary()
-  ]);
-  window.__myProfileTitle = equippedTitle;
-
-  const videoIds = videos.map(v => v.id);
-  const [{ data: sessions }, { data: likes }] = await Promise.all([
-    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : { data: [] },
-    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : { data: [] }
-  ]);
   const viewsByVideo = {};
   (sessions || []).forEach(s => {
     viewsByVideo[s.video_id] = viewsByVideo[s.video_id] || new Set();
@@ -8868,10 +8880,6 @@ async function renderProfile() {
   const likesByVideo = {};
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
-  const { data: referralConfig } = await sb
-    .from("app_config")
-    .select("key, value")
-    .in("key", ["referral_referrer_pts", "referral_referred_pts"]);
   const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
   const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
 

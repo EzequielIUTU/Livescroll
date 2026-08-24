@@ -2569,6 +2569,7 @@ async function renderApp() {
     </div>
     <button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
     <button class="ls-pc-settings-gear" onclick="openLiveScrollSettings()" title="Configuración" aria-label="Configuración" style="background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">⚙️</button>
+    <button class="ls-pc-tutorial-btn" onclick="showTutorialModal()" title="Cómo funciona" aria-label="Cómo funciona" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:4px;">❓</button>
     <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>
@@ -2988,17 +2989,23 @@ async function acknowledgeRoadTo6Teaser() {
 
 
 // ============================================================
-// LIVESCROLL · TUTORIAL V3 · TOUR COMPLETO
-// Recorre las secciones REALES de la app.
+// LIVESCROLL · TUTORIAL V3.1 · TOUR COMPLETO MEJORADO
+// - PC: acceso visible al tutorial.
+// - Omitir más grande.
+// - SIN Billetera ni Planes.
+// - Mejor lectura.
+// - Novedades/Configuración visibles en ☰ móvil.
+// - Visión cómoda abre Configuración real.
+// - Recuperación explicada con flujo visual.
 // ============================================================
 
-const LS_TUTORIAL_V3_STEPS = [
+const LS_TUTORIAL_V31_STEPS = [
   {
     key:"welcome",
     icon:"👋",
     eyebrow:"BIENVENIDA",
     title:"Conocé LiveScroll de verdad",
-    text:"Este tour va a recorrer la app real. Podés avanzar, volver atrás u omitirlo cuando quieras."
+    text:"Este recorrido pasa por las funciones principales de la app. Podés avanzar, volver atrás u omitirlo cuando quieras."
   },
   {
     key:"feed",
@@ -3007,7 +3014,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"🎬",
     eyebrow:"MIRAR",
     title:"El Feed principal",
-    text:"Acá aparecen los videos de la comunidad. Podés desplazarte y descubrir contenido nuevo."
+    text:"Acá aparecen los videos de la comunidad. Deslizá o desplazate para descubrir contenido nuevo."
   },
   {
     key:"feed-actions",
@@ -3016,7 +3023,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"❤️",
     eyebrow:"INTERACTUAR",
     title:"Me gusta, comentarios y compartir",
-    text:"Desde los controles del video podés dar Me gusta, comentar y compartir. Si no hay videos todavía, el tour igual continúa."
+    text:"Los controles del video sirven para reaccionar, comentar y compartir. Si todavía no hay videos, el recorrido continúa normalmente."
   },
   {
     key:"foryou",
@@ -3034,7 +3041,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"⬆️",
     eyebrow:"CREAR",
     title:"Subir video",
-    text:"Desde acá publicás tus clips. Elegís el archivo, completás los datos y LiveScroll se encarga del resto."
+    text:"Desde acá publicás tus clips. Elegís el archivo, completás los datos y LiveScroll prepara la publicación."
   },
   {
     key:"profile",
@@ -3043,16 +3050,16 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"👤",
     eyebrow:"TU ESPACIO",
     title:"Mi Perfil",
-    text:"Tu perfil reúne tus videos, identidad, medallas y datos públicos."
+    text:"Tu perfil reúne tu identidad, tus videos, medallas y actividad. Puede tardar un instante en cargar toda la información."
   },
   {
     key:"profile-edit",
     tab:"profile",
-    selector:"button[onclick*='openEditProfile']",
+    selector:"button[onclick*='openEditProfile'],button[onclick*='showEditProfile']",
     icon:"✏️",
     eyebrow:"PERSONALIZAR",
     title:"Editar perfil",
-    text:"Cuando quieras cambiar foto, portada, bio u otros datos, lo hacés desde Editar perfil."
+    text:"Desde Editar perfil podés cambiar foto, portada, bio y otros datos de tu cuenta."
   },
   {
     key:"users",
@@ -3070,25 +3077,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"🔴",
     eyebrow:"EN VIVO",
     title:"Directos",
-    text:"Cuando haya transmisiones públicas activas, las vas a encontrar en esta sección."
-  },
-  {
-    key:"wallet",
-    tab:"wallet",
-    selector:"#tab-wallet",
-    icon:"💰",
-    eyebrow:"TUS PUNTOS",
-    title:"Billetera",
-    text:"Acá podés consultar tu balance, movimientos y opciones relacionadas con tus puntos."
-  },
-  {
-    key:"plans",
-    tab:"plans",
-    selector:"#tab-plans",
-    icon:"💎",
-    eyebrow:"CUENTA",
-    title:"Planes",
-    text:"Cuando los planes estén disponibles, esta sección muestra las opciones y beneficios para tu cuenta."
+    text:"Cuando haya transmisiones públicas activas, las vas a encontrar acá."
   },
   {
     key:"store",
@@ -3097,7 +3086,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"🛍️",
     eyebrow:"PERSONALIZAR",
     title:"Tienda",
-    text:"Usá tus puntos para explorar medallas, emojis, títulos y otros artículos disponibles."
+    text:"Explorá medallas, emojis, títulos y otros artículos disponibles dentro de LiveScroll."
   },
   {
     key:"ranking",
@@ -3106,7 +3095,7 @@ const LS_TUTORIAL_V3_STEPS = [
     icon:"🏆",
     eyebrow:"COMUNIDAD",
     title:"Ranking",
-    text:"Consultá quiénes generaron más actividad y puntos durante el período mostrado."
+    text:"Consultá quiénes tuvieron más actividad y puntos durante el período mostrado."
   },
   {
     key:"notifications",
@@ -3121,49 +3110,49 @@ const LS_TUTORIAL_V3_STEPS = [
     selector:".nav-changelog-btn",
     icon:"📢",
     eyebrow:"NOVEDADES",
-    title:"Qué cambió en LiveScroll",
-    text:"Novedades reúne versiones, mejoras, reparaciones y revisiones publicadas."
+    title:"Novedades",
+    text:"Acá podés revisar versiones, mejoras, reparaciones y revisiones publicadas de LiveScroll."
   },
   {
     key:"settings",
     selector:".ls-pc-settings-gear",
     icon:"⚙️",
-    eyebrow:"A TU MEDIDA",
+    eyebrow:"CONFIGURACIÓN",
     title:"Configuración",
-    text:"Ajustá Visión cómoda, contraste y fuerza del texto. En celular encontrás Configuración dentro del menú ☰."
+    text:"En PC tenés acceso directo con la tuerquita. En celular está dentro del menú ☰."
   },
   {
-    key:"accessibility",
+    key:"comfortable-vision",
     icon:"👁️",
     eyebrow:"ACCESIBILIDAD",
     title:"Visión cómoda",
-    text:"Si necesitás una interfaz más grande o más marcada, LiveScroll puede adaptar textos, controles y carteles sin usar zoom."
+    text:"LiveScroll puede agrandar textos, botones y controles de forma ordenada. También podés ajustar contraste y fuerza del texto."
   },
   {
-    key:"security",
+    key:"recovery",
     icon:"🔐",
     eyebrow:"SEGURIDAD",
-    title:"Recuperación de contraseña",
-    text:"Si olvidás tu contraseña, usá “Olvidaste tu contraseña”. El enlace recibido te permite crear una nueva y volver al inicio de sesión."
+    title:"Si olvidás tu contraseña",
+    text:"Tocá “Olvidaste tu contraseña”, abrí el correo de recuperación, escribí la nueva contraseña dos veces y LiveScroll te devuelve al inicio para entrar con la clave nueva.",
+    visual:"recovery"
   },
   {
     key:"finish",
     icon:"🚀",
-    eyebrow:"LISTO",
+    eyebrow:"TODO LISTO",
     title:"Ya conocés LiveScroll",
-    text:"Terminaste el recorrido. Podés abrir este tutorial nuevamente desde el menú cuando quieras."
+    text:"Terminaste el recorrido. Cuando quieras repasarlo, abrí “Cómo funciona” desde el menú o desde el acceso de PC."
   }
 ];
 
 let tutorialStepIndex = 0;
-let lsTutorialV3Steps = [];
-let lsTutorialPreviousTab = null;
+let lsTutorialV31Steps = [];
 
-function installTutorialV3Styles() {
-  if (document.getElementById("lsTutorialV3Styles")) return;
+function installTutorialV31Styles() {
+  if (document.getElementById("lsTutorialV31Styles")) return;
 
   const style = document.createElement("style");
-  style.id = "lsTutorialV3Styles";
+  style.id = "lsTutorialV31Styles";
   style.textContent = `
     #lsTutorialV3Layer {
       position:fixed;
@@ -3175,9 +3164,8 @@ function installTutorialV3Styles() {
     #lsTutorialV3Shade {
       position:absolute;
       inset:0;
-      background:rgba(3,5,9,.50);
-      backdrop-filter:blur(1.5px);
-      transition:.22s ease;
+      background:rgba(3,5,9,.48);
+      backdrop-filter:blur(1px);
     }
 
     .ls-tutorial-spotlight {
@@ -3187,28 +3175,22 @@ function installTutorialV3Styles() {
       outline:2px solid var(--gold) !important;
       outline-offset:4px !important;
       box-shadow:
-        0 0 0 7px rgba(218,165,32,.12),
+        0 0 0 7px rgba(218,165,32,.13),
         0 14px 42px rgba(0,0,0,.42) !important;
-      animation:lsTutorialPulse 1.35s ease-in-out infinite;
-    }
-
-    @keyframes lsTutorialPulse {
-      0%,100% { outline-color:var(--gold); }
-      50% { outline-color:color-mix(in srgb,var(--gold) 55%,white); }
     }
 
     #lsTutorialV3Card {
       pointer-events:auto;
       position:fixed;
       z-index:390;
-      width:min(390px,calc(100vw - 24px));
+      width:min(430px,calc(100vw - 24px));
       left:50%;
       bottom:18px;
       transform:translateX(-50%);
-      border:1px solid rgba(255,255,255,.13);
+      border:1px solid rgba(255,255,255,.14);
       border-radius:18px;
-      background:color-mix(in srgb,var(--panel) 96%,black);
-      box-shadow:0 26px 90px rgba(0,0,0,.56);
+      background:color-mix(in srgb,var(--panel) 97%,black);
+      box-shadow:0 26px 90px rgba(0,0,0,.58);
       overflow:hidden;
     }
 
@@ -3217,76 +3199,76 @@ function installTutorialV3Styles() {
       align-items:flex-start;
       justify-content:space-between;
       gap:12px;
-      padding:16px 17px 8px;
+      padding:17px 18px 9px;
     }
 
     .ls-tut-v3-eye {
       color:var(--gold);
-      font-size:8px;
+      font-size:10px;
       line-height:1;
       font-weight:950;
-      letter-spacing:.15em;
-      margin-bottom:5px;
+      letter-spacing:.14em;
+      margin-bottom:6px;
     }
 
     .ls-tut-v3-head h2 {
       margin:0;
-      font-size:18px;
-      line-height:1.2;
+      font-size:21px;
+      line-height:1.22;
     }
 
     .ls-tut-v3-count {
       white-space:nowrap;
-      padding:5px 8px;
+      padding:6px 9px;
       border-radius:999px;
       border:1px solid var(--border);
-      color:var(--text-dim);
-      font-size:9px;
+      color:var(--text);
+      font-size:11px;
       font-weight:850;
       background:var(--panel-2);
     }
 
     .ls-tut-v3-body {
-      padding:6px 17px 13px;
+      padding:7px 18px 14px;
     }
 
     .ls-tut-v3-row {
       display:flex;
       align-items:flex-start;
-      gap:11px;
+      gap:12px;
     }
 
     .ls-tut-v3-icon {
-      width:42px;
-      height:42px;
+      width:46px;
+      height:46px;
       flex:0 0 auto;
       display:grid;
       place-items:center;
-      border-radius:13px;
-      border:1px solid rgba(218,165,32,.22);
-      background:rgba(218,165,32,.08);
-      font-size:21px;
+      border-radius:14px;
+      border:1px solid rgba(218,165,32,.23);
+      background:rgba(218,165,32,.09);
+      font-size:23px;
     }
 
     .ls-tut-v3-copy {
       margin:0;
-      color:var(--text-dim);
-      font-size:12px;
-      line-height:1.55;
+      color:var(--text);
+      font-size:15px;
+      font-weight:520;
+      line-height:1.58;
     }
 
     .ls-tut-v3-progress {
       display:flex;
       gap:3px;
-      padding:0 17px 12px;
+      padding:0 18px 12px;
     }
 
     .ls-tut-v3-progress span {
-      height:4px;
+      height:5px;
       flex:1;
       border-radius:999px;
       background:var(--border);
-      transition:.18s ease;
     }
 
     .ls-tut-v3-progress span.done,
@@ -3295,61 +3277,132 @@ function installTutorialV3Styles() {
     }
 
     .ls-tut-v3-footer {
-      padding:11px 17px 15px;
+      padding:12px 18px 16px;
       border-top:1px solid var(--border);
     }
 
     .ls-tut-v3-controls {
       display:grid;
       grid-template-columns:1fr 1.25fr;
-      gap:8px;
+      gap:9px;
     }
 
     .ls-tut-v3-controls.one {
       grid-template-columns:1fr;
     }
 
+    .ls-tut-v3-controls button {
+      min-height:46px;
+      font-size:12px;
+      font-weight:850;
+    }
+
     .ls-tut-v3-skip {
-      margin-top:9px;
+      margin-top:10px;
       width:100%;
-      padding:4px;
-      border:0;
-      background:transparent;
-      color:var(--text-dim);
+      min-height:42px;
+      border:1px solid var(--border);
+      border-radius:11px;
+      background:var(--panel-2);
+      color:var(--text);
       font-family:inherit;
-      font-size:9px;
+      font-size:12px;
+      font-weight:800;
       cursor:pointer;
+      padding:9px;
     }
 
     .ls-tut-v3-target-note {
-      margin-top:9px;
-      padding:8px 9px;
+      margin-top:10px;
+      padding:10px 11px;
       border-radius:10px;
       border:1px solid var(--border);
       color:var(--text-dim);
-      font-size:9px;
-      line-height:1.4;
-      background:rgba(255,255,255,.018);
+      font-size:11px;
+      line-height:1.45;
+      background:rgba(255,255,255,.02);
+    }
+
+    .ls-tut-recovery-flow {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:7px;
+      margin-top:12px;
+    }
+
+    .ls-tut-recovery-flow div {
+      padding:9px 7px;
+      border:1px solid var(--border);
+      border-radius:11px;
+      text-align:center;
+      background:rgba(255,255,255,.02);
+    }
+
+    .ls-tut-recovery-flow b,
+    .ls-tut-recovery-flow span {
+      display:block;
+    }
+
+    .ls-tut-recovery-flow b {
+      font-size:18px;
+      margin-bottom:5px;
+    }
+
+    .ls-tut-recovery-flow span {
+      color:var(--text-dim);
+      font-size:10px;
+      line-height:1.3;
+    }
+
+    body.ls-vision-large #lsTutorialV3Card .ls-tut-v3-copy {
+      font-size:17px;
+    }
+
+    body.ls-vision-xlarge #lsTutorialV3Card .ls-tut-v3-copy {
+      font-size:19px;
+    }
+
+    body.ls-font-strong #lsTutorialV3Card {
+      font-weight:650;
+    }
+
+    body.ls-high-contrast #lsTutorialV3Card {
+      border-color:rgba(255,255,255,.34);
+      background:#07090d;
+    }
+
+    .ls-pc-tutorial-btn { display:inline-block; }
+
+    @media(max-width:768px) {
+      .ls-pc-tutorial-btn { display:none !important; }
     }
 
     @media(max-width:700px) {
       #lsTutorialV3Card {
-        bottom:9px;
-        width:calc(100vw - 16px);
+        bottom:8px;
+        width:calc(100vw - 14px);
         border-radius:16px;
       }
 
       #lsTutorialV3Shade {
-        background:rgba(3,5,9,.38);
+        background:rgba(3,5,9,.34);
         backdrop-filter:none;
       }
 
       .ls-tut-v3-head {
-        padding:14px 14px 7px;
+        padding:14px 14px 8px;
+      }
+
+      .ls-tut-v3-head h2 {
+        font-size:20px;
       }
 
       .ls-tut-v3-body {
-        padding:5px 14px 11px;
+        padding:6px 14px 12px;
+      }
+
+      .ls-tut-v3-copy {
+        font-size:15px;
       }
 
       .ls-tut-v3-progress {
@@ -3369,21 +3422,13 @@ function installTutorialV3Styles() {
   document.head.appendChild(style);
 }
 
-function buildTutorialV3Steps() {
-  return LS_TUTORIAL_V3_STEPS.filter(step => {
-    if (step.tab === "wallet" && !document.getElementById("tab-wallet")) return false;
-    if (step.tab === "plans" && !document.getElementById("tab-plans")) return false;
-    return true;
-  });
-}
-
-function clearTutorialV3Spotlight() {
+function clearTutorialV31Spotlight() {
   document.querySelectorAll(".ls-tutorial-spotlight").forEach(el => {
     el.classList.remove("ls-tutorial-spotlight");
   });
 }
 
-function findTutorialV3Target(step) {
+function findTutorialV31Target(step) {
   if (!step?.selector) return null;
 
   const candidates = document.querySelectorAll(step.selector);
@@ -3403,48 +3448,91 @@ function findTutorialV3Target(step) {
   return null;
 }
 
-function openTutorialV3MobileMenuIfUseful(step) {
-  if (window.innerWidth > 700) return;
+function findMobileMenuTutorialButton(label) {
+  const panel = document.getElementById("mobileMenuPanel");
+  if (!panel) return null;
 
-  // Para Configuración/Novedades, en móvil esas opciones viven en ☰.
-  if (!["settings","news"].includes(step.key)) return;
-
-  const menu = document.querySelector(".mobile-menu-panel");
-  if (menu) return;
-
-  if (typeof openMobileMenu === "function") {
-    try { openMobileMenu(); } catch (_) {}
-  }
+  return Array.from(panel.querySelectorAll("button"))
+    .find(btn => btn.textContent.includes(label)) || null;
 }
 
-async function prepareTutorialV3Step(step) {
-  clearTutorialV3Spotlight();
+function findSettingsSectionByText(text) {
+  return Array.from(document.querySelectorAll(".ls-settings-section"))
+    .find(section => section.textContent.includes(text)) || null;
+}
+
+async function prepareTutorialV31Step(step) {
+  clearTutorialV31Spotlight();
+
+  // Cerramos Configuración cuando dejamos ese tramo del recorrido.
+  if (!["comfortable-vision"].includes(step.key)) {
+    const settingsOverlay = document.querySelector("#globalModalWrap .modal-overlay");
+    if (settingsOverlay && settingsOverlay.textContent.includes("Configuración")) {
+      const wrap = document.getElementById("globalModalWrap");
+      if (wrap) wrap.innerHTML = "";
+    }
+  }
 
   if (step.tab && currentTab !== step.tab) {
     switchTab(step.tab);
 
-    // Damos tiempo a que la sección real termine de renderizar.
-    await new Promise(resolve => setTimeout(resolve, 220));
+    // Para Perfil no frenamos el tutorial esperando toda la carga.
+    const wait = step.tab === "profile" ? 70 : 120;
+    await new Promise(resolve => setTimeout(resolve, wait));
   }
 
-  openTutorialV3MobileMenuIfUseful(step);
+  // Novedades y Configuración: en móvil abrimos el ☰ REAL.
+  if (window.innerWidth <= 700 && ["news","settings"].includes(step.key)) {
+    if (!document.getElementById("mobileMenuPanel")) {
+      toggleMobileMenu();
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
 
-  // Algunas vistas hacen trabajo async después de switchTab.
-  await new Promise(resolve => setTimeout(resolve, 100));
+    const mobileTarget =
+      step.key === "news"
+        ? findMobileMenuTutorialButton("Novedades")
+        : findMobileMenuTutorialButton("Configuración");
 
-  let target = findTutorialV3Target(step);
+    if (mobileTarget) {
+      mobileTarget.classList.add("ls-tutorial-spotlight");
+      return mobileTarget;
+    }
+  } else if (window.innerWidth <= 700 && document.getElementById("mobileMenuPanel")) {
+    closeMobileMenu();
+  }
 
-  // En móvil intentamos localizar la opción equivalente dentro del menú.
-  if (!target && window.innerWidth <= 700) {
-    const mobileLabels = {
-      news:"Novedades",
-      settings:"Configuración"
-    };
+  // Visión cómoda: abrimos Configuración REAL para que el usuario la vea.
+  if (step.key === "comfortable-vision") {
+    if (document.getElementById("mobileMenuPanel")) closeMobileMenu();
 
-    const label = mobileLabels[step.key];
-    if (label) {
-      const buttons = Array.from(document.querySelectorAll(".mobile-menu-panel button"));
-      target = buttons.find(b => b.textContent.includes(label)) || null;
+    openLiveScrollSettings();
+    await new Promise(resolve => setTimeout(resolve, 60));
+
+    // El tutorial queda arriba del modal, pero quitamos el velo para que
+    // Configuración se vea claramente detrás.
+    const shade = document.getElementById("lsTutorialV3Shade");
+    if (shade) shade.style.display = "none";
+
+    const section = findSettingsSectionByText("Visión cómoda");
+    if (section) {
+      section.classList.add("ls-tutorial-spotlight");
+      try {
+        section.scrollIntoView({ behavior:"smooth", block:"center" });
+      } catch (_) {}
+      return section;
+    }
+  }
+
+  const shade = document.getElementById("lsTutorialV3Shade");
+  if (shade) shade.style.display = "";
+
+  let target = findTutorialV31Target(step);
+
+  // Editar perfil puede aparecer después de que el perfil termina de cargar.
+  if (!target && step.key === "profile-edit") {
+    for (let i = 0; i < 5 && !target; i++) {
+      await new Promise(resolve => setTimeout(resolve, 80));
+      target = findTutorialV31Target(step);
     }
   }
 
@@ -3464,21 +3552,19 @@ async function prepareTutorialV3Step(step) {
 }
 
 function showTutorialModal() {
-  installTutorialV3Styles();
+  installTutorialV31Styles();
 
-  lsTutorialPreviousTab = currentTab || "feed";
-  lsTutorialV3Steps = buildTutorialV3Steps();
+  lsTutorialV31Steps = [...LS_TUTORIAL_V31_STEPS];
   tutorialStepIndex = 0;
 
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
 
-  if (document.getElementById("lsTutorialV3Layer")) {
-    document.getElementById("lsTutorialV3Layer").remove();
-  }
+  document.getElementById("lsTutorialV3Layer")?.remove();
 
   const layer = document.createElement("div");
   layer.id = "lsTutorialV3Layer";
+
   layer.innerHTML = `
     <div id="lsTutorialV3Shade"></div>
 
@@ -3496,6 +3582,9 @@ function showTutorialModal() {
           <div class="ls-tut-v3-icon" id="lsTutorialV3Icon"></div>
           <p class="ls-tut-v3-copy" id="lsTutorialV3Text"></p>
         </div>
+
+        <div id="lsTutorialV3Extra"></div>
+
         <div class="ls-tut-v3-target-note" id="lsTutorialV3TargetNote">
           La zona resaltada es la parte real de LiveScroll que estamos explicando.
         </div>
@@ -3520,21 +3609,30 @@ function showTutorialModal() {
 }
 
 async function renderTutorialStep() {
-  const step = lsTutorialV3Steps[tutorialStepIndex];
+  const step = lsTutorialV31Steps[tutorialStepIndex];
   if (!step) return;
 
   const first = tutorialStepIndex === 0;
-  const last = tutorialStepIndex === lsTutorialV3Steps.length - 1;
+  const last = tutorialStepIndex === lsTutorialV31Steps.length - 1;
 
-  document.getElementById("lsTutorialV3Eyebrow").textContent = step.eyebrow || "TUTORIAL";
+  document.getElementById("lsTutorialV3Eyebrow").textContent = step.eyebrow;
   document.getElementById("lsTutorialV3Title").textContent = step.title;
   document.getElementById("lsTutorialV3Count").textContent =
-    `${tutorialStepIndex + 1} de ${lsTutorialV3Steps.length}`;
-  document.getElementById("lsTutorialV3Icon").textContent = step.icon || "✦";
+    `${tutorialStepIndex + 1} de ${lsTutorialV31Steps.length}`;
+  document.getElementById("lsTutorialV3Icon").textContent = step.icon;
   document.getElementById("lsTutorialV3Text").textContent = step.text;
 
+  const extra = document.getElementById("lsTutorialV3Extra");
+  extra.innerHTML = step.visual === "recovery" ? `
+    <div class="ls-tut-recovery-flow">
+      <div><b>1️⃣</b><span>Pedís recuperar</span></div>
+      <div><b>📧</b><span>Abrís el correo</span></div>
+      <div><b>🔐</b><span>Creás una clave nueva</span></div>
+    </div>
+  ` : "";
+
   document.getElementById("lsTutorialV3Progress").innerHTML =
-    lsTutorialV3Steps.map((_, i) => `
+    lsTutorialV31Steps.map((_, i) => `
       <span class="${i < tutorialStepIndex ? "done" : i === tutorialStepIndex ? "active" : ""}"></span>
     `).join("");
 
@@ -3549,15 +3647,18 @@ async function renderTutorialStep() {
   skip.style.display = last ? "none" : "";
   controls.classList.toggle("one", first || last);
 
-  const target = await prepareTutorialV3Step(step);
+  const target = await prepareTutorialV31Step(step);
 
-  note.style.display = step.selector ? "" : "none";
-  if (step.selector && !target) {
-    note.textContent =
-      "Esta función forma parte de LiveScroll, aunque ahora no haya un elemento disponible para resaltar en esta pantalla.";
+  if (step.key === "comfortable-vision") {
+    note.style.display = "";
+    note.textContent = "Esta es la opción real de Visión cómoda dentro de Configuración.";
+  } else if (step.selector) {
+    note.style.display = "";
+    note.textContent = target
+      ? "La zona resaltada es la parte real de LiveScroll que estamos explicando."
+      : "La función existe, aunque en este momento no haya un elemento disponible para resaltar.";
   } else {
-    note.textContent =
-      "La zona resaltada es la parte real de LiveScroll que estamos explicando.";
+    note.style.display = "none";
   }
 }
 
@@ -3568,7 +3669,7 @@ function tutorialPreviousStep() {
 }
 
 function tutorialNextStep() {
-  if (tutorialStepIndex < lsTutorialV3Steps.length - 1) {
+  if (tutorialStepIndex < lsTutorialV31Steps.length - 1) {
     tutorialStepIndex++;
     renderTutorialStep();
     return;
@@ -3578,17 +3679,16 @@ function tutorialNextStep() {
 }
 
 async function handleAcceptTutorial() {
-  clearTutorialV3Spotlight();
+  clearTutorialV31Spotlight();
 
-  const layer = document.getElementById("lsTutorialV3Layer");
-  if (layer) layer.remove();
+  document.getElementById("lsTutorialV3Layer")?.remove();
 
-  // Cerramos el menú móvil si quedó abierto durante el recorrido.
-  if (document.querySelector(".mobile-menu-panel")) {
-    try {
-      if (typeof closeMobileMenu === "function") closeMobileMenu();
-    } catch (_) {}
+  if (document.getElementById("mobileMenuPanel")) {
+    closeMobileMenu();
   }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
 
   if (currentUser?.id) {
     await sb.rpc("acknowledge_content", {
@@ -3597,7 +3697,6 @@ async function handleAcceptTutorial() {
     });
   }
 
-  // Terminamos en el Feed para que el usuario arranque desde un lugar conocido.
   if (typeof switchTab === "function") {
     switchTab("feed");
   }

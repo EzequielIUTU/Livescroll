@@ -98,7 +98,6 @@ document.addEventListener("DOMContentLoaded", () => {
 // ============================================================
 // ARRANQUE
 // ============================================================
-
 // ============================================================
 // LIVESCROLL · REPORTE DE SEGURIDAD V1
 // Flujo público desde el correo "Tu contraseña fue cambiada".
@@ -394,7 +393,6 @@ function exitSecurityReportScreen() {
   renderLanding();
 }
 
-
 document.addEventListener("DOMContentLoaded", async () => {
   if ("serviceWorker" in navigator) {
     const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
@@ -409,34 +407,37 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.referralCode = params.get("ref");
   window.sharedVideoId = params.get("video");
 
+  // El enlace "No fui yo" abre el reporte público y no inicia la app normal.
   if (isLiveScrollSecurityReportLink()) {
     renderSecurityReportScreen();
     animateLandingOdometer();
     return;
   }
 
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    currentUser = session.user;
-    await loadProfile();
-    renderApp();
-    if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
-  } else {
-    renderLanding();
-  }
+  // Suscribimos primero para capturar PASSWORD_RECOVERY antes de tratar
+  // la sesión temporal del enlace como un inicio de sesión normal.
+  let lsRecoveryMode = false;
 
-  sb.auth.onAuthStateChange(async (event, session) => {
+  const { data: authListenerData } = sb.auth.onAuthStateChange(async (event, session) => {
     if (event === "PASSWORD_RECOVERY") {
+      lsRecoveryMode = true;
+      currentUser = session?.user || null;
       showNewPasswordForm();
       return;
     }
-    if (event === "SIGNED_IN") {
-      if (currentUser && currentUser.id === session.user.id) {
-        // Ya estábamos logueados con esta cuenta: Supabase solo está
-        // revalidando el token en segundo plano (pasa al volver a la
-        // pestaña). No reiniciamos la pantalla en la que estaba el usuario.
-        return;
+
+    if (lsRecoveryMode) {
+      // Mientras estamos cambiando la contraseña, ignoramos eventos de sesión
+      // que podrían mandar al usuario al Feed.
+      if (event === "SIGNED_OUT") {
+        currentUser = null;
+        currentProfile = null;
       }
+      return;
+    }
+
+    if (event === "SIGNED_IN") {
+      if (currentUser && currentUser.id === session.user.id) return;
       currentUser = session.user;
       await loadProfile();
       renderApp();
@@ -447,6 +448,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderLanding();
     }
   });
+
+  // Damos un instante a Supabase para procesar el enlace de recuperación.
+  await new Promise(resolve => setTimeout(resolve, 80));
+
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!lsRecoveryMode) {
+    if (session) {
+      currentUser = session.user;
+      await loadProfile();
+      renderApp();
+      if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+    } else {
+      renderLanding();
+    }
+  }
+
+  // El listener de Auth ya fue instalado antes de leer la sesión.
+
 
   animateLandingOdometer();
 });
@@ -820,39 +840,165 @@ async function handleSignup() {
 
 function showNewPasswordForm() {
   const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  // La recuperación tiene su propia pantalla: no dejamos que el usuario
+  // termine dentro del Feed/Perfil por haber abierto el enlace del correo.
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;">
-      <div class="auth-box" style="margin:0;">
-        <h2>Elegí tu nueva contraseña</h2>
+    <div id="lsPasswordRecoveryScreen" style="
+      position:fixed;
+      inset:0;
+      z-index:500;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      overflow-y:auto;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(214,177,82,.13), transparent 32%),
+        #070a0f;
+    ">
+      <div class="auth-box" style="
+        width:min(100%,430px);
+        margin:0;
+        border:1px solid var(--border);
+        box-shadow:0 24px 80px rgba(0,0,0,.55);
+      ">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="
+            width:58px;height:58px;border-radius:18px;
+            margin:0 auto 12px;
+            display:flex;align-items:center;justify-content:center;
+            background:rgba(214,177,82,.10);
+            border:1px solid rgba(214,177,82,.28);
+            font-size:26px;
+          ">🔐</div>
+          <div style="font-size:10px;letter-spacing:.14em;color:var(--gold);font-weight:900;">
+            LIVESCROLL · SEGURIDAD
+          </div>
+          <h2 style="margin:6px 0 6px;">Crear nueva contraseña</h2>
+          <div style="font-size:11px;line-height:1.5;color:var(--text-dim);">
+            Elegí una contraseña nueva para volver a acceder a tu cuenta.
+          </div>
+        </div>
+
         <div class="field">
           <label>Nueva contraseña</label>
           <div class="password-field-wrap">
-            <input type="password" id="newPasswordInput" placeholder="••••••••">
-            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('newPasswordInput', this)">👁</button>
+            <input
+              type="password"
+              id="newPasswordInput"
+              autocomplete="new-password"
+              placeholder="Mínimo 8 caracteres"
+            >
+            <button type="button" class="password-toggle-btn"
+              onclick="togglePasswordVisibility('newPasswordInput', this)">👁</button>
           </div>
         </div>
-        <button class="btn" style="width:100%" onclick="submitNewPassword()">Guardar contraseña</button>
-        <div id="newPasswordError" class="error-msg"></div>
+
+        <div class="field">
+          <label>Repetir contraseña</label>
+          <div class="password-field-wrap">
+            <input
+              type="password"
+              id="repeatNewPasswordInput"
+              autocomplete="new-password"
+              placeholder="Repetí la contraseña"
+              onkeydown="if(event.key==='Enter') submitNewPassword()"
+            >
+            <button type="button" class="password-toggle-btn"
+              onclick="togglePasswordVisibility('repeatNewPasswordInput', this)">👁</button>
+          </div>
+        </div>
+
+        <div style="
+          padding:10px 11px;
+          margin:4px 0 13px;
+          border:1px solid var(--border);
+          border-radius:11px;
+          color:var(--text-dim);
+          font-size:10px;
+          line-height:1.45;
+        ">
+          Por seguridad, después del cambio vas a volver al inicio de sesión
+          y tendrás que entrar con tu contraseña nueva.
+        </div>
+
+        <button id="newPasswordSubmitBtn" class="btn" style="width:100%;min-height:48px;"
+          onclick="submitNewPassword()">Cambiar contraseña</button>
+
+        <div id="newPasswordError" class="error-msg" style="margin-top:10px;"></div>
       </div>
     </div>`;
 }
 
 async function submitNewPassword() {
-  const password = document.getElementById("newPasswordInput").value;
+  const password = document.getElementById("newPasswordInput")?.value || "";
+  const repeat = document.getElementById("repeatNewPasswordInput")?.value || "";
   const errEl = document.getElementById("newPasswordError");
-  if (!password || password.length < 6) {
-    errEl.textContent = "La contraseña tiene que tener al menos 6 caracteres.";
+  const btn = document.getElementById("newPasswordSubmitBtn");
+
+  if (errEl) {
+    errEl.style.color = "";
+    errEl.textContent = "";
+  }
+
+  if (!password || password.length < 8) {
+    if (errEl) errEl.textContent = "La contraseña tiene que tener al menos 8 caracteres.";
     return;
   }
 
-  const { error } = await sb.auth.updateUser({ password });
-  if (error) { errEl.textContent = error.message; return; }
+  if (password !== repeat) {
+    if (errEl) errEl.textContent = "Las contraseñas no coinciden.";
+    return;
+  }
 
-  document.getElementById("globalModalWrap").innerHTML = "";
-  showToast("¡Contraseña actualizada! Ya podés usarla.");
-  currentUser = (await sb.auth.getUser()).data.user;
-  await loadProfile();
-  renderApp();
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Cambiando contraseña...";
+  }
+
+  const { error } = await sb.auth.updateUser({ password });
+
+  if (error) {
+    if (errEl) errEl.textContent = error.message || "No pudimos cambiar la contraseña.";
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Cambiar contraseña";
+    }
+    return;
+  }
+
+  // La sesión del enlace de recuperación no se usa como sesión normal.
+  // Al terminar, cerramos sesión y volvemos al Login.
+  try {
+    await sb.auth.signOut();
+  } catch (_) {}
+
+  currentUser = null;
+  currentProfile = null;
+  clearAllWatchIntervals?.();
+
+  // Quitamos tokens/hash de recuperación de la barra del navegador.
+  try {
+    history.replaceState({}, document.title, window.location.pathname);
+  } catch (_) {}
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+
+  renderLanding();
+  showAuth("login");
+
+  setTimeout(() => {
+    const loginEmail = document.getElementById("authEmail");
+    if (loginEmail) {
+      const remembered = getRememberedLoginEmail?.();
+      if (remembered && !loginEmail.value) loginEmail.value = remembered;
+    }
+  }, 0);
+
+  showToast("Contraseña cambiada ✓ Iniciá sesión con tu contraseña nueva.");
 }
 
 async function handleForgotPassword() {

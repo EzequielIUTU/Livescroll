@@ -6037,6 +6037,26 @@ async function saveEquippedProfileMedals() {
   renderProfile();
 }
 
+async function getMyCollectionSummary() {
+  const [
+    { data: unlockedEmojis },
+    { data: unlockedItems },
+    { data: titleItems }
+  ] = await Promise.all([
+    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
+    sb.from("store_items").select("id,category").eq("category", "title")
+  ]);
+
+  const titleIds = new Set((titleItems || []).map(t => t.id));
+  const titleCount = (unlockedItems || []).filter(i => titleIds.has(i.item_id)).length;
+
+  return {
+    emojis: (unlockedEmojis || []).length,
+    titles: titleCount
+  };
+}
+
 async function renderProfile() {
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
@@ -6099,9 +6119,10 @@ async function renderProfile() {
     .eq("followed_id", currentUser.id);
 
   const { data: badges } = await sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending: false });
-  const [equippedBadges, equippedTitle] = await Promise.all([
+  const [equippedBadges, equippedTitle, collectionSummary] = await Promise.all([
     getEquippedProfileMedals(currentUser.id),
-    getMyProfileTitle()
+    getMyProfileTitle(),
+    getMyCollectionSummary()
   ]);
   window.__myProfileTitle = equippedTitle;
 
@@ -6142,6 +6163,63 @@ async function renderProfile() {
       </div>
     </div>` : "";
 
+
+  const collectionSummaryHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">💎</div>
+        <h3>Mi colección</h3>
+        <div class="sub">
+          <button
+            onclick="openMyMedalsPanel()"
+            style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;"
+          >Ver colección →</button>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onclick="openMyMedalsPanel()"
+        class="form-card"
+        style="
+          width:100%;
+          border:1px solid var(--border);
+          text-align:left;
+          color:var(--text);
+          cursor:pointer;
+          display:grid;
+          grid-template-columns:repeat(4,1fr);
+          gap:8px;
+          padding:12px;
+        "
+      >
+        <div style="text-align:center;padding:10px 5px;">
+          <div style="font-size:20px;margin-bottom:4px;">💎</div>
+          <div class="mono" style="font-size:19px;font-weight:900;color:var(--gold);">
+            ${(badges || []).length + (collectionSummary.emojis || 0) + (collectionSummary.titles || 0)}
+          </div>
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Objetos</div>
+        </div>
+
+        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+          <div style="font-size:20px;margin-bottom:4px;">🏅</div>
+          <div class="mono" style="font-size:19px;font-weight:900;">${(badges || []).length}</div>
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Medallas</div>
+        </div>
+
+        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+          <div style="font-size:20px;margin-bottom:4px;">😎</div>
+          <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.emojis || 0}</div>
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Emojis</div>
+        </div>
+
+        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+          <div style="font-size:20px;margin-bottom:4px;">🏷️</div>
+          <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.titles || 0}</div>
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Títulos</div>
+        </div>
+      </button>
+    </div>`;
 
   const recentActivity = lsBuildRecentActivity(videos, badges || []);
   const latestVideo = videos?.[0] || null;
@@ -6307,6 +6385,7 @@ async function renderProfile() {
       </div>
     </div>
 
+    ${collectionSummaryHtml}
     ${recentActivityHtml}
     ${socialClicksHtml}
     ${streakSectionHtml}
@@ -10130,5 +10209,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   `;
 
+  document.head.appendChild(style);
+});
+
+
+// ============================================================
+// PERFIL · RESUMEN DE COLECCIÓN
+// ============================================================
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsCollectionSummaryMobile")) return;
+  const style = document.createElement("style");
+  style.id = "lsCollectionSummaryMobile";
+  style.textContent = `
+    @media (max-width:520px) {
+      .profile-section button.form-card[onclick="openMyMedalsPanel()"] {
+        grid-template-columns:repeat(2,1fr) !important;
+      }
+
+      .profile-section button.form-card[onclick="openMyMedalsPanel()"] > div {
+        border-left:none !important;
+      }
+
+      .profile-section button.form-card[onclick="openMyMedalsPanel()"] > div:nth-child(even) {
+        border-left:1px solid var(--border) !important;
+      }
+    }
+  `;
   document.head.appendChild(style);
 });

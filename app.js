@@ -884,6 +884,7 @@ async function renderApp() {
   }
 
   initLiveScrollExperienceMode();
+  setTimeout(applySeasonalTheme, 0);
   ensureModernMobileStyles();
 
   document.getElementById("landingView").classList.add("hidden");
@@ -8470,6 +8471,47 @@ async function renderAdmin() {
         </div>
       `).join("")}` : ""}
 
+    <h3 style="margin-top:32px;">🎨 Eventos visuales</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="font-size:13px;font-weight:800;">Seasonal LiveScroll</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.5;">
+            En Automático, LiveScroll cambia solo según la fecha de Argentina.
+            Este selector sirve únicamente para que vos pruebes los diseños antes del día.
+          </div>
+          <div id="seasonalAdminStatus" style="font-size:10px;color:var(--gold);margin-top:7px;"></div>
+        </div>
+
+        <select
+          id="seasonalThemeAdminSelect"
+          onchange="setSeasonalAdminPreview(this.value)"
+          style="
+            min-width:190px;
+            padding:10px 12px;
+            background:var(--ink);
+            border:1px solid var(--border);
+            border-radius:10px;
+            color:var(--text);
+          "
+        >
+          <option value="auto">🗓️ Automático</option>
+          <option value="normal">⚫ Normal</option>
+          <option value="spring">🌸 Primavera</option>
+          <option value="halloween">🎃 Halloween</option>
+          <option value="christmas">🎄 Navidad</option>
+          <option value="newyear">🎆 Año Nuevo</option>
+          <option value="reyes">👑 Reyes</option>
+          <option value="valentines">💗 San Valentín</option>
+          <option value="patria">🇦🇷 Fecha patria</option>
+          <option value="father">👨 Día del Padre</option>
+          <option value="childhood">🧒 Día de las Infancias</option>
+          <option value="mother">🌷 Día de la Madre</option>
+          <option value="easter">🐰 Pascuas</option>
+        </select>
+      </div>
+    </div>
+
     <h3 style="margin-top:32px;">🔒 Acceso a Planes y Billetera</h3>
     <div class="form-card" style="margin-bottom:14px;padding:0;overflow:hidden;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
@@ -8717,6 +8759,7 @@ async function renderAdmin() {
   loadStreakWeeksOverview();
   loadPlansLockStatus();
   loadWalletLockStatus();
+  setTimeout(syncSeasonalAdminControls, 0);
   loadStoreEmojisList();
   loadStorePrices();
   loadStoreBadgesAdminList();
@@ -10591,4 +10634,458 @@ async function handleAdminChangePlan(userId, planId) {
 }
 async function adminChangeUserPlan(userId, planId) {
   return handleAdminSetUserPlan(userId, planId);
+}
+
+
+// ============================================================
+// LIVESCROLL · SEASONAL ENGINE V1
+// Eventos visuales automáticos según fecha de Argentina.
+// El icono instalado/PWA NO se modifica.
+// Solo decoramos la interfaz y el logo dentro de la app.
+// ============================================================
+
+const LS_SEASONAL_OVERRIDE_KEY = "livescroll_seasonal_admin_preview";
+
+const LS_SEASONAL_THEMES = {
+  normal: {
+    label:"LiveScroll normal",
+    emoji:"",
+    accent:null,
+    accent2:null,
+    glow:null,
+    decorations:[]
+  },
+  spring: {
+    label:"Primavera",
+    emoji:"🌸",
+    accent:"#ff8fbd",
+    accent2:"#fff4fa",
+    glow:"rgba(255,143,189,.18)",
+    decorations:["🌸","🌼","🌸"]
+  },
+  halloween: {
+    label:"Halloween",
+    emoji:"🎃",
+    accent:"#ff8a34",
+    accent2:"#a879ff",
+    glow:"rgba(255,138,52,.18)",
+    decorations:["🎃","🕸️","👻"]
+  },
+  christmas: {
+    label:"Navidad",
+    emoji:"🎄",
+    accent:"#ef5350",
+    accent2:"#f7f7f7",
+    glow:"rgba(239,83,80,.17)",
+    decorations:["❄️","🎄","❄️"]
+  },
+  newyear: {
+    label:"Año Nuevo",
+    emoji:"🎆",
+    accent:"#ffd45c",
+    accent2:"#f8f8ff",
+    glow:"rgba(255,212,92,.18)",
+    decorations:["✨","🎆","✨"]
+  },
+  reyes: {
+    label:"Día de Reyes",
+    emoji:"👑",
+    accent:"#d7b7ff",
+    accent2:"#ffd75e",
+    glow:"rgba(215,183,255,.17)",
+    decorations:["⭐","👑","⭐"]
+  },
+  valentines: {
+    label:"San Valentín",
+    emoji:"💗",
+    accent:"#ff6f9f",
+    accent2:"#ffd6e4",
+    glow:"rgba(255,111,159,.17)",
+    decorations:["💗","✨","💗"]
+  },
+  patria: {
+    label:"Fecha patria",
+    emoji:"🇦🇷",
+    accent:"#75cfff",
+    accent2:"#ffffff",
+    glow:"rgba(117,207,255,.17)",
+    decorations:["🇦🇷","☀️","🇦🇷"]
+  },
+  father: {
+    label:"Día del Padre",
+    emoji:"👨",
+    accent:"#73b8ff",
+    accent2:"#e9f5ff",
+    glow:"rgba(115,184,255,.16)",
+    decorations:["💙","👨","💙"]
+  },
+  childhood: {
+    label:"Día de las Infancias",
+    emoji:"🧒",
+    accent:"#75dfb5",
+    accent2:"#ffd96e",
+    glow:"rgba(117,223,181,.17)",
+    decorations:["🎈","🧸","🎈"]
+  },
+  mother: {
+    label:"Día de la Madre",
+    emoji:"🌷",
+    accent:"#ff93b9",
+    accent2:"#fff0f6",
+    glow:"rgba(255,147,185,.17)",
+    decorations:["🌷","💗","🌷"]
+  },
+  easter: {
+    label:"Pascuas",
+    emoji:"🐰",
+    accent:"#b99cff",
+    accent2:"#ffe8a3",
+    glow:"rgba(185,156,255,.17)",
+    decorations:["🐰","🥚","🌷"]
+  }
+};
+
+function lsArgentinaDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone:"America/Argentina/Buenos_Aires",
+    year:"numeric",
+    month:"2-digit",
+    day:"2-digit",
+    weekday:"short"
+  }).formatToParts(date);
+
+  const pick = type => parts.find(p => p.type === type)?.value;
+  return {
+    year:Number(pick("year")),
+    month:Number(pick("month")),
+    day:Number(pick("day")),
+    weekday:pick("weekday")
+  };
+}
+
+function lsDateKey(y, m, d) {
+  return y * 10000 + m * 100 + d;
+}
+
+function lsNthWeekdayOfMonth(year, month, weekday, nth) {
+  // weekday: 0 domingo ... 6 sábado
+  const first = new Date(Date.UTC(year, month - 1, 1, 12));
+  const firstDay = first.getUTCDay();
+  const offset = (weekday - firstDay + 7) % 7;
+  return 1 + offset + (nth - 1) * 7;
+}
+
+function lsEasterDate(year) {
+  // Algoritmo gregoriano de Meeus/Jones/Butcher.
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return { month, day };
+}
+
+function getAutomaticSeasonalTheme(date = new Date()) {
+  const p = lsArgentinaDateParts(date);
+  const key = lsDateKey(p.year, p.month, p.day);
+
+  // Prioridad: eventos puntuales > temporadas amplias.
+  const easter = lsEasterDate(p.year);
+  if (p.month === easter.month && p.day === easter.day) return "easter";
+
+  // Año Nuevo: 27 dic -> 2 ene
+  if (
+    key >= lsDateKey(p.year, 12, 27) ||
+    key <= lsDateKey(p.year, 1, 2)
+  ) return "newyear";
+
+  // Reyes: 5 y 6 de enero.
+  if (p.month === 1 && p.day >= 5 && p.day <= 6) return "reyes";
+
+  if (p.month === 2 && p.day === 14) return "valentines";
+
+  // Fechas patrias principales de Argentina.
+  if ((p.month === 5 && p.day === 25) || (p.month === 7 && p.day === 9)) {
+    return "patria";
+  }
+
+  // Día del Padre: tercer domingo de junio.
+  const fatherDay = lsNthWeekdayOfMonth(p.year, 6, 0, 3);
+  if (p.month === 6 && p.day === fatherDay) return "father";
+
+  // Día de las Infancias: tercer domingo de agosto.
+  const childhoodDay = lsNthWeekdayOfMonth(p.year, 8, 0, 3);
+  if (p.month === 8 && p.day === childhoodDay) return "childhood";
+
+  // Primavera: semana de lanzamiento.
+  if (p.month === 9 && p.day >= 21 && p.day <= 30) return "spring";
+
+  // Día de la Madre: tercer domingo de octubre.
+  const motherDay = lsNthWeekdayOfMonth(p.year, 10, 0, 3);
+  if (p.month === 10 && p.day === motherDay) return "mother";
+
+  // Halloween: últimos 7 días de octubre.
+  if (p.month === 10 && p.day >= 25 && p.day <= 31) return "halloween";
+
+  // Navidad: 8 al 26 de diciembre.
+  if (p.month === 12 && p.day >= 8 && p.day <= 26) return "christmas";
+
+  return "normal";
+}
+
+function getSeasonalThemeKey() {
+  // El override es SOLO una herramienta local de prueba para Admin.
+  if (currentProfile?.is_admin) {
+    const forced = localStorage.getItem(LS_SEASONAL_OVERRIDE_KEY);
+    if (forced && forced !== "auto" && LS_SEASONAL_THEMES[forced]) {
+      return forced;
+    }
+  }
+  return getAutomaticSeasonalTheme();
+}
+
+function clearSeasonalDecorations() {
+  document.getElementById("lsSeasonalStyle")?.remove();
+  document.getElementById("lsSeasonalLogoDecor")?.remove();
+  document.getElementById("lsSeasonalAmbient")?.remove();
+  document.body?.removeAttribute("data-ls-season");
+}
+
+function applySeasonalTheme() {
+  if (!document.body) return;
+
+  clearSeasonalDecorations();
+
+  const key = getSeasonalThemeKey();
+  const theme = LS_SEASONAL_THEMES[key] || LS_SEASONAL_THEMES.normal;
+  document.body.dataset.lsSeason = key;
+
+  if (key === "normal") {
+    syncSeasonalAdminControls();
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "lsSeasonalStyle";
+
+  const springExtra = key === "spring" ? `
+    body[data-ls-season="spring"] .form-card,
+    body[data-ls-season="spring"] .modal-box {
+      border-color:rgba(255,143,189,.16) !important;
+    }
+    body[data-ls-season="spring"] .page-title::after {
+      content:"  🌸";
+      font-size:.55em;
+      vertical-align:middle;
+      opacity:.85;
+    }
+  ` : "";
+
+  style.textContent = `
+    body[data-ls-season="${key}"] {
+      --gold:${theme.accent};
+      --gold-dim:${theme.accent};
+      background:
+        radial-gradient(circle at 16% 0%, ${theme.glow}, transparent 27%),
+        radial-gradient(circle at 92% 14%, color-mix(in srgb, ${theme.accent2} 12%, transparent), transparent 26%),
+        var(--ink) !important;
+    }
+
+    body[data-ls-season="${key}"] nav {
+      border-bottom-color:color-mix(in srgb, ${theme.accent} 25%, var(--border)) !important;
+      box-shadow:0 8px 30px ${theme.glow};
+    }
+
+    body[data-ls-season="${key}"] .btn {
+      box-shadow:0 8px 24px ${theme.glow};
+    }
+
+    body[data-ls-season="${key}"] .form-card,
+    body[data-ls-season="${key}"] .modal-box,
+    body[data-ls-season="${key}"] .profile-card,
+    body[data-ls-season="${key}"] .store-card {
+      box-shadow:
+        0 16px 42px rgba(0,0,0,.22),
+        0 0 24px ${theme.glow};
+    }
+
+    .ls-seasonal-logo-decor {
+      display:flex;
+      align-items:center;
+      gap:1px;
+      font-size:15px;
+      line-height:1;
+      pointer-events:none;
+      filter:drop-shadow(0 2px 8px ${theme.glow});
+      animation:lsSeasonalFloat 3.2s ease-in-out infinite;
+    }
+
+    .ls-seasonal-logo-decor span:nth-child(2) {
+      transform:translateY(-4px) scale(.82);
+    }
+
+    @keyframes lsSeasonalFloat {
+      0%,100% { transform:translateY(0) rotate(-2deg); }
+      50% { transform:translateY(-2px) rotate(2deg); }
+    }
+
+    .ls-seasonal-petal {
+      position:fixed;
+      top:-25px;
+      z-index:8;
+      pointer-events:none;
+      font-size:12px;
+      opacity:.28;
+      animation:lsPetalFall linear infinite;
+    }
+
+    @keyframes lsPetalFall {
+      from { transform:translate3d(0,-30px,0) rotate(0deg); }
+      to { transform:translate3d(35px,110vh,0) rotate(360deg); }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-seasonal-logo-decor,
+      .ls-seasonal-petal {
+        animation:none !important;
+      }
+      .ls-seasonal-petal { display:none !important; }
+    }
+
+    body.ls-legacy .ls-seasonal-petal {
+      display:none !important;
+    }
+
+    ${springExtra}
+  `;
+  document.head.appendChild(style);
+
+  // Decoramos el logo/área de marca SIN reemplazarlo.
+  const nav = document.querySelector("nav");
+  if (nav) {
+    const decor = document.createElement("div");
+    decor.id = "lsSeasonalLogoDecor";
+    decor.className = "ls-seasonal-logo-decor";
+    decor.setAttribute("aria-hidden", "true");
+    decor.innerHTML = (theme.decorations || []).map(x => `<span>${x}</span>`).join("");
+
+    const brandCandidates = [
+      nav.querySelector(".brand"),
+      nav.querySelector(".logo"),
+      nav.querySelector(".nav-brand"),
+      nav.querySelector("[class*='brand']"),
+      nav.querySelector("[class*='logo']")
+    ].filter(Boolean);
+
+    const brand = brandCandidates[0];
+
+    if (brand) {
+      brand.style.position = brand.style.position || "relative";
+      decor.style.position = "absolute";
+      decor.style.right = "-27px";
+      decor.style.top = "-7px";
+      brand.appendChild(decor);
+    } else {
+      // Fallback seguro: decoración pequeña en la esquina del nav.
+      nav.style.position = nav.style.position || "relative";
+      decor.style.position = "absolute";
+      decor.style.left = "7px";
+      decor.style.top = "3px";
+      decor.style.zIndex = "5";
+      nav.appendChild(decor);
+    }
+  }
+
+  // Primavera recibe pétalos muy sutiles. Los otros eventos quedan limpios.
+  if (key === "spring" && !document.body.classList.contains("ls-legacy")) {
+    const ambient = document.createElement("div");
+    ambient.id = "lsSeasonalAmbient";
+    ambient.setAttribute("aria-hidden", "true");
+    const petals = ["🌸","🌸","🌼","🌸","🌸"];
+    ambient.innerHTML = petals.map((p, i) => `
+      <span class="ls-seasonal-petal" style="
+        left:${8 + i * 20}%;
+        animation-duration:${8 + i * 1.4}s;
+        animation-delay:-${i * 1.8}s;
+      ">${p}</span>
+    `).join("");
+    document.body.appendChild(ambient);
+  }
+
+  syncSeasonalAdminControls();
+}
+
+function setSeasonalAdminPreview(value) {
+  if (!currentProfile?.is_admin) return;
+
+  if (!value || value === "auto") {
+    localStorage.removeItem(LS_SEASONAL_OVERRIDE_KEY);
+  } else {
+    localStorage.setItem(LS_SEASONAL_OVERRIDE_KEY, value);
+  }
+
+  applySeasonalTheme();
+  showToast(
+    value === "auto"
+      ? "🎨 Eventos visuales en Automático"
+      : `🎨 Vista previa: ${LS_SEASONAL_THEMES[value]?.label || value}`
+  );
+}
+
+function syncSeasonalAdminControls() {
+  const select = document.getElementById("seasonalThemeAdminSelect");
+  const status = document.getElementById("seasonalAdminStatus");
+  if (!select && !status) return;
+
+  const forced = currentProfile?.is_admin
+    ? (localStorage.getItem(LS_SEASONAL_OVERRIDE_KEY) || "auto")
+    : "auto";
+
+  if (select) {
+    select.value = (forced === "auto" || LS_SEASONAL_THEMES[forced]) ? forced : "auto";
+  }
+
+  if (status) {
+    const automatic = getAutomaticSeasonalTheme();
+    const active = getSeasonalThemeKey();
+    const activeLabel = LS_SEASONAL_THEMES[active]?.label || active;
+    const autoLabel = LS_SEASONAL_THEMES[automatic]?.label || automatic;
+
+    status.textContent = forced === "auto"
+      ? `Ahora: ${activeLabel} · Automático`
+      : `Vista previa local: ${activeLabel} · En la fecha real sería: ${autoLabel}`;
+  }
+}
+
+// Reaplicamos el tema cuando LiveScroll termina de montar/cambiar vistas.
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(applySeasonalTheme, 80);
+
+  const observer = new MutationObserver(() => {
+    // El decorador del logo puede desaparecer cuando se reconstruye el nav.
+    // Lo restauramos sin recalcular continuamente si ya existe.
+    const key = getSeasonalThemeKey();
+    if (key !== "normal" && !document.getElementById("lsSeasonalLogoDecor")) {
+      setTimeout(applySeasonalTheme, 30);
+    }
+    if (document.getElementById("seasonalThemeAdminSelect")) {
+      syncSeasonalAdminControls();
+    }
+  });
+
+  observer.observe(document.body, { childList:true, subtree:true });
+});
+
+// Si el app ya estaba cargado antes de registrar DOMContentLoaded.
+if (document.readyState !== "loading") {
+  setTimeout(applySeasonalTheme, 80);
 }

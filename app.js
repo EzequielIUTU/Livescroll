@@ -6133,6 +6133,36 @@ function ensureModernMobileStyles() {
     .ls-rarity-legendaria { color:#fbbf24; }
     .ls-rarity-exclusiva { color:#fb7185; }
 
+    .ls-profile-title-chip {
+      --title-color:#cbd5e1;
+      --title-rgb:203,213,225;
+      position:relative;
+      overflow:hidden;
+      border-color:rgba(var(--title-rgb),.42) !important;
+      background:linear-gradient(135deg,rgba(var(--title-rgb),.15),rgba(var(--title-rgb),.04)) !important;
+      color:var(--title-color) !important;
+      box-shadow:0 0 16px rgba(var(--title-rgb),.13);
+    }
+    .ls-profile-title-chip.ls-rarity-rara { --title-color:#7dd3fc; --title-rgb:125,211,252; }
+    .ls-profile-title-chip.ls-rarity-epica { --title-color:#c084fc; --title-rgb:192,132,252; box-shadow:0 0 20px rgba(192,132,252,.24); }
+    .ls-profile-title-chip.ls-rarity-legendaria { --title-color:#fbbf24; --title-rgb:251,191,36; box-shadow:0 0 24px rgba(251,191,36,.28); }
+    .ls-profile-title-chip.ls-rarity-exclusiva { --title-color:#fb7185; --title-rgb:251,113,133; box-shadow:0 0 26px rgba(251,113,133,.30); }
+    .ls-profile-title-chip.ls-rarity-epica::before,
+    .ls-profile-title-chip.ls-rarity-legendaria::before,
+    .ls-profile-title-chip.ls-rarity-exclusiva::before {
+      content:"";
+      position:absolute;
+      inset:-80% -35%;
+      pointer-events:none;
+      background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.30) 50%,transparent 58%);
+      animation:lsTitleShine 3.4s ease-in-out infinite;
+    }
+    @keyframes lsTitleShine {
+      0%,62% { transform:translateX(-55%) rotate(8deg); opacity:0; }
+      72% { opacity:1; }
+      100% { transform:translateX(55%) rotate(8deg); opacity:0; }
+    }
+
     .ls-rarity-tag {
       position:relative;
       z-index:1;
@@ -8285,7 +8315,7 @@ async function getMyProfileTitle() {
     console.warn("No se pudo cargar el título propio:", error);
     return null;
   }
-  return data?.item_id ? data : null;
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
 }
 
 async function getPublicProfileTitle(userId) {
@@ -8295,7 +8325,31 @@ async function getPublicProfileTitle(userId) {
     console.warn("No se pudo cargar el título público:", error);
     return null;
   }
-  return data?.item_id ? data : null;
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
+}
+
+function normalizeProfileTitleRarity(value) {
+  const normalized = String(value || "comun")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+  const aliases = {
+    comun:"comun", common:"comun",
+    rara:"rara", raro:"rara", rare:"rara",
+    epica:"epica", epico:"epica", epic:"epica",
+    legendaria:"legendaria", legendario:"legendaria", legendary:"legendaria",
+    exclusiva:"exclusiva", exclusivo:"exclusiva", exclusive:"exclusiva"
+  };
+  return aliases[normalized] || "comun";
+}
+
+async function hydrateProfileTitleRarity(title) {
+  if (!title?.item_id) return title;
+  if (title.rarity) return { ...title, rarity:normalizeProfileTitleRarity(title.rarity) };
+  const { data } = await sb.from("store_items").select("rarity").eq("id", title.item_id).maybeSingle();
+  return { ...title, rarity:normalizeProfileTitleRarity(data?.rarity) };
 }
 
 function renderProfileTitleInline(title, isOwnProfile = false) {
@@ -8326,8 +8380,12 @@ function renderProfileTitleInline(title, isOwnProfile = false) {
       >+</button>`;
   }
 
+  const rarity = normalizeProfileTitleRarity(title.rarity);
+  const rarityClass = getStoreBadgeRarityClass(rarity);
+  const rarityLabel = getStoreBadgeRarityLabel(rarity);
   return `
     <button
+      class="ls-profile-title-chip ${rarityClass}"
       type="button"
       ${isOwnProfile ? 'onclick="openMyTitlesFromProfile()"' : ""}
       title="${isOwnProfile ? "Cambiar título" : "Título de perfil"}"
@@ -8338,9 +8396,7 @@ function renderProfileTitleInline(title, isOwnProfile = false) {
         margin-top:5px;
         padding:4px 9px;
         border-radius:999px;
-        border:1px solid rgba(250,204,21,.22);
-        background:rgba(250,204,21,.06);
-        color:var(--gold);
+        border:1px solid rgba(203,213,225,.22);
         font-family:'JetBrains Mono',monospace;
         font-size:9px;
         font-weight:900;
@@ -8350,7 +8406,7 @@ function renderProfileTitleInline(title, isOwnProfile = false) {
       "
     >
       <span style="font-size:13px;">${title.icon || "🏷️"}</span>
-      ${escapeHtml(title.name || "Título")}
+      <span style="position:relative;z-index:1;">${escapeHtml(title.name || "Título")} · ${escapeHtml(rarityLabel)}</span>
     </button>`;
 }
 
@@ -8395,18 +8451,20 @@ async function handleUnequipProfileTitle() {
   await renderProfile();
 }
 
-function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "") {
+function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "", rarity = "comun") {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
 
+  const safeRarity = normalizeProfileTitleRarity(rarity);
+  const rarityClass = getStoreBadgeRarityClass(safeRarity);
   wrap.innerHTML = `
     <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
       <div class="modal-box" style="max-width:350px;">
         <div class="modal-box-body" style="padding:26px;text-align:center;">
-          <div style="font-size:50px;margin-bottom:8px;">${icon || "🏷️"}</div>
+          <div class="ls-profile-title-chip ${rarityClass}" style="width:76px;height:76px;border:1px solid;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 10px;">${icon || "🏷️"}</div>
           <h2 style="margin:0 0 6px;">${escapeHtml(name || "Título")}</h2>
           <div style="font-size:10px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:900;">
-            TÍTULO DE PERFIL
+            TÍTULO ${escapeHtml(getStoreBadgeRarityLabel(safeRarity).toUpperCase())}
           </div>
           <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
             Este título se muestra debajo de tu nombre tanto en tu perfil como cuando otras personas visitan tu perfil.
@@ -10207,7 +10265,7 @@ function renderCollection568Grid() {
     const onclick = item.type === "badge"
       ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
       : item.type === "title"
-        ? `openTitleDetail('${item.item_id}','${escapeHtml(item.name)}','${escapeHtml(item.icon)}',${item.equipped ? "true" : "false"},'${escapeHtml(item.obtained_at || "")}')`
+        ? `openTitleDetail('${item.item_id}','${escapeHtml(item.name)}','${escapeHtml(item.icon)}',${item.equipped ? "true" : "false"},'${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.rarity || "comun")}')`
         : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
 
     return `
@@ -12377,7 +12435,7 @@ async function loadProfileTitlesAdminList() {
     <div class="ledger-row">
       <span>
         ${it.icon || "🏷️"} ${escapeHtml(it.name)}
-        · <span style="font-size:10px;font-weight:900;color:var(--gold);text-transform:uppercase;">${escapeHtml(it.rarity || "comun")}</span>
+        · <span class="${getStoreBadgeRarityClass(normalizeProfileTitleRarity(it.rarity))}" style="font-size:10px;font-weight:900;text-transform:uppercase;">${getStoreBadgeRarityLabel(normalizeProfileTitleRarity(it.rarity))}</span>
         · <span class="mono">${it.price_points} pts</span>
         ${!it.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
       </span>
@@ -13050,15 +13108,20 @@ async function renderStore() {
     ${itemsByCategory.length ? itemsByCategory.map(([category, items]) => `
       <h3 style="margin-top:24px;">${String(category).toLowerCase() === "title" ? "🏷️ Títulos de perfil" : `✨ ${escapeHtml(category)}`}</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
-        ${items.map(it => `
-          <div class="form-card" style="text-align:center;">
-            <div style="font-size:30px;">${it.icon}</div>
+        ${items.map(it => {
+          const isTitle = String(it.category || "").toLowerCase() === "title";
+          const itemRarity = normalizeProfileTitleRarity(it.rarity);
+          const rarityClass = isTitle ? getStoreBadgeRarityClass(itemRarity) : "";
+          return `
+          <div class="form-card ${isTitle ? `ls-store-badge-card ${rarityClass}` : ""}" style="text-align:center;">
+            <div class="${isTitle ? "ls-store-badge-icon" : ""}" style="font-size:30px;${isTitle ? "margin-left:auto;margin-right:auto;" : ""}">${it.icon}</div>
             <div style="font-size:12px; margin:4px 0;">${escapeHtml(it.name)}</div>
+            ${isTitle ? `<div class="ls-rarity-tag">${getStoreBadgeRarityLabel(itemRarity)}</div>` : ""}
             ${myItemSet.has(it.id)
               ? `<span style="font-size:11px; color:var(--green);">✓ Tenés este</span>`
               : `<button class="btn-outline" style="padding:4px 8px; font-size:11px;" onclick="handleBuyStoreItem('${it.id}')">${it.price_points} pts</button>`}
           </div>
-        `).join("")}
+        `}).join("")}
       </div>
     `).join("") : ""}`;
 }

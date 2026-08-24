@@ -1978,8 +1978,16 @@ document.addEventListener("DOMContentLoaded", () => {
   style.id = "lsPcSettingsGearStyle";
   style.textContent = `
     .ls-pc-settings-gear { display:inline-block; }
+
+    /* En celular:
+       - Configuración queda dentro de ☰
+       - Novedades queda dentro de ☰
+       - evitamos duplicar iconos en la barra superior */
     @media (max-width: 768px) {
-      .ls-pc-settings-gear { display:none !important; }
+      .ls-pc-settings-gear,
+      .nav-changelog-btn {
+        display:none !important;
+      }
     }
   `;
   document.head.appendChild(style);

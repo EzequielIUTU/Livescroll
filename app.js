@@ -9576,16 +9576,39 @@ async function renderUserCards(data, error, resultsEl, showAll) {
 }
 
 async function handleSetPlan(userId, username) {
+  if (!currentProfile?.is_admin) {
+    showToast("Solo un administrador puede cambiar planes");
+    return;
+  }
+
   const plans = await loadPlans();
   const options = plans.map(p => p.name).join(" / ");
-  const chosen = prompt(`Activar plan para @${username}.\n\nEscribí exactamente uno de estos: ${options}`);
-  if (!chosen) return;
-  const plan = plans.find(p => p.name.toLowerCase() === chosen.trim().toLowerCase());
-  if (!plan) { showToast("Ese plan no existe, escribilo exacto"); return; }
+  const chosen = prompt(`Activar plan para @${username}.
 
-  const { data, error } = await sb.rpc("admin_set_plan", { p_user_id: userId, p_plan_id: plan.id });
-  if (error || !data.ok) { showToast("No se pudo activar el plan"); return; }
-  showToast(`Plan ${plan.name} activado`);
+Escribí exactamente uno de estos: ${options}`);
+  if (!chosen) return;
+
+  const plan = plans.find(
+    p => p.name.toLowerCase() === chosen.trim().toLowerCase()
+  );
+
+  if (!plan) {
+    showToast("Ese plan no existe, escribilo exacto");
+    return;
+  }
+
+  const { data, error } = await sb.rpc("admin_set_user_plan", {
+    p_user_id:userId,
+    p_plan_id:plan.id
+  });
+
+  if (error || !data?.ok) {
+    console.warn("Error activando plan:", error || data);
+    showToast("No se pudo activar el plan");
+    return;
+  }
+
+  showToast(`💎 Plan ${plan.name} activado`);
   handleUserSearch();
 }
 
@@ -9597,8 +9620,18 @@ async function handleAdjustPoints(userId, username) {
 
   const reason = prompt("Motivo (para el registro interno):") || "";
 
-  const { data, error } = await sb.rpc("admin_adjust_points", { p_user_id: userId, p_amount: amount, p_reason: reason });
-  if (error || !data.ok) { showToast("No se pudo ajustar"); return; }
+  const { data, error } = await sb.rpc("admin_adjust_points", {
+    p_user_id:userId,
+    p_amount:amount,
+    p_reason:reason
+  });
+
+  if (error || !data?.ok) {
+    console.warn("Error ajustando puntos:", error || data);
+    showToast("No se pudo ajustar los puntos");
+    return;
+  }
+
   showToast(`Puntos ajustados: ${amount > 0 ? "+" : ""}${amount}`);
   handleUserSearch();
 }

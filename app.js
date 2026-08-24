@@ -3989,6 +3989,7 @@ function showChangelogModal(entries) {
     "5.8.0":"LIVE",
     "5.8.1":"SECURITY",
     "5.8.2":"FINANCIAL",
+    "5.8.6":"CREATOR ACCESS",
     "5.9.0":"CORE",
     "6.0.0":"NEW ERA"
   };
@@ -4024,6 +4025,8 @@ function showChangelogModal(entries) {
                   ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
                   : newestLabel === "5.8.2"
                     ? "Los puntos evolucionan: más recompensas, Boost más accesible y una economía más clara."
+                    : newestLabel === "5.8.6"
+                      ? "Usuarios y Creadores ahora tienen accesos, perfiles y herramientas claramente diferenciados."
                     : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
           </div>
         </div>

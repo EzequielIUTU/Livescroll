@@ -2643,6 +2643,31 @@ async function renderApp() {
 }
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
+let lsStartupChangelogHistoryCache = { data:null, at:0 };
+let lsStartupChangelogHistoryPromise = null;
+
+async function loadStartupChangelogHistory() {
+  if (Array.isArray(lsStartupChangelogHistoryCache.data) &&
+      Date.now() - lsStartupChangelogHistoryCache.at < 60000) {
+    return { data:lsStartupChangelogHistoryCache.data, error:null };
+  }
+
+  if (lsStartupChangelogHistoryPromise) return lsStartupChangelogHistoryPromise;
+
+  lsStartupChangelogHistoryPromise = sb
+    .rpc("get_changelog_history_v2", { p_limit:200 })
+    .then(result => {
+      if (!result?.error && Array.isArray(result?.data)) {
+        lsStartupChangelogHistoryCache = { data:result.data, at:Date.now() };
+      }
+      return result;
+    })
+    .finally(() => {
+      lsStartupChangelogHistoryPromise = null;
+    });
+
+  return lsStartupChangelogHistoryPromise;
+}
 
 // Evita el efecto "cerré un cartel y apareció otro".
 // Términos y tutorial conservan prioridad, pero las novedades/teasers opcionales
@@ -2664,7 +2689,7 @@ async function checkPendingContent() {
   // como respaldo desde la versión interna 25 en adelante.
   const [pendingResult, historyResult] = await Promise.allSettled([
     sb.rpc("get_pending_content", { p_user_id: currentUser.id }),
-    sb.rpc("get_changelog_history_v2", { p_limit: 200 })
+    loadStartupChangelogHistory()
   ]);
 
   const pendingData =
@@ -12771,6 +12796,9 @@ async function handleBumpVersion(key) {
       showToast("No se pudo actualizar");
     }
     return;
+  }
+  if (key === "changelog") {
+    lsStartupChangelogHistoryCache = { data:null, at:0 };
   }
   showToast("Versión actualizada");
 }

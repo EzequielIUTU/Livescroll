@@ -24,31 +24,35 @@
 </head>
 <body>
 
-<div id="introOverlay" onclick="this.classList.add('fade-out'); setTimeout(()=>this.remove(), 550);">
-  <svg viewBox="0 0 400 400" width="200" height="200">
-    <defs>
-      <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#fde047"/>
-        <stop offset="60%" stop-color="#f97316"/>
-        <stop offset="100%" stop-color="#ef4444"/>
-      </radialGradient>
-    </defs>
-    <circle class="intro-ring r1" cx="200" cy="200" r="60" fill="none" stroke="#fde047" stroke-width="4"/>
-    <circle class="intro-ring r2" cx="200" cy="200" r="95" fill="none" stroke="#f97316" stroke-width="4"/>
-    <circle class="intro-ring r3" cx="200" cy="200" r="130" fill="none" stroke="#ef4444" stroke-width="4"/>
-    <circle class="intro-ring r4" cx="200" cy="200" r="165" fill="none" stroke="#be185d" stroke-width="4"/>
-    <circle class="intro-core" cx="200" cy="200" r="24" fill="url(#coreGlow)"/>
-  </svg>
+<div id="introOverlay" role="presentation" aria-label="LiveScroll" onclick="closeLiveScrollIntro()">
+  <div class="intro-ambient intro-ambient-a"></div>
+  <div class="intro-ambient intro-ambient-b"></div>
+  <div class="intro-stage">
+    <div class="intro-orbit intro-orbit-back"></div>
+    <div class="intro-orbit intro-orbit-mid"></div>
+    <div class="intro-orbit intro-orbit-front"></div>
+    <div class="intro-phone">
+      <div class="intro-phone-camera"></div>
+      <div class="intro-phone-line intro-phone-line-a"></div>
+      <div class="intro-phone-line intro-phone-line-b"></div>
+      <div class="intro-phone-play">▶</div>
+      <div class="intro-phone-scroll"></div>
+    </div>
+  </div>
   <div class="intro-word">Live<span>Scroll</span></div>
+  <div class="intro-tagline">MIRÁ · CONECTÁ · CREÁ</div>
+  <div class="intro-skip">Tocá para entrar</div>
 </div>
 <script>
-  setTimeout(function () {
+  function closeLiveScrollIntro() {
     var el = document.getElementById('introOverlay');
-    if (el) {
-      el.classList.add('fade-out');
-      setTimeout(function () { el.remove(); }, 550);
-    }
-  }, 1550);
+    if (!el || el.classList.contains('fade-out')) return;
+    el.classList.add('fade-out');
+    setTimeout(function () { if (el && el.parentNode) el.remove(); }, 420);
+  }
+  setTimeout(function () {
+    closeLiveScrollIntro();
+  }, 1900);
 </script>
 
 <nav>
@@ -137,6 +141,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.8.5-mobile-news-fix2"></script>
+<script src="app.js?v=5.8.8-mobile-stability-intro-corta"></script>
 </body>
 </html>

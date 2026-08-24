@@ -31,6 +31,94 @@ let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
+// ============================================================
+// 5.8.8 · MOBILE STABILITY
+// Altura visible real para barras móviles, teclado y zonas seguras.
+// ============================================================
+let lsViewportSyncFrame = null;
+let lsViewportSyncBound = false;
+
+function syncLiveScrollViewportMetrics() {
+  if (lsViewportSyncFrame) cancelAnimationFrame(lsViewportSyncFrame);
+
+  lsViewportSyncFrame = requestAnimationFrame(() => {
+    lsViewportSyncFrame = null;
+    const viewport = window.visualViewport;
+    const visibleHeight = Math.max(320, Math.round(viewport?.height || window.innerHeight));
+    const hiddenByKeyboard = Math.max(0, Math.round(window.innerHeight - visibleHeight));
+
+    document.documentElement.style.setProperty("--ls-visible-height", `${visibleHeight}px`);
+    document.documentElement.style.setProperty("--ls-keyboard-height", `${hiddenByKeyboard}px`);
+    document.documentElement.classList.toggle("ls-keyboard-open", hiddenByKeyboard > 150);
+  });
+}
+
+function ensureMobileStabilityLayer() {
+  if (!document.getElementById("lsMobileStabilityStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsMobileStabilityStyles";
+    style.textContent = `
+      :root { --ls-visible-height:100dvh; --ls-keyboard-height:0px; }
+
+      #globalModalWrap .modal-overlay {
+        height:var(--ls-visible-height);
+        max-height:var(--ls-visible-height);
+        overscroll-behavior:contain;
+      }
+
+      #globalModalWrap .modal-box {
+        max-height:calc(var(--ls-visible-height) - 28px) !important;
+      }
+
+      #globalModalWrap .modal-box-body {
+        min-height:0;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      @media (max-width:700px) {
+        html.ls-keyboard-open #globalModalWrap .modal-overlay {
+          align-items:flex-start !important;
+          padding-top:8px !important;
+          padding-bottom:8px !important;
+        }
+
+        html.ls-keyboard-open #globalModalWrap .modal-box {
+          max-height:calc(var(--ls-visible-height) - 16px) !important;
+        }
+
+        #globalModalWrap input,
+        #globalModalWrap textarea,
+        #globalModalWrap select {
+          font-size:16px !important;
+        }
+
+        #globalModalWrap .modal-box-footer {
+          flex-shrink:0;
+          padding-bottom:max(12px, env(safe-area-inset-bottom)) !important;
+        }
+
+        button, a, input, textarea, select {
+          touch-action:manipulation;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  if (!lsViewportSyncBound) {
+    lsViewportSyncBound = true;
+    window.addEventListener("resize", syncLiveScrollViewportMetrics, { passive:true });
+    window.addEventListener("orientationchange", syncLiveScrollViewportMetrics, { passive:true });
+    window.visualViewport?.addEventListener("resize", syncLiveScrollViewportMetrics, { passive:true });
+    window.visualViewport?.addEventListener("scroll", syncLiveScrollViewportMetrics, { passive:true });
+  }
+
+  syncLiveScrollViewportMetrics();
+}
+
+document.addEventListener("DOMContentLoaded", ensureMobileStabilityLayer, { once:true });
+
 
 
 
@@ -1166,6 +1254,7 @@ async function loadProfile() {
 // LANDING
 // ============================================================
 function renderLanding() {
+  ensureMobileStabilityLayer();
   document.getElementById("landingView").classList.remove("hidden");
   document.getElementById("appView").classList.add("hidden");
   document.getElementById("navLinks").innerHTML = "";
@@ -2504,6 +2593,7 @@ function initLiveScrollExperienceMode() {
 }
 
 async function renderApp() {
+  ensureMobileStabilityLayer();
   if (landingOdometerRefreshTimer) {
     clearInterval(landingOdometerRefreshTimer);
     landingOdometerRefreshTimer = null;
@@ -5301,7 +5391,7 @@ function switchTab(tab) {
   }
 
   if (tab === "feed") renderFeed(renderToken);
-  if (tab === "foryou") renderForYou();
+  if (tab === "foryou") renderForYou(renderToken);
   if (tab === "upload") renderUpload();
   if (tab === "profile") renderProfile();
   if (tab === "users") renderUsersDirectory();
@@ -9405,11 +9495,12 @@ function logSocialClick(ownerId, platform) {
 // ============================================================
 // PARA TI — videos destacados/anclados por Plus y Diamante
 // ============================================================
-async function renderForYou() {
+async function renderForYou(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `<div id="foryouList">Cargando destacados...</div>`;
 
   const { data: featured, error } = await sb.rpc("get_featured_videos");
+  if (renderToken !== lsTabRenderToken || currentTab !== "foryou") return;
   const list = document.getElementById("foryouList");
 
   if (error) { list.textContent = "Error cargando destacados: " + error.message; return; }
@@ -9427,6 +9518,7 @@ async function renderForYou() {
   }));
 
   const { data: myLikes } = await sb.from("video_likes").select("video_id").eq("user_id", currentUser.id).in("video_id", videos.map(v => v.id));
+  if (renderToken !== lsTabRenderToken || currentTab !== "foryou") return;
   const likedSet = new Set((myLikes || []).map(l => l.video_id));
 
   list.innerHTML = `

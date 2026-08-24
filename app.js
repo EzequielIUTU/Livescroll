@@ -876,6 +876,13 @@ function initLiveScrollExperienceMode() {
 }
 
 async function renderApp() {
+  // Anti-spam POR CUENTA. Si en el mismo teléfono se cierra sesión y entra
+  // otra cuenta, esa cuenta debe poder recibir sus propias Novedades.
+  if (window.__lsStartupUserId !== currentUser?.id) {
+    window.__lsStartupUserId = currentUser?.id || null;
+    window.__lsStartupOptionalModalShown = false;
+  }
+
   initLiveScrollExperienceMode();
   ensureModernMobileStyles();
 
@@ -888,19 +895,17 @@ async function renderApp() {
   if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
 
   const [visibilityResult, plans] = await Promise.all([
-    sb.from("app_text_config")
-      .select("key, value")
-      .in("key", ["wallet_visibility", "plans_visibility"]),
+    sb.rpc("get_app_visibility"),
     loadPlans()
   ]);
 
-  const visibilityRows = visibilityResult.data || [];
+  const visibilityData = visibilityResult?.data || {};
   const walletLocked =
-    visibilityRows.find(r => r.key === "wallet_visibility")?.value === "closed" &&
+    String(visibilityData.wallet_visibility || "open") === "closed" &&
     !currentProfile.is_admin;
 
   const plansLocked =
-    visibilityRows.find(r => r.key === "plans_visibility")?.value === "closed" &&
+    String(visibilityData.plans_visibility || "open") === "closed" &&
     !currentProfile.is_admin;
 
   window.__navWalletLocked = walletLocked;
@@ -1015,7 +1020,14 @@ async function checkPendingContent() {
       )
     : [];
 
-  const locallySeen = Number(localStorage.getItem(seenKey) || 0);
+  const storedSeenRaw = localStorage.getItem(seenKey);
+  const locallySeen = storedSeenRaw === null
+    ? 0
+    : Number(storedSeenRaw || 0);
+
+  // Si es un dispositivo nuevo, locallySeen=0. Eso permite que el teléfono
+  // muestre en un solo "Mientras no estabas..." las versiones que tenga
+  // disponibles en el historial aunque la cuenta las haya visto en otro equipo.
 
   // Si el usuario se perdió varias versiones, mostramos TODAS juntas
   // en "Mientras no estabas..." en lugar de abrir un popup por versión.
@@ -6169,79 +6181,121 @@ async function renderProfile() {
   const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
   const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
 
-  const streakSectionHtml = badges && badges.length ? `
-    <div class="profile-section">
-      <div class="profile-section-head">
-        <div class="ico">🏅</div>
-        <h3>Medallas</h3>
-        <div class="sub" style="display:flex;gap:9px;align-items:center;">
-          <button onclick="openEquipMedalsPanel()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;">Equipar 3</button>
-          <button onclick="openMyBadgesFromProfile()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Ver medallas →</button>
-        </div>
-      </div>
-      <div class="form-card">
-        <div class="streak-badges">
-          ${badges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
-        </div>
-      </div>
-    </div>` : "";
+  const streakSectionHtml = "";
 
 
   const collectionSummaryHtml = `
     <div class="profile-section">
       <div class="profile-section-head">
         <div class="ico">💎</div>
-        <h3>Colección</h3>
+        <h3>Mi colección</h3>
         <div class="sub">
           <button
-            onclick="openMyMedalsPanel()"
+            onclick="openMyMedalsPanel('all')"
             style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;"
-          >Abrir colección →</button>
+          >Explorar →</button>
         </div>
       </div>
 
-      <button
-        type="button"
-        onclick="openMyMedalsPanel()"
-        class="form-card"
+      <div
+        class="form-card ls-profile-collection-hub"
         style="
-          width:100%;
           border:1px solid var(--border);
-          text-align:left;
-          color:var(--text);
-          cursor:pointer;
-          display:grid;
-          grid-template-columns:repeat(4,1fr);
-          gap:8px;
-          padding:12px;
+          border-radius:16px;
+          overflow:hidden;
+          padding:0;
         "
       >
-        <div style="text-align:center;padding:10px 5px;">
-          <div style="font-size:20px;margin-bottom:4px;">💎</div>
-          <div class="mono" style="font-size:19px;font-weight:900;color:var(--gold);">
-            ${(badges || []).length + (collectionSummary.emojis || 0) + (collectionSummary.titles || 0)}
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          padding:14px;
+          border-bottom:1px solid var(--border);
+          background:linear-gradient(135deg,rgba(250,204,21,.055),rgba(255,255,255,.012));
+          flex-wrap:wrap;
+        ">
+          <div>
+            <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">
+              En tu perfil
+            </div>
+            <div style="font-size:13px;font-weight:800;margin-top:3px;">
+              Tus 3 medallas destacadas
+            </div>
           </div>
-          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Objetos</div>
+
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${renderEquippedMedalsInline(equippedBadges, true)}
+            <button
+              class="btn-outline"
+              onclick="openEquipMedalsPanel()"
+              style="padding:7px 10px;font-size:10px;white-space:nowrap;"
+            >Editar</button>
+          </div>
         </div>
 
-        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
-          <div style="font-size:20px;margin-bottom:4px;">🏅</div>
-          <div class="mono" style="font-size:19px;font-weight:900;">${(badges || []).length}</div>
-          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Medallas</div>
-        </div>
+        <button
+          type="button"
+          onclick="openMyMedalsPanel('all')"
+          style="
+            width:100%;
+            border:0;
+            background:transparent;
+            color:var(--text);
+            cursor:pointer;
+            display:grid;
+            grid-template-columns:repeat(4,1fr);
+            gap:0;
+            padding:10px;
+          "
+        >
+          <div style="text-align:center;padding:10px 5px;">
+            <div style="font-size:20px;margin-bottom:4px;">💎</div>
+            <div class="mono" style="font-size:19px;font-weight:900;color:var(--gold);">
+              ${(badges || []).length + (collectionSummary.emojis || 0) + (collectionSummary.titles || 0)}
+            </div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Objetos</div>
+          </div>
 
-        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
-          <div style="font-size:20px;margin-bottom:4px;">😎</div>
-          <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.emojis || 0}</div>
-          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Emojis</div>
-        </div>
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">🏅</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${(badges || []).length}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Medallas</div>
+          </div>
 
-        <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
-          <div style="font-size:20px;margin-bottom:4px;">🏷️</div>
-          <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.titles || 0}</div>
-          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Títulos</div>
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">😎</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.emojis || 0}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Emojis</div>
+          </div>
+
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">🏷️</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.titles || 0}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Títulos</div>
+          </div>
+        </button>
+
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(3,1fr);
+          border-top:1px solid var(--border);
+        ">
+          <button
+            onclick="openMyMedalsPanel('badge')"
+            style="padding:10px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >🏅 Medallas</button>
+          <button
+            onclick="openMyMedalsPanel('emoji')"
+            style="padding:10px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >😎 Emojis</button>
+          <button
+            onclick="openMyMedalsPanel('title')"
+            style="padding:10px;border:0;background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >🏷️ Títulos</button>
         </div>
-      </button>
+      </div>
     </div>`;
 
   const recentActivity = lsBuildRecentActivity(videos, badges || []);
@@ -9314,20 +9368,63 @@ async function handleBumpVersion(key) {
 async function loadPlansLockStatus() {
   const btn = document.getElementById("plansLockBtn");
   if (!btn) return;
-  const { data } = await sb.from("app_text_config").select("*").eq("key", "plans_visibility").single();
-  const status = data?.value || "open";
-  btn.textContent = status === "open" ? "🟢 Abierto — cerrar ahora" : "🔴 Cerrado — abrir ahora";
+
+  const { data, error } = await sb.rpc("get_app_visibility");
+
+  if (error) {
+    console.warn("No se pudo leer visibilidad de Planes:", error);
+    btn.textContent = "⚠️ No se pudo leer el estado";
+    btn.className = "btn-outline";
+    btn.dataset.current = "open";
+    return;
+  }
+
+  const status = String(data?.plans_visibility || "open");
+  btn.textContent = status === "open"
+    ? "🟢 Abierto — cerrar ahora"
+    : "🔴 Cerrado — abrir ahora";
   btn.className = status === "open" ? "btn" : "btn-outline";
   btn.dataset.current = status;
 }
 
 async function handleTogglePlansLock() {
   const btn = document.getElementById("plansLockBtn");
-  const newStatus = btn.dataset.current === "open" ? "closed" : "open";
-  const { data, error } = await sb.rpc("admin_set_plans_visibility", { p_status: newStatus });
-  if (error || !data.ok) { showToast("No se pudo cambiar"); return; }
-  showToast(newStatus === "closed" ? "Planes cerrado para los demás" : "Planes abierto de nuevo");
-  loadPlansLockStatus();
+  if (!btn) return;
+
+  const current = btn.dataset.current === "closed" ? "closed" : "open";
+  const newStatus = current === "open" ? "closed" : "open";
+
+  btn.disabled = true;
+
+  const { data, error } = await sb.rpc("admin_set_plans_visibility", {
+    p_status: newStatus
+  });
+
+  btn.disabled = false;
+
+  if (error || !data?.ok) {
+    console.warn("No se pudo cambiar Planes:", error || data);
+    const reason = data?.error === "no_autorizado"
+      ? "Solo un administrador puede cambiar Planes"
+      : "No se pudo cambiar el estado de Planes";
+    showToast(reason);
+    await loadPlansLockStatus();
+    return;
+  }
+
+  showToast(
+    newStatus === "closed"
+      ? "Planes cerrados para los demás"
+      : "Planes abiertos de nuevo"
+  );
+
+  await loadPlansLockStatus();
+
+  // La navegación se reconstruye para reflejar el cambio inmediatamente.
+  // El admin conserva acceso aunque Planes esté cerrado para los usuarios.
+  if (currentProfile?.is_admin) {
+    window.__navPlansLocked = newStatus === "closed";
+  }
 }
 
 async function loadWalletLockStatus() {
@@ -9565,7 +9662,8 @@ async function renderStore() {
   const canBoost = myPlan && myPlan.id !== "standard";
   const planPrices = (pricesData && pricesData.ok && pricesData.prices) ? pricesData.prices : {};
   const boostPrice = myPlan?.id === "diamante" ? (planPrices.boost_price_diamante ?? 13500) : (planPrices.boost_price_plus ?? 3500);
-  const higherPlans = plans.filter(p => p.id !== "standard" && p.id !== currentProfile.plan_id);
+  const planRank = { standard:0, plus:1, diamante:2 };
+  const currentPlanRank = planRank[currentProfile.plan_id] ?? 0;
 
   const itemsByCategoryMap = {};
   (storeItems || []).forEach(it => {
@@ -9578,7 +9676,77 @@ async function renderStore() {
     <h1 class="page-title">🛍️ Tienda de puntos</h1>
     <p class="page-sub">Balance: <strong class="mono" style="color:var(--gold)">${currentProfile.points_balance} pts</strong></p>
 
+    <div style="
+      display:flex;
+      gap:7px;
+      overflow-x:auto;
+      padding:4px 0 10px;
+      margin-bottom:8px;
+      scrollbar-width:none;
+    ">
+      <button class="btn-outline" onclick="document.getElementById('storePlans')?.scrollIntoView({behavior:'smooth'})" style="white-space:nowrap;padding:7px 10px;font-size:10px;">💎 Planes</button>
+      <button class="btn-outline" onclick="document.getElementById('storeBoost')?.scrollIntoView({behavior:'smooth'})" style="white-space:nowrap;padding:7px 10px;font-size:10px;">⚡ Boost</button>
+      <button class="btn-outline" onclick="document.getElementById('storeBadges')?.scrollIntoView({behavior:'smooth'})" style="white-space:nowrap;padding:7px 10px;font-size:10px;">🏅 Medallas</button>
+      <button class="btn-outline" onclick="document.getElementById('storeEmojis')?.scrollIntoView({behavior:'smooth'})" style="white-space:nowrap;padding:7px 10px;font-size:10px;">😎 Emojis</button>
+      <button class="btn-outline" onclick="document.getElementById('storeExtras')?.scrollIntoView({behavior:'smooth'})" style="white-space:nowrap;padding:7px 10px;font-size:10px;">✨ Extras</button>
+    </div>
 
+    <div id="storePlans" style="scroll-margin-top:90px;">
+      <h3 style="margin-top:18px;">💎 Planes</h3>
+      <p style="font-size:11px;color:var(--text-dim);margin-top:-5px;margin-bottom:12px;">
+        Compará los planes y mirá claramente cuál tenés activo.
+      </p>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:24px;">
+        ${(plans || []).map(p => {
+          const isCurrent = p.id === currentProfile.plan_id;
+          const rank = planRank[p.id] ?? 0;
+          const canUpgrade = rank > currentPlanRank && p.id !== "standard";
+          const planPrice = p.id === "plus"
+            ? planPrices.plan_upgrade_price_plus
+            : p.id === "diamante"
+              ? planPrices.plan_upgrade_price_diamante
+              : 0;
+
+          return `
+            <div class="form-card" style="
+              position:relative;
+              border:${isCurrent ? "1px solid rgba(250,204,21,.42)" : "1px solid var(--border)"};
+              border-radius:14px;
+              padding:14px;
+              overflow:hidden;
+              ${isCurrent ? "box-shadow:0 0 24px rgba(250,204,21,.08);" : ""}
+            ">
+              ${isCurrent ? `
+                <div style="
+                  position:absolute;top:9px;right:9px;
+                  font-size:8px;font-weight:900;
+                  color:var(--gold);
+                  border:1px solid rgba(250,204,21,.28);
+                  background:rgba(250,204,21,.07);
+                  padding:3px 6px;border-radius:999px;
+                ">TU PLAN</div>` : ""}
+
+              <div style="font-size:16px;font-weight:900;margin-bottom:7px;">${escapeHtml(p.name)}</div>
+              <div style="display:grid;gap:5px;font-size:10px;color:var(--text-dim);margin-bottom:12px;">
+                <div>⚡ Boost x${p.boost_multiplier}</div>
+                <div>🎯 Tope diario: ${Number(p.daily_cap_normal || 0).toLocaleString("es-AR")} pts</div>
+                <div>📌 Videos anclados: ${p.max_pinned_videos || 0}</div>
+              </div>
+
+              ${isCurrent
+                ? `<button class="btn-outline" disabled style="width:100%;opacity:.65;">Activo</button>`
+                : canUpgrade
+                  ? `<button class="btn" onclick="handleBuyPlan('${p.id}')" style="width:100%;">
+                      Mejorar · ${Number(planPrice || 0).toLocaleString("es-AR")} pts
+                    </button>`
+                  : `<button class="btn-outline" disabled style="width:100%;opacity:.55;">${rank < currentPlanRank ? "Plan inferior" : "Gratis"}</button>`}
+            </div>`;
+        }).join("")}
+      </div>
+    </div>
+
+    <div id="storeBadges" style="scroll-margin-top:90px;">
     <h3 style="margin-top:24px;">🏅 Medallas exclusivas</h3>
     <p style="font-size:11px;color:var(--text-dim);margin-top:-5px;margin-bottom:12px;">
       Coleccionalas para siempre y equipá hasta 3 en tu perfil.
@@ -9610,6 +9778,9 @@ async function renderStore() {
       `).join("") : `<p style="font-size:12px;color:var(--text-dim);">Todavía no hay medallas disponibles.</p>`}
     </div>
 
+    </div>
+
+    <div id="storeEmojis" style="scroll-margin-top:90px;">
     <h3 style="margin-top:24px;">😎 Emojis exclusivos</h3>
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
       ${(emojis || []).map(e => `
@@ -9637,6 +9808,9 @@ async function renderStore() {
       `).join("")}
     </div>
 
+    </div>
+
+    <div id="storeBoost" style="scroll-margin-top:90px;">
     <h3 style="margin-top:24px;">⚡ Boost extra</h3>
     <div class="form-card" style="margin-bottom:24px;">
       ${canBoost ? `
@@ -9645,17 +9819,9 @@ async function renderStore() {
       ` : `<p style="font-size:13px; color:var(--text-dim);">Este beneficio es solo para planes Plus o Diamante.</p>`}
     </div>
 
-    <h3 style="margin-top:24px;">💎 Cambiar de plan con puntos</h3>
-    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;">
-      ${higherPlans.map(p => `
-        <div class="form-card" style="flex:1; min-width:180px;">
-          <div style="font-weight:600;">${p.name}</div>
-          <div style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Boost x${p.boost_multiplier}, tope semanal $${p.weekly_redemption_cap.toLocaleString("es-AR")}</div>
-          <button class="btn-outline" onclick="handleBuyPlan('${p.id}')">${planPrices[p.id === "plus" ? "plan_upgrade_price_plus" : "plan_upgrade_price_diamante"] ?? (p.id === "plus" ? "2.999" : "6.999")} pts</button>
-        </div>
-      `).join("") || `<p style="color:var(--text-dim); font-size:13px;">Ya tenés el plan más alto.</p>`}
     </div>
 
+    <div id="storeExtras" style="scroll-margin-top:90px;">
     ${itemsByCategory.length ? itemsByCategory.map(([category, items]) => `
       <h3 style="margin-top:24px;">${String(category).toLowerCase() === "title" ? "🏷️ Títulos de perfil" : `✨ ${escapeHtml(category)}`}</h3>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:24px;">
@@ -10262,6 +10428,32 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       .profile-section button.form-card[onclick="openMyMedalsPanel()"] > div:nth-child(even) {
+        border-left:1px solid var(--border) !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsUnifiedCollectionProfileV1")) return;
+  const style = document.createElement("style");
+  style.id = "lsUnifiedCollectionProfileV1";
+  style.textContent = `
+    .ls-profile-collection-hub button {
+      transition:background .15s ease,color .15s ease;
+    }
+    .ls-profile-collection-hub button:hover {
+      background:rgba(250,204,21,.035) !important;
+    }
+    @media (max-width:520px) {
+      .ls-profile-collection-hub > button[onclick*="openMyMedalsPanel('all')"] {
+        grid-template-columns:repeat(2,1fr) !important;
+      }
+      .ls-profile-collection-hub > button[onclick*="openMyMedalsPanel('all')"] > div:nth-child(odd) {
+        border-left:none !important;
+      }
+      .ls-profile-collection-hub > button[onclick*="openMyMedalsPanel('all')"] > div:nth-child(even) {
         border-left:1px solid var(--border) !important;
       }
     }

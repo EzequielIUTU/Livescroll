@@ -9708,91 +9708,27 @@ window.openLocalObsLive = openLocalObsLive;
 
 async function renderDirectos(renderToken = lsTabRenderToken) {
   startConnectedLiveRefresh();
+  stopStudioLiveChat();
   const main = document.getElementById("appView");
   main.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
-      <button class="btn" onclick="window.openObsStreamingSetup && window.openObsStreamingSetup()">🎥 Configurar OBS</button>
-    </div>
-    <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
-    ${currentProfile?.is_admin ? `
-    <div class="ls-obs-local-test" style="
-      margin:14px 0;
-      padding:14px;
-      border:1px solid rgba(244,197,66,.22);
-      border-radius:16px;
-      background:linear-gradient(135deg,rgba(244,197,66,.055),var(--panel));
-    ">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="min-width:0;">
-          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-            <div style="font-weight:900;">🎥 OBS · entorno de prueba</div>
-            <span style="
-              font-size:8px;
-              font-weight:900;
-              letter-spacing:.06em;
-              color:var(--gold);
-              border:1px solid rgba(244,197,66,.25);
-              background:rgba(244,197,66,.06);
-              padding:3px 6px;
-              border-radius:999px;
-            ">SOLO ADMIN</span>
-          </div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
-            MediaMTX · Cloudflare HTTPS · ruta livescroll
-          </div>
-          <div style="font-size:9px;color:var(--text-dim);margin-top:4px;opacity:.8;">
-            Herramienta técnica: no cuenta como un directo público.
-          </div>
-        </div>
-        <button class="btn-outline" type="button" onclick="openLocalObsLive()" style="white-space:nowrap;">
-          Abrir prueba OBS →
-        </button>
-      </div>
-    </div>` : ""}
+    <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
+    <p class="page-sub">Creadores transmitiendo ahora mismo desde Kick y Twitch.</p>
     <div id="directosList">Cargando...</div>`;
 
-  const [ext, studio] = await Promise.allSettled([
-    sb.from("profiles")
-      .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch")
-      .eq("is_live",true)
-      .is("ban_reason",null)
-      .order("live_started_at",{ascending:false}),
-    sb.from("studio_live_sessions")
-      .select("id,user_id,title,started_at,viewer_count,preview_url,profiles!studio_live_sessions_user_id_fkey(id,username,avatar_emoji,avatar_url,plan_id)")
-      .eq("status","live")
-      .order("started_at",{ascending:false})
-  ]);
+  // Conservamos exclusivamente la integración existente de Kick y Twitch.
+  const { data:liveUsersData } = await sb.from("profiles")
+    .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch")
+    .eq("is_live",true)
+    .is("ban_reason",null)
+    .order("live_started_at",{ascending:false});
 
-  const liveUsers = ext.status === "fulfilled" ? (ext.value?.data || []) : [];
-  const studioLives = studio.status === "fulfilled" ? (studio.value?.data || []) : [];
+  const liveUsers = liveUsersData || [];
 
   if (renderToken !== lsTabRenderToken || currentTab !== "directos") return;
   const list = document.getElementById("directosList");
   if (!list) return;
 
   let html = "";
-
-  if (studioLives.length) {
-    html += `<section class="ls-studio-live-section">
-      <div class="ls-studio-live-head"><h3>📡 EN VIVO DESDE LIVESCROLL STUDIO</h3><span>${studioLives.length} directo${studioLives.length===1?"":"s"}</span></div>
-      ${studioLives.map(s => {
-        const p = s.profiles || {};
-        return `<div class="ls-studio-live-card" onclick="window.openStudioLive ? window.openStudioLive('${s.id}') : openStudioLive('${s.id}')">
-          <div class="ls-studio-live-preview">
-            ${s.preview_url && isSafeUrl(s.preview_url) ? `<img src="${escapeHtml(s.preview_url)}">` : `<div style="font-size:28px;">📡</div>`}
-            <div class="ls-studio-live-chip">EN VIVO</div>
-          </div>
-          <div>
-            <div class="ls-studio-live-title">${escapeHtml(s.title || "Directo en LiveScroll")}</div>
-            <div class="ls-studio-live-user">@${escapeHtml(p.username || "usuario")} ${getPlanBadgeHtml(p.plan_id)}</div>
-            <div class="ls-studio-live-meta">LiveScroll Studio · ${Number(s.viewer_count || 0)} viendo</div>
-          </div>
-          <div class="ls-studio-live-open">Entrar →</div>
-        </div>`;
-      }).join("")}
-    </section>`;
-  }
 
   if (liveUsers.length) {
     html += `<section>
@@ -9817,7 +9753,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
     </section>`;
   }
 
-  if (!studioLives.length && !liveUsers.length) {
+  if (!liveUsers.length) {
     html = `
       <div style="
         margin-top:12px;

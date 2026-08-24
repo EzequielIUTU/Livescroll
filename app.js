@@ -14202,10 +14202,23 @@ function applySeasonalTheme() {
 
   window.__lsSeasonalApplying = true;
 
-  clearSeasonalDecorations();
-
   const key = getSeasonalThemeKey();
   const theme = LS_SEASONAL_THEMES[key] || LS_SEASONAL_THEMES.normal;
+
+  // Varias zonas pueden pedir sincronizar el tema durante el arranque.
+  // Si ya está completo, lo reutilizamos sin quitar estilos ni reconstruir DOM.
+  const sameTheme = document.body.dataset.lsSeason === key;
+  const navExists = !!document.querySelector("nav");
+  const seasonalStyleReady = key === "normal" || !!document.getElementById("lsSeasonalStyle");
+  const navDecorationReady = key === "normal" || !navExists || !!document.getElementById("lsSeasonalLogoDecor");
+
+  if (sameTheme && seasonalStyleReady && navDecorationReady) {
+    syncSeasonalAdminControls();
+    window.__lsSeasonalApplying = false;
+    return;
+  }
+
+  clearSeasonalDecorations();
   document.body.dataset.lsSeason = key;
 
   if (key === "normal") {

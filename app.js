@@ -3192,14 +3192,10 @@ function installTutorialV31Styles() {
     }
 
     .ls-tutorial-spotlight {
-      position:relative !important;
-      z-index:382 !important;
       border-radius:12px !important;
       outline:2px solid var(--gold) !important;
       outline-offset:4px !important;
-      box-shadow:
-        0 0 0 7px rgba(218,165,32,.13),
-        0 14px 42px rgba(0,0,0,.42) !important;
+      box-shadow:0 0 0 6px rgba(218,165,32,.12) !important;
     }
 
     #lsTutorialV3Card {
@@ -3562,13 +3558,17 @@ async function prepareTutorialV31Step(step) {
   if (target) {
     target.classList.add("ls-tutorial-spotlight");
 
-    try {
-      target.scrollIntoView({
-        behavior:"smooth",
-        block:"center",
-        inline:"center"
-      });
-    } catch (_) {}
+    // Los controles del video deben quedarse EXACTAMENTE donde están.
+    // Solo les dibujamos una marca simple; no los movemos ni centramos.
+    if (step.key !== "feed-actions") {
+      try {
+        target.scrollIntoView({
+          behavior:"smooth",
+          block:"center",
+          inline:"center"
+        });
+      } catch (_) {}
+    }
   }
 
   return target;

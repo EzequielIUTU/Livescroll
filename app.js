@@ -9391,40 +9391,61 @@ async function handleTogglePlansLock() {
   const btn = document.getElementById("plansLockBtn");
   if (!btn) return;
 
-  const current = btn.dataset.current === "closed" ? "closed" : "open";
+  // Antes de cambiar, consultamos el estado REAL en Supabase.
+  // Así no dependemos de un dataset viejo del botón.
+  const { data: visibilityBefore, error: readError } = await sb.rpc("get_app_visibility");
+
+  if (readError) {
+    console.warn("No se pudo leer Planes antes del cambio:", readError);
+    showToast("No se pudo leer el estado actual de Planes");
+    return;
+  }
+
+  const current = String(visibilityBefore?.plans_visibility || "open");
   const newStatus = current === "open" ? "closed" : "open";
 
   btn.disabled = true;
+  btn.textContent = newStatus === "open" ? "Abriendo..." : "Cerrando...";
 
   const { data, error } = await sb.rpc("admin_set_plans_visibility", {
     p_status: newStatus
   });
 
-  btn.disabled = false;
-
   if (error || !data?.ok) {
+    btn.disabled = false;
     console.warn("No se pudo cambiar Planes:", error || data);
-    const reason = data?.error === "no_autorizado"
-      ? "Solo un administrador puede cambiar Planes"
-      : "No se pudo cambiar el estado de Planes";
-    showToast(reason);
+
+    const errors = {
+      no_autorizado: "Tu cuenta no figura como administradora",
+      not_authenticated: "Volvé a iniciar sesión",
+      estado_invalido: "Estado de Planes inválido"
+    };
+
+    showToast(errors[data?.error] || `No se pudo cambiar Planes${error?.message ? ": " + error.message : ""}`);
     await loadPlansLockStatus();
     return;
   }
 
-  showToast(
-    newStatus === "closed"
-      ? "Planes cerrados para los demás"
-      : "Planes abiertos de nuevo"
-  );
+  // Verificación REAL posterior al cambio.
+  const { data: visibilityAfter, error: verifyError } = await sb.rpc("get_app_visibility");
+  const savedStatus = String(visibilityAfter?.plans_visibility || "");
+
+  btn.disabled = false;
+
+  if (verifyError || savedStatus !== newStatus) {
+    console.warn("Planes no confirmó el cambio:", verifyError, visibilityAfter);
+    showToast("Supabase no confirmó el cambio de Planes");
+    await loadPlansLockStatus();
+    return;
+  }
 
   await loadPlansLockStatus();
 
-  // La navegación se reconstruye para reflejar el cambio inmediatamente.
-  // El admin conserva acceso aunque Planes esté cerrado para los usuarios.
-  if (currentProfile?.is_admin) {
-    window.__navPlansLocked = newStatus === "closed";
-  }
+  showToast(
+    savedStatus === "open"
+      ? "🟢 Planes activados"
+      : "🔴 Planes desactivados"
+  );
 }
 
 async function loadWalletLockStatus() {

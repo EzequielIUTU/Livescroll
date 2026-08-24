@@ -2613,8 +2613,10 @@ async function checkPendingContent() {
   // En celular Novedades sigue disponible manualmente desde el menú ☰,
   // pero NO interrumpe al usuario automáticamente al abrir/reiniciar la app.
   // Términos y Tutorial sí conservan su comportamiento normal.
-  const allowAutomaticChangelog =
-    !window.matchMedia("(max-width: 780px)").matches;
+  // 5.8.5: Novedades queda SOLO bajo demanda.
+  // Nunca aparece automáticamente al iniciar/reiniciar la app.
+  // El usuario puede abrirla manualmente desde 📢 Novedades.
+  const allowAutomaticChangelog = false;
 
   const seenKey = `livescroll_changelog_seen_${currentUser.id}`;
 
@@ -2691,6 +2693,7 @@ async function checkPendingContent() {
     });
 
   // 1) Contenido obligatorio / tutorial conservan prioridad.
+  // Novedades NO se muestra automáticamente; queda manual.
   if (pendingData?.terms_pending) {
     showTermsUpdateModal();
     return;

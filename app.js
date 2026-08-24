@@ -1165,7 +1165,7 @@ function openLiveScrollSettings() {
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:270;">
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:270;">
       <div class="modal-box" style="
         max-width:520px;
         max-height:92dvh;
@@ -1389,6 +1389,76 @@ document.addEventListener("DOMContentLoaded", () => {
   installLiveScrollModalAccessibilityBridge();
 });
 
+
+
+// ============================================================
+// LIVESCROLL 5.8.4 · MODALES V1
+// Protección contra cierres accidentales.
+// ============================================================
+
+function installLiveScrollLockedModalUX() {
+  if (window.__lsLockedModalUXInstalled) return;
+  window.__lsLockedModalUXInstalled = true;
+
+  if (!document.getElementById("lsLockedModalStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsLockedModalStyles";
+    style.textContent = `
+      @keyframes lsLockedModalHint {
+        0%,100% { transform:translateY(0) scale(1); }
+        45% { transform:translateY(-1px) scale(1.008); }
+      }
+
+      .ls-modal-locked.ls-modal-hint .modal-box,
+      .ls-modal-locked.ls-modal-hint .auth-box,
+      .ls-modal-locked.ls-modal-hint > div {
+        animation:lsLockedModalHint .18s ease;
+      }
+
+      .ls-modal-locked {
+        overscroll-behavior:contain;
+      }
+
+      @media(max-width:430px) {
+        .ls-modal-locked .modal-box-footer[style*="grid-template-columns:1fr 1fr 1fr"] {
+          grid-template-columns:1fr !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  document.addEventListener("click", event => {
+    const overlay = event.target?.closest?.("[data-modal-locked='1']");
+    if (!overlay || event.target !== overlay) return;
+
+    // Tocar el fondo ya no cierra. Solo damos una respuesta visual mínima.
+    overlay.classList.remove("ls-modal-hint");
+    void overlay.offsetWidth;
+    overlay.classList.add("ls-modal-hint");
+
+    setTimeout(() => overlay.classList.remove("ls-modal-hint"), 220);
+  }, true);
+
+  document.addEventListener("keydown", event => {
+    if (event.key !== "Escape") return;
+
+    const overlay = document.querySelector(
+      "#globalModalWrap [data-modal-locked='1']"
+    );
+
+    if (!overlay) return;
+
+    // ESC tampoco descarta silenciosamente una edición importante.
+    event.preventDefault();
+    overlay.classList.remove("ls-modal-hint");
+    void overlay.offsetWidth;
+    overlay.classList.add("ls-modal-hint");
+    setTimeout(() => overlay.classList.remove("ls-modal-hint"), 220);
+  }, true);
+}
+
+document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 
 // ============================================================
 // APP SHELL
@@ -2472,7 +2542,7 @@ function showChangelogModal(entries) {
     );
 
     wrap.innerHTML = `
-      <div id="changelogOverlay" class="modal-overlay" style="z-index:140;">
+      <div id="changelogOverlay" class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:140;">
         <div id="changelogBox" class="modal-box" style="
           max-width:480px;
           max-height:88vh;
@@ -2722,7 +2792,7 @@ async function openChangelogHistory() {
   applyLiveScrollSettings();
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">
+    <div class="modal-overlay ls-modal-locked" style="z-index:100;" data-modal-locked="1">
       <div class="modal-box" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
           <div>
@@ -7056,7 +7126,7 @@ function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "") 
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) openMyMedalsPanel()">
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
       <div class="modal-box" style="max-width:350px;">
         <div class="modal-box-body" style="padding:26px;text-align:center;">
           <div style="font-size:50px;margin-bottom:8px;">${icon || "🏷️"}</div>
@@ -7181,7 +7251,7 @@ function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
       <div class="modal-box" style="max-width:350px;">
         <div class="modal-box-body" style="padding:26px;text-align:center;">
           <div class="ls-medal-detail-icon">${icon || "🏅"}</div>
@@ -7214,7 +7284,7 @@ async function openEquipMedalsPanel() {
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:230;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+    <div class="modal-overlay ls-modal-locked" style="z-index:230;" data-modal-locked="1">
       <div class="modal-box" style="max-width:450px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
           <div>
@@ -7251,9 +7321,10 @@ async function openEquipMedalsPanel() {
           }
         </div>
 
-        <div class="modal-box-footer" style="display:flex;gap:9px;">
-          <button class="btn-outline" style="flex:1;" onclick="clearProfileMedalSelection()">Quitar todas</button>
-          <button class="btn" style="flex:1;" onclick="saveEquippedProfileMedals()">Guardar</button>
+        <div class="modal-box-footer" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <button class="btn-outline" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn-outline" onclick="clearProfileMedalSelection()">Quitar todas</button>
+          <button class="btn" onclick="saveEquippedProfileMedals()">Guardar</button>
         </div>
       </div>
     </div>`;
@@ -8472,7 +8543,7 @@ function openEmojiDetail(name, emoji, rarity = "", obtainedAt = "", serialNumber
     "var(--text-dim)";
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:240;" onclick="if(event.target===this) openMyMedalsPanel()">
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
       <div class="modal-box" style="max-width:390px;text-align:center;overflow:hidden;">
         <div style="position:relative;padding:28px 22px 20px;background:
           radial-gradient(circle at 50% 15%, ${rarityColor}18, transparent 48%),
@@ -8625,7 +8696,7 @@ async function openMyMedalsPanel(initialFilter = "all") {
   const allItems = window.__collection568Items;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:210;" onclick="if(event.target===this) closeManagedModal()">
+    <div class="modal-overlay ls-modal-locked" style="z-index:210;" data-modal-locked="1">
       <div class="modal-box" style="max-width:520px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <div>
@@ -9030,13 +9101,14 @@ function openReportModal(videoId) {
   const wrap = document.getElementById("globalModalWrap");
   const reasons = ["Contenido violento", "Spam o engañoso", "Derechos de autor", "Contenido sexual", "Otro"];
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+    <div class="ls-modal-locked" data-modal-locked="1" style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;">
       <div style="background:var(--panel); width:100%; max-width:340px; border-radius:16px; padding:22px;">
         <h3 style="margin-top:0;">🚩 Reportar video</h3>
         <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px;">¿Por qué querés reportarlo?</p>
         <div style="display:flex; flex-direction:column; gap:8px;">
           ${reasons.map(r => `<button class="btn-outline" style="text-align:left;" onclick="submitReport('${videoId}', '${r}')">${r}</button>`).join("")}
         </div>
+        <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="closeManagedModal()">Cancelar</button>
       </div>
     </div>`;
 }
@@ -9231,7 +9303,7 @@ async function openEditProfile() {
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:100;">
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:100;">
       <div class="modal-box ls-profile-edit-modal" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header ls-profile-edit-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
           <h2 style="font-size:19px;margin:0;">Editar perfil</h2>
@@ -9363,7 +9435,7 @@ async function openEditProfile() {
 function openChangePassword() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:110; display:flex; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this) this.remove()">
+    <div class="ls-modal-locked" data-modal-locked="1" style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:110; display:flex; align-items:center; justify-content:center; padding:20px;">
       <div class="auth-box" style="margin:0;">
         <h2>Cambiar contraseña</h2>
         <div class="field">
@@ -9373,7 +9445,10 @@ function openChangePassword() {
             <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('changePasswordInput', this)">👁</button>
           </div>
         </div>
-        <button class="btn" style="width:100%" onclick="submitChangePassword()">Guardar</button>
+        <div style="display:flex;gap:9px;">
+          <button class="btn-outline" style="flex:1;" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="submitChangePassword()">Guardar</button>
+        </div>
         <div id="changePasswordError" class="error-msg"></div>
       </div>
     </div>`;
@@ -10067,7 +10142,7 @@ async function handleRejectSubscription(id) {
 async function openEmojiPicker(targetInputId, list) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:140;" onclick="if(event.target===this) this.remove()">
+    <div class="modal-overlay ls-modal-locked" style="z-index:140;" data-modal-locked="1">
       <div class="modal-box" style="max-width:360px;">
         <div class="modal-box-header"><h2 style="font-size:16px;">Elegí uno</h2></div>
         <div class="modal-box-body">
@@ -10416,7 +10491,7 @@ async function openEditStoreBadge(id) {
   if (!wrap) return;
 
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:260;" onclick="if(event.target===this) document.getElementById('globalModalWrap').innerHTML=''">
+    <div class="modal-overlay ls-modal-locked" style="z-index:260;" data-modal-locked="1">
       <div class="modal-box" style="max-width:440px;">
         <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;">
           <div>
@@ -10465,8 +10540,9 @@ async function openEditStoreBadge(id) {
           </div>` : ""}
         </div>
 
-        <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="handleSaveStoreBadgeEdit('${badge.id}')">Guardar cambios</button>
+        <div class="modal-box-footer" style="display:flex;gap:9px;">
+          <button class="btn-outline" style="flex:1;" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="handleSaveStoreBadgeEdit('${badge.id}')">Guardar cambios</button>
         </div>
       </div>
     </div>`;

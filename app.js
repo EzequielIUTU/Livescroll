@@ -947,6 +947,24 @@ const LS_I18N = {
     ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"We strengthened session controls, permissions and access to internal information."
     ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Points, views, plans and sensitive functions were reviewed to reduce unnecessary exposure."
     ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"Critical logic remains protected server-side and important access requires identity and permission validation."
+    ,"Todavía no hay videos destacados":"There are no featured videos yet"
+    ,"Todavía no hay videos destacados.":"There are no featured videos yet."
+    ,"No hay videos destacados todavía":"There are no featured videos yet"
+    ,"No hay videos destacados todavía.":"There are no featured videos yet."
+    ,"Bienvenido a LiveScroll":"Welcome to LiveScroll"
+    ,"Descubrí videos":"Discover videos"
+    ,"Deslizá para descubrir nuevos videos.":"Swipe to discover new videos."
+    ,"Interactuá con la comunidad":"Interact with the community"
+    ,"Podés dar Me gusta, comentar y compartir videos.":"You can like, comment and share videos."
+    ,"Ganás puntos usando LiveScroll":"Earn points by using LiveScroll"
+    ,"Tus acciones pueden generar puntos según las reglas vigentes.":"Your actions can earn points according to the current rules."
+    ,"Personalizá tu experiencia":"Customize your experience"
+    ,"Usá Configuración para adaptar idioma, visión, contraste y texto.":"Use Settings to adjust language, view, contrast and text."
+    ,"Empezar":"Get started"
+    ,"Saltar":"Skip"
+    ,"Paso":"Step"
+    ,"de":"of"
+    ,"Revisión secundaria de LiveScroll 5.8.3 completada y aprobada.":"LiveScroll 5.8.3 secondary review completed and approved."
 
   },
   pt: {
@@ -1196,6 +1214,24 @@ const LS_I18N = {
     ,"Reforzamos controles de sesión, permisos y acceso a información interna.":"Reforçamos controles de sessão, permissões e acesso a informações internas."
     ,"Se revisaron los sistemas de puntos, visualizaciones, planes y funciones sensibles para reducir exposición innecesaria.":"Os sistemas de pontos, visualizações, planos e funções sensíveis foram revisados para reduzir exposição desnecessária."
     ,"La lógica crítica continúa protegida del lado servidor y los accesos importantes requieren validación de identidad y permisos.":"A lógica crítica continua protegida no servidor e acessos importantes exigem validação de identidade e permissões."
+    ,"Todavía no hay videos destacados":"Ainda não há vídeos em destaque"
+    ,"Todavía no hay videos destacados.":"Ainda não há vídeos em destaque."
+    ,"No hay videos destacados todavía":"Ainda não há vídeos em destaque"
+    ,"No hay videos destacados todavía.":"Ainda não há vídeos em destaque."
+    ,"Bienvenido a LiveScroll":"Bem-vindo ao LiveScroll"
+    ,"Descubrí videos":"Descubra vídeos"
+    ,"Deslizá para descubrir nuevos videos.":"Deslize para descobrir novos vídeos."
+    ,"Interactuá con la comunidad":"Interaja com a comunidade"
+    ,"Podés dar Me gusta, comentar y compartir videos.":"Você pode curtir, comentar e compartilhar vídeos."
+    ,"Ganás puntos usando LiveScroll":"Ganhe pontos usando o LiveScroll"
+    ,"Tus acciones pueden generar puntos según las reglas vigentes.":"Suas ações podem gerar pontos de acordo com as regras atuais."
+    ,"Personalizá tu experiencia":"Personalize sua experiência"
+    ,"Usá Configuración para adaptar idioma, visión, contraste y texto.":"Use Configurações para ajustar idioma, visão, contraste e texto."
+    ,"Empezar":"Começar"
+    ,"Saltar":"Pular"
+    ,"Paso":"Etapa"
+    ,"de":"de"
+    ,"Revisión secundaria de LiveScroll 5.8.3 completada y aprobada.":"Revisão secundária do LiveScroll 5.8.3 concluída e aprovada."
 
   }
 };
@@ -1238,6 +1274,61 @@ function lsTranslateExact(value, lang = getLiveScrollLanguage()) {
   return out;
 }
 
+
+function translateLiveScrollSystemText(value, lang = getLiveScrollLanguage()) {
+  if (!value || lang === "es") return value;
+
+  const direct = lsTranslateExact(String(value).trim(), lang);
+  if (direct !== String(value).trim()) return direct;
+
+  const rules = lang === "en" ? [
+    ["Configuración llega al menú principal con nuevas opciones de apariencia, accesibilidad e idioma.",
+     "Settings arrives in the main menu with new appearance, accessibility and language options."],
+    ["Visión cómoda permite usar tamaños Normal, Grande y Extra grande sin depender del zoom de la página.",
+     "Comfort view offers Normal, Large and Extra large sizes without relying on page zoom."],
+    ["Se agregaron opciones de Contraste y Fuerza de texto con vista previa antes de aplicar los cambios.",
+     "Contrast and Text strength options were added with a preview before applying changes."],
+    ["La interfaz incorpora selección de idioma con Español, English y Português.",
+     "The interface now includes language selection with Spanish, English and Portuguese."],
+    ["Las preferencias de accesibilidad también se aplican a Novedades, carteles, formularios y ventanas emergentes.",
+     "Accessibility preferences also apply to What's New, notices, forms and pop-up windows."],
+    ["Las opciones elegidas quedan guardadas en el dispositivo para conservar la misma experiencia al volver a abrir la app.",
+     "Selected options are saved on the device to preserve the same experience when reopening the app."],
+    ["Los cuadros importantes ahora evitan cierres accidentales al tocar fuera de la ventana.",
+     "Important dialogs now prevent accidental closing when tapping outside the window."],
+    ["Se bloqueó el zoom de página para mantener una interfaz estable y utilizar los nuevos controles de accesibilidad integrados.",
+     "Page zoom was disabled to keep the interface stable and use the new built-in accessibility controls."],
+    ["La traducción de la interfaz comienza a extenderse por navegación, Configuración, Novedades y pantallas principales.",
+     "Interface translation is expanding across navigation, Settings, What's New and main screens."],
+    ["La interfaz ahora puede adaptarse ampliamente a Español, English y Português en navegación, pantallas, carteles y mensajes del sistema.",
+     "The interface can now broadly adapt to Spanish, English and Portuguese across navigation, screens, notices and system messages."]
+  ] : [
+    ["Configuración llega al menú principal con nuevas opciones de apariencia, accesibilidad e idioma.",
+     "Configurações chega ao menu principal com novas opções de aparência, acessibilidade e idioma."],
+    ["Visión cómoda permite usar tamaños Normal, Grande y Extra grande sin depender del zoom de la página.",
+     "A visão confortável oferece tamanhos Normal, Grande e Extra grande sem depender do zoom da página."],
+    ["Se agregaron opciones de Contraste y Fuerza de texto con vista previa antes de aplicar los cambios.",
+     "Foram adicionadas opções de Contraste e Peso do texto com prévia antes de aplicar as alterações."],
+    ["La interfaz incorpora selección de idioma con Español, English y Português.",
+     "A interface agora inclui seleção de idioma com Espanhol, Inglês e Português."],
+    ["Las preferencias de accesibilidad también se aplican a Novedades, carteles, formularios y ventanas emergentes.",
+     "As preferências de acessibilidade também se aplicam a Novidades, avisos, formulários e janelas pop-up."],
+    ["Las opciones elegidas quedan guardadas en el dispositivo para conservar la misma experiencia al volver a abrir la app.",
+     "As opções escolhidas ficam salvas no dispositivo para manter a mesma experiência ao reabrir o app."],
+    ["Los cuadros importantes ahora evitan cierres accidentales al tocar fuera de la ventana.",
+     "As janelas importantes agora evitam fechamentos acidentais ao tocar fora delas."],
+    ["Se bloqueó el zoom de página para mantener una interfaz estable y utilizar los nuevos controles de accesibilidad integrados.",
+     "O zoom da página foi bloqueado para manter a interface estável e usar os novos controles de acessibilidade integrados."],
+    ["La traducción de la interfaz comienza a extenderse por navegación, Configuración, Novedades y pantallas principales.",
+     "A tradução da interface está sendo ampliada na navegação, Configurações, Novidades e telas principais."],
+    ["La interfaz ahora puede adaptarse ampliamente a Español, English y Português en navegación, pantallas, carteles y mensajes del sistema.",
+     "A interface agora pode se adaptar amplamente a Espanhol, Inglês e Português na navegação, telas, avisos e mensagens do sistema."]
+  ];
+
+  const found = rules.find(([source]) => source === String(value).trim());
+  return found ? found[1] : value;
+}
+
 function shouldSkipLiveScrollTranslation(el) {
   if (!el || !el.closest) return false;
 
@@ -1270,7 +1361,7 @@ function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
       if (!el.dataset.lsI18nOriginal) el.dataset.lsI18nOriginal = original;
       el.textContent = lang === "es"
         ? el.dataset.lsI18nOriginal
-        : lsTranslateExact(el.dataset.lsI18nOriginal, lang);
+        : translateLiveScrollSystemText(el.dataset.lsI18nOriginal, lang);
     }
   }
 
@@ -1280,7 +1371,7 @@ function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
       if (!el.dataset.lsI18nPlaceholder) el.dataset.lsI18nPlaceholder = original;
       el.placeholder = lang === "es"
         ? el.dataset.lsI18nPlaceholder
-        : lsTranslateExact(el.dataset.lsI18nPlaceholder, lang);
+        : translateLiveScrollSystemText(el.dataset.lsI18nPlaceholder, lang);
     }
   }
 
@@ -1289,7 +1380,7 @@ function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
     if (!el.dataset.lsI18nTitle) el.dataset.lsI18nTitle = original;
     el.title = lang === "es"
       ? el.dataset.lsI18nTitle
-      : lsTranslateExact(el.dataset.lsI18nTitle, lang);
+      : translateLiveScrollSystemText(el.dataset.lsI18nTitle, lang);
   }
 
   if (el.getAttribute && el.getAttribute("aria-label")) {
@@ -1298,7 +1389,7 @@ function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
     if (!el.dataset.lsI18nAria) el.dataset.lsI18nAria = original;
     el.setAttribute(
       "aria-label",
-      lang === "es" ? el.dataset.lsI18nAria : lsTranslateExact(el.dataset.lsI18nAria, lang)
+      lang === "es" ? el.dataset.lsI18nAria : translateLiveScrollSystemText(el.dataset.lsI18nAria, lang)
     );
   }
 }
@@ -2095,7 +2186,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
-    <button onclick="showTutorialModal(); closeMobileMenu();">❓ Cómo funciona</button>
+    <button onclick="showTutorialModal(); closeMobileMenu(); setTimeout(() => applyLiveScrollTranslations(document.getElementById("globalModalWrap") || document), 30);">❓ Cómo funciona</button>
     <button onclick="openLiveScrollSettings(); closeMobileMenu();">⚙️ Configuración</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
@@ -3139,7 +3230,7 @@ function showChangelogModal(entries) {
       "";
 
     const cleaned = secondaryEntries
-      .map(e => cleanChangelogContent(e.content))
+      .map(e => translateLiveScrollSystemText(cleanChangelogContent(e.content)))
       .filter(Boolean)
       // El encabezado ya comunica que la revisión fue aprobada.
       .filter(c => !/^completada y aprobada\.?$/i.test(c))
@@ -3214,7 +3305,7 @@ function showChangelogModal(entries) {
                   margin:${cleaned.indexOf(c) === cleaned.length - 1 ? "0" : "0 0 9px"};
                 ">
                   <span style="color:#60a5fa;font-weight:900;">✓</span>
-                  <span>${escapeHtml(c)}</span>
+                  <span>${escapeHtml(translateLiveScrollSystemText(c))}</span>
                 </div>
               `).join("")}
             </div>
@@ -3300,7 +3391,7 @@ function showChangelogModal(entries) {
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
                   <div style="margin-bottom:11px;">
                     <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
+                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
             }).join("")}
@@ -3374,7 +3465,7 @@ function showChangelogModal(entries) {
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
                   <div class="ls-next-era-category">
                     <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
+                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
           }).join("")}
@@ -3564,7 +3655,7 @@ async function openChangelogHistory() {
             margin-bottom:7px;
           ">
             <span style="color:#60a5fa;font-weight:900;">✓</span>
-            <span>${escapeHtml(c)}</span>
+            <span>${escapeHtml(translateLiveScrollSystemText(c))}</span>
           </div>
         `).join("")}
       </div>`;
@@ -3592,7 +3683,7 @@ async function openChangelogHistory() {
               color:var(--text-dim);
               margin-bottom:5px;
               line-height:1.48;
-            ">• ${escapeHtml(c)}</div>
+            ">• ${escapeHtml(translateLiveScrollSystemText(c))}</div>
           `).join("")}
         </div>`;
     }).join("");

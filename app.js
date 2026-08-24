@@ -350,6 +350,38 @@ function showAuth(mode) {
   renderAuthForm(mode);
 }
 
+
+const LS_REMEMBER_EMAIL_KEY = "livescroll_remembered_email";
+
+function getRememberedLoginEmail() {
+  return localStorage.getItem(LS_REMEMBER_EMAIL_KEY) || "";
+}
+
+function syncRememberedLoginEmail() {
+  const emailInput = document.getElementById("authEmail");
+  const rememberInput = document.getElementById("authRememberEmail");
+  if (!emailInput || !rememberInput) return;
+
+  const savedEmail = getRememberedLoginEmail();
+
+  if (savedEmail) {
+    emailInput.value = savedEmail;
+    rememberInput.checked = true;
+  }
+}
+
+function saveRememberedLoginEmail() {
+  const emailInput = document.getElementById("authEmail");
+  const rememberInput = document.getElementById("authRememberEmail");
+  if (!emailInput || !rememberInput) return;
+
+  if (rememberInput.checked && emailInput.value.trim()) {
+    localStorage.setItem(LS_REMEMBER_EMAIL_KEY, emailInput.value.trim());
+  } else {
+    localStorage.removeItem(LS_REMEMBER_EMAIL_KEY);
+  }
+}
+
 function renderAuthForm(mode) {
   const wrap = document.getElementById("globalModalWrap");
   const isSignup = mode === "signup";
@@ -366,19 +398,42 @@ function renderAuthForm(mode) {
         ${isSignup ? `
           <div class="field">
             <label>Nombre de usuario</label>
-            <input type="text" id="authUsername" placeholder="ej: ezequieliutu">
+            <input type="text" id="authUsername" placeholder="ej: ezequieliutu" autocomplete="username">
           </div>` : ""}
         <div class="field">
           <label>Email</label>
-          <input type="email" id="authEmail" placeholder="tu@email.com">
+          <input type="email" id="authEmail" placeholder="tu@email.com" autocomplete="email">
         </div>
         <div class="field">
           <label>Contraseña</label>
           <div class="password-field-wrap">
-            <input type="password" id="authPassword" placeholder="••••••••">
+            <input type="password" id="authPassword" placeholder="••••••••" autocomplete="${isSignup ? "new-password" : "current-password"}">
             <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('authPassword', this)">👁</button>
           </div>
         </div>
+        ${!isSignup ? `
+          <div class="field" style="
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:10px;
+            margin-top:-3px;
+          ">
+            <label for="authRememberEmail" style="
+              display:flex;
+              align-items:center;
+              gap:7px;
+              cursor:pointer;
+              font-size:12px;
+              color:var(--text-dim);
+            ">
+              <input type="checkbox" id="authRememberEmail">
+              Recordar mi correo
+            </label>
+            <span style="font-size:9px;color:var(--text-dim);opacity:.75;">
+              La contraseña la guarda tu dispositivo
+            </span>
+          </div>` : ""}
         ${isSignup ? `
           <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
             <input type="checkbox" id="authAcceptTerms" style="margin-top:3px;">
@@ -393,6 +448,10 @@ function renderAuthForm(mode) {
         <div id="authError" class="error-msg"></div>
       </div>
     </div>`;
+
+  if (!isSignup) {
+    setTimeout(syncRememberedLoginEmail, 0);
+  }
 }
 
 function closeAuthModal() {
@@ -515,6 +574,8 @@ async function handleForgotPassword() {
 }
 
 async function handleLogin() {
+  saveRememberedLoginEmail();
+
   const email = document.getElementById("authEmail").value.trim();
   const password = document.getElementById("authPassword").value;
   const errEl = document.getElementById("authError");

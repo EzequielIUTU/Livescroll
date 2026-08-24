@@ -1702,7 +1702,150 @@ async function handleAcceptNewTerms() {
   checkPendingContent(); // por si también hay tutorial o changelog pendiente, se muestra después
 }
 
+
+const LS_SECONDARY_REVISION_PREFIX = "[REVISION_SECUNDARIA]";
+
+function isSecondaryRevisionEntry(entry) {
+  return String(entry?.content || "").trim().startsWith(LS_SECONDARY_REVISION_PREFIX);
+}
+
+function cleanChangelogContent(content) {
+  let value = String(content || "").trim();
+
+  if (value.startsWith(LS_SECONDARY_REVISION_PREFIX)) {
+    value = value.slice(LS_SECONDARY_REVISION_PREFIX.length).trim();
+  }
+
+  // Evitamos repetir el nombre de la app dentro de cada punto.
+  value = value
+    .replace(/^Revisión secundaria de LiveScroll\s+[0-9.]+\s+/i, "")
+    .replace(/\bLiveScroll\b(?=\s+continúa|\s+mantiene|\s+fue)/gi, "La app");
+
+  return value;
+}
+
 function showChangelogModal(entries) {
+  const allEntries = Array.isArray(entries) ? entries : [];
+  const secondaryEntries = allEntries.filter(isSecondaryRevisionEntry);
+
+  // Si este aviso corresponde SOLO a una revisión secundaria,
+  // lo mostramos separado de la publicación principal de la versión.
+  if (secondaryEntries.length && secondaryEntries.length === allEntries.length) {
+    const wrap = document.getElementById("globalModalWrap");
+    if (!wrap) return;
+
+    const newest = secondaryEntries.reduce(
+      (max, e) => Math.max(max, Number(e.version || 0)),
+      0
+    );
+
+    const displayVersion =
+      secondaryEntries.find(e => e.display_version)?.display_version ||
+      secondaryEntries[0]?.display_version ||
+      "";
+
+    const cleaned = secondaryEntries
+      .map(e => cleanChangelogContent(e.content))
+      .filter(Boolean)
+      // El encabezado ya comunica que la revisión fue aprobada.
+      .filter(c => !/^completada y aprobada\.?$/i.test(c))
+      .filter((c, i, arr) => arr.indexOf(c) === i);
+
+    window.__lsChangelogShownVersion = Math.max(
+      Number(window.__lsChangelogShownVersion || 0),
+      newest
+    );
+
+    wrap.innerHTML = `
+      <div id="changelogOverlay" class="modal-overlay" style="z-index:140;">
+        <div id="changelogBox" class="modal-box" style="
+          max-width:480px;
+          max-height:88vh;
+          overflow:hidden;
+          display:flex;
+          flex-direction:column;
+          border:1px solid rgba(96,165,250,.24);
+          box-shadow:0 24px 80px rgba(0,0,0,.52),0 0 36px rgba(59,130,246,.08);
+        ">
+          <div class="modal-box-header" style="align-items:flex-start;">
+            <div>
+              <div style="
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                font-size:9px;
+                font-weight:900;
+                letter-spacing:.1em;
+                color:#7dd3fc;
+                border:1px solid rgba(125,211,252,.22);
+                background:rgba(125,211,252,.06);
+                padding:4px 8px;
+                border-radius:999px;
+                margin-bottom:9px;
+              ">🛡️ REVISIÓN SECUNDARIA</div>
+
+              <h2 style="margin:0;font-size:22px;">Seguridad revisada y aprobada</h2>
+
+              <div style="font-size:11px;color:var(--text-dim);margin-top:5px;">
+                v${escapeHtml(displayVersion)} · revisión adicional
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+            <p style="
+              margin:0 0 14px;
+              font-size:12px;
+              line-height:1.55;
+              color:var(--text-dim);
+            ">
+              Completamos una nueva revisión interna enfocada en protección,
+              permisos y funcionamiento seguro.
+            </p>
+
+            <div style="
+              border:1px solid rgba(96,165,250,.18);
+              background:rgba(59,130,246,.045);
+              border-radius:14px;
+              padding:12px 13px;
+            ">
+              ${cleaned.map(c => `
+                <div style="
+                  display:flex;
+                  align-items:flex-start;
+                  gap:8px;
+                  font-size:12px;
+                  line-height:1.5;
+                  color:var(--text-dim);
+                  margin:${cleaned.indexOf(c) === cleaned.length - 1 ? "0" : "0 0 9px"};
+                ">
+                  <span style="color:#60a5fa;font-weight:900;">✓</span>
+                  <span>${escapeHtml(c)}</span>
+                </div>
+              `).join("")}
+            </div>
+
+            <div style="
+              margin-top:12px;
+              font-size:10px;
+              color:var(--text-dim);
+              opacity:.85;
+              text-align:center;
+            ">
+              Sin cambios necesarios de tu parte.
+            </div>
+          </div>
+
+          <div class="modal-box-footer">
+            <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">
+              Entendido ✓
+            </button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
     actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
@@ -1729,7 +1872,7 @@ function showChangelogModal(entries) {
       byVersion[version].releaseDate = e.release_date;
     }
     byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
-    byVersion[version].cats[e.category].push(e.content);
+    byVersion[version].cats[e.category].push(cleanChangelogContent(e.content));
   });
 
   const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
@@ -1864,15 +2007,18 @@ async function openChangelogHistory() {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">
-      <div class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+      <div class="modal-box" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
-          <h2>📢 Novedades</h2>
+          <div>
+            <h2 style="margin:0;">📢 Novedades</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
+              Versiones y revisiones publicadas
+            </div>
+          </div>
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
+
         <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
-          <p style="color:var(--text-dim);font-size:12px;margin-top:0;margin-bottom:16px;">
-            Historial completo de las últimas versiones publicadas de LiveScroll.
-          </p>
           <div id="changelogHistoryList">Cargando...</div>
         </div>
       </div>
@@ -1880,13 +2026,12 @@ async function openChangelogHistory() {
 
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
-    actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    actualizado: { title: "🔄 Mejoras", color: "var(--gold)" },
     emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
 
-  // Pedimos más filas porque p_limit limita entradas, no versiones completas.
   const { data: entries, error } = await sb.rpc("get_changelog_history_v2", { p_limit: 200 });
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
@@ -1904,24 +2049,29 @@ async function openChangelogHistory() {
     const pa = semverParts(a);
     const pb = semverParts(b);
     const max = Math.max(pa.length, pb.length, 3);
+
     for (let i = 0; i < max; i++) {
       const av = pa[i] || 0;
       const bv = pb[i] || 0;
       if (av !== bv) return bv - av;
     }
+
     return 0;
   };
 
-  // Agrupamos por la versión que ve el usuario, NO por el número interno.
+  // Agrupamos primero por versión visible y luego por revisión interna.
+  // Así 5.8.3 principal y 5.8.3 revisión secundaria NO quedan mezcladas.
   const byDisplayVersion = {};
+
   entries.forEach(e => {
     const display = String(e.display_version || `${e.version}.0.0`);
+    const internal = Number(e.version || 0);
+
     if (!byDisplayVersion[display]) {
       byDisplayVersion[display] = {
         display,
-        releaseDate: e.release_date || null,
-        internalVersions: new Set(),
-        cats: {}
+        releaseDate:e.release_date || null,
+        revisions:{}
       };
     }
 
@@ -1929,13 +2079,23 @@ async function openChangelogHistory() {
       byDisplayVersion[display].releaseDate = e.release_date;
     }
 
-    byDisplayVersion[display].internalVersions.add(Number(e.version || 0));
-    byDisplayVersion[display].cats[e.category] =
-      byDisplayVersion[display].cats[e.category] || [];
+    if (!byDisplayVersion[display].revisions[internal]) {
+      byDisplayVersion[display].revisions[internal] = {
+        internal,
+        secondary:false,
+        cats:{}
+      };
+    }
 
-    // Evitamos líneas duplicadas si una versión tuvo más de una publicación interna.
-    if (!byDisplayVersion[display].cats[e.category].includes(e.content)) {
-      byDisplayVersion[display].cats[e.category].push(e.content);
+    const revision = byDisplayVersion[display].revisions[internal];
+    if (isSecondaryRevisionEntry(e)) revision.secondary = true;
+
+    const cleaned = cleanChangelogContent(e.content);
+
+    revision.cats[e.category] = revision.cats[e.category] || [];
+
+    if (cleaned && !revision.cats[e.category].includes(cleaned)) {
+      revision.cats[e.category].push(cleaned);
     }
   });
 
@@ -1943,42 +2103,173 @@ async function openChangelogHistory() {
   const currentDisplayVersion = versions[0];
 
   const formatReleaseDate = (value) => {
-    if (!value) return "Fecha no registrada";
+    if (!value) return "";
     const d = new Date(`${value}T12:00:00`);
     return Number.isNaN(d.getTime())
-      ? String(value)
-      : d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
+      ? ""
+      : d.toLocaleDateString("es-AR", {
+          day:"2-digit",
+          month:"short",
+          year:"numeric"
+        });
+  };
+
+  const renderSecondaryRevision = (revision) => {
+    const allLines = Object.values(revision.cats)
+      .flat()
+      .filter(Boolean)
+      // No repetimos una línea genérica que ya expresa el encabezado.
+      .filter(c => !/^completada y aprobada\.?$/i.test(c))
+      .filter((c, i, arr) => arr.indexOf(c) === i);
+
+    return `
+      <div style="
+        margin:12px 0 14px;
+        border:1px solid rgba(96,165,250,.20);
+        background:linear-gradient(135deg,rgba(59,130,246,.055),rgba(255,255,255,.012));
+        border-radius:14px;
+        padding:12px 13px;
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;">
+          <div style="
+            display:flex;
+            align-items:center;
+            gap:7px;
+            font-size:12px;
+            font-weight:900;
+            color:#7dd3fc;
+          ">
+            <span>🛡️</span>
+            <span>Revisión secundaria</span>
+          </div>
+
+          <span style="
+            font-size:8px;
+            font-weight:900;
+            letter-spacing:.06em;
+            color:#93c5fd;
+            border:1px solid rgba(147,197,253,.18);
+            padding:3px 6px;
+            border-radius:999px;
+          ">APROBADA</span>
+        </div>
+
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:9px;">
+          Seguridad y protección
+        </div>
+
+        ${allLines.map(c => `
+          <div style="
+            display:flex;
+            align-items:flex-start;
+            gap:7px;
+            font-size:12px;
+            line-height:1.5;
+            color:var(--text-dim);
+            margin-bottom:7px;
+          ">
+            <span style="color:#60a5fa;font-weight:900;">✓</span>
+            <span>${escapeHtml(c)}</span>
+          </div>
+        `).join("")}
+      </div>`;
+  };
+
+  const renderMainRevision = (revision) => {
+    return ["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => {
+      const lines = revision.cats[cat] || [];
+      if (!lines.length) return "";
+
+      return `
+        <div style="margin-bottom:12px;">
+          <div style="
+            font-weight:700;
+            font-size:12px;
+            color:${labels[cat]?.color || "var(--text-dim)"};
+            margin-bottom:6px;
+          ">
+            ${labels[cat]?.title || escapeHtml(cat)}
+          </div>
+
+          ${lines.map(c => `
+            <div style="
+              font-size:12px;
+              color:var(--text-dim);
+              margin-bottom:5px;
+              line-height:1.48;
+            ">• ${escapeHtml(c)}</div>
+          `).join("")}
+        </div>`;
+    }).join("");
   };
 
   list.innerHTML = versions.map(display => {
     const info = byDisplayVersion[display];
+    const revisions = Object.values(info.revisions)
+      .sort((a, b) => b.internal - a.internal);
+
+    const secondary = revisions.filter(r => r.secondary);
+    const main = revisions.filter(r => !r.secondary);
+
+    const dateText = formatReleaseDate(info.releaseDate);
 
     return `
-      <div style="margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);">
-            v${escapeHtml(display)} · ${escapeHtml(formatReleaseDate(info.releaseDate))}
+      <section style="
+        margin-bottom:18px;
+        padding-bottom:18px;
+        border-bottom:1px solid var(--border);
+      ">
+        <div style="
+          display:flex;
+          align-items:flex-start;
+          justify-content:space-between;
+          gap:10px;
+          margin-bottom:10px;
+        ">
+          <div>
+            <div style="
+              font-family:'JetBrains Mono',monospace;
+              font-size:14px;
+              color:var(--text);
+              font-weight:900;
+            ">v${escapeHtml(display)}</div>
+
+            ${dateText ? `
+              <div style="
+                font-family:'JetBrains Mono',monospace;
+                font-size:9px;
+                color:var(--text-dim);
+                margin-top:3px;
+              ">${escapeHtml(dateText)}</div>
+            ` : ""}
           </div>
+
           ${display === currentDisplayVersion
-            ? `<span style="font-size:10px;font-weight:700;color:#12130f;background:var(--green);padding:2px 8px;border-radius:20px;letter-spacing:.04em;">ACTUAL</span>`
+            ? `<span style="
+                font-size:9px;
+                font-weight:900;
+                color:#12130f;
+                background:var(--green);
+                padding:3px 8px;
+                border-radius:20px;
+                letter-spacing:.04em;
+              ">ACTUAL</span>`
             : ""}
         </div>
 
-        ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat =>
-          info.cats[cat] ? `
-            <div style="margin-bottom:10px;">
-              <div style="font-weight:600;font-size:13px;color:${labels[cat].color};margin-bottom:6px;">
-                ${labels[cat].title}
-              </div>
-              ${info.cats[cat].map(c =>
-                `<div style="font-size:13px;color:var(--text-dim);margin-bottom:4px;">• ${escapeHtml(c)}</div>`
-              ).join("")}
-            </div>`
-          : ""
-        ).join("")}
-      </div>`;
+        ${secondary.map(renderSecondaryRevision).join("")}
+
+        ${main.length ? `
+          <div style="
+            padding:${secondary.length ? "4px 2px 0" : "0 2px"};
+          ">
+            ${main.map(renderMainRevision).join("")}
+          </div>
+        ` : ""}
+      </section>`;
   }).join("");
 }
+
 
 function closeChangelogHistory() {
   document.getElementById("globalModalWrap").innerHTML = "";

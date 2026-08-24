@@ -2987,48 +2987,623 @@ async function acknowledgeRoadTo6Teaser() {
 }
 
 
-const tutorialSteps = [
-  {icon:"👋",tag:"BIENVENIDA",title:"Tu LiveScroll, en pocos pasos",text:"Te mostramos lo esencial para empezar sin llenarte de información.",demo:"feed"},
-  {icon:"✨",tag:"DESCUBRIR",title:"Para ti",text:"Deslizá para descubrir clips y creadores de la comunidad.",demo:"feed"},
-  {icon:"❤️",tag:"COMUNIDAD",title:"Participá a tu manera",text:"Dale Me gusta, comentá, seguí perfiles y compartí lo que te interese.",demo:"actions"},
-  {icon:"👤",tag:"TU ESPACIO",title:"Perfil y notificaciones",text:"Administrá tu perfil y usá la campanita para enterarte de lo importante.",demo:"profile"},
-  {icon:"⚙️",tag:"A TU MEDIDA",title:"Configuración y accesibilidad",text:"Ajustá Visión cómoda, contraste y fuerza del texto. También se aplica a Novedades y carteles.",demo:"settings"},
-  {icon:"🚀",tag:"TODO LISTO",title:"Empezá a explorar",text:"Ya conocés lo principal. Podés volver a abrir este tutorial desde el menú cuando quieras.",demo:"ready"}
-];
-let tutorialStepIndex = 0;
+// ============================================================
+// LIVESCROLL · TUTORIAL V3 · TOUR COMPLETO
+// Recorre las secciones REALES de la app.
+// ============================================================
 
-function installTutorialV2Styles(){
-  if(document.getElementById("lsTutorialV2Styles")) return;
-  const s=document.createElement("style"); s.id="lsTutorialV2Styles";
-  s.textContent=`
-  .ls-tut-overlay{z-index:135;background:rgba(3,5,9,.78);backdrop-filter:blur(9px)}
-  .ls-tut-card{width:min(92vw,470px);max-width:470px!important;overflow:hidden;border:1px solid rgba(255,255,255,.11);box-shadow:0 28px 80px rgba(0,0,0,.46)}
-  .ls-tut-head{padding:18px 20px 8px;display:flex;justify-content:space-between;gap:12px}.ls-tut-tag{color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.16em;margin-bottom:5px}.ls-tut-head h2{margin:0;font-size:20px}.ls-tut-count{height:max-content;border:1px solid var(--border);border-radius:999px;padding:6px 9px;color:var(--text-dim);font-size:9px;font-weight:850}
-  .ls-tut-body{padding:8px 20px 15px}.ls-tut-demo{min-height:180px;border:1px solid var(--border);border-radius:18px;background:radial-gradient(circle at 50% 10%,rgba(218,165,32,.12),transparent 40%),rgba(255,255,255,.012);display:grid;place-items:center;padding:18px;margin-bottom:14px}.ls-tut-icon{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:23px;margin:0 auto 10px;background:rgba(218,165,32,.09);border:1px solid rgba(218,165,32,.20)}.ls-tut-copy{text-align:center;color:var(--text-dim);font-size:13px;line-height:1.6;margin:0}
-  .ls-tut-footer{padding:13px 20px 18px;border-top:1px solid var(--border)}.ls-tut-progress{display:flex;gap:5px;margin-bottom:12px}.ls-tut-progress i{height:5px;flex:1;border-radius:99px;background:var(--border)}.ls-tut-progress i.on{background:var(--gold)}.ls-tut-buttons{display:grid;grid-template-columns:1fr 1.2fr;gap:8px}.ls-tut-buttons.one{grid-template-columns:1fr}.ls-tut-skip{width:100%;margin-top:9px;border:0;background:transparent;color:var(--text-dim);font:inherit;font-size:10px;cursor:pointer}
-  .ls-demo-phone{width:min(235px,72vw);padding:12px;border-radius:17px;background:#090b10;border:1px solid rgba(255,255,255,.1)}.ls-demo-top{display:flex;justify-content:space-between;font-size:10px;margin-bottom:9px}.ls-demo-top b:last-child{color:var(--gold)}.ls-demo-video{height:105px;border-radius:11px;display:grid;place-items:center;font-size:24px;background:linear-gradient(135deg,rgba(218,165,32,.22),rgba(129,92,246,.12)),#121620}.ls-demo-row{text-align:right;padding-top:9px;font-size:16px}
-  .ls-demo-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%}.ls-demo-actions div{padding:14px 4px;border:1px solid var(--border);border-radius:12px;text-align:center;font-size:22px}.ls-demo-actions small{display:block;font-size:8px;color:var(--text-dim);margin-top:6px}.ls-demo-profile{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border:1px solid var(--border);border-radius:14px}.ls-demo-avatar{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:#111;font-weight:950}.ls-demo-profile span{flex:1;font-size:11px}.ls-demo-profile small{display:block;color:var(--text-dim);margin-top:4px}.ls-demo-settings{width:100%;display:grid;gap:9px}.ls-demo-settings div{padding:10px 12px;border:1px solid var(--border);border-radius:11px;font-size:9px}.ls-demo-settings b{display:block;color:var(--gold);margin-top:4px}.ls-demo-settings i{display:block;height:6px;background:var(--border);border-radius:99px;margin-top:7px;overflow:hidden}.ls-demo-settings em{display:block;height:100%;background:var(--gold)}.ls-demo-ready{text-align:center}.ls-demo-ready strong{width:68px;height:68px;border-radius:21px;display:grid;place-items:center;margin:0 auto 12px;background:var(--gold);color:#111;font-size:21px}.ls-demo-ready small{display:block;color:var(--text-dim);margin-top:4px}
-  @media(max-width:520px){.ls-tut-card{width:calc(100vw - 22px);max-height:92dvh}.ls-tut-head{padding:15px 15px 7px}.ls-tut-body{padding:7px 15px 12px}.ls-tut-footer{padding:11px 15px 15px}.ls-tut-demo{min-height:160px;padding:13px}.ls-demo-actions{grid-template-columns:repeat(2,1fr)}}`;
-  document.head.appendChild(s);
+const LS_TUTORIAL_V3_STEPS = [
+  {
+    key:"welcome",
+    icon:"👋",
+    eyebrow:"BIENVENIDA",
+    title:"Conocé LiveScroll de verdad",
+    text:"Este tour va a recorrer la app real. Podés avanzar, volver atrás u omitirlo cuando quieras."
+  },
+  {
+    key:"feed",
+    tab:"feed",
+    selector:"#tab-feed",
+    icon:"🎬",
+    eyebrow:"MIRAR",
+    title:"El Feed principal",
+    text:"Acá aparecen los videos de la comunidad. Podés desplazarte y descubrir contenido nuevo."
+  },
+  {
+    key:"feed-actions",
+    tab:"feed",
+    selector:".feed-actions",
+    icon:"❤️",
+    eyebrow:"INTERACTUAR",
+    title:"Me gusta, comentarios y compartir",
+    text:"Desde los controles del video podés dar Me gusta, comentar y compartir. Si no hay videos todavía, el tour igual continúa."
+  },
+  {
+    key:"foryou",
+    tab:"foryou",
+    selector:"#tab-foryou",
+    icon:"✨",
+    eyebrow:"DESCUBRIR",
+    title:"Para Ti",
+    text:"Esta sección reúne contenido destacado para ayudarte a encontrar publicaciones que pueden interesarte."
+  },
+  {
+    key:"upload",
+    tab:"upload",
+    selector:"#tab-upload",
+    icon:"⬆️",
+    eyebrow:"CREAR",
+    title:"Subir video",
+    text:"Desde acá publicás tus clips. Elegís el archivo, completás los datos y LiveScroll se encarga del resto."
+  },
+  {
+    key:"profile",
+    tab:"profile",
+    selector:"#tab-profile",
+    icon:"👤",
+    eyebrow:"TU ESPACIO",
+    title:"Mi Perfil",
+    text:"Tu perfil reúne tus videos, identidad, medallas y datos públicos."
+  },
+  {
+    key:"profile-edit",
+    tab:"profile",
+    selector:"button[onclick*='openEditProfile']",
+    icon:"✏️",
+    eyebrow:"PERSONALIZAR",
+    title:"Editar perfil",
+    text:"Cuando quieras cambiar foto, portada, bio u otros datos, lo hacés desde Editar perfil."
+  },
+  {
+    key:"users",
+    tab:"users",
+    selector:"#tab-users",
+    icon:"👥",
+    eyebrow:"COMUNIDAD",
+    title:"Usuarios",
+    text:"Buscá otras personas, visitá perfiles y descubrí quién forma parte de la comunidad."
+  },
+  {
+    key:"directos",
+    tab:"directos",
+    selector:"#tab-directos",
+    icon:"🔴",
+    eyebrow:"EN VIVO",
+    title:"Directos",
+    text:"Cuando haya transmisiones públicas activas, las vas a encontrar en esta sección."
+  },
+  {
+    key:"wallet",
+    tab:"wallet",
+    selector:"#tab-wallet",
+    icon:"💰",
+    eyebrow:"TUS PUNTOS",
+    title:"Billetera",
+    text:"Acá podés consultar tu balance, movimientos y opciones relacionadas con tus puntos."
+  },
+  {
+    key:"plans",
+    tab:"plans",
+    selector:"#tab-plans",
+    icon:"💎",
+    eyebrow:"CUENTA",
+    title:"Planes",
+    text:"Cuando los planes estén disponibles, esta sección muestra las opciones y beneficios para tu cuenta."
+  },
+  {
+    key:"store",
+    tab:"store",
+    selector:"#tab-store",
+    icon:"🛍️",
+    eyebrow:"PERSONALIZAR",
+    title:"Tienda",
+    text:"Usá tus puntos para explorar medallas, emojis, títulos y otros artículos disponibles."
+  },
+  {
+    key:"ranking",
+    tab:"ranking",
+    selector:"#tab-ranking",
+    icon:"🏆",
+    eyebrow:"COMUNIDAD",
+    title:"Ranking",
+    text:"Consultá quiénes generaron más actividad y puntos durante el período mostrado."
+  },
+  {
+    key:"notifications",
+    selector:"#notifBell",
+    icon:"🔔",
+    eyebrow:"AL DÍA",
+    title:"Notificaciones",
+    text:"La campanita te avisa sobre interacciones, novedades y otros eventos importantes de tu cuenta."
+  },
+  {
+    key:"news",
+    selector:".nav-changelog-btn",
+    icon:"📢",
+    eyebrow:"NOVEDADES",
+    title:"Qué cambió en LiveScroll",
+    text:"Novedades reúne versiones, mejoras, reparaciones y revisiones publicadas."
+  },
+  {
+    key:"settings",
+    selector:".ls-pc-settings-gear",
+    icon:"⚙️",
+    eyebrow:"A TU MEDIDA",
+    title:"Configuración",
+    text:"Ajustá Visión cómoda, contraste y fuerza del texto. En celular encontrás Configuración dentro del menú ☰."
+  },
+  {
+    key:"accessibility",
+    icon:"👁️",
+    eyebrow:"ACCESIBILIDAD",
+    title:"Visión cómoda",
+    text:"Si necesitás una interfaz más grande o más marcada, LiveScroll puede adaptar textos, controles y carteles sin usar zoom."
+  },
+  {
+    key:"security",
+    icon:"🔐",
+    eyebrow:"SEGURIDAD",
+    title:"Recuperación de contraseña",
+    text:"Si olvidás tu contraseña, usá “Olvidaste tu contraseña”. El enlace recibido te permite crear una nueva y volver al inicio de sesión."
+  },
+  {
+    key:"finish",
+    icon:"🚀",
+    eyebrow:"LISTO",
+    title:"Ya conocés LiveScroll",
+    text:"Terminaste el recorrido. Podés abrir este tutorial nuevamente desde el menú cuando quieras."
+  }
+];
+
+let tutorialStepIndex = 0;
+let lsTutorialV3Steps = [];
+let lsTutorialPreviousTab = null;
+
+function installTutorialV3Styles() {
+  if (document.getElementById("lsTutorialV3Styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsTutorialV3Styles";
+  style.textContent = `
+    #lsTutorialV3Layer {
+      position:fixed;
+      inset:0;
+      z-index:380;
+      pointer-events:none;
+    }
+
+    #lsTutorialV3Shade {
+      position:absolute;
+      inset:0;
+      background:rgba(3,5,9,.50);
+      backdrop-filter:blur(1.5px);
+      transition:.22s ease;
+    }
+
+    .ls-tutorial-spotlight {
+      position:relative !important;
+      z-index:382 !important;
+      border-radius:12px !important;
+      outline:2px solid var(--gold) !important;
+      outline-offset:4px !important;
+      box-shadow:
+        0 0 0 7px rgba(218,165,32,.12),
+        0 14px 42px rgba(0,0,0,.42) !important;
+      animation:lsTutorialPulse 1.35s ease-in-out infinite;
+    }
+
+    @keyframes lsTutorialPulse {
+      0%,100% { outline-color:var(--gold); }
+      50% { outline-color:color-mix(in srgb,var(--gold) 55%,white); }
+    }
+
+    #lsTutorialV3Card {
+      pointer-events:auto;
+      position:fixed;
+      z-index:390;
+      width:min(390px,calc(100vw - 24px));
+      left:50%;
+      bottom:18px;
+      transform:translateX(-50%);
+      border:1px solid rgba(255,255,255,.13);
+      border-radius:18px;
+      background:color-mix(in srgb,var(--panel) 96%,black);
+      box-shadow:0 26px 90px rgba(0,0,0,.56);
+      overflow:hidden;
+    }
+
+    .ls-tut-v3-head {
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      padding:16px 17px 8px;
+    }
+
+    .ls-tut-v3-eye {
+      color:var(--gold);
+      font-size:8px;
+      line-height:1;
+      font-weight:950;
+      letter-spacing:.15em;
+      margin-bottom:5px;
+    }
+
+    .ls-tut-v3-head h2 {
+      margin:0;
+      font-size:18px;
+      line-height:1.2;
+    }
+
+    .ls-tut-v3-count {
+      white-space:nowrap;
+      padding:5px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      color:var(--text-dim);
+      font-size:9px;
+      font-weight:850;
+      background:var(--panel-2);
+    }
+
+    .ls-tut-v3-body {
+      padding:6px 17px 13px;
+    }
+
+    .ls-tut-v3-row {
+      display:flex;
+      align-items:flex-start;
+      gap:11px;
+    }
+
+    .ls-tut-v3-icon {
+      width:42px;
+      height:42px;
+      flex:0 0 auto;
+      display:grid;
+      place-items:center;
+      border-radius:13px;
+      border:1px solid rgba(218,165,32,.22);
+      background:rgba(218,165,32,.08);
+      font-size:21px;
+    }
+
+    .ls-tut-v3-copy {
+      margin:0;
+      color:var(--text-dim);
+      font-size:12px;
+      line-height:1.55;
+    }
+
+    .ls-tut-v3-progress {
+      display:flex;
+      gap:3px;
+      padding:0 17px 12px;
+    }
+
+    .ls-tut-v3-progress span {
+      height:4px;
+      flex:1;
+      border-radius:999px;
+      background:var(--border);
+      transition:.18s ease;
+    }
+
+    .ls-tut-v3-progress span.done,
+    .ls-tut-v3-progress span.active {
+      background:var(--gold);
+    }
+
+    .ls-tut-v3-footer {
+      padding:11px 17px 15px;
+      border-top:1px solid var(--border);
+    }
+
+    .ls-tut-v3-controls {
+      display:grid;
+      grid-template-columns:1fr 1.25fr;
+      gap:8px;
+    }
+
+    .ls-tut-v3-controls.one {
+      grid-template-columns:1fr;
+    }
+
+    .ls-tut-v3-skip {
+      margin-top:9px;
+      width:100%;
+      padding:4px;
+      border:0;
+      background:transparent;
+      color:var(--text-dim);
+      font-family:inherit;
+      font-size:9px;
+      cursor:pointer;
+    }
+
+    .ls-tut-v3-target-note {
+      margin-top:9px;
+      padding:8px 9px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      color:var(--text-dim);
+      font-size:9px;
+      line-height:1.4;
+      background:rgba(255,255,255,.018);
+    }
+
+    @media(max-width:700px) {
+      #lsTutorialV3Card {
+        bottom:9px;
+        width:calc(100vw - 16px);
+        border-radius:16px;
+      }
+
+      #lsTutorialV3Shade {
+        background:rgba(3,5,9,.38);
+        backdrop-filter:none;
+      }
+
+      .ls-tut-v3-head {
+        padding:14px 14px 7px;
+      }
+
+      .ls-tut-v3-body {
+        padding:5px 14px 11px;
+      }
+
+      .ls-tut-v3-progress {
+        padding:0 14px 10px;
+      }
+
+      .ls-tut-v3-footer {
+        padding:10px 14px 13px;
+      }
+
+      .ls-tutorial-spotlight {
+        outline-offset:2px !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
 }
-function tutorialDemo(type){
-  if(type==="actions") return `<div class="ls-demo-actions"><div>♡<small>Me gusta</small></div><div>💬<small>Comentar</small></div><div>＋<small>Seguir</small></div><div>↗<small>Compartir</small></div></div>`;
-  if(type==="profile") return `<div class="ls-demo-profile"><div class="ls-demo-avatar">LS</div><span><b>Tu perfil</b><small>Clips · Medallas · Actividad</small></span><b>🔔</b></div>`;
-  if(type==="settings") return `<div class="ls-demo-settings"><div>Visión cómoda<b>Grande</b></div><div>Contraste<i><em style="width:76%"></em></i></div><div>Fuerza del texto<i><em style="width:62%"></em></i></div></div>`;
-  if(type==="ready") return `<div class="ls-demo-ready"><strong>LS</strong><b>Todo preparado</b><small>Tu experiencia empieza acá.</small></div>`;
-  return `<div class="ls-demo-phone"><div class="ls-demo-top"><b>LiveScroll</b><b>Para ti</b></div><div class="ls-demo-video">▶</div><div class="ls-demo-row">♡　💬　↗</div></div>`;
+
+function buildTutorialV3Steps() {
+  return LS_TUTORIAL_V3_STEPS.filter(step => {
+    if (step.tab === "wallet" && !document.getElementById("tab-wallet")) return false;
+    if (step.tab === "plans" && !document.getElementById("tab-plans")) return false;
+    return true;
+  });
 }
-function showTutorialModal(){
-  tutorialStepIndex=0; installTutorialV2Styles(); const wrap=document.getElementById("globalModalWrap"); if(!wrap)return;
-  wrap.innerHTML=`<div class="modal-overlay ls-tut-overlay ls-modal-locked" data-modal-locked="1"><div class="modal-box ls-tut-card"><div class="ls-tut-head"><div><div id="tutorialTag" class="ls-tut-tag"></div><h2 id="tutorialStepTitle"></h2></div><div id="tutorialCount" class="ls-tut-count"></div></div><div class="ls-tut-body"><div id="tutorialDemo" class="ls-tut-demo"></div><div id="tutorialIcon" class="ls-tut-icon"></div><p id="tutorialText" class="ls-tut-copy"></p></div><div class="ls-tut-footer"><div id="tutorialProgress" class="ls-tut-progress"></div><div id="tutorialButtons" class="ls-tut-buttons"><button id="tutorialBack" class="btn-outline" onclick="tutorialPreviousStep()">Anterior</button><button id="tutorialNext" class="btn" onclick="tutorialNextStep()">Siguiente</button></div><button id="tutorialSkip" class="ls-tut-skip" onclick="handleAcceptTutorial()">Omitir tutorial</button></div></div></div>`; renderTutorialStep();
+
+function clearTutorialV3Spotlight() {
+  document.querySelectorAll(".ls-tutorial-spotlight").forEach(el => {
+    el.classList.remove("ls-tutorial-spotlight");
+  });
 }
-function renderTutorialStep(){
-  const x=tutorialSteps[tutorialStepIndex],first=tutorialStepIndex===0,last=tutorialStepIndex===tutorialSteps.length-1;
-  tutorialTag.textContent=x.tag; tutorialStepTitle.textContent=x.title; tutorialCount.textContent=`${tutorialStepIndex+1} de ${tutorialSteps.length}`; tutorialDemo.innerHTML=window.tutorialDemo(x.demo); tutorialIcon.textContent=x.icon; tutorialText.textContent=x.text; tutorialProgress.innerHTML=tutorialSteps.map((_,i)=>`<i class="${i<=tutorialStepIndex?'on':''}"></i>`).join(""); tutorialBack.style.display=first?"none":""; tutorialNext.textContent=last?"Empezar a explorar":"Siguiente"; tutorialSkip.style.display=last?"none":""; tutorialButtons.classList.toggle("one",first||last);
+
+function findTutorialV3Target(step) {
+  if (!step?.selector) return null;
+
+  const candidates = document.querySelectorAll(step.selector);
+  for (const el of candidates) {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      style.display !== "none" &&
+      style.visibility !== "hidden"
+    ) {
+      return el;
+    }
+  }
+
+  return null;
 }
-function tutorialPreviousStep(){if(tutorialStepIndex>0){tutorialStepIndex--;renderTutorialStep();}}
-function tutorialNextStep(){if(tutorialStepIndex<tutorialSteps.length-1){tutorialStepIndex++;renderTutorialStep();}else handleAcceptTutorial();}
-async function handleAcceptTutorial(){if(currentUser?.id)await sb.rpc("acknowledge_content",{p_user_id:currentUser.id,p_content_key:"tutorial"});const wrap=document.getElementById("globalModalWrap");if(wrap)wrap.innerHTML="";checkPendingContent();}
+
+function openTutorialV3MobileMenuIfUseful(step) {
+  if (window.innerWidth > 700) return;
+
+  // Para Configuración/Novedades, en móvil esas opciones viven en ☰.
+  if (!["settings","news"].includes(step.key)) return;
+
+  const menu = document.querySelector(".mobile-menu-panel");
+  if (menu) return;
+
+  if (typeof openMobileMenu === "function") {
+    try { openMobileMenu(); } catch (_) {}
+  }
+}
+
+async function prepareTutorialV3Step(step) {
+  clearTutorialV3Spotlight();
+
+  if (step.tab && currentTab !== step.tab) {
+    switchTab(step.tab);
+
+    // Damos tiempo a que la sección real termine de renderizar.
+    await new Promise(resolve => setTimeout(resolve, 220));
+  }
+
+  openTutorialV3MobileMenuIfUseful(step);
+
+  // Algunas vistas hacen trabajo async después de switchTab.
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  let target = findTutorialV3Target(step);
+
+  // En móvil intentamos localizar la opción equivalente dentro del menú.
+  if (!target && window.innerWidth <= 700) {
+    const mobileLabels = {
+      news:"Novedades",
+      settings:"Configuración"
+    };
+
+    const label = mobileLabels[step.key];
+    if (label) {
+      const buttons = Array.from(document.querySelectorAll(".mobile-menu-panel button"));
+      target = buttons.find(b => b.textContent.includes(label)) || null;
+    }
+  }
+
+  if (target) {
+    target.classList.add("ls-tutorial-spotlight");
+
+    try {
+      target.scrollIntoView({
+        behavior:"smooth",
+        block:"center",
+        inline:"center"
+      });
+    } catch (_) {}
+  }
+
+  return target;
+}
+
+function showTutorialModal() {
+  installTutorialV3Styles();
+
+  lsTutorialPreviousTab = currentTab || "feed";
+  lsTutorialV3Steps = buildTutorialV3Steps();
+  tutorialStepIndex = 0;
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+
+  if (document.getElementById("lsTutorialV3Layer")) {
+    document.getElementById("lsTutorialV3Layer").remove();
+  }
+
+  const layer = document.createElement("div");
+  layer.id = "lsTutorialV3Layer";
+  layer.innerHTML = `
+    <div id="lsTutorialV3Shade"></div>
+
+    <div id="lsTutorialV3Card">
+      <div class="ls-tut-v3-head">
+        <div>
+          <div class="ls-tut-v3-eye" id="lsTutorialV3Eyebrow"></div>
+          <h2 id="lsTutorialV3Title"></h2>
+        </div>
+        <div class="ls-tut-v3-count" id="lsTutorialV3Count"></div>
+      </div>
+
+      <div class="ls-tut-v3-body">
+        <div class="ls-tut-v3-row">
+          <div class="ls-tut-v3-icon" id="lsTutorialV3Icon"></div>
+          <p class="ls-tut-v3-copy" id="lsTutorialV3Text"></p>
+        </div>
+        <div class="ls-tut-v3-target-note" id="lsTutorialV3TargetNote">
+          La zona resaltada es la parte real de LiveScroll que estamos explicando.
+        </div>
+      </div>
+
+      <div class="ls-tut-v3-progress" id="lsTutorialV3Progress"></div>
+
+      <div class="ls-tut-v3-footer">
+        <div class="ls-tut-v3-controls" id="lsTutorialV3Controls">
+          <button class="btn-outline" id="lsTutorialV3Back" onclick="tutorialPreviousStep()">Anterior</button>
+          <button class="btn" id="lsTutorialV3Next" onclick="tutorialNextStep()">Siguiente</button>
+        </div>
+
+        <button class="ls-tut-v3-skip" id="lsTutorialV3Skip" onclick="handleAcceptTutorial()">
+          Omitir tutorial
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(layer);
+  renderTutorialStep();
+}
+
+async function renderTutorialStep() {
+  const step = lsTutorialV3Steps[tutorialStepIndex];
+  if (!step) return;
+
+  const first = tutorialStepIndex === 0;
+  const last = tutorialStepIndex === lsTutorialV3Steps.length - 1;
+
+  document.getElementById("lsTutorialV3Eyebrow").textContent = step.eyebrow || "TUTORIAL";
+  document.getElementById("lsTutorialV3Title").textContent = step.title;
+  document.getElementById("lsTutorialV3Count").textContent =
+    `${tutorialStepIndex + 1} de ${lsTutorialV3Steps.length}`;
+  document.getElementById("lsTutorialV3Icon").textContent = step.icon || "✦";
+  document.getElementById("lsTutorialV3Text").textContent = step.text;
+
+  document.getElementById("lsTutorialV3Progress").innerHTML =
+    lsTutorialV3Steps.map((_, i) => `
+      <span class="${i < tutorialStepIndex ? "done" : i === tutorialStepIndex ? "active" : ""}"></span>
+    `).join("");
+
+  const back = document.getElementById("lsTutorialV3Back");
+  const next = document.getElementById("lsTutorialV3Next");
+  const skip = document.getElementById("lsTutorialV3Skip");
+  const controls = document.getElementById("lsTutorialV3Controls");
+  const note = document.getElementById("lsTutorialV3TargetNote");
+
+  back.style.display = first ? "none" : "";
+  next.textContent = last ? "Entrar a LiveScroll" : "Siguiente";
+  skip.style.display = last ? "none" : "";
+  controls.classList.toggle("one", first || last);
+
+  const target = await prepareTutorialV3Step(step);
+
+  note.style.display = step.selector ? "" : "none";
+  if (step.selector && !target) {
+    note.textContent =
+      "Esta función forma parte de LiveScroll, aunque ahora no haya un elemento disponible para resaltar en esta pantalla.";
+  } else {
+    note.textContent =
+      "La zona resaltada es la parte real de LiveScroll que estamos explicando.";
+  }
+}
+
+function tutorialPreviousStep() {
+  if (tutorialStepIndex <= 0) return;
+  tutorialStepIndex--;
+  renderTutorialStep();
+}
+
+function tutorialNextStep() {
+  if (tutorialStepIndex < lsTutorialV3Steps.length - 1) {
+    tutorialStepIndex++;
+    renderTutorialStep();
+    return;
+  }
+
+  handleAcceptTutorial();
+}
+
+async function handleAcceptTutorial() {
+  clearTutorialV3Spotlight();
+
+  const layer = document.getElementById("lsTutorialV3Layer");
+  if (layer) layer.remove();
+
+  // Cerramos el menú móvil si quedó abierto durante el recorrido.
+  if (document.querySelector(".mobile-menu-panel")) {
+    try {
+      if (typeof closeMobileMenu === "function") closeMobileMenu();
+    } catch (_) {}
+  }
+
+  if (currentUser?.id) {
+    await sb.rpc("acknowledge_content", {
+      p_user_id: currentUser.id,
+      p_content_key: "tutorial"
+    });
+  }
+
+  // Terminamos en el Feed para que el usuario arranque desde un lugar conocido.
+  if (typeof switchTab === "function") {
+    switchTab("feed");
+  }
+
+  checkPendingContent();
+}
 
 function showTermsUpdateModal() {
   const wrap = document.getElementById("globalModalWrap");

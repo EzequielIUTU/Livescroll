@@ -2295,9 +2295,9 @@ function ensureSafeMobileUpgradeStyles() {
     .ls-upload-preview-safe {
       display:none;
       position:relative;
-      margin-top:12px;
+      margin:12px auto 0;
       width:100%;
-      aspect-ratio:16 / 10;
+      max-width:100%;
       overflow:hidden;
       border-radius:12px;
       border:1px solid var(--border);
@@ -2308,12 +2308,41 @@ function ensureSafeMobileUpgradeStyles() {
       display:block;
     }
 
+    .ls-upload-preview-safe.landscape {
+      aspect-ratio:16 / 9;
+      max-height:72vh;
+    }
+
+    .ls-upload-preview-safe.portrait {
+      width:min(100%, 420px);
+      aspect-ratio:9 / 16;
+      max-height:72vh;
+    }
+
+    .ls-upload-preview-safe.square {
+      width:min(100%, 560px);
+      aspect-ratio:1 / 1;
+      max-height:72vh;
+    }
+
     .ls-upload-preview-safe video {
       width:100%;
       height:100%;
       display:block;
       object-fit:contain;
       background:#000;
+    }
+
+    @media (max-width:700px) {
+      .ls-upload-preview-safe.landscape {
+        aspect-ratio:16 / 9;
+        max-height:none;
+      }
+
+      .ls-upload-preview-safe.portrait {
+        width:min(86vw, 390px);
+        max-height:66vh;
+      }
     }
 
     .ls-upload-preview-safe .tag {
@@ -4768,7 +4797,10 @@ function clearUploadPreviewSafe() {
     msg.classList.remove("active");
   }
 
-  preview?.classList.remove("active");
+  if (preview) {
+    preview.classList.remove("active", "landscape", "portrait", "square");
+    preview.style.aspectRatio = "";
+  }
 }
 
 function refreshUploadPreviewSafe() {
@@ -4795,6 +4827,31 @@ function refreshUploadPreviewSafe() {
   video.onloadedmetadata = () => {
     video.style.display = "";
     msg.classList.remove("active");
+
+    const vw = Number(video.videoWidth || 0);
+    const vh = Number(video.videoHeight || 0);
+
+    preview.classList.remove("landscape", "portrait", "square");
+
+    if (vw > 0 && vh > 0) {
+      const ratio = vw / vh;
+
+      if (ratio > 1.12) {
+        preview.classList.add("landscape");
+        // Usamos la proporción REAL del archivo, no una caja vertical fija.
+        preview.style.aspectRatio = `${vw} / ${vh}`;
+      } else if (ratio < 0.88) {
+        preview.classList.add("portrait");
+        preview.style.aspectRatio = `${vw} / ${vh}`;
+      } else {
+        preview.classList.add("square");
+        preview.style.aspectRatio = `${vw} / ${vh}`;
+      }
+    } else {
+      // Fallback seguro para navegadores que no informen metadata.
+      preview.classList.add("landscape");
+      preview.style.aspectRatio = "16 / 9";
+    }
   };
 }
 

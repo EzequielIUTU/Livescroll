@@ -5731,25 +5731,11 @@ function renderProfileTitleInline(title, isOwnProfile = false) {
 }
 
 function openMyBadgesFromProfile() {
-  openMyMedalsPanel();
-
-  setTimeout(() => {
-    const btn = document.querySelector('.ls-collection-filter[data-filter="badge"]');
-    if (btn) setCollection568Filter("badge", btn);
-  }, 120);
+  openMyMedalsPanel("badge");
 }
 
 function openMyTitlesFromProfile() {
-  openMyMedalsPanel();
-
-  // Esperamos a que el modal de colección termine de renderizar
-  // y seleccionamos automáticamente la pestaña Títulos.
-  setTimeout(() => {
-    const btn = document.querySelector('.ls-collection-filter[data-filter="title"]');
-    if (btn) {
-      setCollection568Filter("title", btn);
-    }
-  }, 120);
+  openMyMedalsPanel("title");
 }
 
 async function handleEquipProfileTitle(itemId) {
@@ -7179,7 +7165,7 @@ function openEmojiDetail(name, emoji, rarity = "", obtainedAt = "", serialNumber
     </div>`;
 }
 
-async function openMyMedalsPanel() {
+async function openMyMedalsPanel(initialFilter = "all") {
   const badges = window.__myProfileBadges || [];
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
@@ -7278,7 +7264,7 @@ async function openMyMedalsPanel() {
   window.__collection568Items = [...normalizedBadges, ...normalizedEmojis, ...normalizedTitles];
   // La colección se reconstruye desde Supabase cada vez que se abre,
   // evitando mostrar stock/seriales viejos después de una compra.
-  window.__collection568Filter = "all";
+  window.__collection568Filter = initialFilter || "all";
   window.__collection568RarityFilter = "all";
   window.__collection568Sort = "rarity";
 
@@ -7332,7 +7318,15 @@ async function openMyMedalsPanel() {
       </div>
     </div>`;
 
-  renderCollection568RarityFilters("all");
+  const initialBtn = document.querySelector(`.ls-collection-filter[data-filter="${window.__collection568Filter}"]`);
+  document.querySelectorAll(".ls-collection-filter").forEach(btn => {
+    const active = btn === initialBtn;
+    btn.classList.toggle("active", active);
+    btn.style.borderColor = active ? "var(--gold)" : "";
+    btn.style.color = active ? "var(--gold)" : "";
+  });
+
+  renderCollection568RarityFilters(window.__collection568Filter);
   renderCollection568Grid();
 }
 

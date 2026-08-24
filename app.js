@@ -9816,8 +9816,8 @@ async function renderUsersDirectory() {
     <h1 class="page-title">👥 Usuarios</h1>
     <p class="page-sub">Buscá personas y descubrí a los creadores de LiveScroll.</p>
     <div style="display:flex;gap:8px;margin-bottom:12px;">
-      <button id="usersFilterAll" class="btn" onclick="setUsersDirectoryType('users')" style="flex:1;">👥 Usuarios</button>
-      <button id="usersFilterCreators" class="btn-outline" onclick="setUsersDirectoryType('creators')" style="flex:1;">🎬 Creadores</button>
+      <button id="usersFilterAll" class="btn" onclick="setUsersDirectoryType('users')" style="flex:1;font-size:13px;padding:11px 14px;">👥 Usuarios</button>
+      <button id="usersFilterCreators" class="btn-outline" onclick="setUsersDirectoryType('creators')" style="flex:1;font-size:13px;padding:11px 14px;">🎬 Creadores</button>
     </div>
     <input type="text" id="userSearchInput" class="user-directory-search" placeholder="Buscar por nombre de usuario..." oninput="handleUserSearchInput()">
     <div id="usersDirectoryList">Cargando...</div>`;
@@ -9872,7 +9872,7 @@ async function loadUsersDirectory(term) {
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
       <div class="avatar-sm${u.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${u.is_creator ? `<span style="color:var(--gold);font-size:9px;font-weight:900;">🎬 CREADOR</span>` : ""} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname" style="font-size:14px;">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${u.is_creator ? `<span style="color:var(--gold);font-size:11px;font-weight:900;">🎬 CREADOR</span>` : ""} ${getPlanBadgeHtml(u.plan_id)}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
     </div>`).join("");
@@ -10775,14 +10775,14 @@ async function openEditProfile() {
               <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
             ` : `
               <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);">
-                <div style="font-size:12px;font-weight:800;margin-bottom:7px;">🔒 Kick, Twitch, YouTube y TikTok</div>
-                <div style="font-size:10px;color:var(--text-dim);line-height:1.5;margin-bottom:9px;">
+                <div style="font-size:14px;font-weight:800;margin-bottom:8px;">🔒 Kick, Twitch, YouTube y TikTok</div>
+                <div style="font-size:12px;color:var(--text-dim);line-height:1.55;margin-bottom:10px;">
                   Para habilitar estas redes necesitás ser Creador: 5 videos, una cuenta de 7 días y no tener sanciones.
                 </div>
                 ${creatorStatus === "pending"
                   ? `<button type="button" class="btn-outline" disabled style="width:100%;">⏳ Solicitud en revisión</button>`
                   : `<button type="button" class="btn-outline" onclick="requestCreatorAccess()" ${creatorRequirementsMet ? "" : "disabled"} style="width:100%;">🎬 Solicitar acceso como creador</button>`}
-                <div style="font-size:9px;color:${creatorRequirementsMet ? "var(--green)" : "var(--text-dim)"};margin-top:7px;">
+                <div style="font-size:11px;color:${creatorRequirementsMet ? "var(--green)" : "var(--text-dim)"};margin-top:8px;">
                   Videos: ${currentProfile.creator_video_count}/5 · Antigüedad: ${currentProfile.creator_account_days}/7 días
                 </div>
               </div>
@@ -11150,7 +11150,7 @@ async function renderAdmin() {
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
           <div>
             <div style="font-weight:800;">@${escapeHtml(a.username)}</div>
-            <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">
+            <div style="font-size:13px;color:var(--text-dim);margin-top:5px;line-height:1.45;">
               ${a.video_count} videos · ${a.account_days} días de antigüedad · solicitó ${new Date(a.requested_at).toLocaleDateString("es-AR")}
             </div>
           </div>

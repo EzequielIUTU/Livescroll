@@ -2298,50 +2298,41 @@ function ensureSafeMobileUpgradeStyles() {
       margin:12px auto 0;
       width:100%;
       max-width:100%;
+      min-height:110px;
+      max-height:460px;
       overflow:hidden;
       border-radius:12px;
       border:1px solid var(--border);
       background:#050607;
+      align-items:center;
+      justify-content:center;
     }
 
     .ls-upload-preview-safe.active {
-      display:block;
+      display:flex;
     }
 
-    .ls-upload-preview-safe.landscape {
-      aspect-ratio:16 / 9;
-      max-height:72vh;
-    }
-
-    .ls-upload-preview-safe.portrait {
-      width:min(100%, 420px);
-      aspect-ratio:9 / 16;
-      max-height:72vh;
-    }
-
-    .ls-upload-preview-safe.square {
-      width:min(100%, 560px);
-      aspect-ratio:1 / 1;
-      max-height:72vh;
-    }
-
+    /* No forzamos 9:16, 16:9 ni ninguna caja fija.
+       El VIDEO conserva su proporción real y la caja solo lo centra. */
     .ls-upload-preview-safe video {
-      width:100%;
-      height:100%;
       display:block;
+      width:auto;
+      height:auto;
+      max-width:100%;
+      max-height:460px;
       object-fit:contain;
       background:#000;
+      margin:auto;
     }
 
     @media (max-width:700px) {
-      .ls-upload-preview-safe.landscape {
-        aspect-ratio:16 / 9;
-        max-height:none;
+      .ls-upload-preview-safe {
+        max-height:320px;
       }
 
-      .ls-upload-preview-safe.portrait {
-        width:min(86vw, 390px);
-        max-height:66vh;
+      .ls-upload-preview-safe video {
+        max-width:100%;
+        max-height:320px;
       }
     }
 
@@ -4800,6 +4791,7 @@ function clearUploadPreviewSafe() {
   if (preview) {
     preview.classList.remove("active", "landscape", "portrait", "square");
     preview.style.aspectRatio = "";
+    delete preview.dataset.detectedRatio;
   }
 }
 
@@ -4831,26 +4823,19 @@ function refreshUploadPreviewSafe() {
     const vw = Number(video.videoWidth || 0);
     const vh = Number(video.videoHeight || 0);
 
+    // Algunos celulares informan dimensiones "codificadas" distintas
+    // de la orientación visual cuando el MP4 trae metadata de rotación.
+    // Por eso NO usamos videoWidth/videoHeight para forzar una caja.
+    // Dejamos que <video> conserve su relación visual real y solo limitamos
+    // la altura para que nunca ocupe media pantalla.
     preview.classList.remove("landscape", "portrait", "square");
+    preview.style.aspectRatio = "";
 
     if (vw > 0 && vh > 0) {
       const ratio = vw / vh;
-
-      if (ratio > 1.12) {
-        preview.classList.add("landscape");
-        // Usamos la proporción REAL del archivo, no una caja vertical fija.
-        preview.style.aspectRatio = `${vw} / ${vh}`;
-      } else if (ratio < 0.88) {
-        preview.classList.add("portrait");
-        preview.style.aspectRatio = `${vw} / ${vh}`;
-      } else {
-        preview.classList.add("square");
-        preview.style.aspectRatio = `${vw} / ${vh}`;
-      }
+      preview.dataset.detectedRatio = ratio.toFixed(3);
     } else {
-      // Fallback seguro para navegadores que no informen metadata.
-      preview.classList.add("landscape");
-      preview.style.aspectRatio = "16 / 9";
+      delete preview.dataset.detectedRatio;
     }
   };
 }

@@ -1215,8 +1215,19 @@ function renderLanding() {
   }
 }
 
+let landingOdometerRefreshTimer = null;
+
 async function animateLandingOdometer() {
   const el = document.getElementById("landingOdometer");
+  if (!el) return;
+
+  // Puede llamarse al iniciar y también al volver al landing. Conservamos
+  // un solo reloj para evitar consultas duplicadas cada 60 segundos.
+  if (landingOdometerRefreshTimer) {
+    clearInterval(landingOdometerRefreshTimer);
+    landingOdometerRefreshTimer = null;
+  }
+
   const { data, error } = await sb.rpc("get_todays_total_points");
   if (!error && data !== null) {
     el.textContent = data.toLocaleString("es-AR");
@@ -1225,9 +1236,11 @@ async function animateLandingOdometer() {
   }
 
   // Refresca cada 60s para que se sienta viva, siempre con el dato real
-  setInterval(async () => {
+  landingOdometerRefreshTimer = setInterval(async () => {
+    const currentEl = document.getElementById("landingOdometer");
+    if (!currentEl || document.hidden || currentUser) return;
     const { data: fresh } = await sb.rpc("get_todays_total_points");
-    if (fresh !== null && fresh !== undefined) el.textContent = fresh.toLocaleString("es-AR");
+    if (fresh !== null && fresh !== undefined) currentEl.textContent = fresh.toLocaleString("es-AR");
   }, 60000);
 }
 
@@ -2521,6 +2534,11 @@ function initLiveScrollExperienceMode() {
 }
 
 async function renderApp() {
+  if (landingOdometerRefreshTimer) {
+    clearInterval(landingOdometerRefreshTimer);
+    landingOdometerRefreshTimer = null;
+  }
+
   // Anti-spam POR CUENTA. Si en el mismo teléfono se cierra sesión y entra
   // otra cuenta, esa cuenta debe poder recibir sus propias Novedades.
   if (window.__lsStartupUserId !== currentUser?.id) {
@@ -11079,17 +11097,45 @@ async function saveProfileEdits() {
 
 async function renderAdmin() {
   const main = document.getElementById("appView");
-  main.innerHTML = `<p>Cargando canjes...</p>`;
+  main.innerHTML = `<p>Cargando panel de Admin...</p>`;
 
-  const { data: redemptions, error } = await sb
-    .from("redemptions")
-    .select("*, profiles!redemptions_user_id_fkey(username)")
-    .order("created_at", { ascending: true });
+  // Estas consultas no dependen entre sí. Las ejecutamos juntas para conservar
+  // toda la información del panel sin esperar cada respuesta en cadena.
+  const [
+    redemptionsResult,
+    profilesOverviewResult,
+    pendingUsersResult,
+    subscriptionsResult,
+    plans,
+    reportsResult,
+    statsResult,
+    creatorApplicationsResult,
+    securityReportsResult
+  ] = await Promise.all([
+    sb.from("redemptions")
+      .select("*, profiles!redemptions_user_id_fkey(username)")
+      .order("created_at", { ascending:true }),
+    sb.rpc("admin_get_profiles_overview"),
+    sb.rpc("admin_get_pending_users"),
+    sb.from("subscription_requests")
+      .select("*, profiles!subscription_requests_user_id_fkey(username)")
+      .order("created_at", { ascending:true }),
+    loadPlans(),
+    sb.from("video_reports")
+      .select("*, videos(title, video_url), profiles!video_reports_reporter_id_fkey(username)")
+      .eq("status", "pending")
+      .order("created_at", { ascending:true }),
+    sb.rpc("admin_get_stats"),
+    sb.rpc("admin_get_creator_applications"),
+    sb.rpc("admin_get_security_incident_reports")
+  ]);
+
+  const { data:redemptions, error } = redemptionsResult;
 
   if (error) { main.innerHTML = `<p class="error-msg">Error: ${error.message}</p>`; return; }
 
   // Vista completa solo para admins: IP y estado de bloqueo de cada cuenta
-  const { data: profilesOverview } = await sb.rpc("admin_get_profiles_overview");
+  const profilesOverview = profilesOverviewResult?.data || [];
   const profileById = {};
   (profilesOverview || []).forEach(p => { profileById[p.id] = p; });
 
@@ -11101,29 +11147,19 @@ async function renderAdmin() {
   const pending = (redemptions || []).filter(r => r.status === "pending");
   const resolved = (redemptions || []).filter(r => r.status !== "pending").slice(0, 15);
 
-  const { data: pendingUsersFull } = await sb.rpc("admin_get_pending_users");
+  const pendingUsersFull = pendingUsersResult?.data || [];
   let blockedUsers = (pendingUsersFull && pendingUsersFull.length) ? pendingUsersFull : (profilesOverview || []).filter(p => p.is_blocked);
 
-  const { data: subRequests } = await sb
-    .from("subscription_requests")
-    .select("*, profiles!subscription_requests_user_id_fkey(username)")
-    .order("created_at", { ascending: true });
-  const plans = await loadPlans();
+  const subRequests = subscriptionsResult?.data || [];
   const pendingSubs = (subRequests || []).filter(s => s.status === "pending");
 
-  const { data: reports } = await sb
-    .from("video_reports")
-    .select("*, videos(title, video_url), profiles!video_reports_reporter_id_fkey(username)")
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  const { data: stats } = await sb.rpc("admin_get_stats");
-
-  const { data: creatorApplications } = await sb.rpc("admin_get_creator_applications");
+  const reports = reportsResult?.data || [];
+  const stats = statsResult?.data;
+  const creatorApplications = creatorApplicationsResult?.data || [];
   const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending");
 
   // Reportes de seguridad separados del sistema de reportes de videos.
-  const { data: securityReports } = await sb.rpc("admin_get_security_incident_reports");
+  const securityReports = securityReportsResult?.data || [];
   const pendingSecurityReports = (securityReports || []).filter(r =>
     ["pending", "reviewing", "recovery_authorized"].includes(r.status)
   );

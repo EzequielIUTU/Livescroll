@@ -1156,9 +1156,10 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const [profileResult, statusResult] = await Promise.all([
+  const [profileResult, statusResult, creatorResult] = await Promise.all([
     sb.rpc("get_my_profile_data"),
-    sb.rpc("get_my_status")
+    sb.rpc("get_my_status"),
+    sb.rpc("get_my_creator_access")
   ]);
 
   if (!profileResult.error && profileResult.data?.ok) {
@@ -1185,6 +1186,10 @@ async function loadProfile() {
 
   currentProfile.is_admin = currentProfile.is_admin === true;
   currentProfile.is_blocked = currentProfile.is_blocked === true;
+  currentProfile.is_creator = creatorResult?.data?.is_creator === true;
+  currentProfile.creator_application_status = creatorResult?.data?.application_status || null;
+  currentProfile.creator_video_count = Number(creatorResult?.data?.video_count || 0);
+  currentProfile.creator_account_days = Number(creatorResult?.data?.account_days || 0);
 }
 
 // ============================================================
@@ -9115,7 +9120,7 @@ async function renderProfile() {
           <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
-            <div class="handle">Tu perfil en LiveScroll</div>
+            <div class="handle">${currentProfile.is_creator ? "🎬 Creador" : "Usuario"} · Tu perfil en LiveScroll</div>
             ${renderProfileTitleInline(equippedTitle, true)}
             ${renderEquippedMedalsInline(equippedBadges, true)}
           </div>
@@ -9809,11 +9814,25 @@ async function renderUsersDirectory() {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">👥 Usuarios</h1>
-    <p class="page-sub">Buscá y descubrí a otros creadores de LiveScroll.</p>
+    <p class="page-sub">Buscá personas y descubrí a los creadores de LiveScroll.</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <button id="usersFilterAll" class="btn" onclick="setUsersDirectoryType('users')" style="flex:1;">👥 Usuarios</button>
+      <button id="usersFilterCreators" class="btn-outline" onclick="setUsersDirectoryType('creators')" style="flex:1;">🎬 Creadores</button>
+    </div>
     <input type="text" id="userSearchInput" class="user-directory-search" placeholder="Buscar por nombre de usuario..." oninput="handleUserSearchInput()">
     <div id="usersDirectoryList">Cargando...</div>`;
 
+  window.__usersDirectoryType = "users";
   await loadUsersDirectory("");
+}
+
+function setUsersDirectoryType(type) {
+  window.__usersDirectoryType = type === "creators" ? "creators" : "users";
+  document.getElementById("usersFilterAll")?.classList.toggle("btn", window.__usersDirectoryType === "users");
+  document.getElementById("usersFilterAll")?.classList.toggle("btn-outline", window.__usersDirectoryType !== "users");
+  document.getElementById("usersFilterCreators")?.classList.toggle("btn", window.__usersDirectoryType === "creators");
+  document.getElementById("usersFilterCreators")?.classList.toggle("btn-outline", window.__usersDirectoryType !== "creators");
+  loadUsersDirectory(document.getElementById("userSearchInput")?.value.trim() || "");
 }
 
 function handleUserSearchInput() {
@@ -9830,7 +9849,7 @@ async function loadUsersDirectory(term) {
   list.innerHTML = "Buscando...";
 
   let query = sb.from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator")
     .is("ban_reason", null)
     .neq("id", currentUser.id)
     .order("is_live", { ascending: false })
@@ -9838,6 +9857,8 @@ async function loadUsersDirectory(term) {
     .limit(40);
 
   if (term) query = query.ilike("username", `%${term}%`);
+  if (window.__usersDirectoryType === "creators") query = query.eq("is_creator", true);
+  else query = query.eq("is_creator", false);
 
   const { data: users, error } = await query;
   if (!document.getElementById("usersDirectoryList")) return; // el usuario ya cambió de pestaña
@@ -9851,7 +9872,7 @@ async function loadUsersDirectory(term) {
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
       <div class="avatar-sm${u.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${u.is_creator ? `<span style="color:var(--gold);font-size:9px;font-weight:900;">🎬 CREADOR</span>` : ""} ${getPlanBadgeHtml(u.plan_id)}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
     </div>`).join("");
@@ -10301,7 +10322,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const { data: videos } = await sb
@@ -10356,7 +10377,7 @@ async function viewPublicProfile(username) {
           <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-            <div class="handle">Perfil público</div>
+            <div class="handle">${profile.is_creator ? "🎬 Creador" : "Usuario"}</div>
             ${renderProfileTitleInline(theirTitle, false)}
             ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
           </div>
@@ -10632,6 +10653,9 @@ async function openEditProfile() {
   const baseEmojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
   const { data: unlocked } = await sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id);
   const emojis = [...baseEmojis, ...(unlocked || []).map(u => u.emoji).filter(e => !baseEmojis.includes(e))];
+  const isCreator = currentProfile.is_creator === true;
+  const creatorStatus = currentProfile.creator_application_status;
+  const creatorRequirementsMet = currentProfile.creator_video_count >= 5 && currentProfile.creator_account_days >= 7 && !currentProfile.is_blocked;
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
@@ -10743,11 +10767,26 @@ async function openEditProfile() {
         <div class="field">
           <label>Mis redes (opcional)</label>
           <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="display:flex; align-items:center; gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
-            <div style="display:flex; align-items:center; gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
-            <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
-            <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
             <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
+            ${isCreator ? `
+              <div style="display:flex; align-items:center; gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
+              <div style="display:flex; align-items:center; gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
+              <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
+              <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
+            ` : `
+              <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);">
+                <div style="font-size:12px;font-weight:800;margin-bottom:7px;">🔒 Kick, Twitch, YouTube y TikTok</div>
+                <div style="font-size:10px;color:var(--text-dim);line-height:1.5;margin-bottom:9px;">
+                  Para habilitar estas redes necesitás ser Creador: 5 videos, una cuenta de 7 días y no tener sanciones.
+                </div>
+                ${creatorStatus === "pending"
+                  ? `<button type="button" class="btn-outline" disabled style="width:100%;">⏳ Solicitud en revisión</button>`
+                  : `<button type="button" class="btn-outline" onclick="requestCreatorAccess()" ${creatorRequirementsMet ? "" : "disabled"} style="width:100%;">🎬 Solicitar acceso como creador</button>`}
+                <div style="font-size:9px;color:${creatorRequirementsMet ? "var(--green)" : "var(--text-dim)"};margin-top:7px;">
+                  Videos: ${currentProfile.creator_video_count}/5 · Antigüedad: ${currentProfile.creator_account_days}/7 días
+                </div>
+              </div>
+            `}
           </div>
         </div>
         <div id="editProfileError" class="error-msg"></div>
@@ -10964,6 +11003,24 @@ function selectAvatarEmoji(emoji) {
   document.getElementById(`emoji-${emoji}`).style.background = "var(--panel-2)";
 }
 
+async function requestCreatorAccess() {
+  const { data, error } = await sb.rpc("request_creator_access");
+  if (error || !data?.ok) {
+    const messages = {
+      videos_insuficientes:"Necesitás publicar al menos 5 videos.",
+      cuenta_muy_nueva:"Tu cuenta debe tener al menos 7 días.",
+      cuenta_sancionada:"No podés postularte mientras tengas una sanción.",
+      solicitud_pendiente:"Tu solicitud ya está en revisión.",
+      ya_es_creador:"Tu cuenta ya es Creador."
+    };
+    showToast(messages[data?.error] || "No se pudo enviar la solicitud");
+    return;
+  }
+  currentProfile.creator_application_status = "pending";
+  showToast("🎬 Solicitud enviada al administrador");
+  openEditProfile();
+}
+
 async function saveProfileEdits() {
   const newUsername = document.getElementById("editUsername").value.trim();
   const bio = document.getElementById("editBio").value.trim();
@@ -10981,15 +11038,25 @@ async function saveProfileEdits() {
   const coverPositionEl = document.getElementById("coverPositionRange");
   const coverPositionY = coverPositionEl ? Math.max(0, Math.min(100, Number(coverPositionEl.value) || 50)) : Number(currentProfile.cover_position_y ?? 50);
 
+  const kickEl = document.getElementById("socialKick");
+  const twitchEl = document.getElementById("socialTwitch");
+  const youtubeEl = document.getElementById("socialYoutube");
+  const tiktokEl = document.getElementById("socialTiktok");
+  const socialPayload = {
+    social_instagram:document.getElementById("socialInstagram").value.trim() || null
+  };
+  if (currentProfile.is_creator) {
+    socialPayload.social_kick = kickEl?.value.trim() || null;
+    socialPayload.social_twitch = twitchEl?.value.trim() || null;
+    socialPayload.social_youtube = youtubeEl?.value.trim() || null;
+    socialPayload.social_tiktok = tiktokEl?.value.trim() || null;
+  }
+
   const { error: updateError } = await sb.from("profiles").update({
     bio,
     avatar_emoji: window.selectedAvatarEmoji,
     cover_position_y: coverPositionY,
-    social_kick: document.getElementById("socialKick").value.trim() || null,
-    social_twitch: document.getElementById("socialTwitch").value.trim() || null,
-    social_youtube: document.getElementById("socialYoutube").value.trim() || null,
-    social_tiktok: document.getElementById("socialTiktok").value.trim() || null,
-    social_instagram: document.getElementById("socialInstagram").value.trim() || null
+    ...socialPayload
   }).eq("id", currentUser.id);
 
   if (updateError) { errEl.textContent = "No se pudo guardar."; return; }
@@ -10997,10 +11064,12 @@ async function saveProfileEdits() {
   currentProfile.bio = bio;
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
   currentProfile.cover_position_y = coverPositionY;
-  currentProfile.social_kick = document.getElementById("socialKick").value.trim();
-  currentProfile.social_twitch = document.getElementById("socialTwitch").value.trim();
-  currentProfile.social_youtube = document.getElementById("socialYoutube").value.trim();
-  currentProfile.social_tiktok = document.getElementById("socialTiktok").value.trim();
+  if (currentProfile.is_creator) {
+    currentProfile.social_kick = kickEl?.value.trim() || "";
+    currentProfile.social_twitch = twitchEl?.value.trim() || "";
+    currentProfile.social_youtube = youtubeEl?.value.trim() || "";
+    currentProfile.social_tiktok = tiktokEl?.value.trim() || "";
+  }
   currentProfile.social_instagram = document.getElementById("socialInstagram").value.trim();
   closeManagedModal();
   showToast("Perfil actualizado");
@@ -11050,6 +11119,9 @@ async function renderAdmin() {
 
   const { data: stats } = await sb.rpc("admin_get_stats");
 
+  const { data: creatorApplications } = await sb.rpc("admin_get_creator_applications");
+  const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending");
+
   // Reportes de seguridad separados del sistema de reportes de videos.
   const { data: securityReports } = await sb.rpc("admin_get_security_incident_reports");
   const pendingSecurityReports = (securityReports || []).filter(r =>
@@ -11070,7 +11142,26 @@ async function renderAdmin() {
       <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Ya pagado</div><div class="mono" style="font-size:20px;">$${Number(stats.total_paid_ars).toLocaleString("es-AR")}</div></div>
       <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Por pagar (pendiente)</div><div class="mono" style="font-size:20px;color:var(--gold);">$${Number(stats.total_pending_ars).toLocaleString("es-AR")}</div></div>
     </div>` : ""}
-    <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${(reports || []).length} reporte${(reports || []).length === 1 ? "" : "s"} de video · ${pendingSecurityReports.length} caso${pendingSecurityReports.length === 1 ? "" : "s"} de seguridad</p>
+    <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${pendingCreatorApplications.length} solicitud${pendingCreatorApplications.length === 1 ? "" : "es"} de creador · ${pendingSecurityReports.length} caso${pendingSecurityReports.length === 1 ? "" : "s"} de seguridad</p>
+
+    <h3 style="margin-top:24px;">🎬 Solicitudes de creadores (${pendingCreatorApplications.length})</h3>
+    ${pendingCreatorApplications.length ? pendingCreatorApplications.map(a => `
+      <div class="form-card" style="margin-bottom:12px;border-color:rgba(250,204,21,.28);">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:800;">@${escapeHtml(a.username)}</div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">
+              ${a.video_count} videos · ${a.account_days} días de antigüedad · solicitó ${new Date(a.requested_at).toLocaleDateString("es-AR")}
+            </div>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;">
+            <button class="btn-outline" onclick="viewPublicProfile('${escapeHtml(a.username)}')">Ver perfil</button>
+            <button class="btn" onclick="handleCreatorApplication('${a.application_id}','approve')">✓ Aprobar</button>
+            <button class="btn-outline" style="color:var(--red);" onclick="handleCreatorApplication('${a.application_id}','reject')">✕ Rechazar</button>
+          </div>
+        </div>
+      </div>
+    `).join("") : `<div class="form-card" style="font-size:12px;color:var(--text-dim);">No hay solicitudes pendientes.</div>`}
 
     ${pendingSecurityReports.length ? `
       <h3>🚨 Reportes de seguridad</h3>
@@ -11833,7 +11924,7 @@ function organizeAdminPanel() {
     const value = String(text || "").toLowerCase();
 
     if (value.includes("reportes de seguridad") || value.includes("videos reportados")) return "seguridad";
-    if (value.includes("cuentas nuevas") || value.includes("buscar y gestionar")) return "usuarios";
+    if (value.includes("solicitudes de creadores") || value.includes("cuentas nuevas") || value.includes("buscar y gestionar")) return "usuarios";
     if (value.includes("pagos de suscripción") || value.includes("canjes pendientes") || value.includes("historial reciente")) return "finanzas";
     if (value.includes("precios de la tienda") || value.includes("emojis de la tienda") ||
         value.includes("medallas exclusivas") || value.includes("títulos de perfil") ||
@@ -12727,6 +12818,25 @@ async function handleUserSearch() {
   resultsEl.innerHTML = "Buscando...";
   const { data, error } = await sb.rpc("admin_search_users", { p_query: query });
   renderUserCards(data, error, resultsEl);
+}
+
+async function handleCreatorApplication(applicationId, decision) {
+  const approving = decision === "approve";
+  if (!confirm(approving ? "¿Aprobar esta cuenta como Creador?" : "¿Rechazar esta solicitud?")) return;
+
+  const { data, error } = await sb.rpc("admin_decide_creator_application", {
+    p_application_id:applicationId,
+    p_decision:approving ? "approved" : "rejected"
+  });
+
+  if (error || !data?.ok) {
+    showToast("No se pudo procesar la solicitud");
+    return;
+  }
+
+  showToast(approving ? "🎬 Creador aprobado" : "Solicitud rechazada");
+  await renderAdmin();
+  setTimeout(() => switchAdminPanelGroup("usuarios", document.querySelector('[data-admin-tab="usuarios"]')), 0);
 }
 
 async function handleListAllUsers() {

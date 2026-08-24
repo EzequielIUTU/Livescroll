@@ -12418,13 +12418,22 @@ async function loadProfileTitlesAdminList() {
   const el = document.getElementById("profileTitlesAdminList");
   if (!el) return;
 
-  const { data, error } = await sb.rpc("admin_get_store_items");
+  const [{ data, error }, { data: rarityRows }] = await Promise.all([
+    sb.rpc("admin_get_store_items"),
+    sb.from("store_items").select("id,rarity").eq("category", "title")
+  ]);
   if (error) {
     el.innerHTML = `<p class="error-msg">No se pudieron cargar los títulos.</p>`;
     return;
   }
 
-  const titles = (data || []).filter(it => String(it.category || "").toLowerCase() === "title");
+  const rarityById = new Map((rarityRows || []).map(row => [row.id, normalizeProfileTitleRarity(row.rarity)]));
+  const titles = (data || [])
+    .filter(it => String(it.category || "").toLowerCase() === "title")
+    .map(it => ({
+      ...it,
+      rarity:rarityById.get(it.item_id || it.id) || normalizeProfileTitleRarity(it.rarity)
+    }));
 
   if (!titles.length) {
     el.innerHTML = `<p style="color:var(--text-dim);font-size:12px;">Todavía no creaste títulos de perfil.</p>`;
@@ -12440,6 +12449,15 @@ async function loadProfileTitlesAdminList() {
         ${!it.active ? '<span style="color:var(--text-dim);">(desactivado)</span>' : ""}
       </span>
       <div style="display:flex;gap:6px;">
+        <select
+          id="profileTitleRarity-${it.item_id}"
+          class="${getStoreBadgeRarityClass(normalizeProfileTitleRarity(it.rarity))}"
+          onchange="handleSaveProfileTitleRarityAdmin('${it.item_id}', this.value)"
+          style="padding:4px 7px;font-size:10px;font-weight:900;background:var(--ink);border:1px solid currentColor;border-radius:7px;"
+          title="Cambiar rareza"
+        >
+          ${["comun","rara","epica","legendaria","exclusiva"].map(r => `<option value="${r}" ${normalizeProfileTitleRarity(it.rarity) === r ? "selected" : ""}>${getStoreBadgeRarityLabel(r)}</option>`).join("")}
+        </select>
         <button
           class="btn-outline"
           style="padding:4px 8px;font-size:11px;"
@@ -12455,6 +12473,23 @@ async function loadProfileTitlesAdminList() {
   `).join("");
 }
 
+async function handleSaveProfileTitleRarityAdmin(itemId, rarity) {
+  const safeRarity = normalizeProfileTitleRarity(rarity);
+  const { data, error } = await sb.rpc("admin_set_store_item_rarity", {
+    p_item_id:itemId,
+    p_rarity:safeRarity
+  });
+
+  if (error || !data?.ok) {
+    showToast("No se pudo guardar la rareza. Ejecutá el SQL incluido.");
+    await loadProfileTitlesAdminList();
+    return;
+  }
+
+  showToast(`Rareza guardada: ${getStoreBadgeRarityLabel(safeRarity)}`);
+  await loadProfileTitlesAdminList();
+}
+
 async function handleAddProfileTitleAdmin() {
   const icon = document.getElementById("newProfileTitleIcon")?.value.trim();
   const name = document.getElementById("newProfileTitleName")?.value.trim();
@@ -12467,36 +12502,23 @@ async function handleAddProfileTitleAdmin() {
     return;
   }
 
-  const { data, error } = await sb.rpc("admin_add_store_item", {
-    p_category:"title",
+  const { data, error } = await sb.rpc("admin_add_profile_title", {
     p_icon:icon,
     p_name:name,
+    p_rarity:rarity,
     p_price:price
   });
 
   if (error || !data?.ok) {
-    showToast("No se pudo crear el título");
+    const messages = {
+      no_autorizado:"No tenés permiso de administrador.",
+      datos_incompletos:"Completá ícono y nombre.",
+      precio_invalido:"El precio no es válido.",
+      rareza_invalida:"La rareza no es válida.",
+      titulo_duplicado:"Ya existe un título con ese nombre."
+    };
+    showToast(messages[data?.error] || "No se pudo crear el título. Ejecutá el SQL incluido.");
     return;
-  }
-
-  // admin_add_store_item conserva el sistema existente.
-  // Luego asignamos la rareza al título recién creado buscando el registro exacto.
-  const { data: createdRows } = await sb
-    .from("store_items")
-    .select("id")
-    .eq("category", "title")
-    .eq("name", name)
-    .eq("icon", icon)
-    .eq("price_points", price)
-    .order("created_at", { ascending:false })
-    .limit(1);
-
-  const createdId = createdRows?.[0]?.id;
-  if (createdId) {
-    await sb.rpc("admin_set_store_item_rarity", {
-      p_item_id: createdId,
-      p_rarity: rarity
-    });
   }
 
   document.getElementById("newProfileTitleIcon").value = "";
@@ -12504,7 +12526,7 @@ async function handleAddProfileTitleAdmin() {
   document.getElementById("newProfileTitleRarity").value = "comun";
   document.getElementById("newProfileTitlePrice").value = "";
 
-  showToast("🏷️ Título creado");
+  showToast(`🏷️ Título ${getStoreBadgeRarityLabel(rarity)} creado correctamente`);
   await loadProfileTitlesAdminList();
   loadStoreItemsList();
 }

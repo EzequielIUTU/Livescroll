@@ -5104,6 +5104,107 @@ async function handleUpload() {
   }
 }
 
+async function getUploadRewardPoints() {
+  try {
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "points_per_upload")
+      .single();
+
+    return Number(data?.value) || 40;
+  } catch (_) {
+    return 40;
+  }
+}
+
+function showVideoPublishedSuccess(title, pointsEarned) {
+  const existing = document.getElementById("videoPublishedSuccessModal");
+  if (existing) existing.remove();
+
+  const safeTitle = escapeHtml(title || "Tu video");
+
+  const modal = document.createElement("div");
+  modal.id = "videoPublishedSuccessModal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    background:rgba(0,0,0,.76);
+    display:flex;align-items:center;justify-content:center;
+    padding:18px;box-sizing:border-box;
+    backdrop-filter:blur(7px);
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      width:min(100%,430px);
+      background:var(--panel);
+      border:1px solid rgba(34,197,94,.38);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 22px 70px rgba(0,0,0,.55);
+      text-align:center;
+    ">
+      <div style="
+        width:58px;height:58px;border-radius:50%;
+        margin:0 auto 12px;
+        display:flex;align-items:center;justify-content:center;
+        background:rgba(34,197,94,.12);
+        border:1px solid rgba(34,197,94,.35);
+        font-size:28px;
+      ">✓</div>
+
+      <div style="
+        font-family:'JetBrains Mono',monospace;
+        font-size:9px;font-weight:900;
+        color:var(--green);
+        letter-spacing:.12em;text-transform:uppercase;
+        margin-bottom:6px;
+      ">PUBLICADO</div>
+
+      <h2 style="margin:0 0 7px;font-size:20px;">¡Video publicado!</h2>
+      <p style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">
+        ${safeTitle}
+      </p>
+
+      ${pointsEarned > 0 ? `
+        <div style="
+          margin:16px 0;
+          padding:12px;
+          border-radius:12px;
+          border:1px solid rgba(34,197,94,.25);
+          background:rgba(34,197,94,.07);
+        ">
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">
+            Ganaste
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:900;color:var(--green);">
+            +${pointsEarned} pts
+          </div>
+        </div>
+      ` : `
+        <div style="margin:16px 0;color:var(--text-dim);font-size:11px;">
+          Video publicado sin recompensa de puntos.
+        </div>
+      `}
+
+      <button class="btn" onclick="closeVideoPublishedSuccess(true)" style="width:100%;padding:12px;">
+        ▶ Ver en LiveScroll
+      </button>
+
+      <button class="btn-outline" onclick="closeVideoPublishedSuccess(false)" style="width:100%;padding:10px;margin-top:8px;">
+        Cerrar
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function closeVideoPublishedSuccess(goToFeed) {
+  document.getElementById("videoPublishedSuccessModal")?.remove();
+  if (goToFeed) switchTab("feed");
+}
+
 async function handleUploadLink() {
   const platform = document.getElementById("uploadPlatform").value;
   const title = document.getElementById("uploadTitle").value.trim();
@@ -5122,15 +5223,19 @@ async function handleUploadLink() {
 
   if (error) { errEl.textContent = error.message; return; }
 
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
   if (currentProfile.is_blocked) {
-    showToast("Video subido (sin puntos: cuenta bloqueada)");
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
   } else {
-    currentProfile.points_balance += 25;
+    earned = reward;
+    currentProfile.points_balance += reward;
     updateBalanceUI();
-    showFloatingPointsSafe(25);
-    showToast("+25 pts por tu video");
+    showFloatingPointsSafe(reward);
   }
-  switchTab("feed");
+
+  showVideoPublishedSuccess(title, earned);
 }
 
 
@@ -5217,7 +5322,7 @@ async function handleUploadFile() {
   if (uploadError) {
     errEl.textContent = "Error al subir: " + uploadError.message;
     btn.disabled = false;
-    btn.textContent = "Subir y ganar 25 pts";
+    btn.textContent = "Publicar video";
     return;
   }
 
@@ -5253,19 +5358,23 @@ async function handleUploadFile() {
   });
 
   btn.disabled = false;
-  btn.textContent = "Subir y ganar 25 pts";
+  btn.textContent = "Publicar video";
 
   if (insertError) { errEl.textContent = insertError.message; return; }
 
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
   if (currentProfile.is_blocked) {
-    showToast("Video subido (sin puntos: cuenta bloqueada)");
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
   } else {
-    currentProfile.points_balance += 25;
+    earned = reward;
+    currentProfile.points_balance += reward;
     updateBalanceUI();
-    showFloatingPointsSafe(25);
-    showToast("+25 pts por tu video");
+    showFloatingPointsSafe(reward);
   }
-  switchTab("feed");
+
+  showVideoPublishedSuccess(title, earned);
 }
 
 // ============================================================

@@ -9468,6 +9468,44 @@ async function handleToggleWalletLock() {
 }
 
 
+async function handleAdminSetUserPlan(userId, planId) {
+  if (!currentProfile?.is_admin) {
+    showToast("Solo un administrador puede cambiar planes");
+    return;
+  }
+
+  const planNames = {
+    standard:"Estándar",
+    plus:"Plus",
+    diamante:"Diamante"
+  };
+
+  const label = planNames[planId] || planId;
+
+  if (!confirm(`¿Asignar el plan ${label} a este usuario?`)) return;
+
+  const { data, error } = await sb.rpc("admin_set_user_plan", {
+    p_user_id:userId,
+    p_plan_id:planId
+  });
+
+  if (error || !data?.ok) {
+    console.warn("No se pudo asignar el plan:", error || data);
+
+    const errors = {
+      no_autorizado:"Solo un administrador puede cambiar planes",
+      usuario_no_encontrado:"No se encontró el usuario",
+      plan_invalido:"Ese plan no existe"
+    };
+
+    showToast(errors[data?.error] || "No se pudo activar el plan");
+    return;
+  }
+
+  showToast(`💎 Plan ${label} activado`);
+  await renderAdmin();
+}
+
 async function handleUserSearch() {
   const query = document.getElementById("userSearchInput").value.trim();
   const resultsEl = document.getElementById("userSearchResults");
@@ -10481,3 +10519,11 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
   document.head.appendChild(style);
 });
+
+// Compatibilidad con botones viejos del Admin que puedan seguir llamando nombres anteriores.
+async function handleAdminChangePlan(userId, planId) {
+  return handleAdminSetUserPlan(userId, planId);
+}
+async function adminChangeUserPlan(userId, planId) {
+  return handleAdminSetUserPlan(userId, planId);
+}

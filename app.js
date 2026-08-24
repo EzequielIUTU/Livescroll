@@ -6901,23 +6901,41 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
       <button class="btn" onclick="window.openObsStreamingSetup && window.openObsStreamingSetup()">🎥 Configurar OBS</button>
     </div>
     <p class="page-sub">Creadores transmitiendo ahora mismo dentro y fuera de LiveScroll.</p>
+    ${currentProfile?.is_admin ? `
     <div class="ls-obs-local-test" style="
       margin:14px 0;
       padding:14px;
-      border:1px solid rgba(244,197,66,.25);
-      border-radius:14px;
-      background:var(--panel);
+      border:1px solid rgba(244,197,66,.22);
+      border-radius:16px;
+      background:linear-gradient(135deg,rgba(244,197,66,.055),var(--panel));
     ">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-        <div>
-          <div style="font-weight:900;">🎥 Prueba OBS local</div>
-          <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
+            <div style="font-weight:900;">🎥 OBS · entorno de prueba</div>
+            <span style="
+              font-size:8px;
+              font-weight:900;
+              letter-spacing:.06em;
+              color:var(--gold);
+              border:1px solid rgba(244,197,66,.25);
+              background:rgba(244,197,66,.06);
+              padding:3px 6px;
+              border-radius:999px;
+            ">SOLO ADMIN</span>
+          </div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
             MediaMTX · Cloudflare HTTPS · ruta livescroll
           </div>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:4px;opacity:.8;">
+            Herramienta técnica: no cuenta como un directo público.
+          </div>
         </div>
-        <button class="btn" type="button" onclick="openLocalObsLive()">🔴 Ver directo OBS</button>
+        <button class="btn-outline" type="button" onclick="openLocalObsLive()" style="white-space:nowrap;">
+          Abrir prueba OBS →
+        </button>
       </div>
-    </div>
+    </div>` : ""}
     <div id="directosList">Cargando...</div>`;
 
   const [ext, studio] = await Promise.allSettled([
@@ -6986,7 +7004,21 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   }
 
   if (!studioLives.length && !liveUsers.length) {
-    html = `<p style="color:var(--text-dim);font-size:13px;">Nadie está en vivo ahora mismo. Volvé más tarde 👀</p>`;
+    html = `
+      <div style="
+        margin-top:12px;
+        padding:22px 16px;
+        border:1px solid var(--border);
+        border-radius:16px;
+        background:var(--panel);
+        text-align:center;
+      ">
+        <div style="font-size:28px;margin-bottom:8px;">📡</div>
+        <div style="font-size:13px;font-weight:900;">No hay directos públicos ahora</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:5px;">
+          Cuando un creador inicie una transmisión, va a aparecer acá.
+        </div>
+      </div>`;
   }
 
   list.innerHTML = html;

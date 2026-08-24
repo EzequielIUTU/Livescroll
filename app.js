@@ -10313,6 +10313,12 @@ async function renderAdmin() {
 
   const { data: stats } = await sb.rpc("admin_get_stats");
 
+  // Reportes de seguridad separados del sistema de reportes de videos.
+  const { data: securityReports } = await sb.rpc("admin_get_security_incident_reports");
+  const pendingSecurityReports = (securityReports || []).filter(r =>
+    ["pending", "reviewing", "recovery_authorized"].includes(r.status)
+  );
+
   main.innerHTML = `
     <h1 class="page-title">🛠 Panel de Admin</h1>
 
@@ -10327,7 +10333,68 @@ async function renderAdmin() {
       <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Ya pagado</div><div class="mono" style="font-size:20px;">$${Number(stats.total_paid_ars).toLocaleString("es-AR")}</div></div>
       <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Por pagar (pendiente)</div><div class="mono" style="font-size:20px;color:var(--gold);">$${Number(stats.total_pending_ars).toLocaleString("es-AR")}</div></div>
     </div>` : ""}
-    <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${(reports || []).length} reporte${(reports || []).length === 1 ? "" : "s"} pendiente${(reports || []).length === 1 ? "" : "s"}</p>
+    <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${(reports || []).length} reporte${(reports || []).length === 1 ? "" : "s"} de video · ${pendingSecurityReports.length} caso${pendingSecurityReports.length === 1 ? "" : "s"} de seguridad</p>
+
+    ${pendingSecurityReports.length ? `
+      <h3>🚨 Reportes de seguridad</h3>
+      <p style="color:var(--text-dim);font-size:12px;margin:-4px 0 12px;">
+        Casos relacionados con acceso, contraseña o actividad sospechosa.
+      </p>
+
+      ${pendingSecurityReports.map(r => `
+        <div class="form-card" style="
+          margin-bottom:12px;
+          border-color:${r.status === "pending" ? "rgba(248,113,113,.30)" : "rgba(250,204,21,.24)"};
+          background:linear-gradient(135deg,rgba(248,113,113,.035),rgba(255,255,255,.012));
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+            <div style="min-width:0;flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+                <strong class="mono" style="color:#fb7185;">${escapeHtml(r.case_code || "SIN-CÓDIGO")}</strong>
+                <span style="
+                  font-size:9px;
+                  font-weight:900;
+                  padding:3px 7px;
+                  border-radius:999px;
+                  border:1px solid var(--border);
+                  color:${r.status === "pending" ? "#fca5a5" : "var(--gold)"};
+                ">${escapeHtml(getAdminSecurityStatusLabel(r.status))}</span>
+              </div>
+
+              <div style="font-size:12px;color:var(--text);font-weight:700;">
+                ${escapeHtml(r.email || "Cuenta sin correo")}
+              </div>
+
+              <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">
+                ${escapeHtml(getAdminSecurityReasonLabel(r.reason))}
+              </div>
+
+              <div style="
+                font-size:11px;
+                color:var(--text-dim);
+                margin-top:7px;
+                line-height:1.45;
+                max-width:720px;
+              ">${escapeHtml(r.details || "Sin descripción")}</div>
+
+              <div style="font-size:9px;color:var(--text-dim);margin-top:8px;">
+                ${r.created_at ? new Date(r.created_at).toLocaleString("es-AR") : ""}
+              </div>
+            </div>
+
+            <button class="btn-outline"
+              onclick="openAdminSecurityIncidentDetail('${escapeHtml(r.case_code || "")}')">
+              Revisar caso
+            </button>
+          </div>
+        </div>
+      `).join("")}
+    ` : `
+      <h3>🚨 Reportes de seguridad</h3>
+      <div class="form-card" style="color:var(--text-dim);font-size:12px;">
+        No hay reportes de seguridad pendientes. ✓
+      </div>
+    `}
 
     ${reports && reports.length ? `
       <h3>🚩 Videos reportados</h3>
@@ -10693,6 +10760,7 @@ async function renderAdmin() {
         `).join("")}
       </div>` : ""}`;
 
+  organizeAdminPanel();
   loadStreakWeeksOverview();
   loadPlansLockStatus();
   loadWalletLockStatus();
@@ -10702,6 +10770,272 @@ async function renderAdmin() {
   loadStoreBadgesAdminList();
   loadStoreItemsList();
   loadProfileTitlesAdminList();
+}
+
+
+function getAdminSecurityReasonLabel(reason) {
+  const labels = {
+    password_change_not_recognized: "Cambio de contraseña no reconocido",
+    lost_access_after_change: "Perdió acceso después del cambio",
+    possible_account_takeover: "Posible acceso de otra persona",
+    suspicious_security_email: "Correo de seguridad sospechoso",
+    other: "Otro problema de seguridad"
+  };
+  return labels[reason] || reason || "Sin motivo";
+}
+
+function getAdminSecurityStatusLabel(status) {
+  const labels = {
+    pending: "PENDIENTE",
+    reviewing: "EN REVISIÓN",
+    recovery_authorized: "RECUPERACIÓN AUTORIZADA",
+    resolved: "RESUELTO",
+    rejected: "RECHAZADO"
+  };
+  return labels[status] || String(status || "").toUpperCase();
+}
+
+async function openAdminSecurityIncidentDetail(caseCode) {
+  const { data: rows, error } = await sb.rpc("admin_get_security_incident_reports");
+
+  if (error) {
+    showToast("No pudimos abrir el reporte");
+    return;
+  }
+
+  const incident = (rows || []).find(r => r.case_code === caseCode);
+
+  if (!incident) {
+    showToast("Reporte no encontrado");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:320;">
+      <div class="modal-box" style="
+        max-width:540px;
+        max-height:90dvh;
+        overflow:hidden;
+        display:flex;
+        flex-direction:column;
+        border-color:rgba(248,113,113,.24);
+      ">
+        <div class="modal-box-header" style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;">
+          <div>
+            <div style="font-size:9px;color:#fb7185;font-weight:900;letter-spacing:.12em;">
+              🚨 SEGURIDAD
+            </div>
+            <h2 style="margin:4px 0 3px;">${escapeHtml(incident.case_code)}</h2>
+            <div style="font-size:10px;color:var(--text-dim);">
+              ${escapeHtml(getAdminSecurityStatusLabel(incident.status))}
+            </div>
+          </div>
+          <button type="button" onclick="closeManagedModal()"
+            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          <div class="form-card" style="margin-bottom:10px;">
+            <div style="font-size:9px;color:var(--text-dim);">CUENTA</div>
+            <div style="font-size:13px;font-weight:800;margin-top:3px;">${escapeHtml(incident.email || "")}</div>
+            <div class="mono" style="font-size:9px;color:var(--text-dim);margin-top:4px;">
+              ${escapeHtml(incident.user_id || "Sin user_id")}
+            </div>
+          </div>
+
+          <div class="form-card" style="margin-bottom:10px;">
+            <div style="font-size:9px;color:var(--text-dim);">MOTIVO</div>
+            <div style="font-size:12px;font-weight:800;margin-top:4px;">
+              ${escapeHtml(getAdminSecurityReasonLabel(incident.reason))}
+            </div>
+          </div>
+
+          <div class="form-card" style="margin-bottom:10px;">
+            <div style="font-size:9px;color:var(--text-dim);">DESCRIPCIÓN DEL USUARIO</div>
+            <div style="font-size:12px;line-height:1.55;margin-top:5px;white-space:pre-wrap;">
+              ${escapeHtml(incident.details || "Sin descripción")}
+            </div>
+          </div>
+
+          <div style="font-size:10px;color:var(--text-dim);line-height:1.5;">
+            Reportado: ${incident.created_at ? new Date(incident.created_at).toLocaleString("es-AR") : "—"}<br>
+            ${incident.reviewed_at ? `Revisado: ${new Date(incident.reviewed_at).toLocaleString("es-AR")}<br>` : ""}
+            Estado actual: ${escapeHtml(getAdminSecurityStatusLabel(incident.status))}
+          </div>
+
+          <div style="
+            margin-top:14px;
+            padding:11px 12px;
+            border:1px solid rgba(250,204,21,.20);
+            background:rgba(250,204,21,.04);
+            border-radius:11px;
+            color:var(--text-dim);
+            font-size:10px;
+            line-height:1.5;
+          ">
+            🔐 La autorización de recuperación con código de 6 dígitos se conecta en el próximo paso.
+            Por ahora este panel es de revisión y lectura segura.
+          </div>
+        </div>
+
+        <div class="modal-box-footer">
+          <button class="btn-outline" style="width:100%;" onclick="closeManagedModal()">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function organizeAdminPanel() {
+  const main = document.getElementById("appView");
+  if (!main || main.dataset.adminOrganized === "1") return;
+  main.dataset.adminOrganized = "1";
+
+  if (!document.getElementById("lsAdminOrganizationStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsAdminOrganizationStyles";
+    style.textContent = `
+      .ls-admin-nav {
+        position:sticky;
+        top:8px;
+        z-index:30;
+        display:flex;
+        gap:7px;
+        overflow-x:auto;
+        padding:7px;
+        margin:0 0 18px;
+        border:1px solid var(--border);
+        background:color-mix(in srgb,var(--panel) 94%,transparent);
+        backdrop-filter:blur(12px);
+        border-radius:14px;
+        scrollbar-width:none;
+      }
+      .ls-admin-nav::-webkit-scrollbar { display:none; }
+
+      .ls-admin-nav button {
+        white-space:nowrap;
+        border:1px solid transparent;
+        background:transparent;
+        color:var(--text-dim);
+        border-radius:10px;
+        padding:9px 12px;
+        cursor:pointer;
+        font-family:inherit;
+        font-size:10px;
+        font-weight:850;
+      }
+
+      .ls-admin-nav button.active {
+        color:var(--text);
+        background:var(--panel-2);
+        border-color:var(--border);
+        box-shadow:0 4px 16px rgba(0,0,0,.18);
+      }
+
+      .ls-admin-group {
+        display:none;
+        animation:lsAdminGroupIn .16s ease;
+      }
+
+      .ls-admin-group.active {
+        display:block;
+      }
+
+      .ls-admin-group > h3:first-child {
+        margin-top:4px !important;
+      }
+
+      @keyframes lsAdminGroupIn {
+        from { opacity:.45; transform:translateY(3px); }
+        to { opacity:1; transform:none; }
+      }
+
+      @media(max-width:700px) {
+        .ls-admin-nav {
+          top:4px;
+          border-radius:12px;
+          margin-left:-2px;
+          margin-right:-2px;
+        }
+        .ls-admin-nav button {
+          padding:9px 10px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const title = main.querySelector(".page-title");
+  if (!title) return;
+
+  const nav = document.createElement("div");
+  nav.className = "ls-admin-nav";
+  nav.innerHTML = `
+    <button data-admin-tab="resumen" class="active" onclick="switchAdminPanelGroup('resumen',this)">📊 Resumen</button>
+    <button data-admin-tab="seguridad" onclick="switchAdminPanelGroup('seguridad',this)">🚨 Seguridad</button>
+    <button data-admin-tab="usuarios" onclick="switchAdminPanelGroup('usuarios',this)">👥 Usuarios</button>
+    <button data-admin-tab="finanzas" onclick="switchAdminPanelGroup('finanzas',this)">💰 Finanzas</button>
+    <button data-admin-tab="tienda" onclick="switchAdminPanelGroup('tienda',this)">🛍️ Tienda</button>
+    <button data-admin-tab="sistema" onclick="switchAdminPanelGroup('sistema',this)">⚙️ Sistema</button>
+  `;
+
+  title.insertAdjacentElement("afterend", nav);
+
+  const nodes = Array.from(main.children).filter(n => n !== title && n !== nav);
+
+  const headingGroup = text => {
+    const value = String(text || "").toLowerCase();
+
+    if (value.includes("reportes de seguridad") || value.includes("videos reportados")) return "seguridad";
+    if (value.includes("cuentas nuevas") || value.includes("buscar y gestionar")) return "usuarios";
+    if (value.includes("pagos de suscripción") || value.includes("canjes pendientes") || value.includes("historial reciente")) return "finanzas";
+    if (value.includes("precios de la tienda") || value.includes("emojis de la tienda") ||
+        value.includes("medallas exclusivas") || value.includes("títulos de perfil") ||
+        value.includes("otros artículos")) return "tienda";
+    if (value.includes("eventos visuales") || value.includes("acceso a planes") ||
+        value.includes("novedades y términos") || value.includes("racha semanal")) return "sistema";
+
+    return "resumen";
+  };
+
+  const groups = {};
+  ["resumen","seguridad","usuarios","finanzas","tienda","sistema"].forEach(key => {
+    const el = document.createElement("div");
+    el.className = `ls-admin-group ${key === "resumen" ? "active" : ""}`;
+    el.dataset.adminGroup = key;
+    groups[key] = el;
+    main.appendChild(el);
+  });
+
+  let currentGroup = "resumen";
+
+  nodes.forEach(node => {
+    if (node.tagName === "H3") {
+      currentGroup = headingGroup(node.textContent);
+    }
+    groups[currentGroup].appendChild(node);
+  });
+}
+
+function switchAdminPanelGroup(group, button) {
+  const main = document.getElementById("appView");
+  if (!main) return;
+
+  main.querySelectorAll(".ls-admin-group").forEach(el => {
+    el.classList.toggle("active", el.dataset.adminGroup === group);
+  });
+
+  main.querySelectorAll(".ls-admin-nav button").forEach(btn => {
+    btn.classList.toggle("active", btn === button);
+  });
+
+  try {
+    window.scrollTo({ top:0, behavior:"smooth" });
+  } catch (_) {
+    window.scrollTo(0,0);
+  }
 }
 
 async function handleDeleteVideo(videoId) {

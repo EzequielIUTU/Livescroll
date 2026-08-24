@@ -2599,6 +2599,12 @@ function switchTab(tab) {
   if (window.innerWidth > 700) {
     requestAnimationFrame(() => animateCurrentViewSafe());
   }
+
+  // Seasonal: solo sincroniza controles si estamos en Admin.
+  // No reconstruye el tema ni observa todo el DOM.
+  if (tab === "admin") {
+    setTimeout(syncSeasonalAdminControls, 250);
+  }
 }
 
 function updateBalanceUI() {
@@ -10861,7 +10867,9 @@ function clearSeasonalDecorations() {
 }
 
 function applySeasonalTheme() {
-  if (!document.body) return;
+  if (!document.body || window.__lsSeasonalApplying) return;
+
+  window.__lsSeasonalApplying = true;
 
   clearSeasonalDecorations();
 
@@ -10871,6 +10879,7 @@ function applySeasonalTheme() {
 
   if (key === "normal") {
     syncSeasonalAdminControls();
+    window.__lsSeasonalApplying = false;
     return;
   }
 
@@ -11022,6 +11031,7 @@ function applySeasonalTheme() {
   }
 
   syncSeasonalAdminControls();
+  window.__lsSeasonalApplying = false;
 }
 
 function setSeasonalAdminPreview(value) {
@@ -11066,23 +11076,11 @@ function syncSeasonalAdminControls() {
   }
 }
 
-// Reaplicamos el tema cuando LiveScroll termina de montar/cambiar vistas.
+// Aplicamos el tema al cargar.
+// No usamos MutationObserver global: el Admin reconstruye mucho DOM y eso
+// podía generar un ciclo de reaplicación que frenaba la carga del panel.
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(applySeasonalTheme, 80);
-
-  const observer = new MutationObserver(() => {
-    // El decorador del logo puede desaparecer cuando se reconstruye el nav.
-    // Lo restauramos sin recalcular continuamente si ya existe.
-    const key = getSeasonalThemeKey();
-    if (key !== "normal" && !document.getElementById("lsSeasonalLogoDecor")) {
-      setTimeout(applySeasonalTheme, 30);
-    }
-    if (document.getElementById("seasonalThemeAdminSelect")) {
-      syncSeasonalAdminControls();
-    }
-  });
-
-  observer.observe(document.body, { childList:true, subtree:true });
 });
 
 // Si el app ya estaba cargado antes de registrar DOMContentLoaded.

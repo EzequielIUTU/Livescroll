@@ -791,6 +791,194 @@ function ensureLiveScrollAccessibilityStyles() {
       border-color:rgba(255,255,255,.25) !important;
     }
 
+
+    /* ======================================================
+       5.8.4 · ACCESIBILIDAD TAMBIÉN EN CARTELES / MODALES
+       ====================================================== */
+
+    body.ls-vision-large #globalModalWrap .modal-box {
+      --ls-modal-scale:1.10;
+    }
+
+    body.ls-vision-xlarge #globalModalWrap .modal-box {
+      --ls-modal-scale:1.22;
+    }
+
+    #globalModalWrap .modal-box {
+      --ls-modal-scale:1;
+    }
+
+    /* Escalamos tipografías comunes usadas en carteles sin romper jerarquías. */
+    body.ls-vision-large #globalModalWrap [style*="font-size:8px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 8px"] {
+      font-size:9px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:9px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 9px"] {
+      font-size:10px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:10px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 10px"] {
+      font-size:11px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:11px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 11px"] {
+      font-size:12px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:12px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 12px"] {
+      font-size:13px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:13px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 13px"] {
+      font-size:14px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:14px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 14px"] {
+      font-size:15px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:16px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 16px"] {
+      font-size:18px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:18px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 18px"] {
+      font-size:20px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:20px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 20px"] {
+      font-size:22px !important;
+    }
+    body.ls-vision-large #globalModalWrap [style*="font-size:22px"],
+    body.ls-vision-large #globalModalWrap [style*="font-size: 22px"] {
+      font-size:24px !important;
+    }
+
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:8px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 8px"] {
+      font-size:10px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:9px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 9px"] {
+      font-size:11px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:10px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 10px"] {
+      font-size:12px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:11px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 11px"] {
+      font-size:13px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:12px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 12px"] {
+      font-size:15px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:13px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 13px"] {
+      font-size:16px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:14px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 14px"] {
+      font-size:17px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:16px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 16px"] {
+      font-size:20px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:18px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 18px"] {
+      font-size:22px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:20px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 20px"] {
+      font-size:25px !important;
+    }
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size:22px"],
+    body.ls-vision-xlarge #globalModalWrap [style*="font-size: 22px"] {
+      font-size:27px !important;
+    }
+
+    /* Botones y controles de los carteles también siguen Visión cómoda. */
+    body.ls-vision-large #globalModalWrap button,
+    body.ls-vision-large #globalModalWrap input,
+    body.ls-vision-large #globalModalWrap select,
+    body.ls-vision-large #globalModalWrap textarea {
+      min-height:44px !important;
+    }
+
+    body.ls-vision-xlarge #globalModalWrap button,
+    body.ls-vision-xlarge #globalModalWrap input,
+    body.ls-vision-xlarge #globalModalWrap select,
+    body.ls-vision-xlarge #globalModalWrap textarea {
+      min-height:48px !important;
+    }
+
+    /* Peso de texto: aplica también a Novedades y cualquier cartel futuro. */
+    body.ls-font-medium #globalModalWrap,
+    body.ls-font-medium #globalModalWrap button,
+    body.ls-font-medium #globalModalWrap input,
+    body.ls-font-medium #globalModalWrap select,
+    body.ls-font-medium #globalModalWrap textarea {
+      font-weight:550 !important;
+    }
+
+    body.ls-font-strong #globalModalWrap,
+    body.ls-font-strong #globalModalWrap button,
+    body.ls-font-strong #globalModalWrap input,
+    body.ls-font-strong #globalModalWrap select,
+    body.ls-font-strong #globalModalWrap textarea {
+      font-weight:650 !important;
+    }
+
+    body.ls-font-strong #globalModalWrap h1,
+    body.ls-font-strong #globalModalWrap h2,
+    body.ls-font-strong #globalModalWrap h3,
+    body.ls-font-strong #globalModalWrap strong {
+      font-weight:900 !important;
+    }
+
+    /* Contraste alto: Novedades, tutorial, términos, configuración, perfil, etc. */
+    body.ls-high-contrast #globalModalWrap .modal-overlay {
+      background:rgba(0,0,0,.88) !important;
+    }
+
+    body.ls-high-contrast #globalModalWrap .modal-box {
+      background:#07090d !important;
+      border-color:rgba(255,255,255,.34) !important;
+      color:#ffffff !important;
+      box-shadow:0 24px 80px rgba(0,0,0,.75) !important;
+    }
+
+    body.ls-high-contrast #globalModalWrap .modal-box-body,
+    body.ls-high-contrast #globalModalWrap .modal-box-footer,
+    body.ls-high-contrast #globalModalWrap .modal-box-header {
+      color:#ffffff !important;
+    }
+
+    body.ls-high-contrast #globalModalWrap [style*="color:var(--text-dim)"],
+    body.ls-high-contrast #globalModalWrap [style*="color: var(--text-dim)"] {
+      color:#e6e9ef !important;
+    }
+
+    body.ls-high-contrast #globalModalWrap [style*="border:1px solid var(--border)"],
+    body.ls-high-contrast #globalModalWrap [style*="border: 1px solid var(--border)"] {
+      border-color:rgba(255,255,255,.30) !important;
+    }
+
+    /* Evita que Extra grande haga imposible usar carteles en celular. */
+    body.ls-vision-large #globalModalWrap .modal-box,
+    body.ls-vision-xlarge #globalModalWrap .modal-box {
+      max-height:92dvh !important;
+      overflow:hidden;
+    }
+
+    body.ls-vision-large #globalModalWrap .modal-box-body,
+    body.ls-vision-xlarge #globalModalWrap .modal-box-body {
+      overflow-y:auto !important;
+      min-height:0;
+    }
+
     .ls-settings-grid {
       display:grid;
       grid-template-columns:1fr;
@@ -1191,10 +1379,29 @@ function resetLiveScrollSettings() {
   refreshLiveScrollSettingsUI();
 }
 
+
+
+function installLiveScrollModalAccessibilityBridge() {
+  if (window.__lsModalAccessibilityBridgeInstalled) return;
+  window.__lsModalAccessibilityBridgeInstalled = true;
+
+  const root = document.getElementById("globalModalWrap");
+  if (!root) return;
+
+  const observer = new MutationObserver(() => {
+    // Las reglas dependen de clases del body; solo garantizamos que estén vigentes
+    // cuando aparece un cartel nuevo.
+    applyLiveScrollSettings();
+  });
+
+  observer.observe(root, { childList:true, subtree:false });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   ensureLiveScrollAccessibilityStyles();
   installLiveScrollZoomLock();
   applyLiveScrollSettings();
+  installLiveScrollModalAccessibilityBridge();
 });
 
 
@@ -2247,6 +2454,7 @@ function cleanChangelogContent(content) {
 }
 
 function showChangelogModal(entries) {
+  applyLiveScrollSettings();
   const allEntries = Array.isArray(entries) ? entries : [];
   const secondaryEntries = allEntries.filter(isSecondaryRevisionEntry);
 
@@ -2526,6 +2734,7 @@ function showChangelogModal(entries) {
 // ============================================================
 
 async function openChangelogHistory() {
+  applyLiveScrollSettings();
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeChangelogHistory()">

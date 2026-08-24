@@ -10947,30 +10947,90 @@ function applySeasonalTheme() {
       50% { transform:translateY(-2px) rotate(2deg); }
     }
 
-    .ls-seasonal-petal {
+    .ls-seasonal-ambient-item {
       position:fixed;
-      top:-25px;
+      top:-30px;
       z-index:8;
       pointer-events:none;
-      font-size:12px;
-      opacity:.28;
-      animation:lsPetalFall linear infinite;
+      font-size:13px;
+      opacity:.30;
+      will-change:transform, opacity;
     }
 
-    @keyframes lsPetalFall {
-      from { transform:translate3d(0,-30px,0) rotate(0deg); }
-      to { transform:translate3d(35px,110vh,0) rotate(360deg); }
+    .ls-seasonal-fall {
+      animation:lsSeasonalFall linear infinite;
+    }
+
+    .ls-seasonal-fly {
+      top:auto;
+      bottom:18%;
+      animation:lsSeasonalFly ease-in-out infinite;
+    }
+
+    .ls-seasonal-twinkle {
+      top:12%;
+      animation:lsSeasonalTwinkle ease-in-out infinite;
+    }
+
+    .ls-seasonal-float {
+      top:auto;
+      bottom:-30px;
+      animation:lsSeasonalFloatUp ease-in-out infinite;
+    }
+
+    .ls-seasonal-wave {
+      top:auto;
+      bottom:8%;
+      animation:lsSeasonalWave ease-in-out infinite;
+    }
+
+    .ls-seasonal-bounce {
+      top:auto;
+      bottom:-25px;
+      animation:lsSeasonalBounce ease-in-out infinite;
+    }
+
+    @keyframes lsSeasonalFall {
+      from { transform:translate3d(0,-35px,0) rotate(0deg); }
+      to { transform:translate3d(38px,110vh,0) rotate(360deg); }
+    }
+
+    @keyframes lsSeasonalFly {
+      0%,100% { transform:translate3d(-18px,0,0) rotate(-7deg); }
+      50% { transform:translate3d(42px,-65px,0) rotate(7deg); }
+    }
+
+    @keyframes lsSeasonalTwinkle {
+      0%,100% { opacity:.12; transform:scale(.7) rotate(0deg); }
+      50% { opacity:.52; transform:scale(1.18) rotate(25deg); }
+    }
+
+    @keyframes lsSeasonalFloatUp {
+      0% { transform:translate3d(0,0,0) rotate(-5deg); opacity:.12; }
+      50% { opacity:.38; }
+      100% { transform:translate3d(18px,-110vh,0) rotate(8deg); opacity:.08; }
+    }
+
+    @keyframes lsSeasonalWave {
+      0%,100% { transform:translate3d(-12px,0,0) rotate(-4deg); }
+      50% { transform:translate3d(20px,-18px,0) rotate(4deg); }
+    }
+
+    @keyframes lsSeasonalBounce {
+      0% { transform:translate3d(0,0,0) scale(.9); }
+      50% { transform:translate3d(0,-75vh,0) scale(1.05); }
+      100% { transform:translate3d(20px,-110vh,0) scale(.92); }
     }
 
     @media (prefers-reduced-motion:reduce) {
       .ls-seasonal-logo-decor,
-      .ls-seasonal-petal {
+      .ls-seasonal-ambient-item {
         animation:none !important;
       }
-      .ls-seasonal-petal { display:none !important; }
+      .ls-seasonal-ambient-item { display:none !important; }
     }
 
-    body.ls-legacy .ls-seasonal-petal {
+    body.ls-legacy .ls-seasonal-ambient-item {
       display:none !important;
     }
 
@@ -11014,20 +11074,75 @@ function applySeasonalTheme() {
     }
   }
 
-  // Primavera recibe pétalos muy sutiles. Los otros eventos quedan limpios.
-  if (key === "spring" && !document.body.classList.contains("ls-legacy")) {
-    const ambient = document.createElement("div");
-    ambient.id = "lsSeasonalAmbient";
-    ambient.setAttribute("aria-hidden", "true");
-    const petals = ["🌸","🌸","🌼","🌸","🌸"];
-    ambient.innerHTML = petals.map((p, i) => `
-      <span class="ls-seasonal-petal" style="
-        left:${8 + i * 20}%;
-        animation-duration:${8 + i * 1.4}s;
-        animation-delay:-${i * 1.8}s;
-      ">${p}</span>
-    `).join("");
-    document.body.appendChild(ambient);
+  // Efectos ambientales suaves por evento.
+  if (!document.body.classList.contains("ls-legacy")) {
+    const ambientMap = {
+      spring: {
+        items:["🌸","🌼","🌸","🌸","🌼","🌸"],
+        className:"ls-seasonal-fall"
+      },
+      halloween: {
+        items:["🦇","🦇","🦇","🦇","🦇"],
+        className:"ls-seasonal-fly"
+      },
+      christmas: {
+        items:["🎁","❄️","🎁","❄️","🎁"],
+        className:"ls-seasonal-fall"
+      },
+      newyear: {
+        items:["✨","⭐","✨","🌟","✨","⭐"],
+        className:"ls-seasonal-twinkle"
+      },
+      reyes: {
+        items:["👑","⭐","👑","⭐"],
+        className:"ls-seasonal-float"
+      },
+      valentines: {
+        items:["💗","💕","💗","💕","💗"],
+        className:"ls-seasonal-float"
+      },
+      patria: {
+        items:["🇦🇷","🇦🇷","☀️","🇦🇷"],
+        className:"ls-seasonal-wave"
+      },
+      father: {
+        items:["👔","💙","👔","💙"],
+        className:"ls-seasonal-float"
+      },
+      childhood: {
+        items:["🧸","🪀","🎈","🧸","🎈"],
+        className:"ls-seasonal-float"
+      },
+      mother: {
+        items:["🌹","🌷","🌹","🌷","🌹"],
+        className:"ls-seasonal-fall"
+      },
+      easter: {
+        items:["🥚","🐰","🥚","🌷","🥚"],
+        className:"ls-seasonal-bounce"
+      }
+    };
+
+    const config = ambientMap[key];
+
+    if (config) {
+      const ambient = document.createElement("div");
+      ambient.id = "lsSeasonalAmbient";
+      ambient.setAttribute("aria-hidden", "true");
+
+      ambient.innerHTML = config.items.map((item, i) => `
+        <span
+          class="ls-seasonal-ambient-item ${config.className}"
+          style="
+            left:${6 + (i * 17)}%;
+            animation-duration:${8 + (i * 1.3)}s;
+            animation-delay:-${i * 1.7}s;
+          "
+        >${item}</span>
+      `).join("");
+
+      document.body.appendChild(ambient);
+    }
   }
 
   syncSeasonalAdminControls();
@@ -11087,3 +11202,30 @@ document.addEventListener("DOMContentLoaded", () => {
 if (document.readyState !== "loading") {
   setTimeout(applySeasonalTheme, 80);
 }
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsSeasonalSelectContrastFix")) return;
+  const style = document.createElement("style");
+  style.id = "lsSeasonalSelectContrastFix";
+  style.textContent = `
+    #seasonalThemeAdminSelect {
+      color: var(--text) !important;
+      background: var(--ink) !important;
+    }
+
+    #seasonalThemeAdminSelect option {
+      color: #1d1f23 !important;
+      background: #ffffff !important;
+      font-weight: 700;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      #seasonalThemeAdminSelect option {
+        color: #1d1f23 !important;
+        background: #ffffff !important;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+});

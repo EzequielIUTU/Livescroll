@@ -690,6 +690,353 @@ async function animateLandingOdometer() {
 // - Aplicar / Cancelar
 // ============================================================
 
+
+// ============================================================
+// LIVESCROLL 5.8.4 · IDIOMAS V1
+// Traducción segura de textos de interfaz conocidos.
+// No traduce publicaciones, comentarios, nombres ni contenido del usuario.
+// ============================================================
+
+const LS_I18N = {
+  en: {
+    "Mirar":"Watch",
+    "✨ Para Ti":"✨ For You",
+    "Subir video":"Upload video",
+    "Mi Perfil":"My Profile",
+    "👥 Usuarios":"👥 Users",
+    "🔴 Directos":"🔴 Live",
+    "Billetera":"Wallet",
+    "Planes":"Plans",
+    "🛍️ Tienda":"🛍️ Store",
+    "🏆 Ranking":"🏆 Ranking",
+    "📢 Novedades":"📢 What's New",
+    "❓ Cómo funciona":"❓ How it works",
+    "⚙️ Configuración":"⚙️ Settings",
+    "Salir":"Log out",
+    "Iniciar sesión":"Sign in",
+    "Crear cuenta":"Create account",
+    "Entrar":"Sign in",
+    "Email":"Email",
+    "Contraseña":"Password",
+    "Nombre de usuario":"Username",
+    "Recordar mi correo":"Remember my email",
+    "La contraseña la guarda tu dispositivo":"Your device saves the password",
+    "¿Olvidaste tu contraseña?":"Forgot your password?",
+    "Configuración":"Settings",
+    "Apariencia y accesibilidad":"Appearance and accessibility",
+    "Idioma":"Language",
+    "Visión cómoda":"Comfort view",
+    "Contraste":"Contrast",
+    "Fuerza de texto":"Text strength",
+    "VISTA PREVIA":"PREVIEW",
+    "Normal":"Normal",
+    "Grande":"Large",
+    "Extra grande":"Extra large",
+    "Alto":"High",
+    "Medio":"Medium",
+    "Fuerte":"Strong",
+    "Cancelar":"Cancel",
+    "Aplicar cambios":"Apply changes",
+    "Configuración aplicada ✓":"Settings applied ✓",
+    "Español":"Spanish",
+    "English":"English",
+    "Português":"Portuguese",
+    "Elegí el idioma de la interfaz. La traducción completa se incorporará progresivamente durante 5.8.4.":"Choose the interface language.",
+    "Agranda texto, botones y controles de forma ordenada sin usar zoom.":"Enlarges text, buttons and controls without using zoom.",
+    "Aumenta la diferencia entre texto, fondos y bordes.":"Increases contrast between text, backgrounds and borders.",
+    "Elegí qué tan marcada querés ver la letra.":"Choose how bold you want the text to appear.",
+    "Así vas a ver los textos, botones y elementos principales de la interfaz.":"This is how text, buttons and main interface elements will look.",
+    "Botón de ejemplo":"Example button",
+    "🔒 El zoom de la página está desactivado. Visión cómoda permite agrandar la interfaz sin deformarla.":"🔒 Page zoom is disabled. Comfort view enlarges the interface without distorting it.",
+    "Novedades":"What's New",
+    "Versiones y revisiones publicadas":"Published versions and revisions",
+    "Seguridad revisada y aprobada":"Security reviewed and approved",
+    "REVISIÓN SECUNDARIA":"SECONDARY REVIEW",
+    "Revisión secundaria":"Secondary review",
+    "APROBADA":"APPROVED",
+    "Seguridad y protección":"Security and protection",
+    "Sin cambios necesarios de tu parte.":"No action is required from you.",
+    "Entendido ✓":"Got it ✓",
+    "Nuevo":"New",
+    "Mejoras":"Improvements",
+    "Reparado":"Fixed",
+    "Próximamente":"Coming soon",
+    "Cargando...":"Loading...",
+    "Cargando novedades...":"Loading updates...",
+    "Cargando perfil...":"Loading profile...",
+    "Cargando tienda...":"Loading store...",
+    "Cargando ranking...":"Loading ranking...",
+    "No hay directos públicos ahora":"There are no public live streams right now",
+    "Cuando un creador inicie una transmisión, va a aparecer acá.":"When a creator starts streaming, it will appear here.",
+    "Tienda de puntos":"Points Store",
+    "Balance":"Balance",
+    "Planes":"Plans",
+    "Boost":"Boost",
+    "Medallas":"Badges",
+    "Emojis":"Emojis",
+    "Extras":"Extras",
+    "Tu plan":"Your plan",
+    "Activo":"Active",
+    "Mejorar":"Upgrade",
+    "Plan inferior":"Lower plan",
+    "Gratis":"Free",
+    "Mi colección":"My collection",
+    "Explorar →":"Explore →",
+    "En tu perfil":"On your profile",
+    "Tus 3 medallas destacadas":"Your 3 featured badges",
+    "Editar":"Edit",
+    "Objetos":"Items",
+    "Títulos":"Titles",
+    "Todos":"All",
+    "Cerrar":"Close",
+    "Guardar":"Save",
+    "Guardar cambios":"Save changes",
+    "Editar perfil":"Edit profile",
+    "Bio":"Bio",
+    "Avatar":"Avatar",
+    "Portada":"Cover",
+    "Redes sociales":"Social links",
+    "Usuarios":"Users",
+    "Directos":"Live",
+    "Ranking semanal":"Weekly ranking",
+    "Los que más puntos generaron en los últimos 7 días.":"Users who earned the most points in the last 7 days.",
+    "Todavía no hay actividad esta semana.":"There is no activity this week yet.",
+    "Subí tus clips":"Upload your clips",
+    "Mirá y ganá":"Watch and earn",
+    "Cómo funciona":"How it works",
+    "Siguiente":"Next",
+    "Anterior":"Back",
+    "Finalizar":"Finish",
+    "Aceptar":"Accept",
+    "Abrir":"Open",
+    "Publicar":"Publish",
+    "Seleccionar archivo":"Choose file",
+    "Descripción":"Description",
+    "Título":"Title"
+  },
+  pt: {
+    "Mirar":"Assistir",
+    "✨ Para Ti":"✨ Para Você",
+    "Subir video":"Enviar vídeo",
+    "Mi Perfil":"Meu Perfil",
+    "👥 Usuarios":"👥 Usuários",
+    "🔴 Directos":"🔴 Ao Vivo",
+    "Billetera":"Carteira",
+    "Planes":"Planos",
+    "🛍️ Tienda":"🛍️ Loja",
+    "🏆 Ranking":"🏆 Ranking",
+    "📢 Novedades":"📢 Novidades",
+    "❓ Cómo funciona":"❓ Como funciona",
+    "⚙️ Configuración":"⚙️ Configurações",
+    "Salir":"Sair",
+    "Iniciar sesión":"Entrar",
+    "Crear cuenta":"Criar conta",
+    "Entrar":"Entrar",
+    "Email":"Email",
+    "Contraseña":"Senha",
+    "Nombre de usuario":"Nome de usuário",
+    "Recordar mi correo":"Lembrar meu email",
+    "La contraseña la guarda tu dispositivo":"Seu dispositivo salva a senha",
+    "¿Olvidaste tu contraseña?":"Esqueceu sua senha?",
+    "Configuración":"Configurações",
+    "Apariencia y accesibilidad":"Aparência e acessibilidade",
+    "Idioma":"Idioma",
+    "Visión cómoda":"Visão confortável",
+    "Contraste":"Contraste",
+    "Fuerza de texto":"Peso do texto",
+    "VISTA PREVIA":"PRÉVIA",
+    "Normal":"Normal",
+    "Grande":"Grande",
+    "Extra grande":"Extra grande",
+    "Alto":"Alto",
+    "Medio":"Médio",
+    "Fuerte":"Forte",
+    "Cancelar":"Cancelar",
+    "Aplicar cambios":"Aplicar alterações",
+    "Configuración aplicada ✓":"Configurações aplicadas ✓",
+    "Español":"Espanhol",
+    "English":"Inglês",
+    "Português":"Português",
+    "Elegí el idioma de la interfaz. La traducción completa se incorporará progresivamente durante 5.8.4.":"Escolha o idioma da interface.",
+    "Agranda texto, botones y controles de forma ordenada sin usar zoom.":"Aumenta textos, botões e controles sem usar zoom.",
+    "Aumenta la diferencia entre texto, fondos y bordes.":"Aumenta o contraste entre texto, fundos e bordas.",
+    "Elegí qué tan marcada querés ver la letra.":"Escolha o peso do texto.",
+    "Así vas a ver los textos, botones y elementos principales de la interfaz.":"Assim os textos, botões e principais elementos da interface serão exibidos.",
+    "Botón de ejemplo":"Botão de exemplo",
+    "🔒 El zoom de la página está desactivado. Visión cómoda permite agrandar la interfaz sin deformarla.":"🔒 O zoom da página está desativado. A visão confortável aumenta a interface sem deformá-la.",
+    "Novedades":"Novidades",
+    "Versiones y revisiones publicadas":"Versões e revisões publicadas",
+    "Seguridad revisada y aprobada":"Segurança revisada e aprovada",
+    "REVISIÓN SECUNDARIA":"REVISÃO SECUNDÁRIA",
+    "Revisión secundaria":"Revisão secundária",
+    "APROBADA":"APROVADA",
+    "Seguridad y protección":"Segurança e proteção",
+    "Sin cambios necesarios de tu parte.":"Nenhuma ação é necessária da sua parte.",
+    "Entendido ✓":"Entendi ✓",
+    "Nuevo":"Novo",
+    "Mejoras":"Melhorias",
+    "Reparado":"Corrigido",
+    "Próximamente":"Em breve",
+    "Cargando...":"Carregando...",
+    "Cargando novedades...":"Carregando novidades...",
+    "Cargando perfil...":"Carregando perfil...",
+    "Cargando tienda...":"Carregando loja...",
+    "Cargando ranking...":"Carregando ranking...",
+    "No hay directos públicos ahora":"Não há transmissões públicas ao vivo agora",
+    "Cuando un creador inicie una transmisión, va a aparecer acá.":"Quando um criador iniciar uma transmissão, ela aparecerá aqui.",
+    "Tienda de puntos":"Loja de pontos",
+    "Balance":"Saldo",
+    "Boost":"Boost",
+    "Medallas":"Medalhas",
+    "Emojis":"Emojis",
+    "Extras":"Extras",
+    "Tu plan":"Seu plano",
+    "Activo":"Ativo",
+    "Mejorar":"Melhorar",
+    "Plan inferior":"Plano inferior",
+    "Gratis":"Grátis",
+    "Mi colección":"Minha coleção",
+    "Explorar →":"Explorar →",
+    "En tu perfil":"No seu perfil",
+    "Tus 3 medallas destacadas":"Suas 3 medalhas em destaque",
+    "Editar":"Editar",
+    "Objetos":"Itens",
+    "Títulos":"Títulos",
+    "Todos":"Todos",
+    "Cerrar":"Fechar",
+    "Guardar":"Salvar",
+    "Guardar cambios":"Salvar alterações",
+    "Editar perfil":"Editar perfil",
+    "Bio":"Bio",
+    "Avatar":"Avatar",
+    "Portada":"Capa",
+    "Redes sociales":"Redes sociais",
+    "Usuarios":"Usuários",
+    "Directos":"Ao vivo",
+    "Ranking semanal":"Ranking semanal",
+    "Los que más puntos generaron en los últimos 7 días.":"Quem mais gerou pontos nos últimos 7 dias.",
+    "Todavía no hay actividad esta semana.":"Ainda não há atividade nesta semana.",
+    "Subí tus clips":"Envie seus clipes",
+    "Mirá y ganá":"Assista e ganhe",
+    "Cómo funciona":"Como funciona",
+    "Siguiente":"Próximo",
+    "Anterior":"Anterior",
+    "Finalizar":"Finalizar",
+    "Aceptar":"Aceitar",
+    "Abrir":"Abrir",
+    "Publicar":"Publicar",
+    "Seleccionar archivo":"Selecionar arquivo",
+    "Descripción":"Descrição",
+    "Título":"Título"
+  }
+};
+
+function getLiveScrollLanguage() {
+  return getLiveScrollSettings?.().language || "es";
+}
+
+function lsTranslateExact(value, lang = getLiveScrollLanguage()) {
+  if (!value || lang === "es") return value;
+  return LS_I18N[lang]?.[value] || value;
+}
+
+function shouldSkipLiveScrollTranslation(el) {
+  if (!el || !el.closest) return false;
+
+  return !!el.closest(
+    [
+      ".video-caption",
+      ".video-description",
+      ".comment-text",
+      ".comments-list",
+      ".user-content",
+      ".profile-bio",
+      "[data-user-content]",
+      "pre",
+      "code"
+    ].join(",")
+  );
+}
+
+function translateLiveScrollElement(el, lang = getLiveScrollLanguage()) {
+  if (!el || shouldSkipLiveScrollTranslation(el)) return;
+
+  // Texto exacto de controles simples.
+  if (
+    ["BUTTON","LABEL","OPTION","H1","H2","H3","H4","P","SPAN","DIV"].includes(el.tagName) &&
+    el.childElementCount === 0
+  ) {
+    const original = el.dataset.lsI18nOriginal || el.textContent?.trim();
+
+    if (original) {
+      if (!el.dataset.lsI18nOriginal) el.dataset.lsI18nOriginal = original;
+      el.textContent = lang === "es"
+        ? el.dataset.lsI18nOriginal
+        : lsTranslateExact(el.dataset.lsI18nOriginal, lang);
+    }
+  }
+
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    if (el.placeholder) {
+      const original = el.dataset.lsI18nPlaceholder || el.placeholder;
+      if (!el.dataset.lsI18nPlaceholder) el.dataset.lsI18nPlaceholder = original;
+      el.placeholder = lang === "es"
+        ? el.dataset.lsI18nPlaceholder
+        : lsTranslateExact(el.dataset.lsI18nPlaceholder, lang);
+    }
+  }
+
+  if (el.title) {
+    const original = el.dataset.lsI18nTitle || el.title;
+    if (!el.dataset.lsI18nTitle) el.dataset.lsI18nTitle = original;
+    el.title = lang === "es"
+      ? el.dataset.lsI18nTitle
+      : lsTranslateExact(el.dataset.lsI18nTitle, lang);
+  }
+}
+
+function applyLiveScrollTranslations(root = document) {
+  const lang = getLiveScrollLanguage();
+
+  translateLiveScrollElement(root, lang);
+
+  root.querySelectorAll?.(
+    "button,label,option,h1,h2,h3,h4,p,span,div,input,textarea,[title]"
+  ).forEach(el => translateLiveScrollElement(el, lang));
+
+  document.documentElement.lang =
+    lang === "en" ? "en" :
+    lang === "pt" ? "pt-BR" : "es";
+}
+
+function installLiveScrollTranslationObserver() {
+  if (window.__lsTranslationObserverInstalled || !document.body) return;
+  window.__lsTranslationObserverInstalled = true;
+
+  let queued = false;
+
+  const observer = new MutationObserver(mutations => {
+    if (queued) return;
+    queued = true;
+
+    requestAnimationFrame(() => {
+      queued = false;
+      for (const mutation of mutations) {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            applyLiveScrollTranslations(node);
+          }
+        });
+      }
+    });
+  });
+
+  observer.observe(document.body, {
+    childList:true,
+    subtree:true
+  });
+}
+
 const LS_SETTINGS_KEY = "livescroll_ui_settings_v584";
 const LS_SETTINGS_DEFAULTS = {
   language: "es",
@@ -1145,6 +1492,9 @@ function applyLiveScrollSettings(settings = getLiveScrollSettings()) {
     settings.language === "pt" ? "pt-BR" : "es";
 
   window.__lsLanguage = settings.language;
+
+  // La elección de idioma ahora sí se refleja inmediatamente en la interfaz.
+  setTimeout(() => applyLiveScrollTranslations(document), 0);
 }
 
 function lsSettingsLabel(group, value) {
@@ -1372,6 +1722,9 @@ function applyLiveScrollSettingsDraft() {
   closeManagedModal();
 
   showToast("Configuración aplicada ✓");
+
+  // Fuerza actualización inmediata de la pantalla actual.
+  setTimeout(() => applyLiveScrollTranslations(document), 0);
 }
 
 function resetLiveScrollSettings() {
@@ -1402,6 +1755,8 @@ document.addEventListener("DOMContentLoaded", () => {
   installLiveScrollZoomLock();
   applyLiveScrollSettings();
   installLiveScrollModalAccessibilityBridge();
+  installLiveScrollTranslationObserver();
+  applyLiveScrollTranslations(document);
 });
 
 
@@ -1441,6 +1796,7 @@ function toggleMobileMenu() {
 
   document.body.appendChild(overlay);
   document.body.appendChild(panel);
+  setTimeout(() => applyLiveScrollTranslations(panel), 0);
 }
 
 function closeMobileMenu() {
@@ -3880,6 +4236,8 @@ function switchTab(tab) {
   if (tab === "admin") {
     setTimeout(syncSeasonalAdminControls, 250);
   }
+
+  setTimeout(() => applyLiveScrollTranslations(document.getElementById("appView") || document), 0);
 }
 
 function updateBalanceUI() {

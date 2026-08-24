@@ -98,6 +98,32 @@ document.addEventListener("DOMContentLoaded", () => {
 // ============================================================
 // ARRANQUE
 // ============================================================
+
+(function installSecurityReportContrastStyles() {
+  if (document.getElementById("lsSecurityReportContrastStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsSecurityReportContrastStyles";
+  style.textContent = `
+    .ls-security-reason-select {
+      color:#fff !important;
+      background:#0a0d12 !important;
+      border-color:rgba(255,255,255,.32) !important;
+      font-weight:700 !important;
+    }
+    .ls-security-reason-select option {
+      color:#fff !important;
+      background:#0a0d12 !important;
+      font-weight:700 !important;
+    }
+    .ls-security-reason-select:focus {
+      outline:none;
+      border-color:#fb7185 !important;
+      box-shadow:0 0 0 3px rgba(251,113,133,.12);
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 // ============================================================
 // LIVESCROLL · REPORTE DE SEGURIDAD V1
 // Flujo público desde el correo "Tu contraseña fue cambiada".
@@ -111,6 +137,8 @@ function isLiveScrollSecurityReportLink() {
 
 function getLiveScrollSecurityReportEmail() {
   const params = new URLSearchParams(window.location.search);
+  // En una URL, "+" puede interpretarse como espacio. Lo restauramos
+  // para correos tipo nombre+alias@gmail.com.
   return String(params.get("email") || "").trim().replace(/ /g, "+").toLowerCase();
 }
 
@@ -212,14 +240,15 @@ function renderSecurityReportScreen() {
 
         <div class="field">
           <label>¿Qué ocurrió?</label>
-          <select id="securityReportReason" style="
+          <select id="securityReportReason" class="ls-security-reason-select" style="
             width:100%;
             padding:11px;
-            background:var(--ink);
-            color:var(--text);
-            border:1px solid var(--border);
+            background:#0a0d12;
+            color:#ffffff;
+            border:1px solid rgba(255,255,255,.30);
             border-radius:9px;
             font-family:inherit;
+            font-weight:700;
           ">
             <option value="">Seleccioná un motivo</option>
             <option value="password_change_not_recognized">No reconozco el cambio de contraseña</option>
@@ -1078,51 +1107,14 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
-  // El cierre de sesión no depende únicamente del evento SIGNED_OUT.
-  // Limpiamos la interfaz y el estado local inmediatamente para evitar
-  // que el Feed quede visible hasta recargar la página.
   clearAllWatchIntervals();
 
   if (notifRealtimeChannel) {
-    try {
-      await sb.removeChannel(notifRealtimeChannel);
-    } catch (_) {}
+    await sb.removeChannel(notifRealtimeChannel);
     notifRealtimeChannel = null;
   }
 
-  const { error } = await sb.auth.signOut();
-
-  if (error) {
-    console.error("Error al cerrar sesión:", error);
-    showToast("No pudimos cerrar la sesión. Intentá nuevamente.");
-    return;
-  }
-
-  currentUser = null;
-  currentProfile = null;
-
-  // Limpiamos cualquier modal/panel que haya quedado abierto.
-  const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-
-  const notifPanel = document.getElementById("notifPanel");
-  if (notifPanel) notifPanel.remove();
-
-  // Volvemos al inicio sin esperar a que onAuthStateChange vuelva a renderizar.
-  renderLanding();
-
-  try {
-    history.replaceState({}, document.title, window.location.pathname);
-  } catch (_) {}
-
-  // Respaldo: verificamos que Supabase realmente haya eliminado la sesión.
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) {
-    console.warn("La sesión seguía activa después de signOut; reintentando cierre local.");
-    try {
-      await sb.auth.signOut({ scope: "local" });
-    } catch (_) {}
-  }
+  await sb.auth.signOut();
 }
 
 async function loadProfile() {

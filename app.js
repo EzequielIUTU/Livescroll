@@ -3108,7 +3108,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4136,6 +4136,7 @@ function showChangelogModal(entries) {
     "5.8.8":"MOBILE STABILITY",
     "5.8.9":"ROAD TO 5.9",
     "5.9.0":"ROAD TO 6",
+    "5.9.1":"VISUAL EVOLUTION",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4206,7 +4207,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 6.0.0</div>
         </div>
       </div>
     </div>`;

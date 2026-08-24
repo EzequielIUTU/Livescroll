@@ -1,14 +1,17 @@
 :root {
-  --ink: #061014;
-  --panel: #0D1B21;
-  --panel-2: #122831;
-  --gold: #38F26A;
-  --gold-dim: #129B48;
-  --green: #48DDF2;
+  --ink: #071116;
+  --panel: #0D2028;
+  --panel-2: #12303A;
+  --gold: #2EF27C;
+  --gold-dim: #18A75A;
+  --green: #38DDF2;
   --red: #F87171;
-  --text: #F5F6F7;
-  --text-dim: #9AA0A8;
-  --border: #1B3D49;
+  --text: #F4FBFC;
+  --text-dim: #9AB3BA;
+  --border: #183B46;
+  --ls6-accent: #F4D35E;
+  --ls6-glow-green: rgba(46,242,124,.16);
+  --ls6-glow-blue: rgba(56,221,242,.13);
 }
 
 * { box-sizing: border-box; }
@@ -561,6 +564,230 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
   .profile-hero-top { align-items: flex-start; }
   .profile-avatar-ring { width: 60px; height: 60px; }
   .profile-avatar-ring img { width: 50px; height: 50px; }
+}
+
+/* ==========================================================
+   5.9.1 · VISUAL EVOLUTION
+   Primera etapa de la interfaz rumbo a LiveScroll 6.
+   ========================================================== */
+html:not(.ls-legacy) body {
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 12% -8%,var(--ls6-glow-green),transparent 31rem),
+    radial-gradient(circle at 92% 16%,var(--ls6-glow-blue),transparent 34rem),
+    linear-gradient(155deg,#071116 0%,#08171d 48%,#061014 100%);
+  background-attachment:fixed;
+}
+
+html:not(.ls-legacy) nav {
+  top:8px;
+  width:min(calc(100% - 24px),1180px);
+  margin:8px auto 0;
+  padding:13px 18px;
+  border:1px solid rgba(56,221,242,.16);
+  border-radius:18px;
+  background:linear-gradient(135deg,rgba(13,32,40,.92),rgba(7,17,22,.88));
+  box-shadow:0 14px 42px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.035);
+  backdrop-filter:blur(16px) saturate(135%);
+}
+
+html:not(.ls-legacy) .nav-brand {
+  letter-spacing:-.04em;
+  text-shadow:0 0 24px rgba(46,242,124,.16);
+}
+
+html:not(.ls-legacy) .nav-brand span {
+  background:linear-gradient(100deg,var(--gold),var(--green));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+
+html:not(.ls-legacy) .nav-links button {
+  border:1px solid transparent;
+  border-radius:11px;
+  transition:color .18s ease,background .18s ease,border-color .18s ease,transform .18s ease;
+}
+
+html:not(.ls-legacy) .nav-links button:hover {
+  color:var(--text);
+  background:rgba(255,255,255,.035);
+  transform:translateY(-1px);
+}
+
+html:not(.ls-legacy) .nav-links button.active {
+  color:var(--gold);
+  border-color:rgba(46,242,124,.18);
+  background:linear-gradient(135deg,rgba(46,242,124,.10),rgba(56,221,242,.055));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+html:not(.ls-legacy) .nav-plan-chip,
+html:not(.ls-legacy) .nav-balance {
+  border-color:rgba(46,242,124,.22);
+  background:linear-gradient(135deg,rgba(46,242,124,.075),rgba(56,221,242,.04));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+html:not(.ls-legacy) button.btn,
+html:not(.ls-legacy) .btn {
+  color:#03130b;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:12px;
+  background:linear-gradient(115deg,#25dc70 0%,#45f692 52%,#38ddf2 145%);
+  box-shadow:0 9px 25px rgba(46,242,124,.15),inset 0 1px 0 rgba(255,255,255,.32);
+  transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s ease,filter .18s ease;
+}
+
+html:not(.ls-legacy) button.btn:hover,
+html:not(.ls-legacy) .btn:hover {
+  transform:translateY(-2px);
+  filter:saturate(1.08) brightness(1.04);
+  box-shadow:0 13px 34px rgba(46,242,124,.23),inset 0 1px 0 rgba(255,255,255,.36);
+}
+
+html:not(.ls-legacy) button.btn:active,
+html:not(.ls-legacy) .btn:active {
+  transform:translateY(0) scale(.985);
+}
+
+html:not(.ls-legacy) button.btn-outline {
+  border-color:rgba(154,179,186,.22);
+  border-radius:12px;
+  background:linear-gradient(135deg,rgba(18,48,58,.62),rgba(7,17,22,.52));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  transition:transform .18s ease,border-color .18s ease,background .18s ease;
+}
+
+html:not(.ls-legacy) button.btn-outline:hover {
+  color:var(--text);
+  border-color:rgba(56,221,242,.34);
+  background:linear-gradient(135deg,rgba(46,242,124,.075),rgba(56,221,242,.075));
+}
+
+html:not(.ls-legacy) .form-card,
+html:not(.ls-legacy) .video-card,
+html:not(.ls-legacy) .auth-box,
+html:not(.ls-legacy) .wallet-hero,
+html:not(.ls-legacy) .profile-section,
+html:not(.ls-legacy) .user-directory-row,
+html:not(.ls-legacy) .directo-card {
+  border-color:rgba(56,221,242,.14);
+  border-radius:18px;
+  background:linear-gradient(145deg,rgba(13,32,40,.94),rgba(9,24,30,.90));
+  box-shadow:0 14px 38px rgba(0,0,0,.19),inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+html:not(.ls-legacy) .form-card:hover,
+html:not(.ls-legacy) .video-card:hover,
+html:not(.ls-legacy) .user-directory-row:hover {
+  border-color:rgba(46,242,124,.23);
+}
+
+html:not(.ls-legacy) .modal-overlay {
+  background:rgba(2,8,11,.78);
+  backdrop-filter:blur(10px);
+}
+
+html:not(.ls-legacy) .modal-box {
+  border-color:rgba(56,221,242,.18);
+  border-radius:22px;
+  background:linear-gradient(155deg,rgba(13,32,40,.985),rgba(7,17,22,.985));
+  box-shadow:0 28px 90px rgba(0,0,0,.52),inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+html:not(.ls-legacy) .modal-box-footer {
+  border-color:rgba(56,221,242,.12);
+  background:rgba(7,17,22,.46);
+}
+
+html:not(.ls-legacy) input:not([type="checkbox"]):not([type="radio"]),
+html:not(.ls-legacy) select,
+html:not(.ls-legacy) textarea {
+  border-color:rgba(56,221,242,.16);
+  border-radius:11px;
+  background:rgba(4,14,18,.72);
+  color:var(--text);
+  outline:none;
+  transition:border-color .18s ease,box-shadow .18s ease,background .18s ease;
+}
+
+html:not(.ls-legacy) input:not([type="checkbox"]):not([type="radio"]):focus,
+html:not(.ls-legacy) select:focus,
+html:not(.ls-legacy) textarea:focus {
+  border-color:rgba(46,242,124,.62);
+  background:rgba(5,18,23,.92);
+  box-shadow:0 0 0 3px rgba(46,242,124,.09),0 8px 24px rgba(0,0,0,.14);
+}
+
+html:not(.ls-legacy) .page-title {
+  font-weight:700;
+  letter-spacing:-.045em;
+  text-wrap:balance;
+}
+
+html:not(.ls-legacy) .page-title::after {
+  content:"";
+  display:block;
+  width:44px;
+  height:3px;
+  margin-top:9px;
+  border-radius:99px;
+  background:linear-gradient(90deg,var(--gold),var(--green));
+  box-shadow:0 0 18px rgba(46,242,124,.24);
+}
+
+html:not(.ls-legacy) .mobile-menu-panel {
+  border-left:1px solid rgba(56,221,242,.16);
+  background:linear-gradient(160deg,rgba(13,32,40,.985),rgba(7,17,22,.985));
+  box-shadow:-22px 0 60px rgba(0,0,0,.42);
+}
+
+html:not(.ls-legacy) .mobile-menu-panel button {
+  border-bottom-color:rgba(56,221,242,.10);
+  border-radius:11px;
+}
+
+html:not(.ls-legacy) .mobile-menu-panel button:hover {
+  background:rgba(56,221,242,.055);
+}
+
+html:not(.ls-legacy) ::selection {
+  color:#03130b;
+  background:var(--gold);
+}
+
+html:not(.ls-legacy) * {
+  scrollbar-color:rgba(56,221,242,.26) rgba(7,17,22,.35);
+  scrollbar-width:thin;
+}
+
+html.ls-legacy body {
+  background:var(--ink);
+  background-attachment:scroll;
+}
+
+html.ls-legacy nav {
+  backdrop-filter:none;
+  box-shadow:none;
+}
+
+@media(max-width:780px) {
+  html:not(.ls-legacy) nav {
+    top:6px;
+    width:calc(100% - 12px);
+    margin-top:6px;
+    padding:11px 12px;
+    border-radius:15px;
+  }
+
+  html:not(.ls-legacy) .form-card,
+  html:not(.ls-legacy) .video-card,
+  html:not(.ls-legacy) .auth-box,
+  html:not(.ls-legacy) .wallet-hero,
+  html:not(.ls-legacy) .profile-section {
+    border-radius:16px;
+  }
 }
 
 /* ---------- MODALES (header fijo + body con scroll + footer fijo) ---------- */

@@ -1045,14 +1045,51 @@ async function handleLogin() {
 }
 
 async function handleLogout() {
+  // El cierre de sesión no depende únicamente del evento SIGNED_OUT.
+  // Limpiamos la interfaz y el estado local inmediatamente para evitar
+  // que el Feed quede visible hasta recargar la página.
   clearAllWatchIntervals();
 
   if (notifRealtimeChannel) {
-    await sb.removeChannel(notifRealtimeChannel);
+    try {
+      await sb.removeChannel(notifRealtimeChannel);
+    } catch (_) {}
     notifRealtimeChannel = null;
   }
 
-  await sb.auth.signOut();
+  const { error } = await sb.auth.signOut();
+
+  if (error) {
+    console.error("Error al cerrar sesión:", error);
+    showToast("No pudimos cerrar la sesión. Intentá nuevamente.");
+    return;
+  }
+
+  currentUser = null;
+  currentProfile = null;
+
+  // Limpiamos cualquier modal/panel que haya quedado abierto.
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+
+  const notifPanel = document.getElementById("notifPanel");
+  if (notifPanel) notifPanel.remove();
+
+  // Volvemos al inicio sin esperar a que onAuthStateChange vuelva a renderizar.
+  renderLanding();
+
+  try {
+    history.replaceState({}, document.title, window.location.pathname);
+  } catch (_) {}
+
+  // Respaldo: verificamos que Supabase realmente haya eliminado la sesión.
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    console.warn("La sesión seguía activa después de signOut; reintentando cierre local.");
+    try {
+      await sb.auth.signOut({ scope: "local" });
+    } catch (_) {}
+  }
 }
 
 async function loadProfile() {

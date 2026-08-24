@@ -6802,6 +6802,7 @@ async function openMyMedalsPanel() {
   // La colección se reconstruye desde Supabase cada vez que se abre,
   // evitando mostrar stock/seriales viejos después de una compra.
   window.__collection568Filter = "all";
+  window.__collection568RarityFilter = "all";
   window.__collection568Sort = "rarity";
 
   const allItems = window.__collection568Items;
@@ -6829,6 +6830,12 @@ async function openMyMedalsPanel() {
             <button class="btn-outline ls-collection-filter" data-filter="limited" onclick="setCollection568Filter('limited',this)" style="padding:6px 9px;font-size:10px;">Limitados</button>
             <button class="btn-outline ls-collection-filter" data-filter="top" onclick="setCollection568Filter('top',this)" style="padding:6px 9px;font-size:10px;">Legendarios+</button>
           </div>
+          <div style="margin:4px 0 12px;padding-top:10px;border-top:1px solid var(--border);">
+            <div style="font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;">
+              Rareza
+            </div>
+            <div id="collection568RarityFilters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
 
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
             <select id="collection568Sort" onchange="setCollection568Sort(this.value)"
@@ -6848,11 +6855,13 @@ async function openMyMedalsPanel() {
       </div>
     </div>`;
 
+  renderCollection568RarityFilters("all");
   renderCollection568Grid();
 }
 
 function setCollection568Filter(filter, button) {
   window.__collection568Filter = filter || "all";
+  window.__collection568RarityFilter = "all";
 
   document.querySelectorAll(".ls-collection-filter").forEach(btn => {
     btn.classList.toggle("active", btn === button);
@@ -6860,7 +6869,63 @@ function setCollection568Filter(filter, button) {
     btn.style.color = btn === button ? "var(--gold)" : "";
   });
 
+  renderCollection568RarityFilters(window.__collection568Filter);
   renderCollection568Grid();
+}
+
+function setCollection568RarityFilter(filter, button) {
+  window.__collection568RarityFilter = filter || "all";
+
+  document.querySelectorAll(".ls-collection-rarity-filter").forEach(btn => {
+    btn.classList.toggle("active", btn === button);
+    btn.style.borderColor = btn === button ? "var(--gold)" : "";
+    btn.style.color = btn === button ? "var(--gold)" : "";
+  });
+
+  renderCollection568Grid();
+}
+
+function renderCollection568RarityFilters(activeType) {
+  const wrap = document.getElementById("collection568RarityFilters");
+  if (!wrap) return;
+
+  const all = window.__collection568Items || [];
+  const scoped = ["badge","emoji","title"].includes(activeType)
+    ? all.filter(i => i.type === activeType)
+    : all;
+
+  const available = new Set();
+  scoped.forEach(item => {
+    const rarity = String(item.rarity || "").toLowerCase();
+    if (rarity) available.add(rarity);
+    if (item.is_limited) available.add("limited");
+  });
+
+  const options = [
+    ["all","Todos"],
+    ["comun","Común"],
+    ["rara","Rara"],
+    ["epica","Épica"],
+    ["legendaria","Legendaria"],
+    ["exclusiva","Exclusiva"],
+    ["limited","Limitada"]
+  ].filter(([key]) => key === "all" || available.has(key));
+
+  if (!options.some(([key]) => key === window.__collection568RarityFilter)) {
+    window.__collection568RarityFilter = "all";
+  }
+
+  wrap.innerHTML = options.map(([key,label]) => `
+    <button
+      class="btn-outline ls-collection-rarity-filter ${window.__collection568RarityFilter === key ? "active" : ""}"
+      onclick="setCollection568RarityFilter('${key}',this)"
+      style="
+        padding:5px 8px;
+        font-size:9px;
+        ${window.__collection568RarityFilter === key ? "border-color:var(--gold);color:var(--gold);" : ""}
+      "
+    >${label}</button>
+  `).join("");
 }
 
 function setCollection568Sort(sort) {
@@ -6884,6 +6949,13 @@ function renderCollection568Grid() {
   if (filter === "title") items = items.filter(i => i.type === "title");
   if (filter === "limited") items = items.filter(i => i.is_limited);
   if (filter === "top") items = items.filter(i => ["legendaria","exclusiva"].includes(i.rarity));
+
+  const rarityFilter = window.__collection568RarityFilter || "all";
+  if (rarityFilter === "limited") {
+    items = items.filter(i => i.is_limited);
+  } else if (rarityFilter !== "all") {
+    items = items.filter(i => String(i.rarity || "").toLowerCase() === rarityFilter);
+  }
 
   if (sort === "rarity") {
     items.sort((a,b) => {
@@ -6921,7 +6993,19 @@ function renderCollection568Grid() {
       limited:"Limitados",
       top:"Legendarios y exclusivos"
     };
-    summary.textContent = `${labels[filter] || "Todos"} · ${items.length} resultado${items.length===1?"":"s"}`;
+    const rarityLabels = {
+      all:"Todos",
+      comun:"Común",
+      rara:"Rara",
+      epica:"Épica",
+      legendaria:"Legendaria",
+      exclusiva:"Exclusiva",
+      limited:"Limitada"
+    };
+    const rarityText = rarityFilter === "all"
+      ? ""
+      : ` · ${rarityLabels[rarityFilter] || rarityFilter}`;
+    summary.textContent = `${labels[filter] || "Todos"}${rarityText} · ${items.length} resultado${items.length===1?"":"s"}`;
   }
 
   if (!items.length) {

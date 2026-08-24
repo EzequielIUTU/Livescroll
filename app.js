@@ -677,6 +677,527 @@ async function animateLandingOdometer() {
   }, 60000);
 }
 
+
+// ============================================================
+// LIVESCROLL 5.8.4 · CONFIGURACIÓN + ACCESIBILIDAD V1
+// - Zoom completamente bloqueado (pinch/doble toque/ctrl+wheel)
+// - Configuración en menú hamburguesa
+// - Idioma base: Español / English / Português
+// - Visión cómoda
+// - Contraste
+// - Peso de fuente
+// - Vista previa
+// - Aplicar / Cancelar
+// ============================================================
+
+const LS_SETTINGS_KEY = "livescroll_ui_settings_v584";
+const LS_SETTINGS_DEFAULTS = {
+  language: "es",
+  vision: "normal",
+  contrast: "normal",
+  fontWeight: "normal"
+};
+
+let lsSettingsDraft = null;
+
+function getLiveScrollSettings() {
+  try {
+    return {
+      ...LS_SETTINGS_DEFAULTS,
+      ...(JSON.parse(localStorage.getItem(LS_SETTINGS_KEY) || "{}") || {})
+    };
+  } catch (_) {
+    return { ...LS_SETTINGS_DEFAULTS };
+  }
+}
+
+function saveLiveScrollSettings(settings) {
+  localStorage.setItem(LS_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function ensureLiveScrollAccessibilityStyles() {
+  if (document.getElementById("lsAccessibilityV584Styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsAccessibilityV584Styles";
+  style.textContent = `
+    html, body {
+      touch-action: pan-x pan-y;
+      -ms-touch-action: pan-x pan-y;
+    }
+
+    body.ls-vision-large {
+      --ls-access-font-scale: 1.10;
+    }
+
+    body.ls-vision-xlarge {
+      --ls-access-font-scale: 1.20;
+    }
+
+    body.ls-vision-large main,
+    body.ls-vision-large .modal-box,
+    body.ls-vision-large .mobile-menu-panel {
+      font-size: calc(1em * var(--ls-access-font-scale));
+    }
+
+    body.ls-vision-xlarge main,
+    body.ls-vision-xlarge .modal-box,
+    body.ls-vision-xlarge .mobile-menu-panel {
+      font-size: calc(1em * var(--ls-access-font-scale));
+    }
+
+    body.ls-vision-large button,
+    body.ls-vision-large input,
+    body.ls-vision-large select,
+    body.ls-vision-large textarea {
+      min-height: 44px;
+    }
+
+    body.ls-vision-xlarge button,
+    body.ls-vision-xlarge input,
+    body.ls-vision-xlarge select,
+    body.ls-vision-xlarge textarea {
+      min-height: 48px;
+      font-size: 1.06em;
+    }
+
+    body.ls-font-medium,
+    body.ls-font-medium button,
+    body.ls-font-medium input,
+    body.ls-font-medium select,
+    body.ls-font-medium textarea {
+      font-weight: 550;
+    }
+
+    body.ls-font-strong,
+    body.ls-font-strong button,
+    body.ls-font-strong input,
+    body.ls-font-strong select,
+    body.ls-font-strong textarea {
+      font-weight: 650;
+    }
+
+    body.ls-high-contrast {
+      --text:#ffffff;
+      --text-dim:#d8dde5;
+      --border:rgba(255,255,255,.24);
+    }
+
+    body.ls-high-contrast .modal-box,
+    body.ls-high-contrast .form-card,
+    body.ls-high-contrast .video-card,
+    body.ls-high-contrast .profile-card,
+    body.ls-high-contrast .ledger-row {
+      border-color:rgba(255,255,255,.25) !important;
+    }
+
+    .ls-settings-grid {
+      display:grid;
+      grid-template-columns:1fr;
+      gap:14px;
+    }
+
+    .ls-settings-section {
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:13px;
+      background:rgba(255,255,255,.018);
+    }
+
+    .ls-settings-title {
+      font-size:12px;
+      font-weight:900;
+      margin-bottom:4px;
+    }
+
+    .ls-settings-help {
+      font-size:10px;
+      line-height:1.45;
+      color:var(--text-dim);
+      margin-bottom:10px;
+    }
+
+    .ls-settings-options {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:7px;
+    }
+
+    .ls-settings-option {
+      min-height:40px;
+      padding:8px 7px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--panel-2);
+      color:var(--text-dim);
+      cursor:pointer;
+      font-family:inherit;
+      font-size:10px;
+      font-weight:750;
+    }
+
+    .ls-settings-option.active {
+      color:var(--text);
+      border-color:var(--gold);
+      box-shadow:0 0 0 1px color-mix(in srgb,var(--gold) 35%,transparent);
+      background:color-mix(in srgb,var(--gold) 8%,var(--panel-2));
+    }
+
+    .ls-settings-preview {
+      border:1px solid var(--border);
+      border-radius:15px;
+      padding:14px;
+      background:var(--ink);
+      overflow:hidden;
+    }
+
+    .ls-settings-preview-card {
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:var(--panel);
+      padding:12px;
+      transition:all .18s ease;
+    }
+
+    .ls-settings-preview-card[data-vision="large"] {
+      font-size:15px;
+    }
+
+    .ls-settings-preview-card[data-vision="xlarge"] {
+      font-size:17px;
+    }
+
+    .ls-settings-preview-card[data-contrast="high"] {
+      color:#fff;
+      border-color:rgba(255,255,255,.36);
+      background:#090b0f;
+    }
+
+    .ls-settings-preview-card[data-weight="medium"] {
+      font-weight:550;
+    }
+
+    .ls-settings-preview-card[data-weight="strong"] {
+      font-weight:700;
+    }
+
+    @media(max-width:420px) {
+      .ls-settings-options {
+        grid-template-columns:1fr;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function installLiveScrollZoomLock() {
+  if (window.__lsZoomLockInstalled) return;
+  window.__lsZoomLockInstalled = true;
+
+  // Refuerza el viewport aunque index.html todavía tenga el meta anterior.
+  let viewport = document.querySelector('meta[name="viewport"]');
+  if (!viewport) {
+    viewport = document.createElement("meta");
+    viewport.name = "viewport";
+    document.head.appendChild(viewport);
+  }
+  viewport.setAttribute(
+    "content",
+    "width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
+  );
+
+  document.addEventListener("gesturestart", e => e.preventDefault(), { passive:false });
+  document.addEventListener("gesturechange", e => e.preventDefault(), { passive:false });
+  document.addEventListener("gestureend", e => e.preventDefault(), { passive:false });
+
+  document.addEventListener("touchmove", e => {
+    if (e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive:false });
+
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", e => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive:false });
+
+  window.addEventListener("wheel", e => {
+    if (e.ctrlKey || e.metaKey) e.preventDefault();
+  }, { passive:false });
+
+  window.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && ["+","=","-","0"].includes(e.key)) {
+      e.preventDefault();
+    }
+  });
+}
+
+function applyLiveScrollSettings(settings = getLiveScrollSettings()) {
+  ensureLiveScrollAccessibilityStyles();
+
+  const body = document.body;
+  if (!body) return;
+
+  body.classList.remove(
+    "ls-vision-large",
+    "ls-vision-xlarge",
+    "ls-high-contrast",
+    "ls-font-medium",
+    "ls-font-strong"
+  );
+
+  if (settings.vision === "large") body.classList.add("ls-vision-large");
+  if (settings.vision === "xlarge") body.classList.add("ls-vision-xlarge");
+  if (settings.contrast === "high") body.classList.add("ls-high-contrast");
+  if (settings.fontWeight === "medium") body.classList.add("ls-font-medium");
+  if (settings.fontWeight === "strong") body.classList.add("ls-font-strong");
+
+  document.documentElement.lang =
+    settings.language === "en" ? "en" :
+    settings.language === "pt" ? "pt-BR" : "es";
+
+  window.__lsLanguage = settings.language;
+}
+
+function lsSettingsLabel(group, value) {
+  const labels = {
+    language:{ es:"Español", en:"English", pt:"Português" },
+    vision:{ normal:"Normal", large:"Grande", xlarge:"Extra grande" },
+    contrast:{ normal:"Normal", high:"Alto" },
+    fontWeight:{ normal:"Normal", medium:"Medio", strong:"Fuerte" }
+  };
+  return labels[group]?.[value] || value;
+}
+
+function openLiveScrollSettings() {
+  ensureLiveScrollAccessibilityStyles();
+  lsSettingsDraft = { ...getLiveScrollSettings() };
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:270;">
+      <div class="modal-box" style="
+        max-width:520px;
+        max-height:92dvh;
+        overflow:hidden;
+        display:flex;
+        flex-direction:column;
+      ">
+        <div class="modal-box-header" style="
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:10px;
+        ">
+          <div>
+            <h2 style="margin:0;font-size:20px;">⚙️ Configuración</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
+              Apariencia y accesibilidad
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onclick="cancelLiveScrollSettings()"
+            aria-label="Cerrar"
+            style="
+              width:40px;height:40px;min-width:40px;border-radius:50%;
+              border:1px solid var(--border);background:var(--panel-2);
+              color:var(--text);font-size:18px;cursor:pointer;
+            "
+          >✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          <div class="ls-settings-grid">
+
+            <div class="ls-settings-section">
+              <div class="ls-settings-title">🌐 Idioma</div>
+              <div class="ls-settings-help">
+                Elegí el idioma de la interfaz. La traducción completa se incorporará
+                progresivamente durante 5.8.4.
+              </div>
+              <div class="ls-settings-options" id="lsLanguageOptions">
+                ${["es","en","pt"].map(v => `
+                  <button class="ls-settings-option"
+                    data-setting="language" data-value="${v}"
+                    onclick="setLiveScrollDraft('language','${v}')">
+                    ${lsSettingsLabel("language",v)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+
+            <div class="ls-settings-section">
+              <div class="ls-settings-title">👁️ Visión cómoda</div>
+              <div class="ls-settings-help">
+                Agranda texto, botones y controles de forma ordenada sin usar zoom.
+              </div>
+              <div class="ls-settings-options">
+                ${["normal","large","xlarge"].map(v => `
+                  <button class="ls-settings-option"
+                    data-setting="vision" data-value="${v}"
+                    onclick="setLiveScrollDraft('vision','${v}')">
+                    ${lsSettingsLabel("vision",v)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+
+            <div class="ls-settings-section">
+              <div class="ls-settings-title">◐ Contraste</div>
+              <div class="ls-settings-help">
+                Aumenta la diferencia entre texto, fondos y bordes.
+              </div>
+              <div class="ls-settings-options" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+                ${["normal","high"].map(v => `
+                  <button class="ls-settings-option"
+                    data-setting="contrast" data-value="${v}"
+                    onclick="setLiveScrollDraft('contrast','${v}')">
+                    ${lsSettingsLabel("contrast",v)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+
+            <div class="ls-settings-section">
+              <div class="ls-settings-title">Aa · Fuerza de texto</div>
+              <div class="ls-settings-help">
+                Elegí qué tan marcada querés ver la letra.
+              </div>
+              <div class="ls-settings-options">
+                ${["normal","medium","strong"].map(v => `
+                  <button class="ls-settings-option"
+                    data-setting="fontWeight" data-value="${v}"
+                    onclick="setLiveScrollDraft('fontWeight','${v}')">
+                    ${lsSettingsLabel("fontWeight",v)}
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+
+            <div>
+              <div style="
+                font-size:10px;
+                font-weight:900;
+                color:var(--text-dim);
+                letter-spacing:.06em;
+                margin:0 0 7px 2px;
+              ">VISTA PREVIA</div>
+
+              <div class="ls-settings-preview">
+                <div id="lsSettingsPreviewCard" class="ls-settings-preview-card">
+                  <div style="display:flex;align-items:center;gap:9px;margin-bottom:10px;">
+                    <div style="
+                      width:38px;height:38px;border-radius:50%;
+                      display:flex;align-items:center;justify-content:center;
+                      background:var(--panel-2);font-size:18px;
+                    ">🎬</div>
+                    <div>
+                      <div style="font-weight:900;">LiveScroll</div>
+                      <div style="font-size:.78em;color:var(--text-dim);">@usuario</div>
+                    </div>
+                  </div>
+
+                  <div style="line-height:1.48;">
+                    Así vas a ver los textos, botones y elementos principales de la interfaz.
+                  </div>
+
+                  <button class="btn" style="margin-top:11px;width:100%;pointer-events:none;">
+                    Botón de ejemplo
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div style="
+              border:1px solid var(--border);
+              border-radius:12px;
+              padding:11px 12px;
+              color:var(--text-dim);
+              font-size:10px;
+              line-height:1.5;
+            ">
+              🔒 El zoom de la página está desactivado. Visión cómoda permite
+              agrandar la interfaz sin deformarla.
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-box-footer" style="
+          display:flex;
+          gap:10px;
+          position:sticky;
+          bottom:0;
+          background:var(--panel);
+          border-top:1px solid var(--border);
+        ">
+          <button class="btn-outline" style="flex:1;min-height:48px;"
+            onclick="cancelLiveScrollSettings()">Cancelar</button>
+          <button class="btn" style="flex:1;min-height:48px;"
+            onclick="applyLiveScrollSettingsDraft()">Aplicar cambios</button>
+        </div>
+      </div>
+    </div>`;
+
+  refreshLiveScrollSettingsUI();
+}
+
+function setLiveScrollDraft(key, value) {
+  if (!lsSettingsDraft) lsSettingsDraft = { ...getLiveScrollSettings() };
+  lsSettingsDraft[key] = value;
+  refreshLiveScrollSettingsUI();
+}
+
+function refreshLiveScrollSettingsUI() {
+  if (!lsSettingsDraft) return;
+
+  document.querySelectorAll(".ls-settings-option[data-setting]").forEach(btn => {
+    btn.classList.toggle(
+      "active",
+      lsSettingsDraft[btn.dataset.setting] === btn.dataset.value
+    );
+  });
+
+  const preview = document.getElementById("lsSettingsPreviewCard");
+  if (preview) {
+    preview.dataset.vision = lsSettingsDraft.vision;
+    preview.dataset.contrast = lsSettingsDraft.contrast;
+    preview.dataset.weight = lsSettingsDraft.fontWeight;
+  }
+}
+
+function cancelLiveScrollSettings() {
+  lsSettingsDraft = null;
+  closeManagedModal();
+}
+
+function applyLiveScrollSettingsDraft() {
+  if (!lsSettingsDraft) return;
+
+  const next = { ...lsSettingsDraft };
+  saveLiveScrollSettings(next);
+  applyLiveScrollSettings(next);
+  lsSettingsDraft = null;
+  closeManagedModal();
+
+  showToast("Configuración aplicada ✓");
+}
+
+function resetLiveScrollSettings() {
+  lsSettingsDraft = { ...LS_SETTINGS_DEFAULTS };
+  refreshLiveScrollSettingsUI();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ensureLiveScrollAccessibilityStyles();
+  installLiveScrollZoomLock();
+  applyLiveScrollSettings();
+});
+
+
 // ============================================================
 // APP SHELL
 // ============================================================
@@ -705,6 +1226,7 @@ function toggleMobileMenu() {
     <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
     <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
     <button onclick="showTutorialModal(); closeMobileMenu();">❓ Cómo funciona</button>
+    <button onclick="openLiveScrollSettings(); closeMobileMenu();">⚙️ Configuración</button>
     ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
     <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
       <button onclick="handleLogout(); closeMobileMenu();" style="color:var(--red);">Salir</button>
@@ -8514,7 +9036,7 @@ async function openEditProfile() {
 
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:100;" onclick="if(event.target===this) closeManagedModal()">
+    <div class="modal-overlay" style="z-index:100;">
       <div class="modal-box ls-profile-edit-modal" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header ls-profile-edit-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
           <h2 style="font-size:19px;margin:0;">Editar perfil</h2>

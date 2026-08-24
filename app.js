@@ -4130,11 +4130,17 @@ function showChangelogModal(entries) {
 // una actualización pendiente, evitando quedar clavado en una versión anterior.
 // ============================================================
 
+let lsChangelogHistoryObserver = null;
+
 async function openChangelogHistory() {
+  if (lsChangelogHistoryObserver) {
+    lsChangelogHistoryObserver.disconnect();
+    lsChangelogHistoryObserver = null;
+  }
   applyLiveScrollSettings();
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay ls-modal-locked" style="z-index:100;" data-modal-locked="1">
+    <div class="modal-overlay ls-modal-locked" style="z-index:100;backdrop-filter:none;-webkit-backdrop-filter:none;" data-modal-locked="1">
       <div class="modal-box" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
           <div>
@@ -4146,7 +4152,7 @@ async function openChangelogHistory() {
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
 
-        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;overscroll-behavior:contain;contain:layout paint style;">
           <div id="changelogHistoryList">Cargando...</div>
         </div>
       </div>
@@ -4160,7 +4166,8 @@ async function openChangelogHistory() {
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
   };
 
-  const { data: entries, error } = await sb.rpc("get_changelog_history_v2", { p_limit: 200 });
+  // Reutiliza el historial que ya pudo cargar el inicio y evita otra consulta igual.
+  const { data: entries, error } = await loadStartupChangelogHistory();
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
 
@@ -4331,7 +4338,7 @@ async function openChangelogHistory() {
     }).join("");
   };
 
-  list.innerHTML = versions.map(display => {
+  const renderVersionSection = (display) => {
     const info = byDisplayVersion[display];
     const revisions = Object.values(info.revisions)
       .sort((a, b) => b.internal - a.internal);
@@ -4342,10 +4349,13 @@ async function openChangelogHistory() {
     const dateText = formatReleaseDate(info.releaseDate);
 
     return `
-      <section style="
+      <section class="ls-changelog-history-version" style="
         margin-bottom:18px;
         padding-bottom:18px;
         border-bottom:1px solid var(--border);
+        content-visibility:auto;
+        contain-intrinsic-size:1px 260px;
+        contain:layout paint style;
       ">
         <div style="
           display:flex;
@@ -4395,11 +4405,55 @@ async function openChangelogHistory() {
           </div>
         ` : ""}
       </section>`;
-  }).join("");
+  };
+
+  // No insertamos todo el historial en el DOM de una sola vez. Agregamos
+  // pocas versiones por tanda cuando el usuario se acerca al final.
+  const batchSize = window.__liveScrollLegacyMode ? 4 : 6;
+  let renderedCount = 0;
+
+  list.innerHTML = `<div id="changelogHistoryItems"></div><div id="changelogHistorySentinel" style="height:1px;"></div>`;
+  const itemsWrap = document.getElementById("changelogHistoryItems");
+  const sentinel = document.getElementById("changelogHistorySentinel");
+
+  const appendNextChangelogBatch = () => {
+    if (!itemsWrap || renderedCount >= versions.length) {
+      lsChangelogHistoryObserver?.disconnect();
+      lsChangelogHistoryObserver = null;
+      sentinel?.remove();
+      return;
+    }
+
+    const nextVersions = versions.slice(renderedCount, renderedCount + batchSize);
+    itemsWrap.insertAdjacentHTML("beforeend", nextVersions.map(renderVersionSection).join(""));
+    renderedCount += nextVersions.length;
+
+    if (renderedCount >= versions.length) {
+      lsChangelogHistoryObserver?.disconnect();
+      lsChangelogHistoryObserver = null;
+      sentinel?.remove();
+    }
+  };
+
+  appendNextChangelogBatch();
+
+  if (sentinel?.isConnected && "IntersectionObserver" in window) {
+    const scrollRoot = sentinel.closest(".modal-box-body");
+    lsChangelogHistoryObserver = new IntersectionObserver(entriesList => {
+      if (entriesList.some(entry => entry.isIntersecting)) appendNextChangelogBatch();
+    }, { root:scrollRoot, rootMargin:"500px 0px", threshold:0 });
+    lsChangelogHistoryObserver.observe(sentinel);
+  } else {
+    while (renderedCount < versions.length) appendNextChangelogBatch();
+  }
 }
 
 
 function closeChangelogHistory() {
+  if (lsChangelogHistoryObserver) {
+    lsChangelogHistoryObserver.disconnect();
+    lsChangelogHistoryObserver = null;
+  }
   document.getElementById("globalModalWrap").innerHTML = "";
 }
 

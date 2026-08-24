@@ -951,68 +951,121 @@ async function renderApp() {
   ]).catch(() => {});
 }
 
-async function checkPendingContent() {
-  const { data } = await sb.rpc("get_pending_content", { p_user_id: currentUser.id });
-  if (!data) return;
+const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
 
-  if (data.terms_pending) {
-    showTermsUpdateModal();
-  } else if (data.tutorial_pending) {
-    showTutorialModal();
-  } else if (data.changelog_pending) {
-    // El backend decide si hay Novedades pendientes.
-    // Para el contenido visual, completamos con la versión visible más reciente
-    // del historial. Así el cartel nunca queda clavado en una versión anterior
-    // aunque el payload pendiente venga atrasado.
-    let pendingEntries = Array.isArray(data.changelog_entries)
-      ? [...data.changelog_entries]
+async function checkPendingContent() {
+  if (!currentUser?.id) return;
+
+  const seenKey = `livescroll_changelog_seen_${currentUser.id}`;
+
+  // Leemos backend + historial en paralelo.
+  // Si el backend por algún motivo no marca "pending", el historial funciona
+  // como respaldo desde la versión interna 25 en adelante.
+  const [pendingResult, historyResult] = await Promise.allSettled([
+    sb.rpc("get_pending_content", { p_user_id: currentUser.id }),
+    sb.rpc("get_changelog_history_v2", { p_limit: 200 })
+  ]);
+
+  const pendingData =
+    pendingResult.status === "fulfilled"
+      ? pendingResult.value?.data
+      : null;
+
+  const history =
+    historyResult.status === "fulfilled" && Array.isArray(historyResult.value?.data)
+      ? historyResult.value.data
       : [];
 
-    try {
-      const { data: history } = await sb.rpc("get_changelog_history_v2", { p_limit: 200 });
+  const semverParts = (value) => String(value || "0.0.0")
+    .split(".")
+    .map(n => Number.parseInt(n, 10) || 0);
 
-      if (Array.isArray(history) && history.length) {
-        const semverParts = (value) => String(value || "0.0.0")
-          .split(".")
-          .map(n => Number.parseInt(n, 10) || 0);
+  const compareSemver = (a, b) => {
+    const pa = semverParts(a);
+    const pb = semverParts(b);
+    const max = Math.max(pa.length, pb.length, 3);
+    for (let i = 0; i < max; i++) {
+      const av = pa[i] || 0;
+      const bv = pb[i] || 0;
+      if (av !== bv) return av - bv;
+    }
+    return 0;
+  };
 
-        const compareSemver = (a, b) => {
-          const pa = semverParts(a);
-          const pb = semverParts(b);
-          const max = Math.max(pa.length, pb.length, 3);
-          for (let i = 0; i < max; i++) {
-            const av = pa[i] || 0;
-            const bv = pb[i] || 0;
-            if (av !== bv) return av - bv;
-          }
-          return 0;
-        };
+  const latestInternal = history.reduce(
+    (max, e) => Math.max(max, Number(e.version || 0)),
+    0
+  );
 
-        const latestDisplay = history
-          .map(e => String(e.display_version || `${e.version}.0.0`))
-          .sort(compareSemver)
-          .at(-1);
+  const latestDisplay = history.length
+    ? history
+        .map(e => String(e.display_version || `${e.version}.0.0`))
+        .sort(compareSemver)
+        .at(-1)
+    : null;
 
-        if (latestDisplay) {
-          const alreadyHasLatest = pendingEntries.some(e =>
-            String(e.display_version || `${e.version}.0.0`) === latestDisplay
-          );
+  const latestRows = latestDisplay
+    ? history.filter(
+        e => String(e.display_version || `${e.version}.0.0`) === latestDisplay
+      )
+    : [];
 
-          if (!alreadyHasLatest) {
-            const latestRows = history.filter(e =>
-              String(e.display_version || `${e.version}.0.0`) === latestDisplay
-            );
-            pendingEntries.push(...latestRows);
-          }
-        }
+  const locallySeen = Number(localStorage.getItem(seenKey) || 0);
+
+  // 1) Contenido obligatorio / tutorial conservan prioridad.
+  if (pendingData?.terms_pending) {
+    showTermsUpdateModal();
+    return;
+  }
+
+  if (pendingData?.tutorial_pending) {
+    showTutorialModal();
+    return;
+  }
+
+  // 2) Backend normal: si marca Novedades pendientes, mostramos eso
+  // y completamos con la versión visible más reciente si hiciera falta.
+  if (pendingData?.changelog_pending) {
+    let entries = Array.isArray(pendingData.changelog_entries)
+      ? [...pendingData.changelog_entries]
+      : [];
+
+    if (latestRows.length) {
+      const alreadyHasLatest = entries.some(
+        e => String(e.display_version || `${e.version}.0.0`) === latestDisplay
+      );
+
+      if (!alreadyHasLatest) {
+        entries.push(...latestRows);
       }
-    } catch (err) {
-      console.warn("No se pudo completar Novedades con el historial:", err);
     }
 
-    // Si estuvo varios días afuera, conserva el flujo "Mientras no estabas...".
-    showChangelogModal(pendingEntries);
-  } else if (data.road_to_6_teaser_pending) {
+    window.__lsChangelogShownVersion = Math.max(
+      latestInternal,
+      ...entries.map(e => Number(e.version || 0)),
+      0
+    );
+
+    showChangelogModal(entries);
+    return;
+  }
+
+  // 3) FALLBACK AUTOMÁTICO.
+  // Desde la versión interna 25, si existe una versión nueva en el historial
+  // que este dispositivo todavía no vio, el cartel aparece aunque
+  // get_pending_content() haya fallado o devuelva false.
+  if (
+    latestInternal > CHANGELOG_AUTO_BASELINE_VERSION &&
+    latestInternal > locallySeen &&
+    latestRows.length
+  ) {
+    window.__lsChangelogShownVersion = latestInternal;
+    showChangelogModal(latestRows);
+    return;
+  }
+
+  // 4) El resto del flujo sigue igual.
+  if (pendingData?.road_to_6_teaser_pending) {
     showRoadTo6Teaser();
   } else {
     checkCollection568Launch();
@@ -1435,6 +1488,7 @@ function showChangelogModal(entries) {
     "5.7.9":"CONNECTED",
     "5.8.0":"LIVE",
     "5.8.1":"SECURITY",
+    "5.8.2":"FINANCIAL",
     "5.9.0":"CORE",
     "6.0.0":"NEW ERA"
   };
@@ -1468,7 +1522,9 @@ function showChangelogModal(entries) {
                 ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
                 : newestLabel === "5.8.1"
                   ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
-                  : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
+                  : newestLabel === "5.8.2"
+                    ? "Los puntos evolucionan: más recompensas, Boost más accesible y una economía más clara."
+                    : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
           </div>
         </div>
 
@@ -1498,7 +1554,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.9.0 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -1636,15 +1692,25 @@ function closeChangelogHistory() {
 }
 
 async function handleAcceptChangelog() {
+  const shownVersion = Number(window.__lsChangelogShownVersion || 0);
+  const seenKey = currentUser?.id
+    ? `livescroll_changelog_seen_${currentUser.id}`
+    : null;
+
   const { error } = await sb.rpc("acknowledge_content", {
     p_user_id: currentUser.id,
     p_content_key: "changelog"
   });
 
+  // El backend sigue siendo la fuente principal, pero el dispositivo
+  // guarda también qué versión vio. Esto evita que una falla puntual
+  // del RPC vuelva a ocultar/romper el flujo automático.
+  if (seenKey && shownVersion > 0) {
+    localStorage.setItem(seenKey, String(shownVersion));
+  }
+
   if (error) {
-    console.error("No se pudo marcar Novedades como vistas:", error);
-    showToast("No se pudo guardar todavía");
-    return;
+    console.warn("No se pudo sincronizar Novedades con el servidor:", error);
   }
 
   const box = document.getElementById("changelogBox");
@@ -1654,9 +1720,6 @@ async function handleAcceptChangelog() {
     const wrap = document.getElementById("globalModalWrap");
     if (wrap) wrap.innerHTML = "";
 
-    // Importante: volvemos a consultar inmediatamente.
-    // Así, si el usuario ya se puso al día pero todavía no vio
-    // el teaser del camino a LiveScroll 6, aparece en esta misma sesión.
     setTimeout(() => checkPendingContent(), 120);
   };
 

@@ -3108,7 +3108,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4137,6 +4137,7 @@ function showChangelogModal(entries) {
     "5.8.9":"ROAD TO 5.9",
     "5.9.0":"ROAD TO 6",
     "5.9.1":"VISUAL EVOLUTION",
+    "5.9.2":"FEED EXPERIENCE",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4207,7 +4208,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -5470,7 +5471,234 @@ function showToast(msg) {
 // ============================================================
 // FEED — ver videos de otros y ganar puntos por minuto
 // ============================================================
+function ensureFeedExperience592Styles() {
+  if (document.getElementById("lsFeedExperience592Styles")) return;
+  const style = document.createElement("style");
+  style.id = "lsFeedExperience592Styles";
+  style.textContent = `
+    html:not(.ls-legacy) .feed-item {
+      background:
+        radial-gradient(circle at 50% 34%,rgba(56,221,242,.055),transparent 46%),
+        transparent;
+    }
+
+    html:not(.ls-legacy) .feed-phone {
+      border:1px solid rgba(56,221,242,.19) !important;
+      background:#020608;
+      box-shadow:
+        0 26px 76px rgba(0,0,0,.48),
+        0 0 0 1px rgba(46,242,124,.035),
+        0 0 46px rgba(56,221,242,.055) !important;
+    }
+
+    html:not(.ls-legacy) .feed-phone::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      z-index:3;
+      pointer-events:none;
+      border-radius:inherit;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+    }
+
+    html:not(.ls-legacy) .feed-overlay {
+      min-height:154px;
+      padding:50px 76px 22px 18px;
+      background:linear-gradient(180deg,transparent 0%,rgba(1,5,7,.18) 18%,rgba(2,7,10,.92) 74%,rgba(2,7,10,.985) 100%);
+      gap:10px;
+      pointer-events:none;
+    }
+
+    html:not(.ls-legacy) .feed-overlay > div:first-child {
+      min-width:0;
+      max-width:100%;
+      pointer-events:auto;
+    }
+
+    html:not(.ls-legacy) .feed-overlay .title {
+      max-width:100%;
+      margin:0 0 8px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:17px;
+      font-weight:700;
+      line-height:1.22;
+      letter-spacing:-.025em;
+      color:#fff;
+      text-shadow:0 2px 14px rgba(0,0,0,.7);
+    }
+
+    html:not(.ls-legacy) .feed-overlay .author {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex-wrap:wrap;
+      width:max-content;
+      max-width:100%;
+      color:rgba(244,251,252,.78);
+      font-size:11px;
+      font-weight:650;
+    }
+
+    html:not(.ls-legacy) .feed-platform-chip {
+      display:inline-flex;
+      align-items:center;
+      min-height:20px;
+      padding:3px 7px;
+      border:1px solid rgba(56,221,242,.19);
+      border-radius:999px;
+      background:rgba(56,221,242,.075);
+      color:#8beaf5;
+      font:700 8px 'JetBrains Mono',monospace;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    html:not(.ls-legacy) .feed-overlay .live-pts {
+      position:absolute;
+      right:14px;
+      bottom:24px;
+      min-width:48px;
+      padding:6px 8px;
+      border:1px solid rgba(46,242,124,.22);
+      border-radius:999px;
+      background:rgba(6,24,17,.72);
+      color:var(--gold);
+      text-align:center;
+      box-shadow:0 8px 22px rgba(0,0,0,.20);
+      backdrop-filter:blur(8px);
+    }
+
+    html:not(.ls-legacy) .feed-actions {
+      right:12px !important;
+      bottom:112px !important;
+      gap:10px;
+      z-index:14;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn {
+      position:relative;
+      width:46px;
+      height:46px;
+      border:1px solid rgba(255,255,255,.15);
+      background:linear-gradient(145deg,rgba(13,32,40,.82),rgba(4,12,16,.72));
+      color:#fff;
+      box-shadow:0 10px 26px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07);
+      backdrop-filter:blur(12px) saturate(130%);
+      -webkit-backdrop-filter:blur(12px) saturate(130%);
+      transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:hover {
+      transform:translateY(-2px) scale(1.03);
+      border-color:rgba(56,221,242,.38);
+      background:linear-gradient(145deg,rgba(18,48,58,.92),rgba(6,21,27,.86));
+      box-shadow:0 13px 30px rgba(0,0,0,.34),0 0 18px rgba(56,221,242,.08);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:active {
+      transform:scale(.92);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn.liked {
+      border-color:rgba(248,113,113,.45);
+      background:linear-gradient(145deg,rgba(248,113,113,.30),rgba(80,16,28,.72));
+      box-shadow:0 10px 28px rgba(248,113,113,.12),inset 0 1px 0 rgba(255,255,255,.08);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn::after {
+      content:attr(data-label);
+      position:absolute;
+      right:54px;
+      top:50%;
+      transform:translateY(-50%) translateX(5px);
+      padding:5px 8px;
+      border:1px solid rgba(56,221,242,.16);
+      border-radius:8px;
+      background:rgba(4,13,17,.9);
+      color:rgba(255,255,255,.78);
+      font:700 8px 'JetBrains Mono',monospace;
+      letter-spacing:.04em;
+      white-space:nowrap;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease,transform .15s ease;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:hover::after {
+      opacity:1;
+      transform:translateY(-50%) translateX(0);
+    }
+
+    html:not(.ls-legacy) .feed-nudge {
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(4,13,17,.58);
+      color:rgba(255,255,255,.66);
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+      backdrop-filter:blur(8px);
+    }
+
+    html.ls-legacy .feed-action-btn {
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.58);
+      box-shadow:none;
+      backdrop-filter:none;
+    }
+
+    html.ls-legacy .feed-action-btn::after {
+      display:none;
+    }
+
+    @media(max-width:700px) {
+      html:not(.ls-legacy) #feedVertical .feed-overlay,
+      html:not(.ls-legacy) #profileFeedVertical .feed-overlay,
+      html:not(.ls-legacy) #foryouList .feed-overlay {
+        left:0 !important;
+        right:0 !important;
+        bottom:0 !important;
+        padding:52px 76px max(22px,env(safe-area-inset-bottom)) 16px !important;
+      }
+
+      html:not(.ls-legacy) .feed-item.ls-upload-feed-item .feed-overlay {
+        bottom:52px !important;
+      }
+
+      html:not(.ls-legacy) #feedVertical .feed-actions,
+      html:not(.ls-legacy) #profileFeedVertical .feed-actions,
+      html:not(.ls-legacy) #foryouList .feed-actions {
+        right:10px !important;
+        bottom:112px !important;
+      }
+
+      html:not(.ls-legacy) .feed-item.ls-upload-feed-item .feed-actions {
+        bottom:164px !important;
+      }
+
+      html:not(.ls-legacy) .feed-action-btn {
+        width:44px;
+        height:44px;
+      }
+
+      html:not(.ls-legacy) .feed-action-btn::after {
+        display:none;
+      }
+
+      html:not(.ls-legacy) .feed-overlay .title {
+        font-size:16px;
+      }
+
+      html:not(.ls-legacy) .feed-overlay .live-pts {
+        right:13px;
+        bottom:max(22px,env(safe-area-inset-bottom));
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 async function renderFeed(renderToken = lsTabRenderToken) {
+  ensureFeedExperience592Styles();
   const main = document.getElementById("appView");
   if (!main) return;
 
@@ -5514,15 +5742,15 @@ async function renderFeed(renderToken = lsTabRenderToken) {
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
             <div class="feed-actions">
-              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
-              <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
-              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
-              ${!isMine ? `<button class="feed-action-btn" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
+              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
+              <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+              <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+              ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
             </div>
             <div class="feed-overlay">
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
-                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')">@${escapeHtml(v.profiles?.username || "usuario")} ${getPlanBadgeHtml(v.profiles?.plan_id)} · ${v.platform}</div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')"><span>@${escapeHtml(v.profiles?.username || "usuario")}</span> ${getPlanBadgeHtml(v.profiles?.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
             </div>
@@ -5879,15 +6107,15 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
               <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
               ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
               <div class="feed-actions">
-                <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
-                <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
-                <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
-                ${!isMine ? `<button class="feed-action-btn" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
+                <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
+                <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+                <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+                ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
               </div>
               <div class="feed-overlay">
                 <div>
                   <div class="title">${escapeHtml(v.title)}</div>
-                  <div class="author">@${escapeHtml(authorInfo.username)} ${getPlanBadgeHtml(authorInfo.plan_id)} · ${v.platform}</div>
+                  <div class="author"><span>@${escapeHtml(authorInfo.username)}</span> ${getPlanBadgeHtml(authorInfo.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
                 </div>
                 <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
               </div>
@@ -9564,14 +9792,14 @@ async function renderForYou(renderToken = lsTabRenderToken) {
             <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             <div class="feed-actions">
-              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" onclick="handleLike('${v.id}')">❤️</button>
-              <button class="feed-action-btn" onclick="openComments('${v.id}')">💬</button>
-              <button class="feed-action-btn" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
+              <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+              <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
             </div>
             <div class="feed-overlay">
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
-                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')">@${escapeHtml(v.profiles.username)} ${getPlanBadgeHtml(v.profiles.plan_id)} · ${v.platform}</div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')"><span>@${escapeHtml(v.profiles.username)}</span> ${getPlanBadgeHtml(v.profiles.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
             </div>

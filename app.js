@@ -4510,67 +4510,225 @@ function clearAllWatchIntervals() {
 // ============================================================
 // SUBIR VIDEO
 // ============================================================
-function renderUpload() {
+async function renderUpload() {
   rawSelectedFile = null;
   trimmedFile = null;
+
   const main = document.getElementById("appView");
+  main.innerHTML = `<p style="color:var(--text-dim);">Preparando Subir video...</p>`;
+
+  let uploadReward = 40;
+  try {
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "points_per_upload")
+      .single();
+
+    if (data?.value != null) {
+      uploadReward = Number(data.value) || 40;
+    }
+  } catch (_) {}
+
   main.innerHTML = `
-    <h1 class="page-title">Subir video</h1>
-    <p class="page-sub">Compartí un link o subí tu archivo directamente. Ganás 25 puntos al instante.</p>
+    <div style="max-width:860px;margin:0 auto;">
+      <div style="
+        position:relative;
+        overflow:hidden;
+        padding:22px;
+        margin-bottom:18px;
+        border:1px solid rgba(250,204,21,.22);
+        border-radius:18px;
+        background:
+          radial-gradient(circle at 85% 15%, rgba(250,204,21,.11), transparent 32%),
+          linear-gradient(145deg, rgba(255,255,255,.025), rgba(255,255,255,.006));
+      ">
+        <div style="
+          font-family:'JetBrains Mono',monospace;
+          font-size:9px;
+          font-weight:900;
+          letter-spacing:.13em;
+          color:var(--gold);
+          text-transform:uppercase;
+          margin-bottom:7px;
+        ">CREATOR STUDIO</div>
 
-    <div style="display:flex; gap:8px; margin-bottom:18px;">
-      <button class="btn" id="modeLinkBtn" onclick="setUploadMode('link')">🔗 Link</button>
-      <button class="btn-outline" id="modeFileBtn" onclick="setUploadMode('file')">🎬 Archivo (MP4/MKV)</button>
-    </div>
-
-    <div class="form-card">
-      <div id="linkFields">
-        <div class="field">
-          <label>Plataforma</label>
-          <select id="uploadPlatform" style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
-            <option value="kick">Kick</option>
-            <option value="twitch">Twitch</option>
-            <option value="youtube">YouTube</option>
-            <option value="tiktok">TikTok</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Link del video</label>
-          <input type="text" id="uploadUrl" placeholder="https://...">
-        </div>
-      </div>
-
-      <div id="fileFields" class="hidden">
-        <div class="field">
-          <label>Archivo de video (MP4 o MKV, máx. 50MB)</label>
-          <p style="font-size:12px; color:var(--text-dim); margin:-6px 0 10px;">
-            💡 Si tu video es más largo o pesa de más, elegilo igual — te va a aparecer la opción de recortarlo acá mismo antes de subirlo.
-          </p>
-          <input type="file" id="uploadFile" accept=".mp4,.mkv,video/mp4,video/x-matroska,video/webm"
-            onchange="previewFileSize()"
-            style="width:100%;padding:11px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit">
-          <div id="fileSizeInfo" style="font-size:12px;margin-top:6px;"></div>
-
-          <div id="uploadPreviewSafe" class="ls-upload-preview-safe">
-            <div class="tag">Vista previa</div>
-            <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
-            <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
+        <div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-end;flex-wrap:wrap;">
+          <div>
+            <h1 class="page-title" style="margin-bottom:5px;">Subir video</h1>
+            <p class="page-sub" style="margin:0;max-width:560px;">
+              Compartí un enlace o publicá tu archivo. LiveScroll prepara todo antes de enviarlo.
+            </p>
           </div>
-        </div>
-        <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
-          <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
-            <div id="uploadProgressBar" style="width:0%;height:100%;background:var(--gold);transition:width 0.2s;"></div>
+
+          <div style="
+            border:1px solid rgba(34,197,94,.28);
+            background:rgba(34,197,94,.07);
+            border-radius:12px;
+            padding:10px 13px;
+            min-width:150px;
+          ">
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">Recompensa</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:900;color:var(--green);margin-top:2px;">
+              +${uploadReward} pts
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="field">
-        <label>Título</label>
-        <input type="text" id="uploadTitle" placeholder="ej: Jugada increíble en vivo">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">01</strong><br>
+          <span style="color:var(--text-dim);">Elegí origen</span>
+        </div>
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">02</strong><br>
+          <span style="color:var(--text-dim);">Revisá el contenido</span>
+        </div>
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">03</strong><br>
+          <span style="color:var(--text-dim);">Publicá</span>
+        </div>
       </div>
 
-      <button class="btn" id="uploadSubmitBtn" onclick="handleUpload()">Subir y ganar 25 pts</button>
-      <div id="uploadError" class="error-msg"></div>
+      <div style="
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:10px;
+        margin-bottom:16px;
+      ">
+        <button
+          class="btn"
+          id="modeLinkBtn"
+          onclick="setUploadMode('link')"
+          style="padding:14px;border-radius:12px;"
+        >
+          🔗 Usar enlace
+          <span style="display:block;font-size:9px;opacity:.72;margin-top:3px;">Kick · Twitch · YouTube · TikTok</span>
+        </button>
+
+        <button
+          class="btn-outline"
+          id="modeFileBtn"
+          onclick="setUploadMode('file')"
+          style="padding:14px;border-radius:12px;"
+        >
+          🎬 Subir archivo
+          <span style="display:block;font-size:9px;opacity:.72;margin-top:3px;">MP4 · MKV · WEBM</span>
+        </button>
+      </div>
+
+      <div class="form-card" style="
+        border-radius:16px;
+        border:1px solid var(--border);
+        padding:18px;
+      ">
+        <div id="linkFields">
+          <div style="font-size:11px;font-weight:800;margin-bottom:12px;">🔗 Video desde plataforma</div>
+
+          <div class="field">
+            <label>Plataforma</label>
+            <select
+              id="uploadPlatform"
+              style="width:100%;padding:12px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit"
+            >
+              <option value="kick">Kick</option>
+              <option value="twitch">Twitch</option>
+              <option value="youtube">YouTube</option>
+              <option value="tiktok">TikTok</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Link del video</label>
+            <input type="text" id="uploadUrl" placeholder="Pegá acá el enlace del video">
+          </div>
+        </div>
+
+        <div id="fileFields" class="hidden">
+          <div style="font-size:11px;font-weight:800;margin-bottom:12px;">🎬 Archivo desde tu dispositivo</div>
+
+          <div class="field">
+            <label>Archivo de video</label>
+
+            <label
+              for="uploadFile"
+              style="
+                display:block;
+                border:1px dashed rgba(250,204,21,.35);
+                background:rgba(250,204,21,.035);
+                border-radius:14px;
+                padding:22px 14px;
+                text-align:center;
+                cursor:pointer;
+              "
+            >
+              <div style="font-size:28px;margin-bottom:6px;">＋</div>
+              <div style="font-weight:800;font-size:12px;">Elegir video</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
+                MP4, MKV o WEBM · máximo 50 MB
+              </div>
+            </label>
+
+            <input
+              type="file"
+              id="uploadFile"
+              accept=".mp4,.mkv,video/mp4,video/x-matroska,video/webm"
+              onchange="previewFileSize()"
+              style="display:none;"
+            >
+
+            <div id="fileSizeInfo" style="font-size:12px;margin-top:8px;"></div>
+
+            <p style="font-size:10px;color:var(--text-dim);margin:8px 0 0;line-height:1.5;">
+              Si el video es demasiado largo o pesado, podés seleccionarlo igual:
+              LiveScroll te ofrecerá recortarlo antes de subirlo.
+            </p>
+
+            <div id="uploadPreviewSafe" class="ls-upload-preview-safe" style="margin-top:12px;">
+              <div class="tag">Vista previa</div>
+              <video id="uploadPreviewVideoSafe" controls muted playsinline preload="metadata"></video>
+              <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
+            </div>
+          </div>
+
+          <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-bottom:5px;">
+              <span>SUBIENDO</span>
+              <span>LiveScroll</span>
+            </div>
+            <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
+              <div id="uploadProgressBar" style="width:0%;height:100%;background:var(--gold);transition:width .2s;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
+
+        <div class="field">
+          <label>Título</label>
+          <input
+            type="text"
+            id="uploadTitle"
+            maxlength="100"
+            placeholder="Ej: Jugada increíble en vivo"
+          >
+          <div style="font-size:9px;color:var(--text-dim);margin-top:5px;">
+            Corto, claro y fácil de reconocer.
+          </div>
+        </div>
+
+        <button
+          class="btn"
+          id="uploadSubmitBtn"
+          onclick="handleUpload()"
+          style="width:100%;padding:13px;border-radius:11px;font-weight:900;"
+        >
+          Publicar video · +${uploadReward} pts
+        </button>
+
+        <div id="uploadError" class="error-msg" style="margin-top:8px;"></div>
+      </div>
     </div>`;
 
   setUploadMode("link");

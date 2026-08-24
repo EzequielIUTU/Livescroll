@@ -1294,6 +1294,32 @@ function openLiveScrollSettings() {
               🔒 El zoom de la página está desactivado. Visión cómoda permite
               agrandar la interfaz sin deformarla.
             </div>
+
+            <div style="
+              border:1px solid var(--border);
+              border-radius:14px;
+              padding:13px;
+              background:rgba(255,255,255,.018);
+            ">
+              <div style="font-size:12px;font-weight:900;margin-bottom:4px;">
+                ↺ Restablecer apariencia
+              </div>
+              <div style="
+                font-size:10px;
+                line-height:1.45;
+                color:var(--text-dim);
+                margin-bottom:10px;
+              ">
+                Volvé a la apariencia original de LiveScroll: visión, contraste
+                y fuerza de texto en Normal.
+              </div>
+              <button
+                type="button"
+                class="btn-outline"
+                style="width:100%;min-height:44px;"
+                onclick="resetLiveScrollSettings()"
+              >Restablecer valores</button>
+            </div>
           </div>
         </div>
 
@@ -1362,6 +1388,7 @@ function applyLiveScrollSettingsDraft() {
 function resetLiveScrollSettings() {
   lsSettingsDraft = { ...LS_SETTINGS_DEFAULTS };
   refreshLiveScrollSettingsUI();
+  showToast("Valores restablecidos. Tocá Aplicar cambios para guardar.");
 }
 
 

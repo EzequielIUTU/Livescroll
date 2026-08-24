@@ -953,6 +953,11 @@ async function renderApp() {
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
 
+// Evita el efecto "cerré un cartel y apareció otro".
+// Términos y tutorial conservan prioridad, pero las novedades/teasers opcionales
+// se limitan a UNA interrupción automática por sesión.
+window.__lsStartupOptionalModalShown = window.__lsStartupOptionalModalShown || false;
+
 async function checkPendingContent() {
   if (!currentUser?.id) return;
 
@@ -1012,6 +1017,17 @@ async function checkPendingContent() {
 
   const locallySeen = Number(localStorage.getItem(seenKey) || 0);
 
+  // Si el usuario se perdió varias versiones, mostramos TODAS juntas
+  // en "Mientras no estabas..." en lugar de abrir un popup por versión.
+  const unseenRows = history
+    .filter(e => Number(e.version || 0) > locallySeen)
+    .sort((a, b) => {
+      const va = Number(a.version || 0);
+      const vb = Number(b.version || 0);
+      if (va !== vb) return va - vb;
+      return Number(a.sort_order || 0) - Number(b.sort_order || 0);
+    });
+
   // 1) Contenido obligatorio / tutorial conservan prioridad.
   if (pendingData?.terms_pending) {
     showTermsUpdateModal();
@@ -1025,20 +1041,22 @@ async function checkPendingContent() {
 
   // 2) Backend normal: si marca Novedades pendientes, mostramos eso
   // y completamos con la versión visible más reciente si hiciera falta.
-  if (pendingData?.changelog_pending) {
+  if (pendingData?.changelog_pending && !window.__lsStartupOptionalModalShown) {
     let entries = Array.isArray(pendingData.changelog_entries)
       ? [...pendingData.changelog_entries]
       : [];
 
-    if (latestRows.length) {
-      const alreadyHasLatest = entries.some(
-        e => String(e.display_version || `${e.version}.0.0`) === latestDisplay
+    // Historial como respaldo: agregamos versiones no vistas que el backend
+    // no haya incluido, evitando duplicados.
+    const candidateRows = unseenRows.length ? unseenRows : latestRows;
+    candidateRows.forEach(row => {
+      const duplicate = entries.some(e =>
+        Number(e.version || 0) === Number(row.version || 0) &&
+        String(e.category || "") === String(row.category || "") &&
+        String(e.content || "") === String(row.content || "")
       );
-
-      if (!alreadyHasLatest) {
-        entries.push(...latestRows);
-      }
-    }
+      if (!duplicate) entries.push(row);
+    });
 
     window.__lsChangelogShownVersion = Math.max(
       latestInternal,
@@ -1046,6 +1064,7 @@ async function checkPendingContent() {
       0
     );
 
+    window.__lsStartupOptionalModalShown = true;
     showChangelogModal(entries);
     return;
   }
@@ -1055,17 +1074,23 @@ async function checkPendingContent() {
   // que este dispositivo todavía no vio, el cartel aparece aunque
   // get_pending_content() haya fallado o devuelva false.
   if (
+    !window.__lsStartupOptionalModalShown &&
     latestInternal > CHANGELOG_AUTO_BASELINE_VERSION &&
     latestInternal > locallySeen &&
-    latestRows.length
+    unseenRows.length
   ) {
     window.__lsChangelogShownVersion = latestInternal;
-    showChangelogModal(latestRows);
+    window.__lsStartupOptionalModalShown = true;
+    showChangelogModal(unseenRows);
     return;
   }
 
-  // 4) El resto del flujo sigue igual.
+  // 4) Teasers opcionales: como máximo UNO por sesión y nunca inmediatamente
+  // después de haber mostrado Novedades.
+  if (window.__lsStartupOptionalModalShown) return;
+
   if (pendingData?.road_to_6_teaser_pending) {
+    window.__lsStartupOptionalModalShown = true;
     showRoadTo6Teaser();
   } else {
     checkCollection568Launch();
@@ -1074,11 +1099,12 @@ async function checkPendingContent() {
 
 
 async function checkConnected579Launch() {
-  if (!currentUser?.id) return;
+  if (!currentUser?.id || window.__lsStartupOptionalModalShown) return;
 
   const { data, error } = await sb.rpc("get_connected_579_launch_pending");
   if (error || !data?.pending) return;
 
+  window.__lsStartupOptionalModalShown = true;
   showConnected579Launch();
 }
 
@@ -1160,12 +1186,13 @@ async function acknowledgeConnected579Launch(btn) {
 
 
 async function checkCollection568Launch() {
-  if (!currentUser?.id) return;
+  if (!currentUser?.id || window.__lsStartupOptionalModalShown) return;
 
   const { data, error } = await sb.rpc("get_collection_568_launch_pending");
   if (error) return;
 
   if (data?.pending) {
+    window.__lsStartupOptionalModalShown = true;
     showCollection568Launch();
     return;
   }
@@ -1720,7 +1747,8 @@ async function handleAcceptChangelog() {
     const wrap = document.getElementById("globalModalWrap");
     if (wrap) wrap.innerHTML = "";
 
-    setTimeout(() => checkPendingContent(), 120);
+    // No encadenamos otro popup automático en la misma sesión.
+    // Lo pendiente queda guardado para el próximo ingreso o accesible desde Novedades.
   };
 
   if (box && overlay) {
@@ -5702,6 +5730,15 @@ function renderProfileTitleInline(title, isOwnProfile = false) {
     </button>`;
 }
 
+function openMyBadgesFromProfile() {
+  openMyMedalsPanel();
+
+  setTimeout(() => {
+    const btn = document.querySelector('.ls-collection-filter[data-filter="badge"]');
+    if (btn) setCollection568Filter("badge", btn);
+  }, 120);
+}
+
 function openMyTitlesFromProfile() {
   openMyMedalsPanel();
 
@@ -6153,7 +6190,7 @@ async function renderProfile() {
         <h3>Medallas</h3>
         <div class="sub" style="display:flex;gap:9px;align-items:center;">
           <button onclick="openEquipMedalsPanel()" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;">Equipar 3</button>
-          <button onclick="openMyMedalsPanel()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Mi colección →</button>
+          <button onclick="openMyBadgesFromProfile()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-family:inherit;font-size:12px;">Ver medallas →</button>
         </div>
       </div>
       <div class="form-card">
@@ -6168,12 +6205,12 @@ async function renderProfile() {
     <div class="profile-section">
       <div class="profile-section-head">
         <div class="ico">💎</div>
-        <h3>Mi colección</h3>
+        <h3>Colección</h3>
         <div class="sub">
           <button
             onclick="openMyMedalsPanel()"
             style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;"
-          >Ver colección →</button>
+          >Abrir colección →</button>
         </div>
       </div>
 

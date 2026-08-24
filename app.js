@@ -2001,6 +2001,7 @@ async function renderApp() {
       <span class="pts mono" id="navBalance">${currentProfile.points_balance} pts</span>
     </div>
     <button onclick="openChangelogHistory()" title="Novedades" class="nav-changelog-btn" style="background:none; border:none; font-size:17px; cursor:pointer; margin-left:8px;">📢</button>
+    <button onclick="openLiveScrollSettings()" title="Configuración" aria-label="Configuración" style="background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">⚙️</button>
     <button id="notifBell" onclick="toggleNotifPanel()" style="position:relative; background:none; border:none; font-size:18px; cursor:pointer; margin-left:4px;">
       🔔<span id="notifBadge" class="hidden" style="position:absolute; top:-4px; right:-6px; background:var(--red); color:#fff; font-size:10px; border-radius:10px; padding:1px 5px;"></span>
     </button>

@@ -1119,6 +1119,11 @@ async function handleLogout() {
     } catch (_) {}
     notifRealtimeChannel = null;
   }
+  notifRealtimeUserId = null;
+  if (notifUiRefreshFrame) {
+    cancelAnimationFrame(notifUiRefreshFrame);
+    notifUiRefreshFrame = null;
+  }
 
   const { error } = await sb.auth.signOut();
 
@@ -10544,6 +10549,17 @@ async function submitReport(videoId, reason) {
 
 let notifCache = [];
 let notifRealtimeChannel = null;
+let notifRealtimeUserId = null;
+let notifUiRefreshFrame = null;
+
+function scheduleNotificationUIRefresh() {
+  if (notifUiRefreshFrame) return;
+  notifUiRefreshFrame = requestAnimationFrame(() => {
+    notifUiRefreshFrame = null;
+    updateNotificationBadge();
+    if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+  });
+}
 
 function getNotificationIcon(type) {
   const icons = { like: "❤️", comment: "💬", follow: "👤", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
@@ -10584,11 +10600,14 @@ async function loadNotifications() {
 
 function subscribeToNotifications() {
   if (!currentUser) return;
+  if (notifRealtimeChannel && notifRealtimeUserId === currentUser.id) return;
   if (notifRealtimeChannel) {
     sb.removeChannel(notifRealtimeChannel);
     notifRealtimeChannel = null;
+    notifRealtimeUserId = null;
   }
 
+  notifRealtimeUserId = currentUser.id;
   notifRealtimeChannel = sb
     .channel(`notifications-${currentUser.id}`)
     .on("postgres_changes", {
@@ -10600,12 +10619,15 @@ function subscribeToNotifications() {
       const notification = payload.new;
       if (!notifCache.some(n => n.id === notification.id)) notifCache.unshift(notification);
       notifCache = notifCache.slice(0, 30);
-      updateNotificationBadge();
-      if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+      scheduleNotificationUIRefresh();
       showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
     })
     .subscribe(status => {
       if (status === "SUBSCRIBED") console.log("Notificaciones Realtime conectadas");
+      if (status === "CHANNEL_ERROR" || status === "CLOSED") {
+        notifRealtimeChannel = null;
+        notifRealtimeUserId = null;
+      }
     });
 }
 

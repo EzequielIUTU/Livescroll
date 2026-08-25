@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5.9.3-identity-experience">
+<link rel="stylesheet" href="style.css?v=5.9.4-motion-upgrade">
 </head>
 <body>
 
@@ -62,6 +62,10 @@
     </div>
     <div class="ls6-sparkles"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="ls6-coming">PRÓXIMAMENTE</div>
+    <div class="ls6-access-loader" aria-live="polite">
+      <div class="ls6-access-copy"><span id="ls6AccessStatus">PREPARANDO EXPERIENCIA</span><strong id="ls6AccessPercent">0%</strong></div>
+      <div class="ls6-access-track"><i id="ls6AccessFill"></i></div>
+    </div>
   </section>
 
   <button id="ls6NextButton" class="ls6-next" type="button" onclick="advanceLiveScroll6Intro(event)">Siguiente <span>→</span></button>
@@ -201,6 +205,62 @@
     if (btn) btn.innerHTML = ls6Scene === 5 ? 'Entrar a LiveScroll <span>→</span>' : 'Siguiente <span>→</span>';
   }
 
+  function ls6RunAccessLoader() {
+    var fill = document.getElementById('ls6AccessFill');
+    var percent = document.getElementById('ls6AccessPercent');
+    var status = document.getElementById('ls6AccessStatus');
+    var overlay = document.getElementById('introOverlay');
+    if (!fill || !percent || !status || !overlay) {
+      closeLiveScrollIntro(false);
+      return;
+    }
+
+    var startedAt = performance.now();
+    var duration = 1850;
+    var pageReady = document.readyState === 'complete';
+    var lastValue = -1;
+    var finished = false;
+
+    if (!pageReady) {
+      window.addEventListener('load', function () { pageReady = true; }, { once:true });
+    }
+
+    function frame(now) {
+      if (finished || !document.getElementById('introOverlay')) return;
+      var elapsed = now - startedAt;
+      var ratio = Math.min(1, elapsed / duration);
+      var eased = 1 - Math.pow(1 - ratio, 3);
+      var value = Math.round(eased * 100);
+
+      if (!pageReady && elapsed < 2600) value = Math.min(94, value);
+      if (elapsed >= 2600) value = 100;
+
+      if (value !== lastValue) {
+        lastValue = value;
+        fill.style.transform = 'scaleX(' + (value / 100) + ')';
+        percent.textContent = value + '%';
+        status.textContent = value < 36
+          ? 'PREPARANDO EXPERIENCIA'
+          : value < 72
+            ? 'CONECTANDO TU CUENTA'
+            : value < 100
+              ? 'CARGANDO LIVESCROLL'
+              : 'TODO LISTO';
+      }
+
+      if (value >= 100 && (pageReady || elapsed >= 2600)) {
+        finished = true;
+        overlay.classList.add('ls6-access-ready');
+        setTimeout(function () { closeLiveScrollIntro(false); }, 260);
+        return;
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  }
+
   (function () {
     var el = document.getElementById('introOverlay');
     var seen = false;
@@ -212,9 +272,11 @@
     if (!seen) return;
     el.classList.add('ls6-returning');
     el.dataset.scene = '5';
+    var coming = el.querySelector('.ls6-coming');
+    if (coming) coming.textContent = 'ACCESO LIVESCROLL';
     var button = document.getElementById('ls6NextButton');
     if (button) button.remove();
-    setTimeout(function () { closeLiveScrollIntro(false); }, 1350);
+    ls6RunAccessLoader();
   })();
 </script>
 
@@ -305,6 +367,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.3-identity-reports-hotfix-v2"></script>
+<script src="app.js?v=5.9.4-motion-upgrade"></script>
 </body>
 </html>

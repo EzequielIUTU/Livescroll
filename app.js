@@ -1,4 +1,19 @@
 // ============================================================
+// LIVESCROLL · FIRMA OFICIAL DEL PROYECTO
+// Creador público: @EzequielIUTU · Argentina · 2026
+// Project ID: LS-AR-2026-3124CAB98D0F0FD3
+// Firma SHA-256: 3124cab98d0f0fd3cd465d3c05c49b4d789c2549719dadd127e631d6db287b76
+// ============================================================
+const LIVESCROLL_PROJECT_IDENTITY = Object.freeze({
+  project:"LiveScroll",
+  projectId:"LS-AR-2026-3124CAB98D0F0FD3",
+  creator:"@EzequielIUTU",
+  country:"Argentina",
+  founded:"2026",
+  signature:"3124cab98d0f0fd3cd465d3c05c49b4d789c2549719dadd127e631d6db287b76"
+});
+
+// ============================================================
 // CONFIGURACIÓN — reemplazá con tus datos de Supabase
 // (Project Settings > API en tu dashboard de Supabase)
 // ============================================================

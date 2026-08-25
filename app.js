@@ -2353,10 +2353,19 @@ function openLiveScroll7Teaser() {
       <header>
         <div><small>EL FUTURO EMPIEZA ACÁ</small><strong>LiveScroll <em>7</em></strong></div>
       </header>
-      <div class="ls7-teaser-video-wrap">
-        <video id="ls7TeaserVideo" controls playsinline preload="auto">
-          <source src="LiveScroll-7-EL-PULSO-PREVIEW-V2.mp4" type="video/mp4">
-        </video>
+      <div class="ls7-native-stage" id="ls7NativeStage" aria-label="Animación interactiva de LiveScroll 7">
+        <div class="ls7-native-grid"></div>
+        <div class="ls7-native-beam beam-a"></div><div class="ls7-native-beam beam-b"></div>
+        <div class="ls7-native-copy copy-a">TODO LO QUE CONOCÍAS...</div>
+        <div class="ls7-native-copy copy-b"><span>ESTÁ A PUNTO</span><b>DE EVOLUCIONAR.</b></div>
+        <div class="ls7-native-seven" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="ls7-native-name"><span>Live</span><b>Scroll</b><em>7</em></div>
+        <div class="ls7-native-tag">LA NUEVA EVOLUCIÓN</div>
+        <div class="ls7-native-spark s1"></div><div class="ls7-native-spark s2"></div><div class="ls7-native-spark s3"></div>
+        <button type="button" class="ls7-native-start" id="ls7NativeStart"><span>◈</span><b>TOCÁ PARA INICIAR EL PULSO</b></button>
+        <audio id="ls7NativeAudio" preload="auto"><source src="ls7-pulse-theme.mp3" type="audio/mpeg"></audio>
       </div>
       <div class="ls7-real-hold" id="ls7RealHold" aria-hidden="true">
         <p>El adelanto terminó</p>
@@ -2369,7 +2378,9 @@ function openLiveScroll7Teaser() {
     </section>`;
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add("is-visible"));
-  const video = overlay.querySelector("video");
+  const audio = overlay.querySelector("#ls7NativeAudio");
+  const stage = overlay.querySelector("#ls7NativeStage");
+  const startButton = overlay.querySelector("#ls7NativeStart");
   const holdArea = overlay.querySelector("#ls7RealHold");
   const holdButton = overlay.querySelector("#ls7HoldButton");
   let holdTimer = null;
@@ -2381,9 +2392,14 @@ function openLiveScroll7Teaser() {
     holdArea.classList.add("is-visible");
     holdArea.setAttribute("aria-hidden", "false");
   };
-  video?.addEventListener("ended", revealHold, { once:true });
-  video?.addEventListener("error", revealHold, { once:true });
-  video?.play().catch(() => {});
+  stage.classList.add("is-waiting");
+  startButton.addEventListener("click", () => {
+    if (stage.classList.contains("is-started")) return;
+    stage.classList.remove("is-waiting");
+    stage.classList.add("is-started");
+    audio?.play().catch(() => {});
+    setTimeout(revealHold, 12800);
+  });
 
   const cancelHold = () => {
     if (finished) return;
@@ -2395,6 +2411,7 @@ function openLiveScroll7Teaser() {
   const completeHold = () => {
     if (finished) return;
     finished = true;
+    if (audio) audio.pause();
     clearTimeout(holdTimer);
     holdButton.classList.add("is-complete");
     holdButton.style.setProperty("--ls7-hold", "100%");
@@ -2433,8 +2450,8 @@ function openLiveScroll7Teaser() {
 function closeLiveScroll7Teaser() {
   const overlay = document.getElementById("ls7TeaserOverlay");
   if (!overlay) return;
-  const video = overlay.querySelector("video");
-  if (video) video.pause();
+  const audio = overlay.querySelector("audio");
+  if (audio) audio.pause();
   overlay.classList.remove("is-visible");
   setTimeout(() => overlay.remove(), 180);
 }

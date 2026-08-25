@@ -2368,6 +2368,8 @@ function openLiveScroll7Teaser(options = {}) {
         <div class="ls7-native-seven" aria-hidden="true">
           <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
         </div>
+        <div class="ls7-seven-trail" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="ls7-android-word" aria-label="Android"><span>A</span><span>N</span><span>D</span><span>R</span><span>O</span><span>I</span><span>D</span></div>
         <div class="ls7-native-name"><span>Live</span><b>Scroll</b><em>7</em></div>
         <div class="ls7-native-tag">LA NUEVA EVOLUCIÓN</div>
         <div class="ls7-native-spark s1"></div><div class="ls7-native-spark s2"></div><div class="ls7-native-spark s3"></div>
@@ -2406,7 +2408,7 @@ function openLiveScroll7Teaser(options = {}) {
     stage.classList.remove("is-waiting");
     stage.classList.add("is-started");
     audio?.play().catch(() => {});
-    setTimeout(revealHold, 12800);
+    setTimeout(revealHold, 15000);
   });
 
   const cancelHold = () => {

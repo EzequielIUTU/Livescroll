@@ -3171,7 +3171,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4207,6 +4207,7 @@ function showChangelogModal(entries) {
     "5.9.6":"ACCESS EVOLUTION",
     "5.9.7":"NAVIGATION EVOLUTION",
     "5.9.8":"SOCIAL PULSE",
+    "5.9.9":"VIDEO REVISION",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4277,7 +4278,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -7674,6 +7675,19 @@ function openVideoActionSheet(videoId) {
         </span>
       </button>
 
+      ${video.platform === "upload" ? `
+        <button class="ls-sheet-action" onclick="openVideoReeditor('${videoId}')">
+          <span class="ico">✂️</span>
+          <span class="txt">
+            <strong>Reeditar video</strong>
+            <small>Cambiar el inicio o el final sin perder interacciones</small>
+          </span>
+        </button>` : `
+        <button class="ls-sheet-action" disabled>
+          <span class="ico">✂️</span>
+          <span class="txt"><strong>Reeditar video</strong><small>Disponible para MP4 subidos a LiveScroll</small></span>
+        </button>`}
+
       <button class="ls-sheet-action"
         onclick="closeVideoActionSheet(); window.open('${escapeHtml(video.video_url)}', '_blank', 'noopener')">
         <span class="ico">🔗</span>
@@ -8097,6 +8111,7 @@ const MAX_FILE_MB = 50;
 let rawSelectedFile = null;
 let trimmedFile = null;
 let uploadPreviewUrlSafe = null;
+let videoReeditContext = null;
 
 function previewFileSize() {
   rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
@@ -8217,6 +8232,161 @@ function formatTrimSeconds(s) {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
+async function openVideoReeditor(videoId) {
+  const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
+  if (!video || video.user_id !== currentUser.id) {
+    showToast("No encontramos ese video en tu perfil");
+    return;
+  }
+  if (video.platform !== "upload" || !isSafeUrl(video.video_url)) {
+    showToast("Solo se pueden reeditar videos subidos directamente a LiveScroll");
+    return;
+  }
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Este navegador no permite reeditar videos. Probá con Chrome o Firefox actualizados.");
+    return;
+  }
+
+  closeVideoActionSheet();
+  document.querySelectorAll(".video-grid-menu").forEach(el => el.classList.add("hidden"));
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:140;">
+      <div class="modal-box" style="max-width:420px;text-align:center;">
+        <div class="modal-box-body" style="padding:30px 22px;">
+          <div style="font-size:38px;margin-bottom:12px;">✂️</div>
+          <h2 style="margin:0 0 7px;">Preparando tu video</h2>
+          <p style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">Descargando una copia segura para editar. El original todavía no se modifica.</p>
+          <div class="ls-reedit-loading"><i></i></div>
+        </div>
+      </div>
+    </div>`;
+
+  try {
+    const response = await fetch(video.video_url, { cache:"no-store" });
+    if (!response.ok) throw new Error(`No se pudo descargar (${response.status})`);
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("El archivo recibido está vacío");
+    const extension = blob.type.includes("webm") ? "webm" : "mp4";
+    rawSelectedFile = new File([blob], `video-${video.id}.${extension}`, { type:blob.type || "video/mp4" });
+    trimmedFile = null;
+    videoReeditContext = {
+      videoId:video.id,
+      title:video.title || "Video",
+      oldVideoUrl:video.video_url,
+      oldThumbnailUrl:video.thumbnail_url || null
+    };
+    openVideoTrimmer();
+  } catch (error) {
+    console.error("No se pudo preparar la reedición:", error);
+    wrap.innerHTML = "";
+    videoReeditContext = null;
+    rawSelectedFile = null;
+    showToast("No pudimos preparar el video. El original sigue intacto.");
+  }
+}
+
+function getClipStoragePathFromPublicUrl(publicUrl) {
+  try {
+    const parsed = new URL(publicUrl);
+    const marker = "/storage/v1/object/public/clip-videos/";
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    return decodeURIComponent(parsed.pathname.slice(markerIndex + marker.length));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function saveReeditedVideo(file) {
+  const context = videoReeditContext;
+  if (!context || !file) throw new Error("Falta el contexto de reedición");
+  if (file.size > MAX_FILE_MB * 1024 * 1024) {
+    throw new Error(`La nueva edición supera los ${MAX_FILE_MB} MB`);
+  }
+
+  const progressText = document.getElementById("trimProgressText");
+  const progressBar = document.getElementById("trimProgressBar");
+  if (progressText) progressText.textContent = "Subiendo la nueva edición de forma segura...";
+  if (progressBar) progressBar.style.width = "35%";
+
+  const extension = file.type.includes("mp4") ? "mp4" : "webm";
+  const stamp = Date.now();
+  const newVideoPath = `${currentUser.id}/revisions/${context.videoId}/${stamp}-revision.${extension}`;
+  const uploadedPaths = [];
+  let mediaCommitted = false;
+
+  try {
+  const { error:uploadError } = await sb.storage.from("clip-videos").upload(newVideoPath, file, {
+    cacheControl:"3600",
+    upsert:false,
+    contentType:file.type || undefined
+  });
+  if (uploadError) throw uploadError;
+  uploadedPaths.push(newVideoPath);
+  const { data:videoPublic } = sb.storage.from("clip-videos").getPublicUrl(newVideoPath);
+  const newVideoUrl = videoPublic?.publicUrl;
+  if (!newVideoUrl) throw new Error("No se obtuvo la URL de la nueva edición");
+  if (progressBar) progressBar.style.width = "65%";
+
+  let newThumbnailUrl = null;
+  try {
+    const thumbnailBlob = await createVideoThumbnailBlob(file);
+    if (thumbnailBlob) {
+      const thumbPath = `${currentUser.id}/thumbnails/${stamp}-revision.jpg`;
+      const { error:thumbError } = await sb.storage.from("clip-videos").upload(thumbPath, thumbnailBlob, {
+        cacheControl:"3600",
+        contentType:"image/jpeg",
+        upsert:false
+      });
+      if (!thumbError) {
+        uploadedPaths.push(thumbPath);
+        const { data:thumbPublic } = sb.storage.from("clip-videos").getPublicUrl(thumbPath);
+        newThumbnailUrl = thumbPublic?.publicUrl || null;
+      }
+    }
+  } catch (thumbnailError) {
+    console.warn("No se pudo crear la nueva carátula:", thumbnailError);
+  }
+  if (progressBar) progressBar.style.width = "82%";
+
+  const { data:updateResult, error:updateError } = await sb.rpc("replace_own_video_media", {
+    p_video_id:context.videoId,
+    p_video_url:newVideoUrl,
+    p_thumbnail_url:newThumbnailUrl
+  });
+  if (updateError || !updateResult?.ok) {
+    await sb.storage.from("clip-videos").remove(uploadedPaths).catch(() => {});
+    throw updateError || new Error(updateResult?.error || "No se pudo guardar la edición");
+  }
+  mediaCommitted = true;
+  if (progressBar) progressBar.style.width = "100%";
+
+  const oldPaths = [
+    getClipStoragePathFromPublicUrl(context.oldVideoUrl),
+    getClipStoragePathFromPublicUrl(context.oldThumbnailUrl)
+  ].filter(Boolean);
+  if (oldPaths.length) {
+    sb.storage.from("clip-videos").remove(oldPaths).catch(error => {
+      console.warn("La edición se guardó, pero no se pudo limpiar un archivo anterior:", error);
+    });
+  }
+
+  const editedTitle = context.title;
+  closeVideoTrimmer();
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
+  loadedEmbeds.clear();
+  showToast(`✂️ “${editedTitle}” fue reeditado sin perder sus interacciones`);
+  await renderProfile();
+  } catch (error) {
+    if (!mediaCommitted && uploadedPaths.length) {
+      await sb.storage.from("clip-videos").remove(uploadedPaths).catch(() => {});
+    }
+    throw error;
+  }
+}
+
 function openVideoTrimmer() {
   if (!rawSelectedFile) return;
   if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
@@ -8229,7 +8399,7 @@ function openVideoTrimmer() {
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:140;">
       <div class="modal-box" style="max-width:420px;">
-        <div class="modal-box-header"><h2>✂️ Recortar video</h2></div>
+        <div class="modal-box-header"><h2>✂️ ${videoReeditContext ? "Reeditar video" : "Recortar video"}</h2></div>
         <div class="modal-box-body">
           <video id="trimPreviewVideo" src="${objectUrl}" controls muted style="width:100%; border-radius:10px; margin-bottom:14px; background:#000;"></video>
           <div id="trimLoadingMsg" style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Cargando video...</div>
@@ -8248,13 +8418,13 @@ function openVideoTrimmer() {
             <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden;">
               <div id="trimProgressBar" style="width:0%; height:100%; background:var(--gold); transition:width 0.15s;"></div>
             </div>
-            <div style="font-size:12px; color:var(--text-dim); margin-top:6px; text-align:center;">Procesando, no cierres esta ventana...</div>
+            <div id="trimProgressText" style="font-size:12px; color:var(--text-dim); margin-top:6px; text-align:center;">Procesando, no cierres esta ventana...</div>
           </div>
         </div>
         <div class="modal-box-footer">
           <div style="display:flex; gap:10px;">
             <button class="btn-outline" style="flex:1;" onclick="closeVideoTrimmer()">Cancelar</button>
-            <button class="btn" id="trimConfirmBtn" style="flex:1;" onclick="confirmVideoTrim()" disabled>Recortar y usar</button>
+            <button class="btn" id="trimConfirmBtn" style="flex:1;" onclick="confirmVideoTrim()" disabled>${videoReeditContext ? "Guardar nueva edición" : "Recortar y usar"}</button>
           </div>
         </div>
       </div>
@@ -8298,7 +8468,13 @@ function updateTrimLabels() {
 }
 
 function closeVideoTrimmer() {
+  const wasReediting = !!videoReeditContext;
   document.getElementById("globalModalWrap").innerHTML = "";
+  videoReeditContext = null;
+  if (wasReediting) {
+    rawSelectedFile = null;
+    trimmedFile = null;
+  }
 }
 
 async function confirmVideoTrim() {
@@ -8325,13 +8501,19 @@ async function confirmVideoTrim() {
     const baseName = rawSelectedFile.name.replace(/\.[^.]+$/, "");
     trimmedFile = new File([result.blob], `${baseName}-recorte.${ext}`, { type: result.mimeType });
 
-    closeVideoTrimmer();
-    refreshFileSizeUI();
-    refreshUploadPreviewSafe();
-    showToast("¡Video recortado!");
+    if (videoReeditContext) {
+      await saveReeditedVideo(trimmedFile);
+    } else {
+      closeVideoTrimmer();
+      refreshFileSizeUI();
+      refreshUploadPreviewSafe();
+      showToast("¡Video recortado!");
+    }
   } catch (e) {
-    showToast("No se pudo recortar. Probá con otro navegador o un archivo distinto.");
+    console.error("Error recortando video:", e);
+    showToast("No se pudo recortar. El video original sigue intacto.");
     closeVideoTrimmer();
+    videoReeditContext = null;
   }
 }
 
@@ -8374,6 +8556,7 @@ function trimVideoClientSide(video, startSec, endSec, onProgress) {
 
 async function setUploadMode(mode) {
   window.currentUploadMode = mode;
+  videoReeditContext = null;
   rawSelectedFile = null;
   trimmedFile = null;
   clearUploadPreviewSafe();
@@ -9969,6 +10152,7 @@ async function renderProfile() {
                 ${canPin ? (pinnedIds.has(v.id)
                     ? `<div style="padding:8px 10px; font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</div>`
                     : `<button ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`) : ""}
+                ${v.platform === "upload" ? `<button onclick="openVideoReeditor('${v.id}')">✂️ Reeditar video</button>` : ""}
                 <button onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">🔗 Abrir link</button>
                 <button class="danger" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
               </div>

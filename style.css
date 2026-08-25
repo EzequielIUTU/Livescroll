@@ -249,6 +249,13 @@ html.ls-legacy .ls-nav-view-enter { animation:none !important; }
 
 html.ls-legacy .ls-social-pulse-panel { backdrop-filter:none !important;box-shadow:none !important;animation:none !important; }
 
+/* ---------- 5.9.9 · VIDEO REVISION ---------- */
+.ls-reedit-loading { width:100%;height:6px;margin-top:22px;overflow:hidden;border:1px solid rgba(56,221,242,.15);border-radius:99px;background:rgba(3,13,17,.55); }
+.ls-reedit-loading i { display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2ef27c,#38ddf2,#f4d35e);box-shadow:0 0 14px rgba(56,221,242,.35);animation:lsReeditLoading 1.05s ease-in-out infinite; }
+@keyframes lsReeditLoading { 0% { transform:translateX(-110%); } 100% { transform:translateX(345%); } }
+html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
+@media(prefers-reduced-motion:reduce) { .ls-reedit-loading i { animation:none;width:100%; } }
+
 @media (max-width: 780px) {
   .nav-links { display: none; }
   .nav-hamburger { display: block; }

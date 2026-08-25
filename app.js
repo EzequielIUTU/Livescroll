@@ -2039,6 +2039,12 @@ function openLiveScrollSettings() {
               </div>
               <button type="button" class="btn-outline" style="width:100%;min-height:44px;" onclick="openHiddenVideosManager()">Administrar videos ocultos</button>
             </div>
+
+            <div class="ls6-active-support-card">
+              <div class="ls6-active-support-head"><span></span><strong>LiveScroll 6 · Activo y con soporte</strong></div>
+              <p>Las nuevas funciones están pausadas mientras construimos LiveScroll 7. LiveScroll 6 continúa funcionando y recibirá mantenimiento, seguridad y correcciones urgentes.</p>
+              <button type="button" class="btn-outline" onclick="showLiveScroll6BridgeNotice({manual:true})">Leer comunicado</button>
+            </div>
           </div>
         </div>
 
@@ -2484,6 +2490,62 @@ function openLiveScroll7Teaser(options = {}) {
 function replayLiveScroll7Pulse() {
   document.getElementById("globalModalWrap").innerHTML = "";
   setTimeout(() => openLiveScroll7Teaser({ replay:true }), 120);
+}
+
+// ============================================================
+// 6.1.0 · EL PUENTE — CONTINUIDAD DE LIVESCROLL 6
+// ============================================================
+function showLiveScroll6BridgeNotice(options = {}) {
+  const manual = options.manual === true;
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-bridge-overlay" id="lsBridgeNoticeOverlay" style="z-index:170;">
+      <section class="modal-box ls-bridge-box" role="dialog" aria-modal="true" aria-label="LiveScroll 6 continúa activo">
+        <div class="ls-bridge-mark"><span>6</span><i></i><b>7</b></div>
+        <div class="modal-box-body">
+          <small class="ls-bridge-kicker">6.1.0 · EL PUENTE</small>
+          <h2>LiveScroll 6 sigue más vivo que nunca</h2>
+          <p>Las nuevas versiones con funciones quedarán pausadas temporalmente mientras concentramos nuestro trabajo en construir LiveScroll 7.</p>
+          <p><strong>LiveScroll 6 continuará funcionando con normalidad.</strong> Tus cuentas, videos, perfiles, Directos, puntos y contenido permanecerán disponibles.</p>
+          <p>Durante este período seguiremos realizando correcciones urgentes, mantenimiento y mejoras de seguridad cuando sean necesarias.</p>
+          <blockquote>Esto no es una despedida.<br><b>Es el puente hacia la próxima evolución.</b></blockquote>
+          <div class="ls-bridge-date"><span>LiveScroll 7</span><b>25 DE OCTUBRE DE 2026</b></div>
+          <div class="ls-bridge-status"><i></i><span>LiveScroll 6 continúa activo y con soporte</span></div>
+        </div>
+        <div class="modal-box-footer ls-bridge-actions">
+          <button class="btn-outline" onclick="handleLiveScroll6BridgePulse(${manual ? "true" : "false"})">◈ Volver a ver El Pulso</button>
+          <button class="btn" onclick="handleAcceptLiveScroll6Bridge(${manual ? "true" : "false"})">Entendido</button>
+        </div>
+      </section>
+    </div>`;
+}
+
+async function markLiveScroll6BridgeSeen() {
+  if (!currentUser?.id) return;
+  localStorage.setItem(`livescroll_bridge_610_seen_${currentUser.id}`, "1");
+  await sb.rpc("mark_my_bridge_notice_seen");
+  const shownVersion = Number(window.__lsBridgeShownVersion || 0);
+  if (shownVersion > 0) {
+    localStorage.setItem(`livescroll_changelog_seen_${currentUser.id}`, String(shownVersion));
+    await sb.rpc("set_my_changelog_seen_version", { p_version:shownVersion });
+  }
+  await sb.rpc("acknowledge_content", { p_user_id:currentUser.id, p_content_key:"changelog" });
+}
+
+async function handleAcceptLiveScroll6Bridge(manual = false) {
+  if (!manual) await markLiveScroll6BridgeSeen();
+  document.getElementById("globalModalWrap").innerHTML = "";
+  if (!manual) {
+    window.__lsStartupOptionalModalShown = false;
+    setTimeout(() => checkPendingContent(), 350);
+  }
+}
+
+async function handleLiveScroll6BridgePulse(manual = false) {
+  if (!manual) await markLiveScroll6BridgeSeen();
+  document.getElementById("globalModalWrap").innerHTML = "";
+  setTimeout(() => openLiveScroll7Teaser({ replay:true }), 140);
 }
 
 function closeLiveScroll7Teaser() {
@@ -3332,6 +3394,22 @@ async function checkPendingContent() {
 
   if (pendingData?.tutorial_pending) {
     showTutorialModal();
+    return;
+  }
+
+  // 6.1.0 · EL PUENTE: comunicado único por cuenta. No anuncia el final de
+  // LiveScroll 6; confirma que continúa activo mientras construimos LS7.
+  const bridgeKey = `livescroll_bridge_610_seen_${currentUser.id}`;
+  const localBridgeSeen = localStorage.getItem(bridgeKey) === "1";
+  const cloudBridgeSeen = syncState?.bridge_notice_seen === true;
+  if (localBridgeSeen && !cloudBridgeSeen) {
+    Promise.resolve(sb.rpc("mark_my_bridge_notice_seen")).catch(() => {});
+  }
+  if (cloudBridgeSeen && !localBridgeSeen) localStorage.setItem(bridgeKey,"1");
+  if (!localBridgeSeen && !cloudBridgeSeen && !window.__lsStartupOptionalModalShown) {
+    window.__lsStartupOptionalModalShown = true;
+    window.__lsBridgeShownVersion = latestInternal;
+    showLiveScroll6BridgeNotice();
     return;
   }
 

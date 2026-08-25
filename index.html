@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5.9.4-motion-upgrade">
+<link rel="stylesheet" href="style.css?v=5.9.5-signature-motion">
 </head>
 <body>
 
@@ -216,7 +216,8 @@
     }
 
     var startedAt = performance.now();
-    var duration = 1850;
+    var reducedMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var duration = reducedMotion ? 900 : 4750;
     var pageReady = document.readyState === 'complete';
     var lastValue = -1;
     var finished = false;
@@ -232,26 +233,29 @@
       var eased = 1 - Math.pow(1 - ratio, 3);
       var value = Math.round(eased * 100);
 
-      if (!pageReady && elapsed < 2600) value = Math.min(94, value);
-      if (elapsed >= 2600) value = 100;
+      var safetyLimit = reducedMotion ? 1400 : 5600;
+      if (!pageReady && elapsed < safetyLimit) value = Math.min(94, value);
+      if (elapsed >= safetyLimit) value = 100;
 
       if (value !== lastValue) {
         lastValue = value;
         fill.style.transform = 'scaleX(' + (value / 100) + ')';
         percent.textContent = value + '%';
-        status.textContent = value < 36
+        status.textContent = value < 24
           ? 'PREPARANDO EXPERIENCIA'
-          : value < 72
+          : value < 50
             ? 'CONECTANDO TU CUENTA'
-            : value < 100
-              ? 'CARGANDO LIVESCROLL'
+            : value < 78
+              ? 'CARGANDO TU PERFIL'
+              : value < 100
+                ? 'CARGANDO LIVESCROLL'
               : 'TODO LISTO';
       }
 
-      if (value >= 100 && (pageReady || elapsed >= 2600)) {
+      if (value >= 100 && (pageReady || elapsed >= safetyLimit)) {
         finished = true;
         overlay.classList.add('ls6-access-ready');
-        setTimeout(function () { closeLiveScrollIntro(false); }, 260);
+        setTimeout(function () { closeLiveScrollIntro(false); }, reducedMotion ? 80 : 620);
         return;
       }
 
@@ -367,6 +371,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.4-motion-upgrade"></script>
+<script src="app.js?v=5.9.5-signature-motion"></script>
 </body>
 </html>

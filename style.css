@@ -991,23 +991,31 @@ html.ls-legacy nav {
 .ls6-returning .ls6-stars { animation:none !important;opacity:.16;transform:translateZ(0) scale(1.02);will-change:transform,opacity; }
 .ls6-returning .ls6-gold-seed { display:none; }
 .ls6-returning .ls6-scene-union { visibility:visible !important;opacity:1 !important;animation:none !important;contain:layout paint; }
-.ls6-returning .ls6-brand-union { transform:translateZ(0);contain:layout paint; }
+.ls6-returning .ls6-brand-union { position:relative;transform:translateZ(0);contain:layout paint; }
+.ls6-returning .ls6-brand-union::after { content:"";position:absolute;inset:-12% -4%;pointer-events:none;opacity:0;transform:translate3d(-120%,0,0) skewX(-18deg);background:linear-gradient(90deg,transparent,rgba(255,241,163,.08),rgba(255,241,163,.72),rgba(255,241,163,.08),transparent);filter:blur(2px); }
 .ls6-returning .ls6-live,.ls6-returning .ls6-scroll,.ls6-returning .ls6-brand-six { will-change:transform,opacity;backface-visibility:hidden;transform:translateZ(0); }
-.ls6-returning[data-scene="5"] .ls6-live { animation:ls6AccessLive .88s cubic-bezier(.16,1,.3,1) both !important; }
-.ls6-returning[data-scene="5"] .ls6-scroll { color:#38ddf2;animation:ls6AccessScroll .92s .07s cubic-bezier(.16,1,.3,1) both !important; }
-.ls6-returning[data-scene="5"] .ls6-brand-six { animation:ls6AccessSix 1s .14s cubic-bezier(.16,1,.3,1) both !important; }
-.ls6-returning[data-scene="5"] .ls6-coming { margin-top:16px;padding:6px 13px;border-color:rgba(46,242,124,.22);background:rgba(46,242,124,.045);color:#2ef27c;opacity:1;animation:ls6AccessBadge .4s .62s ease both !important; }
-.ls6-returning .ls6-access-loader { display:block;opacity:0;animation:ls6AccessLoaderIn .38s .72s ease forwards; }
+.ls6-returning[data-scene="5"] .ls6-live { animation:ls6AccessLive 1s cubic-bezier(.16,1,.3,1) both !important; }
+.ls6-returning[data-scene="5"] .ls6-scroll { color:#38ddf2;animation:ls6AccessScroll 1s 1s cubic-bezier(.16,1,.3,1) both !important; }
+.ls6-returning[data-scene="5"] .ls6-brand-six { animation:ls6AccessSix 1s 2s cubic-bezier(.16,1,.3,1) both !important; }
+.ls6-returning[data-scene="5"] .ls6-brand-union::after { animation:ls6AccessShine .8s 3.08s cubic-bezier(.22,.7,.2,1) both; }
+.ls6-returning[data-scene="5"] .ls6-coming { margin-top:16px;padding:6px 13px;border-color:rgba(46,242,124,.22);background:rgba(46,242,124,.045);color:#2ef27c;opacity:1;animation:ls6AccessBadge .45s 3.15s ease both !important; }
+.ls6-returning .ls6-access-loader { display:block;opacity:0;animation:ls6AccessLoaderIn .38s .32s ease forwards; }
 .ls6-returning .ls6-sparkles i { width:4px;height:4px;box-shadow:0 0 8px 2px rgba(244,211,94,.45); }
 .ls6-returning .ls6-sparkles i:nth-child(n+5) { display:none; }
-.ls6-returning[data-scene="5"] .ls6-sparkles i { animation:ls6AccessSpark .75s .72s ease-out both !important;will-change:transform,opacity; }
+.ls6-returning[data-scene="5"] .ls6-sparkles i { animation:ls6AccessSpark .9s 3.12s ease-out both !important;will-change:transform,opacity; }
+.ls6-returning.ls6-access-ready { animation:ls6AccessBackgroundPulse .58s ease both; }
+.ls6-returning.ls6-access-ready .ls6-brand-union { animation:ls6AccessFinalGlow .58s ease both; }
 .ls6-returning.ls6-access-ready .ls6-access-track { border-color:rgba(244,211,94,.38);box-shadow:0 0 20px rgba(244,211,94,.14); }
+.ls6-returning.fade-out { opacity:0;transform:scale(1.012);filter:brightness(.84);transition:opacity .52s ease,transform .52s ease,filter .52s ease; }
 @keyframes ls6AccessLive { from { opacity:0;transform:translate3d(-42vw,0,0); } to { opacity:1;transform:translate3d(0,0,0); } }
 @keyframes ls6AccessScroll { from { opacity:0;transform:translate3d(0,-34vh,0); } to { opacity:1;transform:translate3d(0,0,0); } }
 @keyframes ls6AccessSix { from { opacity:0;transform:translate3d(38vw,0,0) rotate(90deg) scale(.72); } to { opacity:1;transform:translate3d(0,0,0) rotate(0) scale(1); } }
 @keyframes ls6AccessBadge { from { opacity:0;transform:translate3d(0,8px,0); } to { opacity:1;transform:translate3d(0,0,0); } }
 @keyframes ls6AccessLoaderIn { from { opacity:0;transform:translate3d(0,8px,0); } to { opacity:1;transform:translate3d(0,0,0); } }
 @keyframes ls6AccessSpark { 0% { opacity:0;transform:translate3d(0,0,0) scale(.2); } 42% { opacity:1;transform:translate3d(0,-8px,0) scale(1.15); } 100% { opacity:0;transform:translate3d(0,-18px,0) scale(.25); } }
+@keyframes ls6AccessShine { 0% { opacity:0;transform:translate3d(-120%,0,0) skewX(-18deg); } 25% { opacity:.9; } 100% { opacity:0;transform:translate3d(120%,0,0) skewX(-18deg); } }
+@keyframes ls6AccessBackgroundPulse { 0%,100% { background-color:#050b0e; } 50% { background-color:#073024; } }
+@keyframes ls6AccessFinalGlow { 0%,100% { filter:none; } 50% { filter:drop-shadow(0 0 18px rgba(244,211,94,.48)); } }
 @keyframes ls6SceneRise { from { opacity:0;transform:translateY(28px) scale(.96); } to { opacity:1;transform:none; } }
 @keyframes ls6SceneReveal { from { opacity:0; } to { opacity:1; } }
 @keyframes ls6YearScene { 0% { opacity:0;transform:scale(1.8); } 55% { opacity:1;transform:scale(.94); } 100% { opacity:1;transform:scale(1); } }

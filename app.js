@@ -2322,6 +2322,7 @@ function toggleMobileMenu() {
       <button class="${activeTab === 'ranking' ? 'active' : ''}" onclick="switchTab('ranking'); closeMobileMenu();"><span>🏆</span><b>Ranking</b></button>
       <div class="ls-mobile-menu-label">Ayuda y ajustes</div>
       <button onclick="openChangelogHistory(); closeMobileMenu();"><span>📢</span><b>Novedades</b></button>
+      <button class="ls7-menu-teaser" onclick="openLiveScroll7Teaser(); closeMobileMenu();"><span>◈</span><b>LiveScroll 7 <small>PRÓXIMAMENTE</small></b></button>
       <button onclick="showTutorialModal(); closeMobileMenu();"><span>❓</span><b>Cómo funciona</b></button>
       <button onclick="openLiveScrollSettings(); closeMobileMenu();"><span>⚙️</span><b>Configuración</b></button>
       ${currentProfile.is_admin ? `<button class="${activeTab === 'admin' ? 'active' : ''}" onclick="switchTab('admin'); closeMobileMenu();"><span>🛠</span><b>Admin</b></button>` : ""}
@@ -2341,6 +2342,52 @@ function closeMobileMenu() {
 }
 
 // ============================================================
+// 6.0.8 · EL PULSO — ADELANTO DE LIVESCROLL 7
+// ============================================================
+function openLiveScroll7Teaser() {
+  if (window.LiveScrollAndroid?.openLiveScroll7Teaser) {
+    try {
+      window.LiveScrollAndroid.openLiveScroll7Teaser();
+      return;
+    } catch (_) {}
+  }
+
+  closeLiveScroll7Teaser();
+  const overlay = document.createElement("div");
+  overlay.id = "ls7TeaserOverlay";
+  overlay.className = "ls7-teaser-overlay";
+  overlay.innerHTML = `
+    <section class="ls7-teaser-shell" role="dialog" aria-modal="true" aria-label="Adelanto de LiveScroll 7">
+      <header>
+        <div><small>EL FUTURO EMPIEZA ACÁ</small><strong>LiveScroll <em>7</em></strong></div>
+        <button type="button" onclick="closeLiveScroll7Teaser()" aria-label="Cerrar adelanto">✕</button>
+      </header>
+      <div class="ls7-teaser-video-wrap">
+        <video id="ls7TeaserVideo" controls playsinline preload="metadata" poster="">
+          <source src="LiveScroll-7-EL-PULSO-PREVIEW-V2.mp4" type="video/mp4">
+        </video>
+      </div>
+      <footer><span>PRÓXIMAMENTE</span><b>25 DE OCTUBRE DE 2026</b></footer>
+    </section>`;
+  overlay.addEventListener("click", event => {
+    if (event.target === overlay) closeLiveScroll7Teaser();
+  });
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("is-visible"));
+  const video = overlay.querySelector("video");
+  video?.play().catch(() => {});
+}
+
+function closeLiveScroll7Teaser() {
+  const overlay = document.getElementById("ls7TeaserOverlay");
+  if (!overlay) return;
+  const video = overlay.querySelector("video");
+  if (video) video.pause();
+  overlay.classList.remove("is-visible");
+  setTimeout(() => overlay.remove(), 180);
+}
+
+// ============================================================
 // 6.0.4v · BOTÓN ATRÁS NATIVO
 // Android consulta esta función antes de cerrar la Activity.
 // ============================================================
@@ -2348,6 +2395,11 @@ function handleLiveScrollAndroidBack() {
   const portal = document.getElementById("ls6LaunchPortal");
   const intro = document.getElementById("introOverlay");
   if (portal || intro) return "handled";
+
+  if (document.getElementById("ls7TeaserOverlay")) {
+    closeLiveScroll7Teaser();
+    return "handled";
+  }
 
   if (document.getElementById("lsTutorialV3Layer")) {
     showToast("Completá el recorrido para continuar");

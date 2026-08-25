@@ -827,6 +827,83 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
   .profile-avatar-ring img { width: 50px; height: 50px; }
 }
 
+/* ============================================================
+   6.0.8 · EL PULSO — PRIMEROS DETALLES VISUALES DE LIVESCROLL 7
+   Se aplican solamente a elementos nuevos y pequeños acentos.
+   ============================================================ */
+:root {
+  --ls7-blue: #38bdf8;
+  --ls7-violet: #8b5cf6;
+  --ls7-deep: #07091a;
+}
+
+.nav-hamburger,
+.notification-bell {
+  border-color: rgba(56,189,248,.28) !important;
+  box-shadow: 0 0 18px rgba(139,92,246,.08);
+}
+
+.ls7-menu-teaser {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(56,189,248,.48) !important;
+  background: linear-gradient(100deg,rgba(37,99,235,.13),rgba(139,92,246,.15)) !important;
+}
+.ls7-menu-teaser::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg,transparent 20%,rgba(255,255,255,.18) 48%,transparent 72%);
+  transform: translateX(-130%);
+  animation: ls7MenuShine 3.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.ls7-menu-teaser span { color: var(--ls7-blue); text-shadow: 0 0 12px var(--ls7-violet); }
+.ls7-menu-teaser b { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+.ls7-menu-teaser small { color:#a5f3fc;font-size:9px;letter-spacing:.11em; }
+@keyframes ls7MenuShine { 0%,58%{transform:translateX(-130%)} 82%,100%{transform:translateX(130%)} }
+
+.ls7-teaser-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0,1,8,.88);
+  backdrop-filter: blur(14px);
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+.ls7-teaser-overlay.is-visible { opacity: 1; }
+.ls7-teaser-shell {
+  width: min(430px,100%);
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(56,189,248,.55);
+  background: radial-gradient(circle at 50% 0,rgba(76,29,149,.30),transparent 38%),#03040d;
+  box-shadow: 0 0 44px rgba(56,189,248,.18),0 0 90px rgba(139,92,246,.13);
+  transform: translateY(14px) scale(.98);
+  transition: transform .22s ease;
+}
+.ls7-teaser-overlay.is-visible .ls7-teaser-shell { transform:none; }
+.ls7-teaser-shell header,.ls7-teaser-shell footer { display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px; }
+.ls7-teaser-shell header div { display:flex;flex-direction:column;gap:2px; }
+.ls7-teaser-shell header small { color:#67e8f9;font-size:9px;letter-spacing:.12em; }
+.ls7-teaser-shell header strong { color:#fff;font-size:20px; }
+.ls7-teaser-shell header em { color:#e0f2fe;font-style:normal;text-shadow:0 0 12px var(--ls7-blue),4px 3px 0 rgba(139,92,246,.65); }
+.ls7-teaser-shell header button { width:38px;height:38px;border-radius:50%;border:1px solid rgba(139,92,246,.52);background:#090b19;color:#fff;font-size:18px; }
+.ls7-teaser-video-wrap { background:#000;aspect-ratio:9/16;max-height:calc(100dvh - 170px); }
+.ls7-teaser-video-wrap video { display:block;width:100%;height:100%;object-fit:contain;background:#000; }
+.ls7-teaser-shell footer { flex-direction:column;gap:3px; }
+.ls7-teaser-shell footer span { color:#e0f2fe;font-weight:800;letter-spacing:.1em; }
+.ls7-teaser-shell footer b { color:#fbbf24;font-size:13px; }
+
+.ls-legacy .ls7-menu-teaser::after { animation:none;display:none; }
+.ls-legacy .ls7-teaser-overlay { backdrop-filter:none; }
+@media (prefers-reduced-motion:reduce) { .ls7-menu-teaser::after{animation:none}.ls7-teaser-shell{transition:none} }
+
 /* LiveScroll 6.0 — GOLDEN INTERFACE (solo vista previa ?preview600=1) */
 html.ls6-golden-preview {
   --ink:#080909;--panel:#11110f;--panel-2:#191813;--gold:#f4d35e;--gold-dim:#c89a27;

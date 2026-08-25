@@ -1261,6 +1261,19 @@ async function loadProfile() {
 
   currentProfile.is_admin = currentProfile.is_admin === true;
   currentProfile.is_blocked = currentProfile.is_blocked === true;
+
+  // 6.0.7v: las cuentas nuevas normales se verifican solas. Una sancion o
+  // una señal sospechosa siempre permanece para revision humana.
+  if (currentProfile.is_blocked) {
+    const { data:autoVerification } = await sb.rpc("auto_verify_current_user");
+    if (autoVerification?.status === "verified") {
+      currentProfile.is_blocked = false;
+      currentProfile.auto_verification_reason = autoVerification.reason || "controles_superados";
+    } else {
+      currentProfile.auto_verification_reason = autoVerification?.reason || "revision_manual";
+    }
+  }
+
   currentProfile.is_creator = creatorResult?.data?.is_creator === true;
   currentProfile.creator_application_status = creatorResult?.data?.application_status || null;
   currentProfile.creator_video_count = Number(creatorResult?.data?.video_count || 0);
@@ -1994,6 +2007,14 @@ function openLiveScrollSettings() {
                 >🌀 Solo portal</button>
               </div>
             </div>
+
+            <div style="border:1px solid rgba(103,232,249,.25);border-radius:14px;padding:13px;background:rgba(103,232,249,.045);">
+              <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:#67e8f9;">🙈 Videos ocultos</div>
+              <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">
+                Revisá los videos que marcaste como “No me interesa” y volvé a mostrarlos cuando quieras.
+              </div>
+              <button type="button" class="btn-outline" style="width:100%;min-height:44px;" onclick="openHiddenVideosManager()">Administrar videos ocultos</button>
+            </div>
           </div>
         </div>
 
@@ -2034,6 +2055,49 @@ function replayLiveScrollPortalOnly() {
 }
 
 window.replayLiveScrollPortalOnly = replayLiveScrollPortalOnly;
+
+async function openHiddenVideosManager() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+  wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:280;">
+    <div class="modal-box" style="max-width:520px;max-height:92dvh;display:flex;flex-direction:column;">
+      <div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div><h2 style="margin:0;font-size:20px;">🙈 Videos ocultos</h2><div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Sólo vos podés ver esta lista</div></div>
+        <button type="button" onclick="openLiveScrollSettings()" aria-label="Volver" class="btn-outline" style="min-height:40px;">← Volver</button>
+      </div>
+      <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+        <div id="hiddenVideosList" style="color:var(--text-dim);">Cargando...</div>
+      </div>
+    </div>
+  </div>`;
+  const { data, error } = await sb.rpc("get_my_hidden_videos");
+  const list = document.getElementById("hiddenVideosList");
+  if (!list) return;
+  if (error) { list.textContent = "No pudimos cargar los videos ocultos."; return; }
+  const videos = data || [];
+  if (!videos.length) { list.innerHTML = `<div class="form-card" style="text-align:center;padding:24px;">No tenés videos ocultos ✓</div>`; return; }
+  list.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;"><span>${videos.length} video${videos.length === 1 ? "" : "s"}</span><button class="btn-outline" onclick="restoreAllHiddenVideos()">Restaurar todos</button></div>${videos.map(video => `<div class="ledger-row" id="hidden-video-${video.video_id}" style="gap:10px;"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(video.title || "Video")}</span><button class="btn-outline" style="flex:none;" onclick="restoreHiddenVideo('${video.video_id}')">Restaurar</button></div>`).join("")}`;
+}
+window.openHiddenVideosManager = openHiddenVideosManager;
+
+async function restoreHiddenVideo(videoId) {
+  const { data, error } = await sb.rpc("restore_hidden_video", { p_video_id:videoId });
+  if (error || !data?.ok) return showToast("No se pudo restaurar el video");
+  document.getElementById(`hidden-video-${videoId}`)?.remove();
+  lsPerfCache.feed = { data:null, at:0 };
+  showToast("Video restaurado ✓");
+}
+window.restoreHiddenVideo = restoreHiddenVideo;
+
+async function restoreAllHiddenVideos() {
+  if (!confirm("¿Volver a mostrar todos los videos ocultos?")) return;
+  const { data, error } = await sb.rpc("restore_all_hidden_videos");
+  if (error || !data?.ok) return showToast("No se pudieron restaurar los videos");
+  lsPerfCache.feed = { data:null, at:0 };
+  showToast(`${Number(data.restored || 0)} video(s) restaurado(s)`);
+  openHiddenVideosManager();
+}
+window.restoreAllHiddenVideos = restoreAllHiddenVideos;
 
 function setLiveScrollDraft(key, value) {
   if (!lsSettingsDraft) lsSettingsDraft = { ...getLiveScrollSettings() };
@@ -5079,9 +5143,18 @@ async function handleDeleteOwnVideo(videoId) {
 function checkBlockedStatus() {
   const wrap = document.getElementById("blockedBannerWrap");
   if (currentProfile.is_blocked) {
+    const verificationMessages = {
+      correo_sin_confirmar:"Confirmá el enlace que enviamos a tu correo y volvé a ingresar.",
+      nombre_invalido:"Tu nombre de usuario necesita una revisión rápida.",
+      registro_masivo_misma_red:"Detectamos varios registros recientes desde la misma conexión. La cuenta quedó protegida para revisión.",
+      sancion_activa:"Esta cuenta tiene una restricción activa y requiere revisión del equipo.",
+      perfil_incompleto:"Estamos terminando de preparar tu perfil.",
+      revision_manual:"La cuenta necesita una revisión rápida del equipo."
+    };
+    const verificationDetail = verificationMessages[currentProfile.auto_verification_reason] || verificationMessages.revision_manual;
     wrap.innerHTML = `
       <div style="max-width:920px;margin:14px auto 0;padding:10px 18px;background:rgba(34,197,94,0.08);border:1px solid var(--gold-dim);border-radius:10px;color:var(--text);font-size:13px;text-align:center;">
-        🕒 Tu cuenta está pendiente de verificación por el equipo. Podés navegar tranquilo, pero todavía no vas a sumar puntos hasta que te habilitemos (normalmente es rápido).
+        🕒 ${escapeHtml(verificationDetail)} Podés navegar, pero todavía no vas a sumar puntos.
       </div>`;
   } else {
     wrap.innerHTML = "";
@@ -12492,7 +12565,8 @@ async function renderAdmin() {
     reportsResult,
     statsResult,
     creatorApplicationsResult,
-    securityReportsResult
+    securityReportsResult,
+    autoVerificationResult
   ] = await Promise.all([
     sb.from("redemptions")
       .select("*, profiles!redemptions_user_id_fkey(username)")
@@ -12506,7 +12580,8 @@ async function renderAdmin() {
     loadAdminPendingVideoReports(),
     sb.rpc("admin_get_stats"),
     sb.rpc("admin_get_creator_applications"),
-    sb.rpc("admin_get_security_incident_reports")
+    sb.rpc("admin_get_security_incident_reports"),
+    sb.rpc("admin_get_auto_verification_log", { p_limit:30 })
   ]);
 
   const { data:redemptions, error } = redemptionsResult;
@@ -12537,6 +12612,7 @@ async function renderAdmin() {
   const stats = statsResult?.data;
   const creatorApplications = creatorApplicationsResult?.data || [];
   const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending");
+  const autoVerificationLog = autoVerificationResult?.data || [];
 
   // Reportes de seguridad separados del sistema de reportes de videos.
   const securityReports = securityReportsResult?.data || [];
@@ -12732,13 +12808,19 @@ async function renderAdmin() {
 
     ${blockedUsers && blockedUsers.length ? `
       <h3 style="margin-top:32px;">🆕 Cuentas nuevas pendientes de verificar (${blockedUsers.length})</h3>
-      <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">Toda cuenta nueva arranca así hasta que la verifiques. Revisá que el email tenga sentido y verificala.</p>
+      <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">SMART VERIFICATION sólo deja acá las cuentas que necesitan una revisión humana.</p>
       ${blockedUsers.map(u => `
         <div class="ledger-row">
           <span>@${escapeHtml(u.username)} · <span id="email-pending-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-pending-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
           <button class="btn-outline" style="padding:4px 12px; font-size:12px;" onclick="handleUnblockUser('${u.id}')">✓ Verificar</button>
         </div>
       `).join("")}` : ""}
+
+    <h3 style="margin-top:32px;">🛡️ Verificación automática</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Últimos controles de Usuarios nuevos. Las solicitudes de Creadores funcionan por separado.</div>
+      ${autoVerificationLog.length ? autoVerificationLog.slice(0,12).map(entry => `<div class="ledger-row" style="gap:10px;"><span>@${escapeHtml(entry.username || "usuario")} · ${escapeHtml(entry.reason || "control")}</span><span class="mono" style="color:${entry.decision === "verified" ? "var(--green)" : "var(--gold)"};">${entry.decision === "verified" ? "VERIFICADO" : "REVISIÓN"}</span></div>`).join("") : `<div style="font-size:12px;color:var(--text-dim);">Todavía no hay verificaciones automáticas registradas.</div>`}
+    </div>
 
     <h3 style="margin-top:32px;">🎨 Eventos visuales</h3>
     <div class="form-card" style="margin-bottom:14px;">

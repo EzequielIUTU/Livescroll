@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.0.3v-intro-order">
+<link rel="stylesheet" href="style.css?v=6.0.3v-intro-order-v2">
 </head>
 <body>
 
@@ -82,6 +82,7 @@
   var ls6Scene = 0;
   var ls6AudioContext = null;
   var ls6MusicStarted = false;
+  window.__ls6StartupIntroActive = true;
 
   function ls6IsLegacyDevice() {
     try {
@@ -189,7 +190,11 @@
       }, 55);
     }
     el.classList.add('fade-out');
-    setTimeout(function () { if (el && el.parentNode) el.remove(); }, 420);
+    setTimeout(function () {
+      if (el && el.parentNode) el.remove();
+      window.__ls6StartupIntroActive = false;
+      try { window.dispatchEvent(new CustomEvent('livescroll6:startup-intro-finished')); } catch (_) {}
+    }, 420);
   }
 
   function advanceLiveScroll6Intro(event) {
@@ -273,6 +278,9 @@
     var el = document.getElementById('introOverlay');
     var seen = false;
     try { seen = localStorage.getItem(LS6_INTRO_KEY) === '1'; } catch (_) {}
+    var forceStartupPreview = false;
+    try { forceStartupPreview = new URLSearchParams(window.location.search).get('startupPreview') === '1'; } catch (_) {}
+    if (forceStartupPreview) seen = true;
     if (ls6IsLegacyDevice()) {
       ls6UseLegacyIntro();
       return;
@@ -337,18 +345,27 @@
     var params = new URLSearchParams(window.location.search);
     var isPreview = params.get('preview600') === '1';
     var portalOnly = params.get('portalOnly') === '1';
+    var startupPreview = params.get('startupPreview') === '1';
     var officialLaunchEnabled = true;
     var portal = document.getElementById('ls6LaunchPortal');
     if (!portal) return;
 
-    // Una sola bienvenida controla el arranque. La presentación anterior no
-    // debe competir con el portal oficial ni volver a aparecer en Android.
+    // El portal oficial y la animación corta de apertura nunca se superponen.
+    // Cuando el portal ya fue visto, conservamos la apertura LiveScroll 6 -> Feed.
     window.__ls6StartupPresentationActive = !isPreview;
     var previousIntro = document.getElementById('introOverlay');
-    if (previousIntro) {
-      var previousMusic = previousIntro.querySelector('audio');
-      if (previousMusic) { try { previousMusic.pause(); } catch (_) {} }
-      previousIntro.remove();
+
+    // Prueba aislada de la apertura corta. No modifica ni reinicia el portal.
+    if (startupPreview) {
+      portal.remove();
+      window.__ls6StartupPresentationActive = !!previousIntro;
+      if (previousIntro) {
+        window.addEventListener('livescroll6:startup-intro-finished', function () {
+          window.__ls6StartupPresentationActive = false;
+          try { window.dispatchEvent(new CustomEvent('livescroll6:presentation-finished')); } catch (_) {}
+        }, { once:true });
+      }
+      return;
     }
 
     if (!isPreview && !officialLaunchEnabled) {
@@ -391,8 +408,37 @@
     } catch (_) {}
     if (!isPreview && officialSeen) {
       portal.remove();
-      window.__ls6StartupPresentationActive = false;
+      if (previousIntro) {
+        // Las instalaciones que vieron primero el portal heredan directamente
+        // la apertura corta, sin volver a recorrer la presentación larga vieja.
+        if (!previousIntro.classList.contains('ls6-returning')) {
+          try { localStorage.setItem(LS6_INTRO_KEY, '1'); } catch (_) {}
+          previousIntro.classList.add('ls6-returning');
+          previousIntro.dataset.scene = '5';
+          var returningComing = previousIntro.querySelector('.ls6-coming');
+          if (returningComing) returningComing.textContent = 'ACCESO LIVESCROLL';
+          var returningButton = document.getElementById('ls6NextButton');
+          if (returningButton) returningButton.remove();
+          if (typeof ls6RunAccessLoader === 'function') ls6RunAccessLoader();
+        }
+        window.__ls6StartupPresentationActive = true;
+        window.addEventListener('livescroll6:startup-intro-finished', function () {
+          window.__ls6StartupPresentationActive = false;
+          try { window.dispatchEvent(new CustomEvent('livescroll6:presentation-finished')); } catch (_) {}
+        }, { once:true });
+      } else {
+        window.__ls6StartupPresentationActive = false;
+      }
       return;
+    }
+
+    // Primera entrada: manda el portal. La animación corta volverá en las
+    // aperturas siguientes, cuando el portal ya esté marcado como visto.
+    if (previousIntro) {
+      var previousMusic = previousIntro.querySelector('audio');
+      if (previousMusic) { try { previousMusic.pause(); } catch (_) {} }
+      previousIntro.remove();
+      window.__ls6StartupIntroActive = false;
     }
 
     var legacy = typeof ls6IsLegacyDevice === 'function' && ls6IsLegacyDevice();
@@ -505,6 +551,7 @@
         try {
           localStorage.setItem(officialGlobalKey, '1');
           localStorage.setItem(officialKey, '1');
+          localStorage.setItem(LS6_INTRO_KEY, '1');
         } catch (_) {}
       }
       portal.classList.add('is-finished');
@@ -680,6 +727,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.0.3v-intro-order"></script>
+<script src="app.js?v=6.0.3v-intro-order-v2"></script>
 </body>
 </html>

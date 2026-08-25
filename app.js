@@ -5854,9 +5854,19 @@ function fitMobileFeedViewport(containerId = "feedVertical") {
   const viewportHeight = window.visualViewport?.height || window.innerHeight;
   const top = Math.max(0, container.getBoundingClientRect().top);
 
-  // Dejamos solo una pequeña zona segura inferior. La altura se calcula
-  // según dónde empieza realmente el feed, así no desperdiciamos espacio.
-  const safeBottom = 8;
+  // Si el dock movil esta visible, el feed termina justo encima para que
+  // los controles nativos del MP4 (sonido, progreso y pantalla completa)
+  // nunca queden tapados. En un modal el dock ya queda por detras.
+  const dock = document.getElementById("lsMobileDock");
+  const feedIsInsideModal = !!container.closest("#globalModalWrap, .modal-overlay");
+  const dockIsVisible = !!(
+    dock &&
+    !feedIsInsideModal &&
+    window.getComputedStyle(dock).display !== "none"
+  );
+  const safeBottom = dockIsVisible
+    ? Math.ceil(dock.getBoundingClientRect().height + 20)
+    : 8;
   const usable = Math.max(430, Math.floor(viewportHeight - top - safeBottom));
 
   container.style.setProperty("--ls-mobile-feed-height", `${usable}px`);

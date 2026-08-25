@@ -873,6 +873,29 @@ html.ls6-golden-preview ::-webkit-scrollbar-thumb { background:linear-gradient(#
 .ls6-mythic-preview-box .btn { width:100%;margin-top:20px;min-height:45px; }
 @media (prefers-reduced-motion:reduce) { .ls-equipped-medal.ls-medal-rarity-mitica{animation:none!important} }
 
+/* LiveScroll 6.0.2v — ANDROID READY + DESCRIPTION CONTRAST */
+html.ls6-golden-preview { --text-dim:#c9c1ae; }
+html.ls6-golden-preview.ls-legacy { --text-dim:#d4d7dc; }
+html.ls6-golden-preview [style*="color:var(--text-dim)"],
+html.ls6-golden-preview [style*="color: var(--text-dim)"] { color:var(--text-dim)!important; }
+html.ls6-golden-preview button span[style*="opacity:.72"],
+html.ls6-golden-preview button span[style*="opacity: .72"] { opacity:.90!important; }
+html.ls6-golden-preview .page-sub,html.ls6-golden-preview small { color:var(--text-dim); }
+
+.ls-android-media-actions { display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%; }
+.ls-android-media-actions button { min-height:42px;padding:8px 10px;font-size:11px; }
+.ls-android-permission-overlay { position:fixed;inset:0;z-index:980;display:grid;place-items:center;padding:18px;background:rgba(0,0,0,.82);backdrop-filter:blur(10px); }
+.ls-android-permission-card { width:min(410px,100%);padding:26px 23px;border:1px solid rgba(244,211,94,.28);border-radius:22px;background:linear-gradient(155deg,#1b1913,#0b0c0a 72%);color:var(--text);text-align:center;box-shadow:0 26px 80px rgba(0,0,0,.62),0 0 36px rgba(244,211,94,.08); }
+.ls-android-permission-icon { width:68px;height:68px;margin:0 auto 14px;display:grid;place-items:center;border:1px solid rgba(244,211,94,.22);border-radius:20px;background:rgba(244,211,94,.075);font-size:33px; }
+.ls-android-permission-kicker { color:#e8ce6c;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.12em; }
+.ls-android-permission-card h2 { margin:9px 0 10px;font-size:23px; }
+.ls-android-permission-card p { margin:0;color:#ddd5c3;font-size:13px;line-height:1.58; }
+.ls-android-permission-note { margin-top:14px;padding:11px;border:1px solid rgba(255,255,255,.10);border-radius:12px;background:rgba(255,255,255,.035);color:#c8c1b2;font-size:11px;line-height:1.5;text-align:left; }
+.ls-android-permission-actions { display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:18px; }
+.ls-android-permission-actions button { min-height:45px; }
+@media(max-width:370px) { .ls-android-media-actions{grid-template-columns:1fr}.ls-android-permission-card{padding:22px 17px} }
+html.ls-legacy .ls-android-permission-overlay { backdrop-filter:none; }
+
 /* ==========================================================
    5.9.1 · VISUAL EVOLUTION
    Primera etapa de la interfaz rumbo a LiveScroll 6.

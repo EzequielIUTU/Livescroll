@@ -2271,6 +2271,74 @@ function closeMobileMenu() {
   document.getElementById("mobileMenuPanel")?.remove();
 }
 
+// ============================================================
+// 6.0.2v · ANDROID PERMISSION CONTEXT
+// Explica el uso antes de abrir cámara o selector de archivos.
+// En la web normal abre el selector directamente.
+// ============================================================
+function isLiveScrollAndroidContainer() {
+  const preview = new URLSearchParams(window.location.search).get("androidPreview") === "1";
+  return preview || !!window.LiveScrollAndroid || /LiveScrollAndroid/i.test(navigator.userAgent || "");
+}
+
+function closeLiveScrollAndroidPermissionInfo() {
+  document.getElementById("lsAndroidPermissionInfo")?.remove();
+}
+
+function triggerLiveScrollMediaInput(inputId, source) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (source === "camera") input.setAttribute("capture", "environment");
+  else input.removeAttribute("capture");
+  input.click();
+}
+
+function continueLiveScrollAndroidAccess(kind, inputId, source) {
+  try {
+    localStorage.setItem(`livescroll-android-permission-info-${kind}-v1`, "1");
+    window.LiveScrollAndroid?.notePermissionPurpose?.(kind);
+  } catch (_) {}
+  closeLiveScrollAndroidPermissionInfo();
+  triggerLiveScrollMediaInput(inputId, source);
+}
+
+function openLiveScrollAndroidMedia(kind, inputId, purpose, source = "files") {
+  if (!isLiveScrollAndroidContainer()) {
+    triggerLiveScrollMediaInput(inputId, source);
+    return;
+  }
+
+  let explained = false;
+  try { explained = localStorage.getItem(`livescroll-android-permission-info-${kind}-v1`) === "1"; } catch (_) {}
+  if (explained) {
+    triggerLiveScrollMediaInput(inputId, source);
+    return;
+  }
+
+  closeLiveScrollAndroidPermissionInfo();
+  const overlay = document.createElement("div");
+  overlay.id = "lsAndroidPermissionInfo";
+  overlay.className = "ls-android-permission-overlay";
+  const isCamera = kind === "camera";
+  overlay.innerHTML = `
+    <div class="ls-android-permission-card" role="dialog" aria-modal="true" aria-label="Permiso de ${isCamera ? "cámara" : "archivos"}">
+      <div class="ls-android-permission-icon">${isCamera ? "📷" : "📁"}</div>
+      <div class="ls-android-permission-kicker">LIVESCROLL 6 · PERMISO EXPLICADO</div>
+      <h2>${isCamera ? "Acceso a la cámara" : "Acceso a tus archivos"}</h2>
+      <p>${isCamera
+        ? `LiveScroll necesita la cámara solamente para ${escapeHtml(purpose)}. No se utilizará en segundo plano ni se grabará sin que lo decidas.`
+        : `LiveScroll abrirá el selector de Android para ${escapeHtml(purpose)}. Solo podrá usar el archivo que elijas; no revisará el resto de tu almacenamiento.`}</p>
+      <div class="ls-android-permission-note">${isCamera
+        ? "Si no lo permitís, podrás seguir usando LiveScroll y elegir una imagen desde tus archivos."
+        : "Si cancelás, no se subirá nada y podrás continuar usando todas las demás funciones."}</div>
+      <div class="ls-android-permission-actions">
+        <button class="btn-outline" onclick="closeLiveScrollAndroidPermissionInfo()">Ahora no</button>
+        <button class="btn" onclick="continueLiveScrollAndroidAccess('${kind}','${inputId}','${source}')">Continuar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
 function ensureNavigationEvolution597() {
   document.body.classList.add("ls-navigation-ready");
   let dock = document.getElementById("lsMobileDock");
@@ -4081,7 +4149,7 @@ function showChangelogModal(entries) {
               <h2 style="margin:0;font-size:22px;">Seguridad revisada y aprobada</h2>
 
               <div style="font-size:11px;color:var(--text-dim);margin-top:5px;">
-                v${escapeHtml(displayVersion)} · revisión adicional
+                ${escapeHtml(displayVersion)} · revisión adicional
               </div>
             </div>
           </div>
@@ -4196,7 +4264,7 @@ function showChangelogModal(entries) {
               const info=byVersion[v];
               const label=info.display || `${v}.0.0`;
               return `<div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
-                <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll v${escapeHtml(label)}</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll ${escapeHtml(label)}</div>
                 ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
                   <div style="margin-bottom:11px;">
                     <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
@@ -4234,7 +4302,8 @@ function showChangelogModal(entries) {
     "5.9.8":"SOCIAL PULSE",
     "5.9.9":"VIDEO REVISION",
     "6.0.0":"NEW ERA",
-    "6.0.1v":"CORE REVIEW"
+    "6.0.1v":"CORE REVIEW",
+    "6.0.2v":"ANDROID READY"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
 
@@ -4258,7 +4327,7 @@ function showChangelogModal(entries) {
 
         <div class="ls-next-era-head">
           <div class="ls-next-era-kicker">LIVE SCROLL · ACTUALIZACIÓN</div>
-          <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `v${escapeHtml(newestLabel)} · ${stage}`}</h2>
+          <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `${escapeHtml(newestLabel)} · ${stage}`}</h2>
           <div class="ls-next-era-sub">
             ${multipleVersions
               ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
@@ -4266,6 +4335,8 @@ function showChangelogModal(entries) {
                 ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
                 : newestLabel === "6.0.1v"
                   ? "LiveScroll 6 refuerza su núcleo para responder más rápido, cargar mejor y proteger cada cuenta."
+                  : newestLabel === "6.0.2v"
+                    ? "LiveScroll comienza su preparación para llegar a Android con permisos claros y mayor compatibilidad."
                 : newestLabel === "5.8.1"
                   ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
                   : newestLabel === "5.8.2"
@@ -4288,7 +4359,7 @@ function showChangelogModal(entries) {
               <div class="ls-next-era-version">
                 <div class="ls-next-era-version-head">
                   <div>
-                    <div class="ls-next-era-version-name">LiveScroll v${escapeHtml(label)}</div>
+                    <div class="ls-next-era-version-name">LiveScroll ${escapeHtml(label)}</div>
                     ${info.releaseDate ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:3px;">${escapeHtml(formatLaunchDate(info.releaseDate))}</div>` : ""}
                   </div>
                   ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
@@ -4306,7 +4377,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : newestLabel.startsWith("6.") ? "Continuar en LiveScroll 6 →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0 → 6.0.1v</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0 → 6.0.1v → 6.0.2v</div>
         </div>
       </div>
     </div>`;
@@ -4559,7 +4630,7 @@ async function openChangelogHistory() {
               font-size:14px;
               color:var(--text);
               font-weight:900;
-            ">v${escapeHtml(display)}</div>
+            ">${escapeHtml(display)}</div>
 
             ${dateText ? `
               <div style="
@@ -8025,12 +8096,16 @@ async function renderUpload() {
           <div class="field">
             <label>Archivo de video</label>
 
-            <label
-              for="uploadFile"
+            <button
+              type="button"
+              onclick="openLiveScrollAndroidMedia('files','uploadFile','elegir el video que querés publicar','files')"
               style="
+                width:100%;
                 display:block;
                 border:1px dashed rgba(250,204,21,.35);
                 background:rgba(250,204,21,.035);
+                color:var(--text);
+                font-family:inherit;
                 border-radius:14px;
                 padding:22px 14px;
                 text-align:center;
@@ -8042,7 +8117,7 @@ async function renderUpload() {
               <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
                 MP4, MKV o WEBM · máximo 50 MB
               </div>
-            </label>
+            </button>
 
             <input
               type="file"
@@ -11609,7 +11684,11 @@ async function openEditProfile() {
               ? `<img src="${escapeHtml(currentProfile.avatar_url)}" alt="avatar" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim);">`
               : `<div style="width:80px; height:80px; border-radius:50%; background:var(--panel-2); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto;">${currentProfile.avatar_emoji || "🎬"}</div>`}
           </div>
-          <input type="file" id="avatarPhotoInput" accept="image/*" onchange="handleAvatarPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
+          <input type="file" id="avatarPhotoInput" accept="image/*" onchange="handleAvatarPhotoUpload()" style="display:none;">
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','avatarPhotoInput','elegir una foto para tu perfil','files')">📁 Elegir foto</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','avatarPhotoInput','tomar una foto para tu perfil','camera')">📷 Usar cámara</button>
+          </div>
           <div id="avatarUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 3MB. Si subís una foto, tapa al emoji.</div>
           ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveAvatarPhoto()">🗑️ Quitar foto y volver al emoji</button>` : ""}
         </div>
@@ -11632,7 +11711,11 @@ async function openEditProfile() {
               <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;"><span>Arriba</span><span>Abajo</span></div>
             </div>` : ""}
 
-          <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;">
+          <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="display:none;">
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','coverPhotoInput','elegir la portada de tu perfil','files')">📁 Elegir portada</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','coverPhotoInput','tomar una foto para tu portada','camera')">📷 Usar cámara</button>
+          </div>
           <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Después podés elegir qué parte de la foto se ve.</div>
           ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
         </div>
@@ -11674,8 +11757,12 @@ async function openEditProfile() {
             id="profileSideImageInput"
             accept="image/*"
             onchange="handleProfileSideImageUpload()"
-            style="width:100%; padding:8px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit; font-size:12px;"
+            style="display:none;"
           >
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','profileSideImageInput','elegir la imagen de fondo de tu perfil','files')">📁 Elegir imagen</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','profileSideImageInput','tomar una foto para el fondo de tu perfil','camera')">📷 Usar cámara</button>
+          </div>
           <div id="profileSideImageStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">
             Máximo 5MB. Recomendado: imagen vertical. Se usa como fondo decorativo en segundo plano.
           </div>

@@ -306,6 +306,12 @@ html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
 .ls6-portal-tunnel > i:nth-child(2){border-color:rgba(56,221,242,.30);animation-delay:.42s!important}.ls6-portal-tunnel > i:nth-child(3){animation-delay:.84s!important}.ls6-portal-tunnel > i:nth-child(4){border-color:rgba(46,242,124,.25);animation-delay:1.26s!important}.ls6-portal-tunnel > i:nth-child(5){animation-delay:1.68s!important}.ls6-portal-tunnel > i:nth-child(6){border-color:rgba(56,221,242,.28);animation-delay:2.10s!important}
 .ls6-tunnel-logo { position:relative;z-index:2;font-size:clamp(42px,10vw,116px);font-weight:900;letter-spacing:-.07em;opacity:0;transform:translate3d(0,0,-600px) scale(.2);white-space:nowrap; }
 .ls6-tunnel-logo span { color:#38ddf2; }.ls6-tunnel-logo b { margin-left:.12em;color:#f4d35e; }
+.ls6-portal-rays { position:absolute;inset:0;overflow:hidden;pointer-events:none; }
+.ls6-portal-rays i { position:absolute;left:50%;top:50%;width:2px;height:48vh;opacity:0;transform-origin:center top;background:linear-gradient(#fff1a3,rgba(244,211,94,.06),transparent);box-shadow:0 0 9px rgba(244,211,94,.38);will-change:transform,opacity; }
+.ls6-portal-rays i:nth-child(1){rotate:12deg}.ls6-portal-rays i:nth-child(2){rotate:52deg}.ls6-portal-rays i:nth-child(3){rotate:96deg}.ls6-portal-rays i:nth-child(4){rotate:142deg}.ls6-portal-rays i:nth-child(5){rotate:190deg}.ls6-portal-rays i:nth-child(6){rotate:234deg}.ls6-portal-rays i:nth-child(7){rotate:282deg}.ls6-portal-rays i:nth-child(8){rotate:326deg}
+.ls6-portal-beats { position:absolute;z-index:8;left:50%;top:17%;width:min(760px,90vw);height:48px;display:none;place-items:center;transform:translateX(-50%);pointer-events:none;text-align:center; }
+.ls6-portal-beats strong { position:absolute;color:#fff;font:900 clamp(11px,2vw,17px) 'JetBrains Mono',monospace;letter-spacing:.17em;opacity:0;text-shadow:0 8px 30px rgba(0,0,0,.65); }
+.ls6-portal-beats .ls6-beat-connect { color:#f4d35e; }.ls6-portal-beats .ls6-beat-arrival { color:#2ef27c; }
 .ls6-portal-feed-preview { position:absolute;z-index:7;left:50%;top:50%;width:min(390px,80vw);height:min(68vh,700px);padding:18px;display:none;grid-template-rows:1fr 13px 13px 13px;gap:10px;border:1px solid rgba(56,221,242,.22);border-radius:25px;background:rgba(7,22,27,.92);opacity:0;transform:translate3d(-50%,-50%,0) scale(.08);box-shadow:0 0 80px rgba(56,221,242,.18);will-change:transform,opacity; }
 .ls6-portal-feed-preview span { border-radius:16px;background:linear-gradient(145deg,#153b45,#071116); }
 .ls6-portal-feed-preview i { width:70%;border-radius:99px;background:rgba(255,255,255,.10); }
@@ -315,8 +321,14 @@ html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
 .ls6-launch-portal.is-travelling .ls6-portal-copy,.ls6-launch-portal.is-travelling .ls6-portal-realm,.ls6-launch-portal.is-travelling .ls6-door,.ls6-launch-portal.is-travelling .ls6-door-light { opacity:0;pointer-events:none;transition:opacity .45s ease; }
 .ls6-launch-portal.is-travelling .ls6-portal-tunnel { display:grid; }
 .ls6-launch-portal.is-travelling .ls6-portal-tunnel > i { animation:ls6TunnelRing 2.5s linear infinite; }
-.ls6-launch-portal.is-travelling .ls6-tunnel-logo { animation:ls6TunnelLogo 3.2s .8s cubic-bezier(.16,1,.3,1) both; }
-.ls6-launch-portal.is-travelling .ls6-portal-feed-preview { display:grid;animation:ls6FeedApproach 3.2s 3.5s cubic-bezier(.16,1,.3,1) forwards; }
+.ls6-launch-portal.is-travelling .ls6-tunnel-logo { animation:ls6TunnelLogo 4.6s 1.6s cubic-bezier(.16,1,.3,1) both; }
+.ls6-launch-portal.is-travelling .ls6-portal-rays i { animation:ls6PortalRay 1.35s linear infinite; }
+.ls6-launch-portal.is-travelling .ls6-portal-rays i:nth-child(2n){animation-delay:-.45s}.ls6-launch-portal.is-travelling .ls6-portal-rays i:nth-child(3n){animation-delay:-.9s}
+.ls6-launch-portal.is-travelling .ls6-portal-beats { display:grid; }
+.ls6-launch-portal.is-beat-story .ls6-beat-story { animation:ls6PortalBeat 2.2s ease both; }
+.ls6-launch-portal.is-beat-connect .ls6-beat-connect { animation:ls6PortalBeat 2.2s ease both; }
+.ls6-launch-portal.is-beat-arrival .ls6-beat-arrival { animation:ls6PortalBeat 2.35s ease both; }
+.ls6-launch-portal.is-travelling .ls6-portal-feed-preview { display:grid;animation:ls6FeedApproach 2.9s 5.85s cubic-bezier(.16,1,.3,1) forwards; }
 .ls6-launch-portal.is-travelling .ls6-portal-travel-status { display:flex;animation:ls6PortalStatus .4s ease both; }
 .ls6-launch-portal.is-finished { opacity:0;transition:opacity .58s ease; }
 @keyframes ls6PortalCoreFloat { to { opacity:.33;transform:translate3d(-50%,-52%,0) scale(.78) rotateY(9deg); } }
@@ -325,9 +337,11 @@ html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
 @keyframes ls6PortalSubtitle { to { opacity:1;transform:translate3d(0,0,0); } }
 @keyframes ls6PortalEnterPulse { 50% { transform:translateY(-2px);box-shadow:0 16px 45px rgba(244,211,94,.34),0 0 26px rgba(244,211,94,.16); } }
 @keyframes ls6TunnelRing { 0% { opacity:0;transform:translateZ(-900px) rotate(45deg) scale(.12); } 18% { opacity:.75; } 100% { opacity:0;transform:translateZ(350px) rotate(225deg) scale(1.8); } }
-@keyframes ls6TunnelLogo { 0% { opacity:0;transform:translate3d(0,0,-600px) scale(.2) rotateY(-25deg); } 48% { opacity:1;transform:translate3d(0,0,0) scale(1) rotateY(0); } 100% { opacity:0;transform:translate3d(0,0,450px) scale(4.2) rotateY(8deg); } }
+@keyframes ls6TunnelLogo { 0% { opacity:0;transform:translate3d(0,0,-600px) scale(.2) rotateY(-25deg); } 38% { opacity:1;transform:translate3d(0,0,0) scale(1) rotateY(0); } 65% { opacity:1;transform:translate3d(0,0,0) scale(1.04) rotateY(0); } 100% { opacity:0;transform:translate3d(0,0,450px) scale(4.2) rotateY(8deg); } }
 @keyframes ls6FeedApproach { 0% { opacity:0;transform:translate3d(-50%,-50%,0) scale(.06); } 60% { opacity:.72; } 100% { opacity:1;transform:translate3d(-50%,-50%,0) scale(1); } }
 @keyframes ls6PortalStatus { from { opacity:0; } to { opacity:1; } }
+@keyframes ls6PortalRay { 0% { opacity:0;transform:translate3d(0,0,0) scaleY(.05); } 30% { opacity:.72; } 100% { opacity:0;transform:translate3d(0,0,0) scaleY(2.6); } }
+@keyframes ls6PortalBeat { 0% { opacity:0;transform:translate3d(0,14px,0) scale(.94); } 22%,68% { opacity:1;transform:translate3d(0,0,0) scale(1); } 100% { opacity:0;transform:translate3d(0,-12px,0) scale(1.03); } }
 @media(max-width:600px) {
   .ls6-portal-copy { width:100%;padding:20px 16px; }
   .ls6-portal-copy h1 { font-size:clamp(40px,13vw,68px);line-height:.91; }
@@ -337,6 +351,7 @@ html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
   .ls6-door::after { width:82px;height:82px; }.ls6-door-left::after{right:-41px}.ls6-door-right::after{left:-41px}
 }
 .ls6-portal-legacy .ls6-portal-grid,.ls6-portal-legacy .ls6-portal-particles,.ls6-portal-legacy .ls6-portal-tunnel > i:nth-child(n+3) { display:none; }
+.ls6-portal-legacy .ls6-portal-rays i:nth-child(n+3) { display:none; }
 .ls6-portal-legacy .ls6-door { transition-duration:.6s; }
 .ls6-portal-legacy.is-travelling .ls6-portal-tunnel > i { animation-duration:1.4s; }
 .ls6-portal-legacy.is-travelling .ls6-tunnel-logo { animation-duration:1.6s;animation-delay:.15s; }

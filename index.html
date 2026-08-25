@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.0.0-portal-preview1">
+<link rel="stylesheet" href="style.css?v=6.0.0-portal-preview2">
 </head>
 <body>
 
@@ -317,6 +317,12 @@
   <div class="ls6-portal-tunnel" aria-hidden="true">
     <i></i><i></i><i></i><i></i><i></i><i></i>
     <div class="ls6-tunnel-logo">Live<span>Scroll</span><b>6</b></div>
+    <div class="ls6-portal-rays"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="ls6-portal-beats" aria-live="polite">
+    <strong class="ls6-beat-story">TU HISTORIA COMIENZA AHORA</strong>
+    <strong class="ls6-beat-connect">CONECTANDO CON LA NUEVA ERA</strong>
+    <strong class="ls6-beat-arrival">LA NUEVA ERA YA ESTÁ ACÁ</strong>
   </div>
   <div class="ls6-portal-feed-preview" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
   <div class="ls6-portal-travel-status"><span>ATRAVESANDO EL PORTAL</span><b id="ls6PortalTravelPercent">0%</b></div>
@@ -326,6 +332,7 @@
   (function () {
     var params = new URLSearchParams(window.location.search);
     var isPreview = params.get('preview600') === '1';
+    var portalOnly = params.get('portalOnly') === '1';
     var officialLaunchEnabled = false;
     var portal = document.getElementById('ls6LaunchPortal');
     if (!portal) return;
@@ -368,6 +375,28 @@
     var holdStartedAt = 0;
     var holdValue = 0;
     var holdDuration = legacy || reduced ? 900 : 2000;
+    var portalAudioContext = null;
+
+    function playPortalImpact() {
+      try {
+        var AudioEngine = window.AudioContext || window.webkitAudioContext;
+        if (!AudioEngine) return;
+        portalAudioContext = portalAudioContext || new AudioEngine();
+        var ctx = portalAudioContext;
+        if (ctx.state === 'suspended') ctx.resume();
+        var now = ctx.currentTime;
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(92, now);
+        osc.frequency.exponentialRampToValueAtTime(38, now + .42);
+        gain.gain.setValueAtTime(.0001, now);
+        gain.gain.exponentialRampToValueAtTime(.10, now + .025);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + .46);
+        osc.connect(gain);gain.connect(ctx.destination);
+        osc.start(now);osc.stop(now + .48);
+      } catch (_) {}
+    }
 
     function startPortalMusic() {
       if (!music) return;
@@ -438,6 +467,8 @@
         try { localStorage.setItem(officialKey, '1'); } catch (_) {}
       }
       portal.classList.add('is-finished');
+      playPortalImpact();
+      try { if (navigator.vibrate) navigator.vibrate([55,35,95]); } catch (_) {}
       if (music && !music.paused) {
         var fade = setInterval(function () {
           music.volume = Math.max(0, music.volume - .055);
@@ -456,13 +487,30 @@
     function enterPortal() {
       if (!completed || portal.classList.contains('is-travelling')) return;
       portal.classList.add('is-travelling');
-      var duration = reduced ? 900 : legacy ? 2800 : 7000;
+      startPortalMusic();
+      playPortalImpact();
+      var duration = reduced ? 900 : legacy ? 3200 : 9000;
       var started = performance.now();
+      var beatOne = false;
+      var beatTwo = false;
+      var beatThree = false;
       function travel(now) {
         var ratio = Math.min(1, (now - started) / duration);
         var eased = 1 - Math.pow(1 - ratio, 3);
         portal.style.setProperty('--ls6-travel-progress', eased);
         if (travelPercent) travelPercent.textContent = Math.round(ratio * 100) + '%';
+        if (!beatOne && ratio >= .06) {
+          beatOne = true;portal.classList.add('is-beat-story');
+          try { if (navigator.vibrate) navigator.vibrate(24); } catch (_) {}
+        }
+        if (!beatTwo && ratio >= .38) {
+          beatTwo = true;portal.classList.add('is-beat-connect');playPortalImpact();
+          try { if (navigator.vibrate) navigator.vibrate([25,35,40]); } catch (_) {}
+        }
+        if (!beatThree && ratio >= .72) {
+          beatThree = true;portal.classList.add('is-beat-arrival');
+          try { if (navigator.vibrate) navigator.vibrate(38); } catch (_) {}
+        }
         if (ratio < 1) requestAnimationFrame(travel);
         else finishPortalTravel();
       }
@@ -482,9 +530,16 @@
     });
     enterButton.addEventListener('click', enterPortal);
 
-    setTimeout(function () { portal.classList.add('is-door-open'); }, legacy || reduced ? 120 : 520);
-    setTimeout(function () { portal.classList.add('is-message-visible'); }, legacy || reduced ? 280 : 1750);
-    setTimeout(function () { portal.classList.add('is-ready'); }, legacy || reduced ? 520 : 4300);
+    if (portalOnly) {
+      completed = true;
+      paintHold(1);
+      portal.classList.add('is-door-open','is-message-visible','is-ready','is-hold-complete');
+      if (enterButton) enterButton.focus();
+    } else {
+      setTimeout(function () { portal.classList.add('is-door-open'); }, legacy || reduced ? 120 : 520);
+      setTimeout(function () { portal.classList.add('is-message-visible'); }, legacy || reduced ? 280 : 1750);
+      setTimeout(function () { portal.classList.add('is-ready'); }, legacy || reduced ? 520 : 4300);
+    }
   })();
 </script>
 
@@ -575,6 +630,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.0.0-portal-preview1"></script>
+<script src="app.js?v=6.0.0-portal-preview2"></script>
 </body>
 </html>

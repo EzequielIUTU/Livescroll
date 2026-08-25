@@ -1972,12 +1972,20 @@ function openLiveScrollSettings() {
               <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">
                 Probá nuevamente la puerta, el acceso mantenido y el viaje hacia la nueva era. En Legacy se abre una versión liviana.
               </div>
-              <button
-                type="button"
-                class="btn-outline"
-                style="width:100%;min-height:44px;"
-                onclick="replayLiveScrollRoadTo6Intro()"
-              >▶ Abrir portal 6.0</button>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <button
+                  type="button"
+                  class="btn-outline"
+                  style="min-height:44px;padding:9px;"
+                  onclick="replayLiveScrollRoadTo6Intro()"
+                >▶ Presentación completa</button>
+                <button
+                  type="button"
+                  class="btn-outline"
+                  style="min-height:44px;padding:9px;"
+                  onclick="replayLiveScrollPortalOnly()"
+                >🌀 Solo portal</button>
+              </div>
             </div>
           </div>
         </div>
@@ -2005,10 +2013,20 @@ function replayLiveScrollRoadTo6Intro() {
   try { localStorage.removeItem("livescroll_portal_600_seen"); } catch (_) {}
   const url = new URL(window.location.href);
   url.searchParams.set("preview600", "1");
+  url.searchParams.delete("portalOnly");
   window.location.href = url.toString();
 }
 
 window.replayLiveScrollRoadTo6Intro = replayLiveScrollRoadTo6Intro;
+
+function replayLiveScrollPortalOnly() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("preview600", "1");
+  url.searchParams.set("portalOnly", "1");
+  window.location.href = url.toString();
+}
+
+window.replayLiveScrollPortalOnly = replayLiveScrollPortalOnly;
 
 function setLiveScrollDraft(key, value) {
   if (!lsSettingsDraft) lsSettingsDraft = { ...getLiveScrollSettings() };

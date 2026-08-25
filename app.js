@@ -11573,12 +11573,14 @@ async function loadAdminPendingVideoReports() {
   // fue ejecutada. Evita depender del nombre interno de una clave foránea.
   const rawResult = await sb.from("video_reports")
     .select("*")
-    .or("status.eq.pending,status.eq.open,status.is.null")
     .order("created_at", { ascending:true });
 
   if (rawResult.error) return { data:[], error:rawResult.error };
 
-  const rawReports = rawResult.data || [];
+  const closedStatuses = new Set(["dismissed", "resolved", "closed", "rejected", "descartado", "resuelto", "cerrado"]);
+  const rawReports = (rawResult.data || []).filter(r =>
+    !closedStatuses.has(String(r.status || "pending").toLowerCase())
+  );
   const videoIds = [...new Set(rawReports.map(r => r.video_id).filter(Boolean))];
   const reporterIds = [...new Set(rawReports.map(r => r.reporter_id).filter(Boolean))];
 
@@ -12546,7 +12548,12 @@ function switchAdminPanelGroup(group, button) {
 async function handleDeleteVideo(videoId) {
   if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y reportes.")) return;
   const { data, error } = await sb.rpc("admin_delete_video", { p_video_id: videoId });
-  if (error || !data.ok) { showToast("No se pudo eliminar"); return; }
+  if (error || !data?.ok) {
+    console.error("admin_delete_video:", error, data);
+    const detail = data?.detail || error?.message || "Error desconocido";
+    showToast(`No se pudo eliminar: ${detail}`);
+    return;
+  }
   showToast("Video eliminado");
   renderAdmin();
 }

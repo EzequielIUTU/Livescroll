@@ -1967,17 +1967,17 @@ function openLiveScrollSettings() {
               background:linear-gradient(135deg,rgba(250,204,21,.07),rgba(72,221,242,.045));
             ">
               <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:var(--gold);">
-                ✨ Presentación ROAD TO 6
+                ✨ Portal LiveScroll 6
               </div>
               <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">
-                Volvé a reproducir la presentación de LiveScroll 6. En dispositivos Legacy se abrirá la versión liviana.
+                Probá nuevamente la puerta, el acceso mantenido y el viaje hacia la nueva era. En Legacy se abre una versión liviana.
               </div>
               <button
                 type="button"
                 class="btn-outline"
                 style="width:100%;min-height:44px;"
                 onclick="replayLiveScrollRoadTo6Intro()"
-              >▶ Volver a ver presentación</button>
+              >▶ Abrir portal 6.0</button>
             </div>
           </div>
         </div>
@@ -2002,8 +2002,10 @@ function openLiveScrollSettings() {
 }
 
 function replayLiveScrollRoadTo6Intro() {
-  try { localStorage.removeItem("livescroll_intro_590_seen"); } catch (_) {}
-  window.location.reload();
+  try { localStorage.removeItem("livescroll_portal_600_seen"); } catch (_) {}
+  const url = new URL(window.location.href);
+  url.searchParams.set("preview600", "1");
+  window.location.href = url.toString();
 }
 
 window.replayLiveScrollRoadTo6Intro = replayLiveScrollRoadTo6Intro;

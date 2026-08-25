@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=5.9.9-video-revision">
+<link rel="stylesheet" href="style.css?v=6.0.0-portal-preview1">
 </head>
 <body>
 
@@ -284,6 +284,210 @@
   })();
 </script>
 
+<!-- ================= LIVESCROLL 6 · PORTAL PREVIEW ================= -->
+<div id="ls6LaunchPortal" class="ls6-launch-portal" aria-hidden="true" role="dialog" aria-label="Entrada a LiveScroll 6">
+  <div class="ls6-portal-realm" aria-hidden="true">
+    <div class="ls6-portal-grid"></div>
+    <div class="ls6-portal-core">6</div>
+    <div class="ls6-portal-particles">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+  </div>
+  <div class="ls6-door ls6-door-left" aria-hidden="true"><span></span></div>
+  <div class="ls6-door ls6-door-right" aria-hidden="true"><span></span></div>
+  <div class="ls6-door-light" aria-hidden="true"></div>
+
+  <div class="ls6-portal-copy">
+    <div class="ls6-portal-kicker">LIVESCROLL 6 · NEW ERA</div>
+    <h1>BIENVENIDOS A<br><em>LA NUEVA ERA</em></h1>
+    <p>PREPARATE PARA LO MEJOR</p>
+
+    <button id="ls6HoldButton" class="ls6-hold-button" type="button" aria-label="Mantené para entrar">
+      <span class="ls6-hold-ring"><i></i><b id="ls6HoldPercent">0%</b></span>
+      <span class="ls6-hold-label"><strong>MANTENÉ PARA ENTRAR</strong><small>No sueltes hasta completar</small></span>
+    </button>
+
+    <div class="ls6-portal-welcome">
+      <span>ACCESO COMPLETADO</span>
+      <strong>BIENVENIDO A LIVESCROLL 6</strong>
+      <button id="ls6PortalEnterButton" type="button">ENTRAR <b>→</b></button>
+    </div>
+  </div>
+
+  <div class="ls6-portal-tunnel" aria-hidden="true">
+    <i></i><i></i><i></i><i></i><i></i><i></i>
+    <div class="ls6-tunnel-logo">Live<span>Scroll</span><b>6</b></div>
+  </div>
+  <div class="ls6-portal-feed-preview" aria-hidden="true"><span></span><i></i><i></i><i></i></div>
+  <div class="ls6-portal-travel-status"><span>ATRAVESANDO EL PORTAL</span><b id="ls6PortalTravelPercent">0%</b></div>
+  <audio id="ls6PortalMusic" src="violet-sky-livescroll.mp3" preload="none" loop></audio>
+</div>
+<script>
+  (function () {
+    var params = new URLSearchParams(window.location.search);
+    var isPreview = params.get('preview600') === '1';
+    var officialLaunchEnabled = false;
+    var portal = document.getElementById('ls6LaunchPortal');
+    if (!portal) return;
+
+    if (!isPreview && !officialLaunchEnabled) {
+      portal.remove();
+      return;
+    }
+
+    var officialKey = 'livescroll_portal_600_seen';
+    var officialSeen = false;
+    try { officialSeen = localStorage.getItem(officialKey) === '1'; } catch (_) {}
+    if (!isPreview && officialSeen) {
+      portal.remove();
+      return;
+    }
+
+    var previousIntro = document.getElementById('introOverlay');
+    if (previousIntro) {
+      var previousMusic = previousIntro.querySelector('audio');
+      if (previousMusic) { try { previousMusic.pause(); } catch (_) {} }
+      previousIntro.remove();
+    }
+
+    var legacy = typeof ls6IsLegacyDevice === 'function' && ls6IsLegacyDevice();
+    var reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (legacy) portal.classList.add('ls6-portal-legacy');
+    if (reduced) portal.classList.add('ls6-portal-reduced');
+    portal.classList.add('is-active');
+    portal.setAttribute('aria-hidden', 'false');
+
+    var music = document.getElementById('ls6PortalMusic');
+    var holdButton = document.getElementById('ls6HoldButton');
+    var holdPercent = document.getElementById('ls6HoldPercent');
+    var enterButton = document.getElementById('ls6PortalEnterButton');
+    var travelPercent = document.getElementById('ls6PortalTravelPercent');
+    var holding = false;
+    var completed = false;
+    var holdFrame = 0;
+    var holdStartedAt = 0;
+    var holdValue = 0;
+    var holdDuration = legacy || reduced ? 900 : 2000;
+
+    function startPortalMusic() {
+      if (!music) return;
+      try {
+        music.volume = .20;
+        var result = music.play();
+        if (result && result.catch) result.catch(function () {});
+      } catch (_) {}
+    }
+
+    function paintHold(value) {
+      holdValue = Math.max(0, Math.min(1, value));
+      portal.style.setProperty('--ls6-hold-progress', (holdValue * 360) + 'deg');
+      if (holdPercent) holdPercent.textContent = Math.round(holdValue * 100) + '%';
+      if (music && !music.paused) music.volume = Math.min(.54, .20 + holdValue * .34);
+    }
+
+    function releaseHold() {
+      if (!holding || completed) return;
+      holding = false;
+      cancelAnimationFrame(holdFrame);
+      var releaseStart = performance.now();
+      var from = holdValue;
+      function reverse(now) {
+        if (holding || completed) return;
+        var ratio = Math.min(1, (now - releaseStart) / 340);
+        paintHold(from * (1 - ratio));
+        if (ratio < 1) requestAnimationFrame(reverse);
+      }
+      requestAnimationFrame(reverse);
+    }
+
+    function completeHold() {
+      if (completed) return;
+      completed = true;
+      holding = false;
+      paintHold(1);
+      portal.classList.add('is-hold-complete');
+      try { if (navigator.vibrate) navigator.vibrate([35,45,70]); } catch (_) {}
+      setTimeout(function () { if (enterButton) enterButton.focus(); }, 900);
+    }
+
+    function startHold(event) {
+      if (event) event.preventDefault();
+      if (completed || holding || !portal.classList.contains('is-ready')) return;
+      holding = true;
+      startPortalMusic();
+      holdStartedAt = performance.now() - holdValue * holdDuration;
+      portal.classList.add('is-holding');
+      function step(now) {
+        if (!holding || completed) return;
+        var value = Math.min(1, (now - holdStartedAt) / holdDuration);
+        paintHold(value);
+        if (value >= 1) { completeHold(); return; }
+        holdFrame = requestAnimationFrame(step);
+      }
+      holdFrame = requestAnimationFrame(step);
+    }
+
+    function stopHold(event) {
+      if (event) event.preventDefault();
+      portal.classList.remove('is-holding');
+      releaseHold();
+    }
+
+    function finishPortalTravel() {
+      if (!isPreview) {
+        try { localStorage.setItem(officialKey, '1'); } catch (_) {}
+      }
+      portal.classList.add('is-finished');
+      if (music && !music.paused) {
+        var fade = setInterval(function () {
+          music.volume = Math.max(0, music.volume - .055);
+          if (music.volume <= .01) { clearInterval(fade);music.pause(); }
+        }, 45);
+      }
+      setTimeout(function () {
+        if (portal && portal.parentNode) portal.remove();
+        try {
+          if (typeof currentUser !== 'undefined' && currentUser && typeof switchTab === 'function') switchTab('feed');
+          else if (typeof showAuth === 'function') showAuth('login');
+        } catch (_) {}
+      }, reduced ? 80 : 620);
+    }
+
+    function enterPortal() {
+      if (!completed || portal.classList.contains('is-travelling')) return;
+      portal.classList.add('is-travelling');
+      var duration = reduced ? 900 : legacy ? 2800 : 7000;
+      var started = performance.now();
+      function travel(now) {
+        var ratio = Math.min(1, (now - started) / duration);
+        var eased = 1 - Math.pow(1 - ratio, 3);
+        portal.style.setProperty('--ls6-travel-progress', eased);
+        if (travelPercent) travelPercent.textContent = Math.round(ratio * 100) + '%';
+        if (ratio < 1) requestAnimationFrame(travel);
+        else finishPortalTravel();
+      }
+      requestAnimationFrame(travel);
+    }
+
+    holdButton.addEventListener('pointerdown', startHold);
+    holdButton.addEventListener('pointerup', stopHold);
+    holdButton.addEventListener('pointercancel', stopHold);
+    holdButton.addEventListener('pointerleave', stopHold);
+    holdButton.addEventListener('contextmenu', function (event) { event.preventDefault(); });
+    holdButton.addEventListener('keydown', function (event) {
+      if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) startHold(event);
+    });
+    holdButton.addEventListener('keyup', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') stopHold(event);
+    });
+    enterButton.addEventListener('click', enterPortal);
+
+    setTimeout(function () { portal.classList.add('is-door-open'); }, legacy || reduced ? 120 : 520);
+    setTimeout(function () { portal.classList.add('is-message-visible'); }, legacy || reduced ? 280 : 1750);
+    setTimeout(function () { portal.classList.add('is-ready'); }, legacy || reduced ? 520 : 4300);
+  })();
+</script>
+
 <nav>
   <div class="nav-brand">Live<span>Scroll</span><b>6</b></div>
   <div class="nav-links" id="navLinks"></div>
@@ -371,6 +575,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5.9.9-video-revision"></script>
+<script src="app.js?v=6.0.0-portal-preview1"></script>
 </body>
 </html>

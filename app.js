@@ -2915,6 +2915,29 @@ window.__lsStartupOptionalModalShown = window.__lsStartupOptionalModalShown || f
 async function checkPendingContent() {
   if (!currentUser?.id) return;
 
+  // 6.0.3v: la bienvenida manda. Las novedades esperan a que termine el
+  // portal y aparecen una sola vez, ya dentro del Feed.
+  if (window.__ls6StartupPresentationActive || document.getElementById("ls6LaunchPortal")) {
+    if (!window.__lsPendingContentWaitingForPresentation) {
+      window.__lsPendingContentWaitingForPresentation = true;
+      let continuedAfterPresentation = false;
+      const continueAfterPresentation = () => {
+        if (continuedAfterPresentation) return;
+        continuedAfterPresentation = true;
+        window.__lsPendingContentWaitingForPresentation = false;
+        setTimeout(() => checkPendingContent(), 1100);
+      };
+      window.addEventListener("livescroll6:presentation-finished", continueAfterPresentation, { once:true });
+      // Respaldo por si el WebView pausa o descarta el evento durante el viaje.
+      setTimeout(() => {
+        if (!window.__ls6StartupPresentationActive && !document.getElementById("ls6LaunchPortal")) {
+          continueAfterPresentation();
+        }
+      }, 18000);
+    }
+    return;
+  }
+
   // 5.8.6: Novedades vuelve a aparecer automáticamente cuando existe
   // una versión pendiente. El sistema de confirmación y la marca local
   // garantizan que cada versión se muestre una sola vez por usuario.

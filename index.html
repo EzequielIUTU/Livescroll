@@ -24,7 +24,7 @@
 <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.0.2v-android-ready">
+<link rel="stylesheet" href="style.css?v=6.0.3v-intro-order">
 </head>
 <body>
 
@@ -341,6 +341,16 @@
     var portal = document.getElementById('ls6LaunchPortal');
     if (!portal) return;
 
+    // Una sola bienvenida controla el arranque. La presentación anterior no
+    // debe competir con el portal oficial ni volver a aparecer en Android.
+    window.__ls6StartupPresentationActive = !isPreview;
+    var previousIntro = document.getElementById('introOverlay');
+    if (previousIntro) {
+      var previousMusic = previousIntro.querySelector('audio');
+      if (previousMusic) { try { previousMusic.pause(); } catch (_) {} }
+      previousIntro.remove();
+    }
+
     if (!isPreview && !officialLaunchEnabled) {
       portal.remove();
       return;
@@ -361,19 +371,28 @@
       } catch (_) {}
       return 'guest';
     }
-    var officialKey = 'livescroll_portal_600_seen_' + getStoredLiveScrollUserId();
+    var officialGlobalKey = 'livescroll_portal_600_seen';
+    var officialKey = officialGlobalKey + '_' + getStoredLiveScrollUserId();
     var officialSeen = false;
-    try { officialSeen = localStorage.getItem(officialKey) === '1'; } catch (_) {}
+    try {
+      officialSeen = localStorage.getItem(officialGlobalKey) === '1' || localStorage.getItem(officialKey) === '1';
+      // Migra las marcas creadas antes de 6.0.3v, incluso si el portal se abrió
+      // una vez como invitado y otra después de recuperar la sesión.
+      if (!officialSeen) {
+        for (var seenIndex = 0; seenIndex < localStorage.length; seenIndex++) {
+          var seenName = localStorage.key(seenIndex) || '';
+          if (seenName.indexOf(officialGlobalKey + '_') === 0 && localStorage.getItem(seenName) === '1') {
+            officialSeen = true;
+            break;
+          }
+        }
+      }
+      if (officialSeen) localStorage.setItem(officialGlobalKey, '1');
+    } catch (_) {}
     if (!isPreview && officialSeen) {
       portal.remove();
+      window.__ls6StartupPresentationActive = false;
       return;
-    }
-
-    var previousIntro = document.getElementById('introOverlay');
-    if (previousIntro) {
-      var previousMusic = previousIntro.querySelector('audio');
-      if (previousMusic) { try { previousMusic.pause(); } catch (_) {} }
-      previousIntro.remove();
     }
 
     var legacy = typeof ls6IsLegacyDevice === 'function' && ls6IsLegacyDevice();
@@ -483,7 +502,10 @@
 
     function finishPortalTravel() {
       if (!isPreview) {
-        try { localStorage.setItem(officialKey, '1'); } catch (_) {}
+        try {
+          localStorage.setItem(officialGlobalKey, '1');
+          localStorage.setItem(officialKey, '1');
+        } catch (_) {}
       }
       portal.classList.add('is-finished');
       playPortalImpact();
@@ -496,6 +518,10 @@
       }
       setTimeout(function () {
         if (portal && portal.parentNode) portal.remove();
+        if (!isPreview) {
+          window.__ls6StartupPresentationActive = false;
+          try { window.dispatchEvent(new CustomEvent('livescroll6:presentation-finished')); } catch (_) {}
+        }
         try {
           if (typeof currentUser !== 'undefined' && currentUser && typeof switchTab === 'function') switchTab('feed');
           else if (typeof showAuth === 'function') showAuth('login');
@@ -654,6 +680,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.0.2v-android-ready"></script>
+<script src="app.js?v=6.0.3v-intro-order"></script>
 </body>
 </html>

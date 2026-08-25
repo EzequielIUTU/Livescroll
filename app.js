@@ -5639,7 +5639,7 @@ async function loadFeedVideosCached() {
 
   lsFeedLoadPromise = sb
     .from("videos")
-    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id), video_hashtags(hashtags(slug, display_name))")
     .order("created_at", { ascending:false })
     .limit(20)
     .then(result => {
@@ -5992,8 +5992,19 @@ async function renderFeed(renderToken = lsTabRenderToken) {
   checkAndShowLoginStreak();
 
   const feedResult = await loadFeedVideosCached();
-  const videos = feedResult?.data || [];
+  let videos = feedResult?.data || [];
   const error = feedResult?.error;
+
+  // La preferencia "No me interesa" es privada y nunca borra el video.
+  if (currentUser?.id && videos.length) {
+    const { data:hiddenRows } = await sb
+      .from("user_hidden_videos")
+      .select("video_id")
+      .eq("user_id", currentUser.id)
+      .in("video_id", videos.map(v => v.id));
+    const hiddenIds = new Set((hiddenRows || []).map(row => row.video_id));
+    videos = videos.filter(video => !hiddenIds.has(video.id));
+  }
 
   // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
   if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;
@@ -6029,11 +6040,13 @@ async function renderFeed(renderToken = lsTabRenderToken) {
               <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
               <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
               <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+              ${!isMine ? `<button class="feed-action-btn" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${v.id}')">🙈</button>` : ""}
               ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
             </div>
             <div class="feed-overlay">
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
+                ${renderVideoHashtags(v)}
                 <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')"><span>@${escapeHtml(v.profiles?.username || "usuario")}</span> ${getPlanBadgeHtml(v.profiles?.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
@@ -7987,9 +8000,66 @@ function extractYoutubeId(url) {
   return m ? m[1] : null;
 }
 
+const lsDiscoveryStartedVideos = new Set();
+
+function recordDiscoverySignal(videoId, eventType, watchSecondsValue = 0) {
+  if (!currentUser?.id || !videoId) return;
+  sb.rpc("record_discovery_event", {
+    p_video_id: videoId,
+    p_event_type: eventType,
+    p_watch_seconds: Math.max(0, Math.round(Number(watchSecondsValue) || 0))
+  }).then(({ error }) => {
+    if (error) console.warn("Señal de descubrimiento no registrada:", error.message);
+  });
+}
+
+function renderVideoHashtags(video) {
+  const tags = (video?.video_hashtags || [])
+    .map(row => row?.hashtags)
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!tags.length) return "";
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 2px;">${tags.map(tag =>
+    `<button type="button" onclick="event.stopPropagation();openHashtagFeed('${escapeHtml(tag.slug)}')" style="border:0;background:transparent;color:#67e8f9;padding:0;font:800 11px 'JetBrains Mono',monospace;cursor:pointer;">#${escapeHtml(tag.display_name || tag.slug)}</button>`
+  ).join("")}</div>`;
+}
+
+async function hideVideoFromDiscovery(videoId) {
+  const { error } = await sb.rpc("hide_video_for_user", { p_video_id: videoId });
+  if (error) return showToast("No se pudo ocultar el video");
+  document.querySelector(`.feed-item[data-video-id="${videoId}"]`)?.remove();
+  lsPerfCache.feed = { data:null, at:0 };
+  showToast("Entendido: te mostraremos menos contenido así");
+}
+window.hideVideoFromDiscovery = hideVideoFromDiscovery;
+
+async function openHashtagFeed(rawSlug) {
+  const slug = normalizeHashtag(rawSlug);
+  if (!slug) return;
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)this.innerHTML=''">
+    <div class="modal-box"><div class="modal-box-body"><h2 style="margin:0 0 14px;color:var(--gold)">#${escapeHtml(slug)}</h2><div id="hashtagVideoList" style="color:var(--text-dim)">Buscando videos...</div></div></div>
+  </div>`;
+  const { data:ids, error } = await sb.rpc("get_video_ids_by_hashtag", { p_slug:slug, p_limit:30 });
+  const list = document.getElementById("hashtagVideoList");
+  if (!list) return;
+  if (error) { list.textContent = "No pudimos cargar esta etiqueta."; return; }
+  const videoIds = (ids || []).map(row => row.video_id);
+  if (!videoIds.length) { list.textContent = "Todavía no hay videos con esta etiqueta."; return; }
+  const { data:videos } = await sb.from("videos").select("id,title,thumbnail_url,profiles!videos_user_id_fkey(username)").in("id", videoIds);
+  const byId = new Map((videos || []).map(video => [video.id, video]));
+  list.innerHTML = videoIds.map(id => byId.get(id)).filter(Boolean).map(video => `<button class="btn-outline" style="width:100%;display:flex;justify-content:space-between;gap:10px;margin:8px 0;text-align:left" onclick="openSharedVideo('${video.id}')"><span>${escapeHtml(video.title)}</span><span style="color:var(--text-dim)">@${escapeHtml(video.profiles?.username || "usuario")}</span></button>`).join("");
+}
+window.openHashtagFeed = openHashtagFeed;
+
 function startWatching(video) {
   if (video.user_id === currentUser.id) return;
   if (watchIntervals[video.id]) return; // ya está corriendo, no duplicar
+
+  if (!lsDiscoveryStartedVideos.has(video.id)) {
+    lsDiscoveryStartedVideos.add(video.id);
+    recordDiscoverySignal(video.id, "view_start", 0);
+  }
 
   watchSeconds[video.id] = watchSeconds[video.id] || 0;
 
@@ -8001,6 +8071,7 @@ function startWatching(video) {
     if (secsEl) secsEl.textContent = watchSeconds[video.id] + "s";
 
     if (watchSeconds[video.id] % 15 === 0) {
+      recordDiscoverySignal(video.id, "watch_progress", watchSeconds[video.id]);
       const { data, error } = await sb.rpc("award_watch_points", {
         p_video_id: video.id,
         p_viewer_id: currentUser.id,
@@ -8060,6 +8131,43 @@ function clearAllWatchIntervals() {
 // ============================================================
 // SUBIR VIDEO
 // ============================================================
+function normalizeHashtag(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/^#+/, "")
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 28);
+}
+
+function getUploadHashtags() {
+  const raw = document.getElementById("uploadHashtags")?.value || "";
+  const parts = raw.split(/[\s,]+/).map(normalizeHashtag).filter(tag => tag.length >= 2);
+  const unique = [...new Set(parts)];
+  return { tags:unique.slice(0, 5), tooMany:unique.length > 5 };
+}
+
+function refreshUploadHashtagPreview() {
+  const { tags, tooMany } = getUploadHashtags();
+  const preview = document.getElementById("uploadHashtagPreview");
+  if (!preview) return;
+  preview.innerHTML = `${tags.map(tag => `<span style="border:1px solid rgba(103,232,249,.28);background:rgba(103,232,249,.08);color:#67e8f9;border-radius:20px;padding:5px 9px;">#${escapeHtml(tag)}</span>`).join("")}${tooMany ? `<span style="color:var(--red)">Máximo 5 etiquetas</span>` : ""}`;
+}
+window.refreshUploadHashtagPreview = refreshUploadHashtagPreview;
+
+async function loadTrendingHashtagSuggestions() {
+  const { data } = await sb.rpc("get_trending_hashtags", { p_limit:12 });
+  const datalist = document.getElementById("uploadHashtagSuggestions");
+  if (datalist) datalist.innerHTML = (data || []).map(tag => `<option value="#${escapeHtml(tag.slug)}"></option>`).join("");
+}
+
+async function saveVideoHashtags(videoId) {
+  const { tags, tooMany } = getUploadHashtags();
+  if (tooMany) throw new Error("Podés usar como máximo 5 hashtags.");
+  const { error } = await sb.rpc("set_video_hashtags", { p_video_id:videoId, p_tags:tags });
+  if (error) throw error;
+}
+
 async function renderUpload() {
   rawSelectedFile = null;
   trimmedFile = null;
@@ -8315,6 +8423,14 @@ async function renderUpload() {
           </div>
         </div>
 
+        <div class="field">
+          <label>Hashtags <span style="color:var(--text-dim);font-weight:500">(hasta 5)</span></label>
+          <input type="text" id="uploadHashtags" list="uploadHashtagSuggestions" maxlength="150" placeholder="#gaming #futbol #humor" oninput="refreshUploadHashtagPreview()">
+          <datalist id="uploadHashtagSuggestions"></datalist>
+          <div id="uploadHashtagPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:10px;"></div>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:6px;">Ayudan a encontrar tu video. Separalos con espacios.</div>
+        </div>
+
         <button
           class="btn"
           id="uploadSubmitBtn"
@@ -8329,6 +8445,7 @@ async function renderUpload() {
     </div>`;
 
   setUploadMode("link");
+  loadTrendingHashtagSuggestions();
 }
 
 const MAX_FILE_MB = 50;
@@ -8956,15 +9073,22 @@ async function handleUploadLink() {
   errEl.textContent = "";
 
   if (!title || !url) { errEl.textContent = "Completá título y link."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
 
-  const { error } = await sb.from("videos").insert({
+  const { data:createdVideo, error } = await sb.from("videos").insert({
     user_id: currentUser.id,
     platform,
     title,
     video_url: url
-  });
+  }).select("id").single();
 
   if (error) { errEl.textContent = error.message; return; }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    errEl.textContent = "El video se publicó, pero faltan los hashtags: " + tagError.message;
+  }
+  lsPerfCache.feed = { data:null, at:0 };
 
   const reward = await getUploadRewardPoints();
   let earned = 0;
@@ -9049,6 +9173,7 @@ async function handleUploadFile() {
   errEl.textContent = "";
 
   if (!title || !file) { errEl.textContent = "Completá el título y elegí un archivo."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
   if (file.size > MAX_FILE_MB * 1024 * 1024) { errEl.textContent = `El archivo supera los ${MAX_FILE_MB}MB permitidos. Probá recortarlo un poco más.`; return; }
 
   btn.disabled = true;
@@ -9092,18 +9217,24 @@ async function handleUploadFile() {
     console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
   }
 
-  const { error: insertError } = await sb.from("videos").insert({
+  const { data:createdVideo, error: insertError } = await sb.from("videos").insert({
     user_id: currentUser.id,
     platform: "upload",
     title,
     video_url: publicUrlData.publicUrl,
     thumbnail_url: thumbnailUrl
-  });
+  }).select("id").single();
 
   btn.disabled = false;
   btn.textContent = "Publicar video";
 
   if (insertError) { errEl.textContent = insertError.message; return; }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    showToast("Video publicado; no pudimos guardar sus hashtags");
+  }
+  lsPerfCache.feed = { data:null, at:0 };
 
   const reward = await getUploadRewardPoints();
   let earned = 0;

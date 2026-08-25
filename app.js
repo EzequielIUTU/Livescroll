@@ -2429,7 +2429,10 @@ function openLiveScroll7Teaser(options = {}) {
     const reveal = overlay.querySelector("#ls7RealReveal");
     reveal.classList.add("is-visible");
     reveal.setAttribute("aria-hidden", "false");
-    if (!isReplay) localStorage.setItem(`livescroll_ls7_pulse_seen_${currentUser.id}`, "1");
+    if (!isReplay) {
+      localStorage.setItem(`livescroll_ls7_pulse_seen_${currentUser.id}`, "1");
+      Promise.resolve(sb.rpc("mark_my_ls7_pulse_seen")).catch(() => {});
+    }
     setTimeout(() => {
       overlay.classList.remove("is-visible");
       setTimeout(() => {
@@ -3211,9 +3214,10 @@ async function checkPendingContent() {
   // Leemos backend + historial en paralelo.
   // Si el backend por algún motivo no marca "pending", el historial funciona
   // como respaldo desde la versión interna 25 en adelante.
-  const [pendingResult, historyResult] = await Promise.allSettled([
+  const [pendingResult, historyResult, syncResult] = await Promise.allSettled([
     sb.rpc("get_pending_content", { p_user_id: currentUser.id }),
-    loadStartupChangelogHistory()
+    loadStartupChangelogHistory(),
+    sb.rpc("get_my_app_sync_state")
   ]);
 
   const pendingData =
@@ -3225,6 +3229,11 @@ async function checkPendingContent() {
     historyResult.status === "fulfilled" && Array.isArray(historyResult.value?.data)
       ? historyResult.value.data
       : [];
+
+  const syncState =
+    syncResult.status === "fulfilled" && !syncResult.value?.error
+      ? (syncResult.value?.data || {})
+      : {};
 
   const semverParts = (value) => String(value || "0.0.0")
     .split(".")
@@ -3261,9 +3270,23 @@ async function checkPendingContent() {
     : [];
 
   const storedSeenRaw = localStorage.getItem(seenKey);
-  const locallySeen = storedSeenRaw === null
+  let locallySeen = storedSeenRaw === null
     ? 0
     : Number(storedSeenRaw || 0);
+  const cloudSeen = Number(syncState?.changelog_seen_version || 0);
+  locallySeen = Math.max(locallySeen, cloudSeen);
+
+  // Una cuenta que ya reconoció Novedades en el backend no debe reconstruir
+  // todo el historial al abrir otro dispositivo por primera vez.
+  if (pendingData?.changelog_pending === false && cloudSeen === 0 && latestInternal > 0) {
+    locallySeen = latestInternal;
+    localStorage.setItem(seenKey, String(latestInternal));
+    Promise.resolve(sb.rpc("set_my_changelog_seen_version", { p_version:latestInternal })).catch(() => {});
+  } else if (cloudSeen > 0 && cloudSeen > Number(storedSeenRaw || 0)) {
+    localStorage.setItem(seenKey, String(cloudSeen));
+  } else if (locallySeen > cloudSeen) {
+    Promise.resolve(sb.rpc("set_my_changelog_seen_version", { p_version:locallySeen })).catch(() => {});
+  }
 
   const accountCreatedAt = new Date(currentUser?.created_at || 0).getTime();
   const isRecentlyCreatedAccount = Number.isFinite(accountCreatedAt) &&
@@ -3271,9 +3294,8 @@ async function checkPendingContent() {
     Date.now() - accountCreatedAt < 7 * 24 * 60 * 60 * 1000;
   const newAccountBaselineKey = `livescroll_new_account_changelog_baselined_${currentUser.id}`;
 
-  // Si es un dispositivo nuevo, locallySeen=0. Eso permite que el teléfono
-  // muestre en un solo "Mientras no estabas..." las versiones que tenga
-  // disponibles en el historial aunque la cuenta las haya visto en otro equipo.
+  // La nube es la fuente principal. localStorage queda solamente como respaldo
+  // para una carga sin conexión o una falla temporal del RPC.
 
   // Si el usuario se perdió varias versiones, mostramos TODAS juntas
   // en "Mientras no estabas..." en lugar de abrir un popup por versión.
@@ -3301,8 +3323,13 @@ async function checkPendingContent() {
   // 6.0.8 · EL PULSO: no vive en el menú. Aparece automáticamente una sola
   // vez por Usuario y solamente se completa manteniendo presionado de verdad.
   const ls7PulseKey = `livescroll_ls7_pulse_seen_${currentUser.id}`;
+  const localPulseSeen = localStorage.getItem(ls7PulseKey) === "1";
+  const cloudPulseSeen = syncState?.ls7_pulse_seen === true;
+  const ls7PulseSeen = cloudPulseSeen || localPulseSeen;
+  if (localPulseSeen && !cloudPulseSeen) Promise.resolve(sb.rpc("mark_my_ls7_pulse_seen")).catch(() => {});
+  if (cloudPulseSeen && !localPulseSeen) localStorage.setItem(ls7PulseKey,"1");
   if (
-    localStorage.getItem(ls7PulseKey) !== "1" &&
+    !ls7PulseSeen &&
     !window.__lsStartupOptionalModalShown
   ) {
     window.__lsStartupOptionalModalShown = true;
@@ -3315,6 +3342,7 @@ async function checkPendingContent() {
   // obligatorio, pero el historial anterior queda disponible solo desde 📢.
   if (isRecentlyCreatedAccount && localStorage.getItem(newAccountBaselineKey) !== "1") {
     if (latestInternal > 0) localStorage.setItem(seenKey, String(latestInternal));
+    if (latestInternal > 0) await sb.rpc("set_my_changelog_seen_version", { p_version:latestInternal });
     localStorage.setItem(newAccountBaselineKey, "1");
     await sb.rpc("acknowledge_content", {
       p_user_id:currentUser.id,
@@ -5078,6 +5106,7 @@ async function handleAcceptChangelog() {
   // del RPC vuelva a ocultar/romper el flujo automático.
   if (seenKey && shownVersion > 0) {
     localStorage.setItem(seenKey, String(shownVersion));
+    await sb.rpc("set_my_changelog_seen_version", { p_version:shownVersion });
   }
 
   if (error) {
@@ -13005,7 +13034,7 @@ async function renderAdmin() {
           <div style="font-size:13px;font-weight:800;">Seasonal LiveScroll</div>
           <div style="font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.5;">
             En Automático, LiveScroll cambia solo según la fecha de Argentina.
-            Este selector sirve únicamente para que vos pruebes los diseños antes del día.
+            Lo que publiques acá se aplica a todos los Usuarios en PC y celular.
           </div>
           <div id="seasonalAdminStatus" style="font-size:10px;color:var(--gold);margin-top:7px;"></div>
         </div>
@@ -15675,6 +15704,7 @@ async function adminChangeUserPlan(userId, planId) {
 // ============================================================
 
 const LS_SEASONAL_OVERRIDE_KEY = "livescroll_seasonal_admin_preview";
+window.__lsGlobalSeasonalTheme = window.__lsGlobalSeasonalTheme || "auto";
 
 const LS_SEASONAL_THEMES = {
   normal: {
@@ -15873,14 +15903,23 @@ function getAutomaticSeasonalTheme(date = new Date()) {
 }
 
 function getSeasonalThemeKey() {
-  // El override es SOLO una herramienta local de prueba para Admin.
-  if (currentProfile?.is_admin) {
-    const forced = localStorage.getItem(LS_SEASONAL_OVERRIDE_KEY);
-    if (forced && forced !== "auto" && LS_SEASONAL_THEMES[forced]) {
-      return forced;
-    }
+  const published = String(window.__lsGlobalSeasonalTheme || "auto");
+  if (published !== "auto" && LS_SEASONAL_THEMES[published]) {
+    return published;
   }
   return getAutomaticSeasonalTheme();
+}
+
+async function loadGlobalSeasonalTheme() {
+  try {
+    const { data, error } = await sb.rpc("get_global_seasonal_theme");
+    if (!error) {
+      const key = String(data?.theme || data || "auto");
+      window.__lsGlobalSeasonalTheme = key === "auto" || LS_SEASONAL_THEMES[key] ? key : "auto";
+      localStorage.removeItem(LS_SEASONAL_OVERRIDE_KEY);
+    }
+  } catch (_) {}
+  applySeasonalTheme();
 }
 
 function clearSeasonalDecorations() {
@@ -16186,20 +16225,22 @@ function applySeasonalTheme() {
   window.__lsSeasonalApplying = false;
 }
 
-function setSeasonalAdminPreview(value) {
+async function setSeasonalAdminPreview(value) {
   if (!currentProfile?.is_admin) return;
-
-  if (!value || value === "auto") {
-    localStorage.removeItem(LS_SEASONAL_OVERRIDE_KEY);
-  } else {
-    localStorage.setItem(LS_SEASONAL_OVERRIDE_KEY, value);
+  const next = !value ? "auto" : value;
+  const { data, error } = await sb.rpc("admin_set_global_seasonal_theme", { p_theme:next });
+  if (error || !data?.ok) {
+    showToast("No se pudo publicar la apariencia");
+    syncSeasonalAdminControls();
+    return;
   }
-
+  window.__lsGlobalSeasonalTheme = next;
+  localStorage.removeItem(LS_SEASONAL_OVERRIDE_KEY);
   applySeasonalTheme();
   showToast(
-    value === "auto"
-      ? "🎨 Eventos visuales en Automático"
-      : `🎨 Vista previa: ${LS_SEASONAL_THEMES[value]?.label || value}`
+    next === "auto"
+      ? "🎨 Apariencia global en Automático"
+      : `🎨 Publicado para todos: ${LS_SEASONAL_THEMES[next]?.label || next}`
   );
 }
 
@@ -16208,9 +16249,7 @@ function syncSeasonalAdminControls() {
   const status = document.getElementById("seasonalAdminStatus");
   if (!select && !status) return;
 
-  const forced = currentProfile?.is_admin
-    ? (localStorage.getItem(LS_SEASONAL_OVERRIDE_KEY) || "auto")
-    : "auto";
+  const forced = String(window.__lsGlobalSeasonalTheme || "auto");
 
   if (select) {
     select.value = (forced === "auto" || LS_SEASONAL_THEMES[forced]) ? forced : "auto";
@@ -16223,8 +16262,8 @@ function syncSeasonalAdminControls() {
     const autoLabel = LS_SEASONAL_THEMES[automatic]?.label || automatic;
 
     status.textContent = forced === "auto"
-      ? `Ahora: ${activeLabel} · Automático`
-      : `Vista previa local: ${activeLabel} · En la fecha real sería: ${autoLabel}`;
+      ? `Publicado: Automático · Ahora: ${activeLabel}`
+      : `Publicado para todos: ${activeLabel} · En automático sería: ${autoLabel}`;
   }
 }
 
@@ -16232,7 +16271,7 @@ function syncSeasonalAdminControls() {
 // No usamos MutationObserver global: el Admin reconstruye mucho DOM y eso
 // podía generar un ciclo de reaplicación que frenaba la carga del panel.
 document.addEventListener("DOMContentLoaded", () => {
-  setTimeout(applySeasonalTheme, 80);
+  setTimeout(loadGlobalSeasonalTheme, 80);
 });
 
 // Si el app ya estaba cargado antes de registrar DOMContentLoaded.

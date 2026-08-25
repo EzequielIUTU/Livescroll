@@ -2420,7 +2420,6 @@ function openLiveScroll7Teaser(options = {}) {
   const completeHold = () => {
     if (finished) return;
     finished = true;
-    if (audio) audio.pause();
     clearTimeout(holdTimer);
     holdButton.classList.add("is-complete");
     holdButton.style.setProperty("--ls7-hold", "100%");

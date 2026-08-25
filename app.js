@@ -26,6 +26,8 @@ try {
 let currentUser = null;
 let currentProfile = null;
 let currentTab = "feed";
+let previousTabForAndroidBack = "feed";
+let suppressAndroidTabHistory = false;
 let watchIntervals = {}; // video_id -> intervalId
 let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
@@ -2270,6 +2272,53 @@ function closeMobileMenu() {
   document.getElementById("mobileMenuOverlay")?.remove();
   document.getElementById("mobileMenuPanel")?.remove();
 }
+
+// ============================================================
+// 6.0.4v · BOTÓN ATRÁS NATIVO
+// Android consulta esta función antes de cerrar la Activity.
+// ============================================================
+function handleLiveScrollAndroidBack() {
+  const portal = document.getElementById("ls6LaunchPortal");
+  const intro = document.getElementById("introOverlay");
+  if (portal || intro) return "handled";
+
+  if (document.getElementById("mobileMenuPanel") || document.getElementById("mobileMenuOverlay")) {
+    closeMobileMenu();
+    return "handled";
+  }
+
+  const notifPanel = document.getElementById("notifPanel");
+  if (notifPanel) {
+    notifPanel.remove();
+    return "handled";
+  }
+
+  const modalWrap = document.getElementById("globalModalWrap");
+  if (modalWrap && modalWrap.innerHTML.trim()) {
+    const lockedModal = modalWrap.querySelector("[data-modal-locked='1'], .ls-modal-locked");
+    if (lockedModal) {
+      showToast("Completá esta pantalla para continuar");
+      return "handled";
+    }
+    modalWrap.innerHTML = "";
+    return "handled";
+  }
+
+  if (currentTab && currentTab !== "feed") {
+    const target = previousTabForAndroidBack && previousTabForAndroidBack !== currentTab
+      ? previousTabForAndroidBack
+      : "feed";
+    suppressAndroidTabHistory = true;
+    switchTab(target);
+    suppressAndroidTabHistory = false;
+    previousTabForAndroidBack = "feed";
+    return "handled";
+  }
+
+  return "exit";
+}
+
+window.handleLiveScrollAndroidBack = handleLiveScrollAndroidBack;
 
 // ============================================================
 // 6.0.2v · ANDROID PERMISSION CONTEXT
@@ -5603,6 +5652,9 @@ function switchTab(tab) {
   stopConnectedLiveRefresh();
 
   clearAllWatchIntervals();
+  if (!suppressAndroidTabHistory && currentTab && tab !== currentTab) {
+    previousTabForAndroidBack = currentTab;
+  }
   currentTab = tab;
   const renderToken = ++lsTabRenderToken;
 

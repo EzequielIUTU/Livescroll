@@ -1265,6 +1265,9 @@ async function loadProfile() {
 // ============================================================
 function renderLanding() {
   ensureMobileStabilityLayer();
+  document.getElementById("lsMobileDock")?.remove();
+  document.body.classList.remove("ls-navigation-ready");
+  closeMobileMenu();
   document.getElementById("landingView").classList.remove("hidden");
   document.getElementById("appView").classList.add("hidden");
   document.getElementById("navLinks").innerHTML = "";
@@ -2181,6 +2184,7 @@ document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 // APP SHELL
 // ============================================================
 function toggleMobileMenu() {
+  if (!currentProfile) return;
   const existing = document.getElementById("mobileMenuPanel");
   if (existing) { closeMobileMenu(); return; }
 
@@ -2192,23 +2196,33 @@ function toggleMobileMenu() {
   const panel = document.createElement("div");
   panel.className = "mobile-menu-panel";
   panel.id = "mobileMenuPanel";
+  const activeTab = currentTab || "feed";
   panel.innerHTML = `
-    <button onclick="switchTab('feed'); closeMobileMenu();">Mirar</button>
-    <button onclick="switchTab('foryou'); closeMobileMenu();">✨ Para Ti</button>
-    <button onclick="switchTab('upload'); closeMobileMenu();">Subir video</button>
-    <button onclick="switchTab('profile'); closeMobileMenu();">Mi Perfil</button>
-    <button onclick="switchTab('users'); closeMobileMenu();">👥 Usuarios</button>
-    <button onclick="switchTab('directos'); closeMobileMenu();" style="color:var(--red)">🔴 Directos</button>
-    ${!window.__navWalletLocked ? `<button onclick="switchTab('wallet'); closeMobileMenu();">Billetera</button>` : ""}
-    ${!window.__navPlansLocked ? `<button onclick="switchTab('plans'); closeMobileMenu();">Planes</button>` : ""}
-    <button onclick="switchTab('store'); closeMobileMenu();">🛍️ Tienda</button>
-    <button onclick="switchTab('ranking'); closeMobileMenu();">🏆 Ranking</button>
-    <button onclick="openChangelogHistory(); closeMobileMenu();">📢 Novedades</button>
-    <button onclick="showTutorialModal(); closeMobileMenu();">❓ Cómo funciona</button>
-    <button onclick="openLiveScrollSettings(); closeMobileMenu();">⚙️ Configuración</button>
-    ${currentProfile.is_admin ? `<button onclick="switchTab('admin'); closeMobileMenu();" style="color:var(--green)">🛠 Admin</button>` : ""}
-    <div style="border-top:1px solid var(--border); margin-top:10px; padding-top:10px;">
-      <button onclick="handleLogout(); closeMobileMenu();" style="color:var(--red);">Salir</button>
+    <div class="ls-mobile-menu-head">
+      <div><strong>LiveScroll <em>6</em></strong><small>Explorá la aplicación</small></div>
+      <button class="ls-mobile-menu-close" onclick="closeMobileMenu()" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="ls-mobile-menu-scroll">
+      <div class="ls-mobile-menu-label">Principal</div>
+      <button class="${activeTab === 'feed' ? 'active' : ''}" onclick="switchTab('feed'); closeMobileMenu();"><span>▶️</span><b>Mirar</b></button>
+      <button class="${activeTab === 'foryou' ? 'active' : ''}" onclick="switchTab('foryou'); closeMobileMenu();"><span>✨</span><b>Para Ti</b></button>
+      <button class="${activeTab === 'upload' ? 'active' : ''}" onclick="switchTab('upload'); closeMobileMenu();"><span>＋</span><b>Subir video</b></button>
+      <button class="${activeTab === 'profile' ? 'active' : ''}" onclick="switchTab('profile'); closeMobileMenu();"><span>👤</span><b>Mi Perfil</b></button>
+      <button class="${activeTab === 'users' ? 'active' : ''}" onclick="switchTab('users'); closeMobileMenu();"><span>👥</span><b>Usuarios</b></button>
+      <button class="${activeTab === 'directos' ? 'active' : ''}" onclick="switchTab('directos'); closeMobileMenu();"><span>🔴</span><b>Directos</b></button>
+      <div class="ls-mobile-menu-label">Mi cuenta</div>
+      ${!window.__navWalletLocked ? `<button class="${activeTab === 'wallet' ? 'active' : ''}" onclick="switchTab('wallet'); closeMobileMenu();"><span>💰</span><b>Billetera</b></button>` : ""}
+      ${!window.__navPlansLocked ? `<button class="${activeTab === 'plans' ? 'active' : ''}" onclick="switchTab('plans'); closeMobileMenu();"><span>💎</span><b>Planes</b></button>` : ""}
+      <button class="${activeTab === 'store' ? 'active' : ''}" onclick="switchTab('store'); closeMobileMenu();"><span>🛍️</span><b>Tienda</b></button>
+      <button class="${activeTab === 'ranking' ? 'active' : ''}" onclick="switchTab('ranking'); closeMobileMenu();"><span>🏆</span><b>Ranking</b></button>
+      <div class="ls-mobile-menu-label">Ayuda y ajustes</div>
+      <button onclick="openChangelogHistory(); closeMobileMenu();"><span>📢</span><b>Novedades</b></button>
+      <button onclick="showTutorialModal(); closeMobileMenu();"><span>❓</span><b>Cómo funciona</b></button>
+      <button onclick="openLiveScrollSettings(); closeMobileMenu();"><span>⚙️</span><b>Configuración</b></button>
+      ${currentProfile.is_admin ? `<button class="${activeTab === 'admin' ? 'active' : ''}" onclick="switchTab('admin'); closeMobileMenu();"><span>🛠</span><b>Admin</b></button>` : ""}
+      <div class="ls-mobile-menu-exit">
+        <button onclick="handleLogout(); closeMobileMenu();"><span>↪</span><b>Salir</b></button>
+      </div>
     </div>`;
 
   document.body.appendChild(overlay);
@@ -2218,6 +2232,43 @@ function toggleMobileMenu() {
 function closeMobileMenu() {
   document.getElementById("mobileMenuOverlay")?.remove();
   document.getElementById("mobileMenuPanel")?.remove();
+}
+
+function ensureNavigationEvolution597() {
+  document.body.classList.add("ls-navigation-ready");
+  let dock = document.getElementById("lsMobileDock");
+  if (!dock) {
+    dock = document.createElement("div");
+    dock.id = "lsMobileDock";
+    dock.className = "ls-mobile-dock";
+    dock.setAttribute("aria-label", "Navegación principal");
+    dock.innerHTML = `
+      <button data-tab="feed" onclick="switchTab('feed')"><span>▶</span><small>Mirar</small></button>
+      <button data-tab="foryou" onclick="switchTab('foryou')"><span>✦</span><small>Para Ti</small></button>
+      <button data-tab="upload" class="ls-dock-create" onclick="switchTab('upload')"><span>＋</span><small>Subir</small></button>
+      <button data-tab="profile" onclick="switchTab('profile')"><span>👤</span><small>Perfil</small></button>
+      <button data-tab="more" onclick="toggleMobileMenu()"><span>☰</span><small>Más</small></button>`;
+    document.body.appendChild(dock);
+  }
+  updateNavigationEvolution597(currentTab || "feed");
+}
+
+function updateNavigationEvolution597(tab) {
+  document.querySelectorAll("#navLinks button").forEach(button => {
+    const active = button.id === `tab-${tab}`;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
+
+  const primaryTabs = ["feed", "foryou", "upload", "profile"];
+  document.querySelectorAll("#lsMobileDock button[data-tab]").forEach(button => {
+    const buttonTab = button.dataset.tab;
+    const active = buttonTab === tab || (buttonTab === "more" && !primaryTabs.includes(tab));
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  });
 }
 
 
@@ -2707,6 +2758,8 @@ async function renderApp() {
     </button>
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
+  ensureNavigationEvolution597();
+
 
   // Lo visible primero.
   checkBlockedStatus();
@@ -3118,7 +3171,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4152,6 +4205,7 @@ function showChangelogModal(entries) {
     "5.9.4":"MOTION UPGRADE",
     "5.9.5":"SIGNATURE MOTION",
     "5.9.6":"ACCESS EVOLUTION",
+    "5.9.7":"NAVIGATION EVOLUTION",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4222,7 +4276,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -5431,8 +5485,15 @@ function switchTab(tab) {
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
   const activeBtn = document.getElementById("tab-" + tab);
   if (activeBtn) activeBtn.classList.add("active");
+  updateNavigationEvolution597(tab);
 
   const main = document.getElementById("appView");
+  if (main) {
+    main.classList.remove("ls-nav-view-enter");
+    void main.offsetWidth;
+    main.classList.add("ls-nav-view-enter");
+    setTimeout(() => main.classList.remove("ls-nav-view-enter"), 240);
+  }
 
   // Feedback visual en el mismo frame del toque.
   if (main && ["feed","foryou","profile","users","directos","wallet","plans","store","ranking","admin"].includes(tab)) {

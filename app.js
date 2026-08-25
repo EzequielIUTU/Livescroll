@@ -1265,7 +1265,10 @@ async function loadProfile() {
   // 6.0.7v: las cuentas nuevas normales se verifican solas. Una sancion o
   // una señal sospechosa siempre permanece para revision humana.
   if (currentProfile.is_blocked) {
-    const { data:autoVerification } = await sb.rpc("auto_verify_current_user");
+    const { data:autoVerification, error:autoVerificationError } = await sb.rpc("auto_verify_current_user");
+    if (autoVerificationError) {
+      console.warn("SMART VERIFICATION no pudo completar el control:", autoVerificationError.message);
+    }
     if (autoVerification?.status === "verified") {
       currentProfile.is_blocked = false;
       currentProfile.auto_verification_reason = autoVerification.reason || "controles_superados";
@@ -3120,6 +3123,12 @@ async function checkPendingContent() {
     ? 0
     : Number(storedSeenRaw || 0);
 
+  const accountCreatedAt = new Date(currentUser?.created_at || 0).getTime();
+  const isRecentlyCreatedAccount = Number.isFinite(accountCreatedAt) &&
+    accountCreatedAt > 0 &&
+    Date.now() - accountCreatedAt < 7 * 24 * 60 * 60 * 1000;
+  const newAccountBaselineKey = `livescroll_new_account_changelog_baselined_${currentUser.id}`;
+
   // Si es un dispositivo nuevo, locallySeen=0. Eso permite que el teléfono
   // muestre en un solo "Mientras no estabas..." las versiones que tenga
   // disponibles en el historial aunque la cuenta las haya visto en otro equipo.
@@ -3144,6 +3153,19 @@ async function checkPendingContent() {
 
   if (pendingData?.tutorial_pending) {
     showTutorialModal();
+    return;
+  }
+
+  // Una cuenta nueva no puede tener versiones "perdidas": comienza desde la
+  // version que estaba publicada cuando llego. El tutorial sigue siendo
+  // obligatorio, pero el historial anterior queda disponible solo desde 📢.
+  if (isRecentlyCreatedAccount && localStorage.getItem(newAccountBaselineKey) !== "1") {
+    if (latestInternal > 0) localStorage.setItem(seenKey, String(latestInternal));
+    localStorage.setItem(newAccountBaselineKey, "1");
+    await sb.rpc("acknowledge_content", {
+      p_user_id:currentUser.id,
+      p_content_key:"changelog"
+    });
     return;
   }
 

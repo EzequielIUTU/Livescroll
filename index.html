@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.0.0-portal-preview2">
+<link rel="stylesheet" href="style.css?v=6.0.0-golden-preview">
 </head>
 <body>
 
@@ -342,6 +342,8 @@
       return;
     }
 
+    if (isPreview) document.documentElement.classList.add('ls6-golden-preview');
+
     var officialKey = 'livescroll_portal_600_seen';
     var officialSeen = false;
     try { officialSeen = localStorage.getItem(officialKey) === '1'; } catch (_) {}
@@ -481,6 +483,11 @@
           if (typeof currentUser !== 'undefined' && currentUser && typeof switchTab === 'function') switchTab('feed');
           else if (typeof showAuth === 'function') showAuth('login');
         } catch (_) {}
+        if (isPreview) {
+          setTimeout(function () {
+            try { if (typeof openLiveScroll6MythicPreview === 'function') openLiveScroll6MythicPreview(); } catch (_) {}
+          }, reduced ? 120 : 1150);
+        }
       }, reduced ? 80 : 620);
     }
 
@@ -630,6 +637,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.0.0-portal-preview2"></script>
+<script src="app.js?v=6.0.0-golden-preview"></script>
 </body>
 </html>

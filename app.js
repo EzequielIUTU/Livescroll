@@ -6755,6 +6755,7 @@ function ensureModernMobileStyles() {
     .ls-rarity-epica { color:#c084fc; }
     .ls-rarity-legendaria { color:#fbbf24; }
     .ls-rarity-exclusiva { color:#fb7185; }
+    .ls-rarity-mitica { color:#ff365d;text-shadow:0 0 11px rgba(255,54,93,.62),0 0 19px rgba(244,211,94,.30); }
 
     .ls-profile-title-chip {
       --title-color:#cbd5e1;
@@ -6975,6 +6976,18 @@ function ensureModernMobileStyles() {
       border-color:#fb7185;
       box-shadow:0 0 0 2px rgba(251,113,133,.18), 0 0 22px rgba(251,113,133,.30), 0 5px 16px rgba(0,0,0,.24);
     }
+
+    .ls-equipped-medal.ls-medal-rarity-mitica {
+      color:#f4d35e;
+      border-color:#ff365d;
+      background:radial-gradient(circle at 32% 23%,#ff879b 0 7%,transparent 24%),linear-gradient(145deg,#6f061d 4%,#ee214b 43%,#7e071e 67%,#d69b1f 100%);
+      box-shadow:0 0 0 2px rgba(244,211,94,.28),0 0 18px rgba(255,32,77,.65),0 0 34px rgba(244,211,94,.28),0 7px 20px rgba(0,0,0,.38);
+      animation:ls6MythicPulse 1.85s ease-in-out infinite;
+    }
+    .ls-equipped-medal.ls-medal-rarity-mitica::after {
+      content:"";position:absolute;inset:-5px;border:1px solid #f4d35e;border-radius:50%;opacity:.52;pointer-events:none;
+    }
+    @keyframes ls6MythicPulse { 0%,100%{transform:translateZ(0) scale(1);filter:saturate(1)}50%{transform:translateZ(0) scale(1.07);filter:saturate(1.22)} }
 
     .ls-equipped-medal.ls-medal-rarity-rara::after,
     .ls-equipped-medal.ls-medal-rarity-epica::after,
@@ -9148,7 +9161,8 @@ function normalizeProfileTitleRarity(value) {
     rara:"rara", raro:"rara", rare:"rara",
     epica:"epica", epico:"epica", epic:"epica",
     legendaria:"legendaria", legendario:"legendaria", legendary:"legendaria",
-    exclusiva:"exclusiva", exclusivo:"exclusiva", exclusive:"exclusiva"
+    exclusiva:"exclusiva", exclusivo:"exclusiva", exclusive:"exclusiva",
+    mitica:"mitica", mitico:"mitica", mythic:"mitica"
   };
   return aliases[normalized] || "comun";
 }
@@ -9343,7 +9357,7 @@ async function getEquippedProfileMedals(userId) {
 
 
 function getProfileMedalRarityClass(rarity) {
-  const safe = ["comun","rara","epica","legendaria","exclusiva"].includes(rarity)
+  const safe = ["comun","rara","epica","legendaria","exclusiva","mitica"].includes(rarity)
     ? rarity
     : "";
   return safe ? `ls-medal-rarity-${safe}` : "";
@@ -9355,7 +9369,8 @@ function getProfileMedalRarityLabel(rarity) {
     rara:"Rara",
     epica:"Épica",
     legendaria:"Legendaria",
-    exclusiva:"Exclusiva"
+    exclusiva:"Exclusiva",
+    mitica:"Mítica"
   })[rarity] || "";
 }
 
@@ -10931,6 +10946,7 @@ function renderCollection568RarityFilters(activeType) {
     ["epica","Épica"],
     ["legendaria","Legendaria"],
     ["exclusiva","Exclusiva"],
+    ["mitica","Mítica"],
     ["limited","Limitada"]
   ].filter(([key]) => key === "all" || available.has(key));
 
@@ -10961,7 +10977,7 @@ function renderCollection568Grid() {
   const summary = document.getElementById("collection568Summary");
   if (!grid) return;
 
-  const rarityRank = { exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
+  const rarityRank = { mitica:6, exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
   const filter = window.__collection568Filter || "all";
   const sort = window.__collection568Sort || "rarity";
 
@@ -10971,7 +10987,7 @@ function renderCollection568Grid() {
   if (filter === "emoji") items = items.filter(i => i.type === "emoji");
   if (filter === "title") items = items.filter(i => i.type === "title");
   if (filter === "limited") items = items.filter(i => i.is_limited);
-  if (filter === "top") items = items.filter(i => ["legendaria","exclusiva"].includes(i.rarity));
+  if (filter === "top") items = items.filter(i => ["legendaria","exclusiva","mitica"].includes(i.rarity));
 
   const rarityFilter = window.__collection568RarityFilter || "all";
   if (rarityFilter === "limited") {
@@ -11014,7 +11030,7 @@ function renderCollection568Grid() {
       emoji:"Emojis",
       title:"Títulos",
       limited:"Limitados",
-      top:"Legendarios y exclusivos"
+      top:"Legendarios, exclusivos y míticos"
     };
     const rarityLabels = {
       all:"Todos",
@@ -11023,6 +11039,7 @@ function renderCollection568Grid() {
       epica:"Épica",
       legendaria:"Legendaria",
       exclusiva:"Exclusiva",
+      mitica:"Mítica",
       limited:"Limitada"
     };
     const rarityText = rarityFilter === "all"
@@ -11054,6 +11071,7 @@ function renderCollection568Grid() {
       item.rarity === "epica" ? "#c084fc" :
       item.rarity === "legendaria" ? "#fbbf24" :
       item.rarity === "exclusiva" ? "#fb7185" :
+      item.rarity === "mitica" ? "#ff365d" :
       item.rarity === "comun" ? "#cbd5e1" :
       "var(--text-dim)";
 
@@ -13282,12 +13300,33 @@ function getStoreBadgeRarityLabel(rarity) {
     rara:"Rara",
     epica:"Épica",
     legendaria:"Legendaria",
-    exclusiva:"Exclusiva"
+    exclusiva:"Exclusiva",
+    mitica:"Mítica"
   })[rarity] || "Común";
 }
 
 function getStoreBadgeRarityClass(rarity) {
-  return `ls-rarity-${["comun","rara","epica","legendaria","exclusiva"].includes(rarity) ? rarity : "comun"}`;
+  return `ls-rarity-${["comun","rara","epica","legendaria","exclusiva","mitica"].includes(rarity) ? rarity : "comun"}`;
+}
+
+function openLiveScroll6MythicPreview() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap || !document.documentElement.classList.contains("ls6-golden-preview")) return;
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked ls6-mythic-preview-overlay" style="z-index:260;" data-modal-locked="1">
+      <div class="modal-box ls6-mythic-preview-box">
+        <div class="modal-box-body">
+          <div class="ls6-preview-label">VISTA PREVIA · TODAVÍA NO ENTREGADA</div>
+          <div class="ls6-mythic-medal ls-equipped-medal ls-medal-rarity-mitica" aria-label="Medalla mítica Fundador de la Nueva Era"><span>6</span></div>
+          <div class="ls6-mythic-rarity">MEDALLA MÍTICA</div>
+          <h2>Fundador de la Nueva Era</h2>
+          <p>Recompensa única del lanzamiento de LiveScroll 6.</p>
+          <div class="ls6-launch-window"><b>7 DÍAS</b><span>para conseguirla desde el lanzamiento</span></div>
+          <small>Después desaparece para quienes no la obtuvieron. Quien la gane la conserva para siempre.</small>
+          <button class="btn" onclick="document.getElementById('globalModalWrap').innerHTML=''">CONTINUAR A LIVESCROLL 6</button>
+        </div>
+      </div>
+    </div>`;
 }
 
 async function loadStoreBadgesAdminList() {

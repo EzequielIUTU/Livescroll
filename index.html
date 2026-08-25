@@ -20,7 +20,7 @@
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.0.0-golden-preview">
+<link rel="stylesheet" href="style.css?v=6.0.0-official">
 </head>
 <body>
 
@@ -333,7 +333,7 @@
     var params = new URLSearchParams(window.location.search);
     var isPreview = params.get('preview600') === '1';
     var portalOnly = params.get('portalOnly') === '1';
-    var officialLaunchEnabled = false;
+    var officialLaunchEnabled = true;
     var portal = document.getElementById('ls6LaunchPortal');
     if (!portal) return;
 
@@ -342,9 +342,22 @@
       return;
     }
 
-    if (isPreview) document.documentElement.classList.add('ls6-golden-preview');
+    document.documentElement.classList.add('ls6-golden-preview');
+    if (!isPreview) document.documentElement.classList.add('ls6-golden-official');
 
-    var officialKey = 'livescroll_portal_600_seen';
+    function getStoredLiveScrollUserId() {
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i) || '';
+          if (!/^sb-.+-auth-token$/.test(key)) continue;
+          var stored = JSON.parse(localStorage.getItem(key) || 'null');
+          var userId = stored && (stored.user && stored.user.id || stored.currentSession && stored.currentSession.user && stored.currentSession.user.id);
+          if (userId) return String(userId);
+        }
+      } catch (_) {}
+      return 'guest';
+    }
+    var officialKey = 'livescroll_portal_600_seen_' + getStoredLiveScrollUserId();
     var officialSeen = false;
     try { officialSeen = localStorage.getItem(officialKey) === '1'; } catch (_) {}
     if (!isPreview && officialSeen) {
@@ -637,6 +650,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.0.0-golden-preview"></script>
+<script src="app.js?v=6.0.0-official"></script>
 </body>
 </html>

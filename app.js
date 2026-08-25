@@ -2714,6 +2714,8 @@ async function renderApp() {
     window.__lsStartupOptionalModalShown = false;
   }
 
+  claimLiveScroll6LaunchReward();
+
   initLiveScrollExperienceMode();
   setTimeout(applySeasonalTheme, 0);
   ensureModernMobileStyles();
@@ -9339,15 +9341,16 @@ async function getEquippedProfileMedals(userId) {
       const key = String(m.badge_name || "").toLowerCase();
       const ownedBadge = ownedByName[key] || {};
       const storeBadge = storeByName[key] || {};
+      const launchBadge = getLiveScroll6LaunchBadgeMeta(m.badge_name) || {};
       const claim = claimByBadgeId[storeBadge.id] || {};
 
       return {
         ...m,
         badge_icon: m.badge_icon || ownedBadge.badge_icon || "🏅",
         earned_at: ownedBadge.earned_at || "",
-        rarity: m.rarity || storeBadge.rarity || "",
-        description: storeBadge.description || "",
-        is_limited: !!storeBadge.is_limited,
+        rarity: m.rarity || storeBadge.rarity || launchBadge.rarity || "",
+        description: storeBadge.description || launchBadge.description || "",
+        is_limited: !!storeBadge.is_limited || !!launchBadge.is_limited,
         stock_total: storeBadge.stock_total || null,
         serial_number: claim.serial_number || null
       };
@@ -9372,6 +9375,16 @@ function getProfileMedalRarityLabel(rarity) {
     exclusiva:"Exclusiva",
     mitica:"Mítica"
   })[rarity] || "";
+}
+
+function getLiveScroll6LaunchBadgeMeta(name) {
+  return String(name || "").trim().toLowerCase() === "fundador de la nueva era"
+    ? {
+        rarity:"mitica",
+        description:"Recompensa única para quienes estuvieron presentes durante los primeros 7 días de LiveScroll 6.",
+        is_limited:true
+      }
+    : null;
 }
 
 function renderEquippedMedalsInline(medals, ownProfile = false) {
@@ -10771,14 +10784,15 @@ async function openMyMedalsPanel(initialFilter = "all") {
 
   const normalizedBadges = badges.map(b => {
     const meta = storeBadgeByName[String(b.badge_name || "").toLowerCase()] || {};
+    const launchMeta = getLiveScroll6LaunchBadgeMeta(b.badge_name) || {};
     const claim = badgeClaimById[meta.id] || {};
     return {
       type:"badge",
       icon:b.badge_icon || "🏅",
       name:b.badge_name || "Medalla",
-      rarity:meta.rarity || null,
-      description:meta.description || "",
-      is_limited:!!meta.is_limited,
+      rarity:meta.rarity || launchMeta.rarity || null,
+      description:meta.description || launchMeta.description || "",
+      is_limited:!!meta.is_limited || !!launchMeta.is_limited,
       stock_total:meta.stock_total || null,
       serial_number:claim.serial_number || null,
       obtained_at:claim.claimed_at || b.earned_at || null,
@@ -13309,24 +13323,62 @@ function getStoreBadgeRarityClass(rarity) {
   return `ls-rarity-${["comun","rara","epica","legendaria","exclusiva","mitica"].includes(rarity) ? rarity : "comun"}`;
 }
 
-function openLiveScroll6MythicPreview() {
+function renderLiveScroll6MythicModal(isOfficialReward = false) {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap || !document.documentElement.classList.contains("ls6-golden-preview")) return;
   wrap.innerHTML = `
     <div class="modal-overlay ls-modal-locked ls6-mythic-preview-overlay" style="z-index:260;" data-modal-locked="1">
       <div class="modal-box ls6-mythic-preview-box">
         <div class="modal-box-body">
-          <div class="ls6-preview-label">VISTA PREVIA · TODAVÍA NO ENTREGADA</div>
+          <div class="ls6-preview-label">${isOfficialReward ? "RECOMPENSA DESBLOQUEADA · TUYA PARA SIEMPRE" : "VISTA PREVIA · TODAVÍA NO ENTREGADA"}</div>
           <div class="ls6-mythic-medal ls-equipped-medal ls-medal-rarity-mitica" aria-label="Medalla mítica Fundador de la Nueva Era"><span>6</span></div>
           <div class="ls6-mythic-rarity">MEDALLA MÍTICA</div>
           <h2>Fundador de la Nueva Era</h2>
-          <p>Recompensa única del lanzamiento de LiveScroll 6.</p>
-          <div class="ls6-launch-window"><b>7 DÍAS</b><span>para conseguirla desde el lanzamiento</span></div>
-          <small>Después desaparece para quienes no la obtuvieron. Quien la gane la conserva para siempre.</small>
+          <p>${isOfficialReward ? "Estuviste presente en el comienzo de la Nueva Era." : "Recompensa única del lanzamiento de LiveScroll 6."}</p>
+          <div class="ls6-launch-window"><b>${isOfficialReward ? "OBTENIDA" : "7 DÍAS"}</b><span>${isOfficialReward ? "ya forma parte permanente de tu colección" : "para conseguirla desde el lanzamiento"}</span></div>
+          <small>${isOfficialReward ? "Es única por cuenta, no puede comprarse, venderse ni transferirse." : "Después desaparece para quienes no la obtuvieron. Quien la gane la conserva para siempre."}</small>
           <button class="btn" onclick="document.getElementById('globalModalWrap').innerHTML=''">CONTINUAR A LIVESCROLL 6</button>
         </div>
       </div>
     </div>`;
+}
+
+function openLiveScroll6MythicPreview() {
+  renderLiveScroll6MythicModal(false);
+}
+
+function queueLiveScroll6MythicRewardReveal() {
+  let attempts = 0;
+  const tryReveal = () => {
+    attempts += 1;
+    const portalVisible = !!document.getElementById("ls6LaunchPortal");
+    const wrap = document.getElementById("globalModalWrap");
+    const anotherModalVisible = !!String(wrap?.innerHTML || "").trim();
+    if (!portalVisible && !anotherModalVisible) {
+      renderLiveScroll6MythicModal(true);
+      return;
+    }
+    if (attempts < 40) setTimeout(tryReveal, 750);
+  };
+  setTimeout(tryReveal, 900);
+}
+
+async function claimLiveScroll6LaunchReward() {
+  if (!currentUser?.id || window.__ls6LaunchClaimAttemptedFor === currentUser.id) return;
+  window.__ls6LaunchClaimAttemptedFor = currentUser.id;
+  try {
+    const { data, error } = await sb.rpc("claim_livescroll6_launch_reward");
+    if (error) {
+      console.warn("Recompensa LiveScroll 6 no disponible:", error.message || error);
+      return;
+    }
+    if (data?.ok && data?.claimed) {
+      window.__myProfileBadges = null;
+      queueLiveScroll6MythicRewardReveal();
+    }
+  } catch (error) {
+    console.warn("No se pudo comprobar la recompensa LiveScroll 6:", error);
+  }
 }
 
 async function loadStoreBadgesAdminList() {

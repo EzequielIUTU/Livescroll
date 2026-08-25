@@ -3171,7 +3171,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4206,6 +4206,7 @@ function showChangelogModal(entries) {
     "5.9.5":"SIGNATURE MOTION",
     "5.9.6":"ACCESS EVOLUTION",
     "5.9.7":"NAVIGATION EVOLUTION",
+    "5.9.8":"SOCIAL PULSE",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4276,7 +4277,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -8678,7 +8679,7 @@ async function renderWallet() {
     .select("*")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(60);
 
   const { data: boostStatus } = await sb.rpc("get_boost_status", { p_user_id: currentUser.id });
   const { data: walletConfig } = await sb.from("app_text_config").select("*").eq("key", "wallet_visibility").single();
@@ -11060,6 +11061,44 @@ let notifCache = [];
 let notifRealtimeChannel = null;
 let notifRealtimeUserId = null;
 let notifUiRefreshFrame = null;
+let notifVisibleCount = 18;
+let notifSoundContext = null;
+const LS_NOTIFICATION_SOUND_KEY = "livescroll_notification_sound_v598";
+
+function isNotificationSoundEnabled() {
+  try { return localStorage.getItem(LS_NOTIFICATION_SOUND_KEY) === "1"; }
+  catch (_) { return false; }
+}
+
+function playLiveScrollNotificationSound() {
+  if (!isNotificationSoundEnabled() || document.hidden) return;
+  try {
+    const AudioEngine = window.AudioContext || window.webkitAudioContext;
+    if (!AudioEngine) return;
+    notifSoundContext = notifSoundContext || new AudioEngine();
+    const ctx = notifSoundContext;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(940, now + .12);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.exponentialRampToValueAtTime(.045, now + .018);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + .20);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now); osc.stop(now + .22);
+  } catch (_) {}
+}
+
+function toggleLiveScrollNotificationSound() {
+  const enabled = !isNotificationSoundEnabled();
+  try { localStorage.setItem(LS_NOTIFICATION_SOUND_KEY, enabled ? "1" : "0"); } catch (_) {}
+  if (enabled) playLiveScrollNotificationSound();
+  renderNotificationPanelContent();
+  showToast(enabled ? "🔊 Sonido de notificaciones activado" : "🔇 Sonido de notificaciones desactivado");
+}
 
 function scheduleNotificationUIRefresh() {
   if (notifUiRefreshFrame) return;
@@ -11127,8 +11166,9 @@ function subscribeToNotifications() {
     }, payload => {
       const notification = payload.new;
       if (!notifCache.some(n => n.id === notification.id)) notifCache.unshift(notification);
-      notifCache = notifCache.slice(0, 30);
+      notifCache = notifCache.slice(0, 60);
       scheduleNotificationUIRefresh();
+      playLiveScrollNotificationSound();
       showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
     })
     .subscribe(status => {
@@ -11144,22 +11184,82 @@ function renderNotificationPanelContent() {
   const list = document.getElementById("notifPanelList");
   if (!list) return;
   if (!notifCache.length) {
-    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;padding:18px 10px;text-align:center;">Sin notificaciones todavía.</p>`;
+    list.innerHTML = `<div class="ls-notif-empty"><span>🔔</span><strong>Todo tranquilo por acá</strong><small>Las novedades de tu cuenta aparecerán en este lugar.</small></div>`;
     return;
   }
 
-  list.innerHTML = notifCache.map(n => {
-    const clickable = n.video_id || n.actor_id || n.comment_id;
-    return `
-      <div onclick="${clickable ? `handleNotificationClick('${n.id}')` : ""}" style="display:flex;gap:10px;padding:11px 8px;border-bottom:1px solid var(--border);font-size:13px;cursor:${clickable ? "pointer" : "default"};border-radius:8px;transition:background 0.15s ease;${n.read ? "opacity:0.62;" : "background:rgba(255,255,255,0.025);"}">
-        <div style="font-size:20px;width:28px;flex-shrink:0;text-align:center;padding-top:1px;">${getNotificationIcon(n.type)}</div>
-        <div style="min-width:0;flex:1;">
-          <div style="color:var(--text);line-height:1.35;">${escapeHtml(n.message || "Nueva notificación")}</div>
-          <div style="color:var(--text-dim);font-size:10px;margin-top:4px;">${formatNotificationTime(n.created_at)}${clickable ? " · Tocá para ver" : ""}</div>
-        </div>
-        ${!n.read ? `<div style="width:7px;height:7px;border-radius:50%;background:var(--gold);margin-top:7px;flex-shrink:0;"></div>` : ""}
-      </div>`;
-  }).join("");
+  const grouped = [];
+  const groupsByKey = new Map();
+  notifCache.forEach(n => {
+    const key = n.type === "like"
+      ? `like:${n.video_id || n.message || "general"}`
+      : n.type === "follow"
+        ? `follow:${n.actor_id || n.message || n.id}`
+        : n.type === "comment"
+          ? `comment:${n.video_id || ""}:${n.actor_id || n.id}`
+          : `${n.type || "system"}:${n.message || n.id}`;
+    let group = groupsByKey.get(key);
+    if (!group) {
+      group = { ...n, members:[], groupUnread:false };
+      groupsByKey.set(key, group);
+      grouped.push(group);
+    }
+    group.members.push(n.id);
+    if (!n.read) group.groupUnread = true;
+  });
+
+  window.__notifGroupMembers = {};
+  grouped.forEach(group => { window.__notifGroupMembers[group.id] = group.members; });
+  const visible = grouped.slice(0, notifVisibleCount);
+  const newItems = visible.filter(n => n.groupUnread);
+  const previousItems = visible.filter(n => !n.groupUnread);
+
+  const renderGroup = (items, title) => items.length ? `
+    <section class="ls-notif-section">
+      <div class="ls-notif-section-title">${title}<span>${items.length}</span></div>
+      ${items.map(n => {
+        const clickable = n.video_id || n.actor_id || n.comment_id;
+        return `<button class="ls-notif-item${n.groupUnread ? " is-unread" : ""}" onclick="${clickable ? `handleNotificationClick('${n.id}')` : "void(0)"}">
+          <span class="ls-notif-icon">${getNotificationIcon(n.type)}</span>
+          <span class="ls-notif-copy">
+            <strong>${escapeHtml(n.message || "Nueva notificación")}${n.members.length > 1 ? ` <em>+${n.members.length - 1}</em>` : ""}</strong>
+            <small>${formatNotificationTime(n.created_at)}${clickable ? " · Tocá para abrir" : ""}</small>
+          </span>
+          ${n.groupUnread ? `<i aria-label="Nueva"></i>` : ""}
+        </button>`;
+      }).join("")}
+    </section>` : "";
+
+  list.innerHTML = `
+    <div class="ls-notif-tools">
+      <button onclick="toggleLiveScrollNotificationSound()">${isNotificationSoundEnabled() ? "🔊 Sonido activo" : "🔇 Activar sonido"}</button>
+      ${notifCache.some(n => !n.read) ? `<button onclick="markAllNotificationsRead()">✓ Leer todas</button>` : `<span>Todo leído</span>`}
+    </div>
+    ${renderGroup(newItems, "Nuevas")}
+    ${renderGroup(previousItems, "Anteriores")}
+    ${grouped.length > visible.length ? `<button class="ls-notif-more" onclick="notifVisibleCount += 18; renderNotificationPanelContent()">Ver anteriores (${grouped.length - visible.length})</button>` : ""}`;
+}
+
+async function markAllNotificationsRead() {
+  if (!currentUser) return;
+  const result = await sb.rpc("mark_notifications_read", { p_user_id:currentUser.id });
+  if (result?.error) {
+    showToast("No se pudieron marcar las notificaciones");
+    return;
+  }
+  notifCache = notifCache.map(n => ({ ...n, read:true }));
+  updateNotificationBadge();
+  renderNotificationPanelContent();
+}
+
+async function markNotificationGroupRead(notificationId) {
+  const ids = window.__notifGroupMembers?.[notificationId] || [notificationId];
+  const idSet = new Set(ids);
+  notifCache = notifCache.map(n => idSet.has(n.id) ? ({ ...n, read:true }) : n);
+  updateNotificationBadge();
+  try {
+    await sb.from("notifications").update({ read:true }).eq("user_id", currentUser.id).in("id", ids);
+  } catch (_) {}
 }
 
 function formatNotificationTime(dateString) {
@@ -11179,22 +11279,18 @@ function toggleNotifPanel() {
   const existing = document.getElementById("notifPanel");
   if (existing) { existing.remove(); return; }
 
+  notifVisibleCount = 18;
   const panel = document.createElement("div");
   panel.id = "notifPanel";
-  panel.style.cssText = "position:absolute;top:60px;right:20px;width:min(360px, calc(100vw - 24px));max-height:480px;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:10px;z-index:160;box-shadow:0 14px 40px rgba(0,0,0,0.55);";
+  panel.className = "ls-social-pulse-panel";
   panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;padding:3px 5px 8px;border-bottom:1px solid var(--border);">
-      <div><strong style="font-size:14px;">🔔 Notificaciones</strong><div style="color:var(--text-dim);font-size:10px;margin-top:2px;">Actividad reciente</div></div>
-      <button onclick="document.getElementById('notifPanel')?.remove()" style="background:none;border:none;color:var(--text-dim);font-size:18px;cursor:pointer;padding:4px 7px;">✕</button>
+    <div class="ls-notif-head">
+      <div><span>SOCIAL PULSE</span><strong>Notificaciones</strong><small>Tu actividad en tiempo real</small></div>
+      <button onclick="document.getElementById('notifPanel')?.remove()" aria-label="Cerrar">✕</button>
     </div>
-    <div id="notifPanelList" style="max-height:400px;overflow-y:auto;padding-right:2px;"></div>`;
+    <div id="notifPanelList" class="ls-notif-list"></div>`;
   document.body.appendChild(panel);
   renderNotificationPanelContent();
-
-  sb.rpc("mark_notifications_read", { p_user_id: currentUser.id }).then(() => {
-    notifCache = notifCache.map(n => ({ ...n, read: true }));
-    updateNotificationBadge();
-  });
 
   setTimeout(() => {
     document.addEventListener("click", function closeOnOutsideClick(e) {
@@ -11212,8 +11308,7 @@ async function handleNotificationClick(notificationId) {
   const notification = notifCache.find(n => n.id === notificationId);
   if (!notification) return;
   document.getElementById("notifPanel")?.remove();
-  notification.read = true;
-  updateNotificationBadge();
+  markNotificationGroupRead(notificationId);
 
   if (notification.type === "comment" && notification.video_id) {
     await openComments(notification.video_id, notification.comment_id || null);

@@ -825,14 +825,24 @@ function renderAuthForm(mode) {
   const wrap = document.getElementById("globalModalWrap");
   const isSignup = mode === "signup";
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.15s ease;" onclick="if(event.target===this) closeAuthModal()">
-      <div class="auth-box" style="margin:0; animation:scaleIn 0.15s ease;">
-        <button onclick="closeAuthModal()" style="position:absolute; top:16px; right:20px; background:none; border:none; color:var(--text-dim); font-size:20px; cursor:pointer;">✕</button>
-        <div style="display:flex; gap:6px; margin-bottom:18px;">
+    <div class="ls-access-evolution" onclick="if(event.target===this) closeAuthModal()">
+      <div class="ls-access-orb ls-access-orb-a" aria-hidden="true"></div>
+      <div class="ls-access-orb ls-access-orb-b" aria-hidden="true"></div>
+      <div class="auth-box ls-access-card">
+        <button class="ls-access-close" onclick="closeAuthModal()" aria-label="Cerrar">✕</button>
+        <div class="ls-access-brand" aria-label="LiveScroll 6">
+          <div class="ls-access-logo">6</div>
+          <div>
+            <div class="ls-access-word">Live<span>Scroll</span></div>
+            <small>${isSignup ? "CREÁ TU IDENTIDAD" : "VOLVÉ A CONECTAR"}</small>
+          </div>
+        </div>
+        <div class="ls-access-tabs">
           <button onclick="renderAuthForm('login')" class="${!isSignup ? "btn" : "btn-outline"}" style="flex:1; padding:8px; font-size:13px;">Iniciar sesión</button>
           <button onclick="renderAuthForm('signup')" class="${isSignup ? "btn" : "btn-outline"}" style="flex:1; padding:8px; font-size:13px;">Crear cuenta</button>
         </div>
-        <h2>${isSignup ? "Crear cuenta" : "Iniciar sesión"}</h2>
+        <h2>${isSignup ? "Tu camino empieza acá" : "Qué bueno verte de nuevo"}</h2>
+        <p class="ls-access-subtitle">${isSignup ? "Sumate a la próxima generación de creadores y usuarios." : "Ingresá para continuar recorriendo LiveScroll."}</p>
         ${isSignup && window.referralCode ? `<p style="font-size:12px; color:var(--gold); margin-top:-8px; margin-bottom:14px;">🎉 Te invitó @${escapeHtml(window.referralCode)}</p>` : ""}
         ${isSignup ? `
           <div class="field">
@@ -880,7 +890,7 @@ function renderAuthForm(mode) {
               Soy mayor de 18 años y acepto los <a href="terminos.html" target="_blank">Términos y Condiciones</a>.
             </label>
           </div>` : ""}
-        <button class="btn" style="width:100%" onclick="${isSignup ? "handleSignup()" : "handleLogin()"}">
+        <button class="btn ls-access-submit" style="width:100%" onclick="${isSignup ? "handleSignup()" : "handleLogin()"}">
           ${isSignup ? "Crear cuenta" : "Entrar"}
         </button>
         ${!isSignup ? `<div style="text-align:center; margin-top:10px;"><button onclick="handleForgotPassword()" style="background:none;border:none;color:var(--text-dim);font-size:12px;cursor:pointer;text-decoration:underline;">¿Olvidaste tu contraseña?</button></div>` : ""}
@@ -3108,7 +3118,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4141,6 +4151,7 @@ function showChangelogModal(entries) {
     "5.9.3":"IDENTITY EXPERIENCE",
     "5.9.4":"MOTION UPGRADE",
     "5.9.5":"SIGNATURE MOTION",
+    "5.9.6":"ACCESS EVOLUTION",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4211,7 +4222,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -6156,6 +6167,70 @@ function getGridCoverHtml(video) {
   return `<div class="grid-fallback">${thumb}</div>`;
 }
 
+let lsProfilePreviewObserver = null;
+let lsProfilePreviewQueue = [];
+let lsProfilePreviewBusy = false;
+
+function lsLoadNextProfilePreview() {
+  if (lsProfilePreviewBusy) return;
+  const cover = lsProfilePreviewQueue.shift();
+  if (!cover) return;
+  if (!cover.isConnected || cover.dataset.lsPreviewLoaded === "1") {
+    requestAnimationFrame(lsLoadNextProfilePreview);
+    return;
+  }
+
+  const video = cover.querySelector("video");
+  const src = cover.dataset.lsPreviewSrc;
+  if (!video || !src) {
+    requestAnimationFrame(lsLoadNextProfilePreview);
+    return;
+  }
+
+  lsProfilePreviewBusy = true;
+  cover.dataset.lsPreviewLoaded = "1";
+  video.preload = "metadata";
+  video.src = src;
+
+  let completed = false;
+  const finish = () => {
+    if (completed) return;
+    completed = true;
+    cover.classList.add("ls-preview-ready");
+    lsProfilePreviewBusy = false;
+    setTimeout(lsLoadNextProfilePreview, 90);
+  };
+  video.addEventListener("loadeddata", finish, { once:true });
+  video.addEventListener("error", finish, { once:true });
+  setTimeout(finish, 2200);
+  video.load();
+}
+
+function initLazyProfilePreviews() {
+  if (lsProfilePreviewObserver) lsProfilePreviewObserver.disconnect();
+  lsProfilePreviewQueue = [];
+  lsProfilePreviewBusy = false;
+  const covers = document.querySelectorAll(".ls-lazy-video-cover[data-ls-preview-src]");
+  if (!covers.length) return;
+
+  if (!("IntersectionObserver" in window)) {
+    lsProfilePreviewQueue = Array.from(covers).slice(0, 6);
+    lsLoadNextProfilePreview();
+    return;
+  }
+
+  lsProfilePreviewObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      lsProfilePreviewObserver.unobserve(entry.target);
+      if (!lsProfilePreviewQueue.includes(entry.target)) lsProfilePreviewQueue.push(entry.target);
+    });
+    lsLoadNextProfilePreview();
+  }, { root:null, rootMargin:"220px 0px", threshold:0.01 });
+
+  covers.forEach(cover => lsProfilePreviewObserver.observe(cover));
+}
+
 function ensureModernMobileStyles() {
   if (document.getElementById("livescrollModernMobileStyles")) return;
 
@@ -7585,10 +7660,13 @@ function getThumbnailHtml(video) {
       return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy">`;
     }
 
-    // Videos viejos sin carátula persistida: mostramos el propio MP4 como preview.
+    // Videos viejos sin carátula persistida: el MP4 se activa recién cerca de la pantalla.
     if (isSafeUrl(video.video_url)) {
-      return `<video src="${escapeHtml(video.video_url)}#t=0.3" preload="metadata" muted playsinline
-        style="width:100%;height:100%;object-fit:cover;pointer-events:none;background:#050607;"></video>`;
+      return `<div class="ls-lazy-video-cover" data-ls-preview-src="${escapeHtml(video.video_url)}#t=0.3">
+        <span aria-hidden="true">▶</span>
+        <video preload="none" muted playsinline disablepictureinpicture
+          style="width:100%;height:100%;object-fit:cover;pointer-events:none;background:#071116;"></video>
+      </div>`;
     }
 
     return "🎬";
@@ -9908,6 +9986,7 @@ async function renderProfile() {
     ${videosSectionHtml}`;
 
   initProfileNovaTilt();
+  initLazyProfilePreviews();
 }
 
 async function handleLike(videoId) {

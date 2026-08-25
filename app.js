@@ -11555,6 +11555,55 @@ function closeLiveScroll590AdminPreview() {
 window.openLiveScroll590AdminPreview = openLiveScroll590AdminPreview;
 window.closeLiveScroll590AdminPreview = closeLiveScroll590AdminPreview;
 
+async function loadAdminPendingVideoReports() {
+  const rpcResult = await sb.rpc("admin_get_pending_video_reports");
+  if (!rpcResult?.error && rpcResult?.data?.ok) {
+    const reports = Array.isArray(rpcResult.data.reports) ? rpcResult.data.reports : [];
+    return {
+      data:reports.map(r => ({
+        ...r,
+        videos:{ title:r.video_title || null, video_url:r.video_url || null },
+        profiles:{ username:r.reporter_username || null }
+      })),
+      error:null
+    };
+  }
+
+  // Respaldo compatible con instalaciones donde la función nueva todavía no
+  // fue ejecutada. Evita depender del nombre interno de una clave foránea.
+  const rawResult = await sb.from("video_reports")
+    .select("*")
+    .or("status.eq.pending,status.eq.open,status.is.null")
+    .order("created_at", { ascending:true });
+
+  if (rawResult.error) return { data:[], error:rawResult.error };
+
+  const rawReports = rawResult.data || [];
+  const videoIds = [...new Set(rawReports.map(r => r.video_id).filter(Boolean))];
+  const reporterIds = [...new Set(rawReports.map(r => r.reporter_id).filter(Boolean))];
+
+  const [videosResult, profilesResult] = await Promise.all([
+    videoIds.length
+      ? sb.from("videos").select("id,title,video_url").in("id", videoIds)
+      : Promise.resolve({ data:[], error:null }),
+    reporterIds.length
+      ? sb.from("profiles").select("id,username").in("id", reporterIds)
+      : Promise.resolve({ data:[], error:null })
+  ]);
+
+  const videosById = Object.fromEntries((videosResult.data || []).map(v => [v.id, v]));
+  const profilesById = Object.fromEntries((profilesResult.data || []).map(p => [p.id, p]));
+
+  return {
+    data:rawReports.map(r => ({
+      ...r,
+      videos:videosById[r.video_id] || null,
+      profiles:profilesById[r.reporter_id] || null
+    })),
+    error:null
+  };
+}
+
 
 async function renderAdmin() {
   const main = document.getElementById("appView");
@@ -11582,10 +11631,7 @@ async function renderAdmin() {
       .select("*, profiles!subscription_requests_user_id_fkey(username)")
       .order("created_at", { ascending:true }),
     loadPlans(),
-    sb.from("video_reports")
-      .select("*, videos(title, video_url), profiles!video_reports_reporter_id_fkey(username)")
-      .eq("status", "pending")
-      .order("created_at", { ascending:true }),
+    loadAdminPendingVideoReports(),
     sb.rpc("admin_get_stats"),
     sb.rpc("admin_get_creator_applications"),
     sb.rpc("admin_get_security_incident_reports")
@@ -11615,6 +11661,7 @@ async function renderAdmin() {
   const pendingSubs = (subRequests || []).filter(s => s.status === "pending");
 
   const reports = reportsResult?.data || [];
+  const reportsError = reportsResult?.error || null;
   const stats = statsResult?.data;
   const creatorApplications = creatorApplicationsResult?.data || [];
   const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending");
@@ -11734,8 +11781,12 @@ async function renderAdmin() {
       </div>
     `}
 
-    ${reports && reports.length ? `
-      <h3>🚩 Videos reportados</h3>
+    <h3>🚩 Videos reportados (${reports.length})</h3>
+    ${reportsError ? `
+      <div class="form-card" style="margin-bottom:14px;border-color:rgba(248,113,113,.28);color:var(--red);font-size:12px;line-height:1.5;">
+        No se pudieron consultar los reportes. Ejecutá el SQL de reparación de reportes Admin y volvé a abrir el panel.
+      </div>
+    ` : reports && reports.length ? `
       ${reports.map(r => `
         <div class="form-card" style="margin-bottom:14px;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
@@ -11751,7 +11802,11 @@ async function renderAdmin() {
             </div>
           </div>
         </div>
-      `).join("")}` : ""}
+      `).join("")}` : `
+      <div class="form-card" style="margin-bottom:14px;color:var(--text-dim);font-size:12px;">
+        No hay videos reportados pendientes. ✓
+      </div>
+    `}
 
     ${pendingSubs.length ? `
     <h3 style="margin-top:24px;">💳 Pagos de suscripción a confirmar</h3>
@@ -12416,10 +12471,15 @@ function organizeAdminPanel() {
   if (!title) return;
 
   const nav = document.createElement("div");
+  const securityHeadingsText = Array.from(main.querySelectorAll("h3"))
+    .map(h => h.textContent || "")
+    .join(" ");
+  const videoReportsMatch = securityHeadingsText.match(/Videos reportados\s*\((\d+)\)/i);
+  const visibleVideoReportsCount = videoReportsMatch ? Number(videoReportsMatch[1]) : 0;
   nav.className = "ls-admin-nav";
   nav.innerHTML = `
     <button data-admin-tab="resumen" class="active" onclick="switchAdminPanelGroup('resumen',this)">📊 Resumen</button>
-    <button data-admin-tab="seguridad" onclick="switchAdminPanelGroup('seguridad',this)">🚨 Seguridad</button>
+    <button data-admin-tab="seguridad" onclick="switchAdminPanelGroup('seguridad',this)">🚨 Seguridad${visibleVideoReportsCount ? ` (${visibleVideoReportsCount})` : ""}</button>
     <button data-admin-tab="usuarios" onclick="switchAdminPanelGroup('usuarios',this)">👥 Usuarios</button>
     <button data-admin-tab="finanzas" onclick="switchAdminPanelGroup('finanzas',this)">💰 Finanzas</button>
     <button data-admin-tab="tienda" onclick="switchAdminPanelGroup('tienda',this)">🛍️ Tienda</button>

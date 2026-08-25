@@ -2322,7 +2322,6 @@ function toggleMobileMenu() {
       <button class="${activeTab === 'ranking' ? 'active' : ''}" onclick="switchTab('ranking'); closeMobileMenu();"><span>🏆</span><b>Ranking</b></button>
       <div class="ls-mobile-menu-label">Ayuda y ajustes</div>
       <button onclick="openChangelogHistory(); closeMobileMenu();"><span>📢</span><b>Novedades</b></button>
-      <button class="ls7-menu-teaser" onclick="openLiveScroll7Teaser(); closeMobileMenu();"><span>◈</span><b>LiveScroll 7 <small>PRÓXIMAMENTE</small></b></button>
       <button onclick="showTutorialModal(); closeMobileMenu();"><span>❓</span><b>Cómo funciona</b></button>
       <button onclick="openLiveScrollSettings(); closeMobileMenu();"><span>⚙️</span><b>Configuración</b></button>
       ${currentProfile.is_admin ? `<button class="${activeTab === 'admin' ? 'active' : ''}" onclick="switchTab('admin'); closeMobileMenu();"><span>🛠</span><b>Admin</b></button>` : ""}
@@ -2345,14 +2344,7 @@ function closeMobileMenu() {
 // 6.0.8 · EL PULSO — ADELANTO DE LIVESCROLL 7
 // ============================================================
 function openLiveScroll7Teaser() {
-  if (window.LiveScrollAndroid?.openLiveScroll7Teaser) {
-    try {
-      window.LiveScrollAndroid.openLiveScroll7Teaser();
-      return;
-    } catch (_) {}
-  }
-
-  closeLiveScroll7Teaser();
+  if (document.getElementById("ls7TeaserOverlay")) return;
   const overlay = document.createElement("div");
   overlay.id = "ls7TeaserOverlay";
   overlay.className = "ls7-teaser-overlay";
@@ -2360,22 +2352,82 @@ function openLiveScroll7Teaser() {
     <section class="ls7-teaser-shell" role="dialog" aria-modal="true" aria-label="Adelanto de LiveScroll 7">
       <header>
         <div><small>EL FUTURO EMPIEZA ACÁ</small><strong>LiveScroll <em>7</em></strong></div>
-        <button type="button" onclick="closeLiveScroll7Teaser()" aria-label="Cerrar adelanto">✕</button>
       </header>
       <div class="ls7-teaser-video-wrap">
-        <video id="ls7TeaserVideo" controls playsinline preload="metadata" poster="">
+        <video id="ls7TeaserVideo" controls playsinline preload="auto">
           <source src="LiveScroll-7-EL-PULSO-PREVIEW-V2.mp4" type="video/mp4">
         </video>
       </div>
-      <footer><span>PRÓXIMAMENTE</span><b>25 DE OCTUBRE DE 2026</b></footer>
+      <div class="ls7-real-hold" id="ls7RealHold" aria-hidden="true">
+        <p>El adelanto terminó</p>
+        <button type="button" id="ls7HoldButton"><i></i><b>MANTENÉ PARA CONTINUAR</b></button>
+        <small>No sueltes hasta completar el pulso</small>
+      </div>
+      <div class="ls7-real-reveal" id="ls7RealReveal" aria-hidden="true">
+        <span>PRÓXIMAMENTE</span><b>25 DE OCTUBRE DE 2026</b><small>LiveScroll 7</small>
+      </div>
     </section>`;
-  overlay.addEventListener("click", event => {
-    if (event.target === overlay) closeLiveScroll7Teaser();
-  });
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add("is-visible"));
   const video = overlay.querySelector("video");
+  const holdArea = overlay.querySelector("#ls7RealHold");
+  const holdButton = overlay.querySelector("#ls7HoldButton");
+  let holdTimer = null;
+  let holdStartedAt = 0;
+  let finished = false;
+
+  const revealHold = () => {
+    if (finished || holdArea.classList.contains("is-visible")) return;
+    holdArea.classList.add("is-visible");
+    holdArea.setAttribute("aria-hidden", "false");
+  };
+  video?.addEventListener("ended", revealHold, { once:true });
+  video?.addEventListener("error", revealHold, { once:true });
   video?.play().catch(() => {});
+
+  const cancelHold = () => {
+    if (finished) return;
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    holdButton.classList.remove("is-holding");
+    holdButton.style.setProperty("--ls7-hold", "0%");
+  };
+  const completeHold = () => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(holdTimer);
+    holdButton.classList.add("is-complete");
+    holdButton.style.setProperty("--ls7-hold", "100%");
+    holdArea.classList.remove("is-visible");
+    const reveal = overlay.querySelector("#ls7RealReveal");
+    reveal.classList.add("is-visible");
+    reveal.setAttribute("aria-hidden", "false");
+    localStorage.setItem(`livescroll_ls7_pulse_seen_${currentUser.id}`, "1");
+    setTimeout(() => {
+      overlay.classList.remove("is-visible");
+      setTimeout(() => {
+        overlay.remove();
+        window.__lsStartupOptionalModalShown = false;
+        checkPendingContent();
+      }, 220);
+    }, 3200);
+  };
+  const startHold = event => {
+    if (finished || !holdArea.classList.contains("is-visible")) return;
+    event.preventDefault();
+    holdStartedAt = performance.now();
+    holdButton.classList.add("is-holding");
+    const animate = now => {
+      if (!holdTimer || finished) return;
+      const progress = Math.min(100, ((now - holdStartedAt) / 1800) * 100);
+      holdButton.style.setProperty("--ls7-hold", `${progress}%`);
+      if (progress < 100) requestAnimationFrame(animate);
+    };
+    holdTimer = setTimeout(completeHold, 1800);
+    requestAnimationFrame(animate);
+  };
+  ["pointerdown","touchstart"].forEach(name => holdButton.addEventListener(name, startHold, { passive:false }));
+  ["pointerup","pointercancel","pointerleave","touchend","touchcancel"].forEach(name => holdButton.addEventListener(name, cancelHold));
 }
 
 function closeLiveScroll7Teaser() {
@@ -3205,6 +3257,18 @@ async function checkPendingContent() {
 
   if (pendingData?.tutorial_pending) {
     showTutorialModal();
+    return;
+  }
+
+  // 6.0.8 · EL PULSO: no vive en el menú. Aparece automáticamente una sola
+  // vez por Usuario y solamente se completa manteniendo presionado de verdad.
+  const ls7PulseKey = `livescroll_ls7_pulse_seen_${currentUser.id}`;
+  if (
+    localStorage.getItem(ls7PulseKey) !== "1" &&
+    !window.__lsStartupOptionalModalShown
+  ) {
+    window.__lsStartupOptionalModalShown = true;
+    openLiveScroll7Teaser();
     return;
   }
 

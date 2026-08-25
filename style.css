@@ -877,6 +877,7 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 }
 .ls7-teaser-overlay.is-visible { opacity: 1; }
 .ls7-teaser-shell {
+  position: relative;
   width: min(430px,100%);
   max-height: calc(100dvh - 24px);
   overflow: hidden;
@@ -899,6 +900,48 @@ main.app-view { max-width: 920px; margin: 0 auto; padding: 32px 28px 80px; }
 .ls7-teaser-shell footer { flex-direction:column;gap:3px; }
 .ls7-teaser-shell footer span { color:#e0f2fe;font-weight:800;letter-spacing:.1em; }
 .ls7-teaser-shell footer b { color:#fbbf24;font-size:13px; }
+
+.ls7-real-hold,.ls7-real-reveal {
+  position:absolute;
+  inset:0;
+  z-index:4;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:26px;
+  text-align:center;
+  background:rgba(1,2,10,.94);
+  opacity:0;
+  visibility:hidden;
+  transition:opacity .25s ease,visibility .25s ease;
+}
+.ls7-real-hold.is-visible,.ls7-real-reveal.is-visible { opacity:1;visibility:visible; }
+.ls7-real-hold p { margin:0;color:#e0f2fe;font-size:20px;font-weight:800; }
+.ls7-real-hold small { color:#9ca3af;font-size:12px; }
+.ls7-real-hold button {
+  --ls7-hold:0%;
+  position:relative;
+  width:min(320px,100%);
+  min-height:66px;
+  overflow:hidden;
+  border:1px solid rgba(56,189,248,.82);
+  border-radius:18px;
+  background:#080b19;
+  color:#fff;
+  touch-action:none;
+  user-select:none;
+  -webkit-user-select:none;
+  box-shadow:0 0 28px rgba(56,189,248,.14);
+}
+.ls7-real-hold button i { position:absolute;inset:0 auto 0 0;width:var(--ls7-hold);background:linear-gradient(90deg,rgba(37,99,235,.8),rgba(139,92,246,.88));transition:width .08s linear; }
+.ls7-real-hold button b { position:relative;z-index:1;font-size:13px;letter-spacing:.06em; }
+.ls7-real-hold button.is-holding { transform:scale(.985);box-shadow:0 0 40px rgba(139,92,246,.34); }
+.ls7-real-reveal { z-index:5;background:radial-gradient(circle at 50% 40%,rgba(76,29,149,.42),transparent 38%),#01020a; }
+.ls7-real-reveal span { color:#e0f2fe;font-size:25px;font-weight:900;letter-spacing:.1em;text-shadow:0 0 18px #38bdf8; }
+.ls7-real-reveal b { color:#fbbf24;font-size:18px; }
+.ls7-real-reveal small { color:#a5f3fc;font-size:14px;letter-spacing:.14em; }
 
 .ls-legacy .ls7-menu-teaser::after { animation:none;display:none; }
 .ls-legacy .ls7-teaser-overlay { backdrop-filter:none; }

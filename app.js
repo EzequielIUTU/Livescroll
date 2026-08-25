@@ -8303,6 +8303,23 @@ let rawSelectedFile = null;
 let trimmedFile = null;
 let uploadPreviewUrlSafe = null;
 let videoReeditContext = null;
+let videoReeditAbortController = null;
+
+function cancelVideoReeditorPreparation() {
+  window.__lsVideoReeditCancelledByUser = true;
+  if (videoReeditAbortController) {
+    try { videoReeditAbortController.abort(); } catch (_) {}
+  }
+  videoReeditAbortController = null;
+  videoReeditContext = null;
+  rawSelectedFile = null;
+  trimmedFile = null;
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  showToast("Preparación cancelada. El video original sigue intacto.");
+}
+
+window.cancelVideoReeditorPreparation = cancelVideoReeditorPreparation;
 
 function previewFileSize() {
   rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
@@ -8440,6 +8457,18 @@ async function openVideoReeditor(videoId) {
 
   closeVideoActionSheet();
   document.querySelectorAll(".video-grid-menu").forEach(el => el.classList.add("hidden"));
+  if (videoReeditAbortController) {
+    try { videoReeditAbortController.abort(); } catch (_) {}
+  }
+  window.__lsVideoReeditCancelledByUser = false;
+  videoReeditAbortController = new AbortController();
+  const localAbortController = videoReeditAbortController;
+  let preparationTimedOut = false;
+  const preparationTimeout = setTimeout(() => {
+    preparationTimedOut = true;
+    try { localAbortController.abort(); } catch (_) {}
+  }, 90000);
+
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
     <div class="modal-overlay" style="z-index:140;">
@@ -8447,17 +8476,29 @@ async function openVideoReeditor(videoId) {
         <div class="modal-box-body" style="padding:30px 22px;">
           <div style="font-size:38px;margin-bottom:12px;">✂️</div>
           <h2 style="margin:0 0 7px;">Preparando tu video</h2>
-          <p style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">Descargando una copia segura para editar. El original todavía no se modifica.</p>
+          <p id="videoReeditPrepareStatus" style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">Descargando una copia segura para editar. El original todavía no se modifica.</p>
           <div class="ls-reedit-loading"><i></i></div>
+          <button class="btn-outline" style="width:100%;margin-top:16px;" onclick="cancelVideoReeditorPreparation()">Cancelar</button>
         </div>
       </div>
     </div>`;
 
   try {
-    const response = await fetch(video.video_url, { cache:"no-store" });
+    const response = await fetch(video.video_url, {
+      cache:"no-store",
+      signal:localAbortController.signal
+    });
     if (!response.ok) throw new Error(`No se pudo descargar (${response.status})`);
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    const prepareStatus = document.getElementById("videoReeditPrepareStatus");
+    if (prepareStatus && contentLength > 0) {
+      prepareStatus.textContent = `Descargando ${(contentLength / (1024 * 1024)).toFixed(1)} MB para editar sin tocar el original...`;
+    }
     const blob = await response.blob();
     if (!blob.size) throw new Error("El archivo recibido está vacío");
+    if (blob.size > MAX_FILE_MB * 1024 * 1024) {
+      throw new Error(`El archivo supera los ${MAX_FILE_MB} MB permitidos para reedición`);
+    }
     const extension = blob.type.includes("webm") ? "webm" : "mp4";
     rawSelectedFile = new File([blob], `video-${video.id}.${extension}`, { type:blob.type || "video/mp4" });
     trimmedFile = null;
@@ -8469,11 +8510,19 @@ async function openVideoReeditor(videoId) {
     };
     openVideoTrimmer();
   } catch (error) {
+    if (window.__lsVideoReeditCancelledByUser) return;
     console.error("No se pudo preparar la reedición:", error);
     wrap.innerHTML = "";
     videoReeditContext = null;
     rawSelectedFile = null;
-    showToast("No pudimos preparar el video. El original sigue intacto.");
+    showToast(preparationTimedOut
+      ? "La descarga tardó demasiado. Probá nuevamente con una conexión más estable."
+      : "No pudimos preparar el video. El original sigue intacto.");
+  } finally {
+    clearTimeout(preparationTimeout);
+    if (videoReeditAbortController === localAbortController) {
+      videoReeditAbortController = null;
+    }
   }
 }
 

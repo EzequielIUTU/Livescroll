@@ -3108,7 +3108,7 @@ function showRoadTo6Teaser() {
 
           <div class="ls-road6-road">
             5.4.6 → 5.5.7 → 5.6.8 → 5.7.9<br>
-            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → <strong>6.0.0</strong>
+            5.8.0 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → <strong>6.0.0</strong>
           </div>
 
           <button class="ls-road6-btn" onclick="acknowledgeRoadTo6Teaser()">
@@ -4138,6 +4138,7 @@ function showChangelogModal(entries) {
     "5.9.0":"ROAD TO 6",
     "5.9.1":"VISUAL EVOLUTION",
     "5.9.2":"FEED EXPERIENCE",
+    "5.9.3":"IDENTITY EXPERIENCE",
     "6.0.0":"NEW ERA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
@@ -4208,7 +4209,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 6.0.0</div>
         </div>
       </div>
     </div>`;
@@ -9215,7 +9216,311 @@ async function getMyCollectionSummary() {
   };
 }
 
+function ensureIdentityExperience593Styles() {
+  if (document.getElementById("lsIdentityExperience593Styles")) return;
+  const style = document.createElement("style");
+  style.id = "lsIdentityExperience593Styles";
+  style.textContent = `
+    html:not(.ls-legacy) .profile-hero {
+      border:1px solid rgba(56,221,242,.18) !important;
+      border-radius:24px !important;
+      background:
+        radial-gradient(circle at 88% 18%,rgba(56,221,242,.11),transparent 30%),
+        radial-gradient(circle at 10% 82%,rgba(46,242,124,.09),transparent 34%),
+        linear-gradient(150deg,rgba(13,32,40,.98),rgba(7,17,22,.97)) !important;
+      box-shadow:0 24px 70px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    html:not(.ls-legacy) .profile-cover {
+      height:142px;
+      border-bottom:1px solid rgba(56,221,242,.13);
+      background-color:#0b2730;
+      background-image:
+        radial-gradient(circle at 22% 30%,rgba(46,242,124,.18),transparent 28%),
+        linear-gradient(120deg,#0d2932,#09202a 55%,#10333c);
+    }
+
+    html:not(.ls-legacy) .profile-cover::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+      background-size:28px 28px;
+      pointer-events:none;
+    }
+
+    html:not(.ls-legacy) .profile-cover-edit-btn {
+      top:12px;
+      right:12px;
+      min-height:34px;
+      padding:6px 11px;
+      border-color:rgba(255,255,255,.16);
+      background:rgba(4,13,17,.68);
+      box-shadow:0 8px 20px rgba(0,0,0,.20);
+      backdrop-filter:blur(8px);
+    }
+
+    html:not(.ls-legacy) .profile-avatar-ring {
+      width:82px;
+      height:82px;
+      border:2px solid var(--gold-dim);
+      background:linear-gradient(145deg,#102d36,#071116);
+      box-shadow:0 0 0 5px rgba(7,17,22,.78),0 14px 34px rgba(0,0,0,.27),0 0 28px rgba(46,242,124,.08);
+    }
+
+    html:not(.ls-legacy) .profile-avatar-ring img {
+      width:70px;
+      height:70px;
+    }
+
+    html:not(.ls-legacy) .profile-name-block h1 {
+      font-size:24px;
+      font-weight:700;
+      letter-spacing:-.045em;
+      text-wrap:balance;
+    }
+
+    .profile-role-badge {
+      display:inline-flex;
+      align-items:center;
+      width:max-content;
+      margin-top:5px;
+      padding:5px 9px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      font:800 9px 'JetBrains Mono',monospace !important;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    html:not(.ls-legacy) .profile-role-badge.user {
+      color:#a9c1c7;
+      border-color:rgba(154,179,186,.20);
+      background:rgba(154,179,186,.06);
+    }
+
+    html:not(.ls-legacy) .profile-role-badge.creator {
+      color:var(--gold);
+      border-color:rgba(46,242,124,.25);
+      background:linear-gradient(135deg,rgba(46,242,124,.10),rgba(56,221,242,.055));
+      box-shadow:0 0 20px rgba(46,242,124,.06);
+    }
+
+    html:not(.ls-legacy) .profile-bio {
+      max-width:680px;
+      padding:11px 13px;
+      border-left:2px solid rgba(56,221,242,.35);
+      border-radius:0 11px 11px 0;
+      background:rgba(4,14,18,.30);
+      color:#b9cdd2;
+    }
+
+    .ls-profile-socials {
+      display:flex;
+      gap:8px;
+      margin:0 0 16px;
+      flex-wrap:wrap;
+      position:relative;
+      z-index:3;
+    }
+
+    .ls-profile-social-link {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      min-height:34px;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--panel-2);
+      color:var(--text);
+      text-decoration:none;
+      font-size:10px;
+      font-weight:750;
+      transition:transform .16s ease,border-color .16s ease,background .16s ease;
+    }
+
+    html:not(.ls-legacy) .ls-profile-social-link {
+      border-color:rgba(56,221,242,.15);
+      background:rgba(7,24,30,.66);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .ls-profile-social-link:hover {
+      transform:translateY(-2px);
+      border-color:rgba(46,242,124,.30);
+      background:rgba(18,48,58,.78);
+    }
+
+    html:not(.ls-legacy) .profile-stats-row {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:9px !important;
+    }
+
+    html:not(.ls-legacy) .stat-pill {
+      min-width:0;
+      padding:12px 10px;
+      border:1px solid rgba(56,221,242,.14);
+      border-radius:14px !important;
+      background:linear-gradient(145deg,rgba(18,48,58,.58),rgba(7,21,27,.50));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .stat-pill .num {
+      font-size:20px;
+      color:var(--gold);
+      text-shadow:0 0 18px rgba(46,242,124,.12);
+    }
+
+    html:not(.ls-legacy) .profile-section-head .ico {
+      border-color:rgba(56,221,242,.17);
+      border-radius:11px;
+      background:linear-gradient(145deg,rgba(46,242,124,.08),rgba(56,221,242,.07));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .profile-section-head h3 {
+      font-size:16px;
+      letter-spacing:-.025em;
+    }
+
+    html:not(.ls-legacy) .video-grid-tile {
+      border:1px solid rgba(56,221,242,.10);
+      border-radius:10px;
+      box-shadow:0 10px 24px rgba(0,0,0,.18);
+      transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+    }
+
+    html:not(.ls-legacy) .video-grid-tile:hover {
+      transform:translateY(-2px);
+      border-color:rgba(46,242,124,.24);
+      box-shadow:0 14px 30px rgba(0,0,0,.25);
+    }
+
+    .users-directory-tabs {
+      display:grid !important;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px !important;
+      margin-bottom:12px;
+      padding:5px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel);
+    }
+
+    html:not(.ls-legacy) .users-directory-tabs {
+      border-color:rgba(56,221,242,.14);
+      background:linear-gradient(145deg,rgba(13,32,40,.82),rgba(7,17,22,.76));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    .users-directory-tabs button {
+      width:100%;
+      min-width:0;
+    }
+
+    html:not(.ls-legacy) .user-directory-search {
+      min-height:48px;
+      margin-bottom:14px;
+      padding-left:15px;
+      border-color:rgba(56,221,242,.17);
+      border-radius:14px;
+      background:rgba(4,14,18,.68);
+    }
+
+    html:not(.ls-legacy) .user-directory-row {
+      min-height:68px;
+      margin-bottom:9px;
+      padding:12px 14px;
+      border-color:rgba(56,221,242,.12) !important;
+      background:linear-gradient(145deg,rgba(13,32,40,.88),rgba(8,22,28,.84)) !important;
+      transition:transform .17s ease,border-color .17s ease,background .17s ease;
+    }
+
+    html:not(.ls-legacy) .user-directory-row:hover {
+      transform:translateX(3px);
+      border-color:rgba(46,242,124,.24) !important;
+      background:linear-gradient(145deg,rgba(15,39,47,.94),rgba(8,25,31,.90)) !important;
+    }
+
+    html:not(.ls-legacy) .user-directory-row .avatar-sm {
+      width:44px;
+      height:44px;
+      border-color:rgba(56,221,242,.20);
+      box-shadow:0 7px 18px rgba(0,0,0,.20);
+    }
+
+    .ls-directory-role {
+      display:inline-flex;
+      margin-top:4px;
+      color:var(--text-dim);
+      font:750 9px 'JetBrains Mono',monospace;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+
+    .ls-directory-role.creator {
+      color:var(--gold);
+    }
+
+    html.ls-legacy .profile-hero,
+    html.ls-legacy .user-directory-row,
+    html.ls-legacy .video-grid-tile {
+      box-shadow:none !important;
+      backdrop-filter:none !important;
+    }
+
+    @media(max-width:600px) {
+      html:not(.ls-legacy) .profile-hero {
+        border-radius:18px !important;
+        padding-left:16px;
+        padding-right:16px;
+      }
+
+      html:not(.ls-legacy) .profile-cover {
+        height:122px;
+        margin-left:-16px;
+        margin-right:-16px;
+      }
+
+      html:not(.ls-legacy) .profile-avatar-ring {
+        width:68px;
+        height:68px;
+      }
+
+      html:not(.ls-legacy) .profile-avatar-ring img {
+        width:58px;
+        height:58px;
+      }
+
+      html:not(.ls-legacy) .profile-name-block h1 {
+        font-size:20px;
+        overflow-wrap:anywhere;
+      }
+
+      html:not(.ls-legacy) .profile-stats-row {
+        gap:6px !important;
+      }
+
+      html:not(.ls-legacy) .stat-pill {
+        padding:10px 5px;
+      }
+
+      html:not(.ls-legacy) .stat-pill .num {
+        font-size:17px;
+      }
+
+      html:not(.ls-legacy) .stat-pill .lbl {
+        font-size:8px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 async function renderProfile() {
+  ensureIdentityExperience593Styles();
   const main = document.getElementById("appView");
   main.innerHTML = `<p>Cargando tu perfil...</p>`;
 
@@ -9575,7 +9880,7 @@ async function renderProfile() {
           <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
-            <div class="handle">${currentProfile.is_creator ? "🎬 Creador" : "Usuario"} · Tu perfil en LiveScroll</div>
+            <div class="handle profile-role-badge ${currentProfile.is_creator ? "creator" : "user"}">${currentProfile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
             ${renderProfileTitleInline(equippedTitle, true)}
             ${renderEquippedMedalsInline(equippedBadges, true)}
           </div>
@@ -9745,8 +10050,8 @@ function renderSocialIcons(profile) {
   ];
   const active = socials.filter(s => profile[s.key] && isSafeUrl(profile[s.key]));
   if (!active.length) return "";
-  return `<div style="display:flex; gap:10px; margin-bottom:16px;">
-    ${active.map(s => `<a href="${escapeHtml(profile[s.key])}" target="_blank" rel="noopener" title="${s.label}" style="font-size:20px; text-decoration:none;" onclick="logSocialClick('${profile.id}', '${s.label}')">${s.icon}</a>`).join("")}
+  return `<div class="ls-profile-socials">
+    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(profile[s.key])}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><span style="font-size:16px;">${s.icon}</span><span>${s.label}</span></a>`).join("")}
   </div>`;
 }
 
@@ -9919,11 +10224,12 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
 }
 
 async function renderUsersDirectory() {
+  ensureIdentityExperience593Styles();
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title">👥 Usuarios</h1>
     <p class="page-sub">Buscá personas y descubrí a los creadores de LiveScroll.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;">
+    <div class="users-directory-tabs">
       <button id="usersFilterAll" class="btn" onclick="setUsersDirectoryType('users')" style="flex:1;font-size:13px;padding:11px 14px;">👥 Usuarios</button>
       <button id="usersFilterCreators" class="btn-outline" onclick="setUsersDirectoryType('creators')" style="flex:1;font-size:13px;padding:11px 14px;">🎬 Creadores</button>
     </div>
@@ -9982,7 +10288,8 @@ async function loadUsersDirectory(term) {
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
       <div class="avatar-sm${u.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname" style="font-size:14px;">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${u.is_creator ? `<span style="color:var(--gold);font-size:11px;font-weight:900;">🎬 CREADOR</span>` : ""} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname" style="font-size:14px;">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="ls-directory-role ${u.is_creator ? "creator" : "user"}">${u.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
     </div>`).join("");
@@ -10422,6 +10729,7 @@ function renderCollection568Grid() {
 }
 
 async function viewPublicProfile(username) {
+  ensureIdentityExperience593Styles();
   if (!username) return;
   if (username === currentProfile.username) { switchTab("profile"); return; }
 
@@ -10497,7 +10805,7 @@ async function viewPublicProfile(username) {
           <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
-            <div class="handle">${profile.is_creator ? "🎬 Creador" : "Usuario"}</div>
+            <div class="handle profile-role-badge ${profile.is_creator ? "creator" : "user"}">${profile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
             ${renderProfileTitleInline(theirTitle, false)}
             ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
           </div>

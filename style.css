@@ -178,8 +178,16 @@ nav {
 .mobile-menu-panel .ls-mobile-menu-scroll > button span,.ls-mobile-menu-exit button span { display:grid;place-items:center;width:29px;height:29px;border-radius:9px;background:rgba(56,221,242,.055);font-size:14px; }
 .mobile-menu-panel .ls-mobile-menu-scroll > button b,.ls-mobile-menu-exit button b { font-size:13px;font-weight:650; }
 .mobile-menu-panel .ls-mobile-menu-scroll > button.active { color:#2ef27c;border-color:rgba(46,242,124,.17);background:linear-gradient(135deg,rgba(46,242,124,.09),rgba(56,221,242,.045)); }
-.ls-mobile-menu-exit { margin-top:10px;padding-top:10px;border-top:1px solid rgba(248,113,113,.14); }
-.ls-mobile-menu-exit button { color:var(--red);background:none;font-family:inherit;cursor:pointer;border-radius:11px; }
+.ls-mobile-menu-exit { margin-top:10px;padding-top:10px;border-top:1px solid rgba(244,211,94,.16);display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,.75fr);gap:7px; }
+.ls-mobile-menu-exit button { min-width:0;color:var(--red);background:none;font-family:inherit;cursor:pointer;border-radius:11px; }
+.ls-mobile-menu-exit .ls-menu-mode-button { color:#f4d35e;border-color:rgba(244,211,94,.26);background:linear-gradient(135deg,rgba(244,211,94,.11),rgba(244,211,94,.025));overflow:hidden; }
+.ls-mobile-menu-exit .ls-menu-mode-button b { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit; }
+.ls-mobile-menu-exit .ls-menu-mode-button.is-nova { color:#ffe88a;box-shadow:inset 0 0 18px rgba(244,211,94,.045);animation:ls601NovaNameGlow 2.4s ease-in-out infinite; }
+.ls-mobile-menu-exit .ls-menu-mode-button.is-nova span { color:#fff1a3;text-shadow:0 0 10px rgba(244,211,94,.72); }
+.ls-mobile-menu-exit .ls-menu-mode-button.is-legacy { color:#d9dde2;border-color:rgba(217,221,226,.24);background:linear-gradient(135deg,rgba(217,221,226,.10),rgba(119,128,139,.035)); }
+.ls-mobile-menu-exit .ls-menu-mode-button.is-legacy span { color:#eef1f4; }
+@keyframes ls601NovaNameGlow { 0%,100%{text-shadow:0 0 5px rgba(244,211,94,.24)}50%{text-shadow:0 0 13px rgba(244,211,94,.72)} }
+@media(max-width:360px) { .ls-mobile-menu-exit{grid-template-columns:1fr}.ls-mobile-menu-exit button{min-height:44px} }
 
 @media(max-width:780px) {
   body.ls-navigation-ready main.app-view { padding-bottom:max(104px,calc(env(safe-area-inset-bottom) + 90px)); }

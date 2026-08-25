@@ -887,7 +887,7 @@ function renderAuthForm(mode) {
           <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
             <input type="checkbox" id="authAcceptTerms" style="margin-top:3px;">
             <label for="authAcceptTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">
-              Soy mayor de 18 años y acepto los <a href="terminos.html" target="_blank">Términos y Condiciones</a>.
+              Soy mayor de 18 años y acepto los <a href="terminos.html" target="_blank" rel="noopener noreferrer">Términos y Condiciones</a>.
             </label>
           </div>` : ""}
         <button class="btn ls-access-submit" style="width:100%" onclick="${isSignup ? "handleSignup()" : "handleLogin()"}">
@@ -917,6 +917,11 @@ async function handleSignup() {
 
   if (!username || !email || !password) {
     errEl.textContent = "Completá todos los campos.";
+    return;
+  }
+
+  if (password.length < 8) {
+    errEl.textContent = "La contraseña tiene que tener al menos 8 caracteres.";
     return;
   }
 
@@ -2203,6 +2208,17 @@ document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 // ============================================================
 // APP SHELL
 // ============================================================
+function getLiveScroll6ModeMenuMarkup() {
+  const mode = window.__liveScrollExperienceMode || "nova";
+  const isLegacy = mode === "legacy";
+  return `
+    <button type="button" class="ls-menu-mode-button ${isLegacy ? "is-legacy" : "is-nova"}"
+      onclick="openLiveScrollModeInfo()" aria-label="Información sobre LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}">
+      <span>${isLegacy ? "🪶" : "✦"}</span>
+      <b>LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}</b>
+    </button>`;
+}
+
 function toggleMobileMenu() {
   if (!currentProfile) return;
   const existing = document.getElementById("mobileMenuPanel");
@@ -2241,6 +2257,7 @@ function toggleMobileMenu() {
       <button onclick="openLiveScrollSettings(); closeMobileMenu();"><span>⚙️</span><b>Configuración</b></button>
       ${currentProfile.is_admin ? `<button class="${activeTab === 'admin' ? 'active' : ''}" onclick="switchTab('admin'); closeMobileMenu();"><span>🛠</span><b>Admin</b></button>` : ""}
       <div class="ls-mobile-menu-exit">
+        ${getLiveScroll6ModeMenuMarkup()}
         <button onclick="handleLogout(); closeMobileMenu();"><span>↪</span><b>Salir</b></button>
       </div>
     </div>`;
@@ -2347,13 +2364,13 @@ function openLiveScrollModeInfo() {
       <div class="ls-mode-head">
         <div class="ls-mode-icon">${isLegacy ? "🪶" : "✨"}</div>
         <div class="ls-mode-title">
-          <strong>LiveScroll ${isLegacy ? "Legacy" : "Nova"}</strong>
+          <strong>LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}</strong>
           <span>${isLegacy ? "Experiencia optimizada" : "Experiencia completa"}</span>
         </div>
       </div>
 
       <div class="ls-mode-current">
-        <strong>Este dispositivo está usando ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
+        <strong>Este dispositivo está usando LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
         LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo.
       </div>
 
@@ -2501,6 +2518,16 @@ function initLiveScrollExperienceMode() {
         color:var(--gold);
       }
 
+      .ls-nova .ls-mode-title strong {
+        color:#ffe88a;
+        animation:ls601NovaNameGlow 2.4s ease-in-out infinite;
+      }
+
+      .ls-legacy .ls-mode-title strong {
+        color:#d9dde2;
+        text-shadow:none;
+      }
+
       .ls-mode-title span {
         display:block;
         margin-top:2px;
@@ -2640,32 +2667,8 @@ function initLiveScrollExperienceMode() {
     document.head.appendChild(style);
   }
 
-  let badge = document.getElementById("lsExperienceBadge");
-  if (!badge) {
-    badge = document.createElement("div");
-    badge.id = "lsExperienceBadge";
-    badge.className = "ls-experience-badge";
-    document.body.appendChild(badge);
-  }
-
-  badge.textContent = mode === "legacy"
-    ? "🪶 LiveScroll Legacy"
-    : "✨ LiveScroll Nova";
-
-  badge.setAttribute("role", "button");
-  badge.setAttribute("tabindex", "0");
-  badge.setAttribute("aria-label", `Ver información sobre LiveScroll ${mode === "legacy" ? "Legacy" : "Nova"}`);
-
-  if (!badge.dataset.modeInfoBound) {
-    badge.dataset.modeInfoBound = "1";
-    badge.addEventListener("click", openLiveScrollModeInfo);
-    badge.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        openLiveScrollModeInfo();
-      }
-    });
-  }
+  // 6.0.1v: el modo deja de flotar sobre el contenido. Vive junto a Salir.
+  document.getElementById("lsExperienceBadge")?.remove();
 
   const storageKey = `livescroll-experience-notice-${mode}-v1`;
   let alreadyShown = false;
@@ -2680,12 +2683,12 @@ function initLiveScrollExperienceMode() {
 
     if (mode === "legacy") {
       toast.innerHTML = `
-        <strong>🪶 LiveScroll Legacy activado</strong>
+        <strong>🪶 LiveScroll 6 Legacy activado</strong>
         Optimizamos automáticamente la experiencia para que LiveScroll funcione mejor en este dispositivo.
       `;
     } else {
       toast.innerHTML = `
-        <strong>✨ LiveScroll Nova</strong>
+        <strong>✨ LiveScroll 6 Nova</strong>
         Estás usando la experiencia completa de LiveScroll.
       `;
     }
@@ -3967,7 +3970,7 @@ function showTermsUpdateModal() {
         <div class="modal-box-header"><h2>📋 Actualizamos los Términos</h2></div>
         <div class="modal-box-body">
         <p style="color:var(--text-dim); font-size:13px;">Cambiamos nuestros Términos y Condiciones. Por favor, revisalos antes de seguir usando LiveScroll.</p>
-        <a href="terminos.html" target="_blank" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
+        <a href="terminos.html" target="_blank" rel="noopener noreferrer" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
         <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
           <input type="checkbox" id="acceptNewTerms" style="margin-top:3px;">
           <label for="acceptNewTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">Leí y acepto los Términos y Condiciones actualizados.</label>
@@ -4230,7 +4233,8 @@ function showChangelogModal(entries) {
     "5.9.7":"NAVIGATION EVOLUTION",
     "5.9.8":"SOCIAL PULSE",
     "5.9.9":"VIDEO REVISION",
-    "6.0.0":"NEW ERA"
+    "6.0.0":"NEW ERA",
+    "6.0.1v":"CORE REVIEW"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
 
@@ -4260,6 +4264,8 @@ function showChangelogModal(entries) {
               ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
               : newestLabel === "6.0.0"
                 ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
+                : newestLabel === "6.0.1v"
+                  ? "LiveScroll 6 refuerza su núcleo para responder más rápido, cargar mejor y proteger cada cuenta."
                 : newestLabel === "5.8.1"
                   ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
                   : newestLabel === "5.8.2"
@@ -4298,9 +4304,9 @@ function showChangelogModal(entries) {
 
         <div class="ls-next-era-foot">
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
-            ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : "Continuar el camino →"}
+            ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : newestLabel.startsWith("6.") ? "Continuar en LiveScroll 6 →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0</div>
+          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0 → 6.0.1v</div>
         </div>
       </div>
     </div>`;
@@ -7773,12 +7779,12 @@ document.addEventListener("click", (e) => {
 function getThumbnailHtml(video) {
   if (video.platform === "youtube") {
     const id = extractYoutubeId(video.video_url);
-    if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy">`;
+    if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy" decoding="async">`;
   }
 
   if (video.platform === "upload") {
     if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
-      return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy">`;
+      return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy" decoding="async">`;
     }
 
     // Videos viejos sin carátula persistida: el MP4 se activa recién cerca de la pantalla.
@@ -9923,7 +9929,7 @@ async function renderProfile() {
     lsPerfCache.profileVideos = { data:videos, at:Date.now() };
   }
 
-  if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${error.message}</p>`; return; }
+  if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${escapeHtml(error.message || "Error desconocido")}</p>`; return; }
 
   const watchedByOther = viewsLedgerResult?.data || [];
   if (!viewsLedgerResult?.error && !lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
@@ -10201,7 +10207,7 @@ async function renderProfile() {
                     ? `<div style="padding:8px 10px; font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</div>`
                     : `<button ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`) : ""}
                 ${v.platform === "upload" ? `<button onclick="openVideoReeditor('${v.id}')">✂️ Reeditar video</button>` : ""}
-                <button onclick="window.open('${escapeHtml(v.video_url)}', '_blank')">🔗 Abrir link</button>
+                ${isSafeUrl(v.video_url) ? `<button onclick="window.open('${escapeHtml(v.video_url)}', '_blank', 'noopener,noreferrer')">🔗 Abrir link</button>` : ""}
                 <button class="danger" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
               </div>
             </div>
@@ -10408,7 +10414,7 @@ function closeComments() {
 function renderAvatarHtml(profile, size) {
   size = size || 32;
   if (profile.avatar_url) {
-    return `<img src="${escapeHtml(profile.avatar_url)}" alt="avatar" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle;">`;
+    return `<img src="${escapeHtml(profile.avatar_url)}" alt="avatar" loading="lazy" decoding="async" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle;">`;
   }
   return `<span style="font-size:${Math.round(size * 0.85)}px; vertical-align:middle;">${profile.avatar_emoji || "🎬"}</span>`;
 }
@@ -11756,8 +11762,8 @@ function openChangePassword() {
 async function submitChangePassword() {
   const password = document.getElementById("changePasswordInput").value;
   const errEl = document.getElementById("changePasswordError");
-  if (!password || password.length < 6) {
-    errEl.textContent = "La contraseña tiene que tener al menos 6 caracteres.";
+  if (!password || password.length < 8) {
+    errEl.textContent = "La contraseña tiene que tener al menos 8 caracteres.";
     return;
   }
 
@@ -11980,6 +11986,12 @@ async function saveProfileEdits() {
     socialPayload.social_tiktok = tiktokEl?.value.trim() || null;
   }
 
+  const invalidSocial = Object.entries(socialPayload).find(([, value]) => value && !isSafeUrl(value));
+  if (invalidSocial) {
+    errEl.textContent = "Los enlaces de redes deben comenzar con https:// o http://";
+    return;
+  }
+
   const { error: updateError } = await sb.from("profiles").update({
     bio,
     avatar_emoji: window.selectedAvatarEmoji,
@@ -12124,7 +12136,7 @@ async function renderAdmin() {
 
   const { data:redemptions, error } = redemptionsResult;
 
-  if (error) { main.innerHTML = `<p class="error-msg">Error: ${error.message}</p>`; return; }
+  if (error) { main.innerHTML = `<p class="error-msg">Error: ${escapeHtml(error.message || "Error desconocido")}</p>`; return; }
 
   // Vista completa solo para admins: IP y estado de bloqueo de cada cuenta
   const profilesOverview = profilesOverviewResult?.data || [];
@@ -14139,7 +14151,7 @@ async function renderRanking() {
   main.innerHTML = `<p>Cargando ranking...</p>`;
 
   const { data: leaderboard, error } = await sb.rpc("get_weekly_leaderboard");
-  if (error) { main.innerHTML = `<p class="error-msg">${error.message}</p>`; return; }
+  if (error) { main.innerHTML = `<p class="error-msg">${escapeHtml(error.message || "Error desconocido")}</p>`; return; }
 
   const medals = ["🥇", "🥈", "🥉"];
 

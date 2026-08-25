@@ -2282,6 +2282,11 @@ function handleLiveScrollAndroidBack() {
   const intro = document.getElementById("introOverlay");
   if (portal || intro) return "handled";
 
+  if (document.getElementById("lsTutorialV3Layer")) {
+    showToast("Completá el recorrido para continuar");
+    return "handled";
+  }
+
   if (document.getElementById("mobileMenuPanel") || document.getElementById("mobileMenuOverlay")) {
     closeMobileMenu();
     return "handled";
@@ -3403,7 +3408,7 @@ const LS_TUTORIAL_V31_STEPS = [
     icon:"👋",
     eyebrow:"BIENVENIDA",
     title:"Conocé LiveScroll de verdad",
-    text:"Este recorrido pasa por las funciones principales de la app. Podés avanzar, volver atrás u omitirlo cuando quieras."
+    text:"Este recorrido obligatorio aparece una sola vez para mostrarte todo lo nuevo. Podés avanzar y volver atrás; al terminar no volverá a interrumpirte."
   },
   {
     key:"feed",
@@ -3412,7 +3417,7 @@ const LS_TUTORIAL_V31_STEPS = [
     icon:"🎬",
     eyebrow:"MIRAR",
     title:"El Feed principal",
-    text:"Acá aparecen los videos de la comunidad. Deslizá o desplazate para descubrir contenido nuevo."
+    text:"Acá aparecen los videos de Usuarios y Creadores. Deslizá o desplazate para descubrir contenido nuevo."
   },
   {
     key:"feed-actions",
@@ -3442,6 +3447,14 @@ const LS_TUTORIAL_V31_STEPS = [
     text:"Desde acá publicás tus clips. Elegís el archivo, completás los datos y LiveScroll prepara la publicación."
   },
   {
+    key:"video-edit",
+    tab:"upload",
+    icon:"✂️",
+    eyebrow:"RECORTAR",
+    title:"Videos largos y reedición",
+    text:"Podés elegir un video largo, recortar solamente el fragmento que querés publicar y reeditar después tus videos propios sin borrar primero el original."
+  },
+  {
     key:"profile",
     tab:"profile",
     selector:"#tab-profile",
@@ -3464,9 +3477,17 @@ const LS_TUTORIAL_V31_STEPS = [
     tab:"users",
     selector:"#tab-users",
     icon:"👥",
-    eyebrow:"COMUNIDAD",
+    eyebrow:"USUARIOS",
     title:"Usuarios",
-    text:"Buscá otras personas, visitá perfiles y descubrí quién forma parte de la comunidad."
+    text:"Buscá otras personas, visitá perfiles y descubrí nuevos Usuarios y Creadores dentro de LiveScroll."
+  },
+  {
+    key:"creators",
+    tab:"profile",
+    icon:"🔓",
+    eyebrow:"CREADORES",
+    title:"Acceso a Creador",
+    text:"Todo Usuario puede agregar Instagram. Con al menos cinco videos puede solicitar acceso a Creador para desbloquear TikTok, YouTube, Twitch y Kick."
   },
   {
     key:"directos",
@@ -3525,6 +3546,20 @@ const LS_TUTORIAL_V31_STEPS = [
     eyebrow:"ACCESIBILIDAD",
     title:"Visión cómoda",
     text:"LiveScroll puede agrandar textos, botones y controles de forma ordenada. También podés ajustar contraste y fuerza del texto."
+  },
+  {
+    key:"android-back",
+    icon:"↩️",
+    eyebrow:"ANDROID",
+    title:"Botón Atrás inteligente",
+    text:"Atrás cierra primero menús y ventanas, vuelve al Feed desde otros apartados y solamente sale de la aplicación con una segunda pulsación."
+  },
+  {
+    key:"nova-legacy",
+    icon:"✨",
+    eyebrow:"RENDIMIENTO",
+    title:"LiveScroll 6 Nova y Legacy",
+    text:"Nova ofrece la experiencia visual completa. Legacy reduce efectos en celulares modestos para mantener la navegación más estable."
   },
   {
     key:"recovery",
@@ -3996,9 +4031,9 @@ function showTutorialModal() {
           <button class="btn" id="lsTutorialV3Next" onclick="tutorialNextStep()">Siguiente</button>
         </div>
 
-        <button class="ls-tut-v3-skip" id="lsTutorialV3Skip" onclick="handleAcceptTutorial()">
-          Omitir tutorial
-        </button>
+        <div class="ls-tut-v3-skip" id="lsTutorialV3Required">
+          Recorrido obligatorio · aparece una sola vez
+        </div>
       </div>
     </div>`;
 
@@ -4036,13 +4071,11 @@ async function renderTutorialStep() {
 
   const back = document.getElementById("lsTutorialV3Back");
   const next = document.getElementById("lsTutorialV3Next");
-  const skip = document.getElementById("lsTutorialV3Skip");
   const controls = document.getElementById("lsTutorialV3Controls");
   const note = document.getElementById("lsTutorialV3TargetNote");
 
   back.style.display = first ? "none" : "";
   next.textContent = last ? "Entrar a LiveScroll" : "Siguiente";
-  skip.style.display = last ? "none" : "";
   controls.classList.toggle("one", first || last);
 
   const target = await prepareTutorialV31Step(step);

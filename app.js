@@ -2009,6 +2009,12 @@ function openLiveScrollSettings() {
                   onclick="replayLiveScrollPortalOnly()"
                 >🌀 Solo portal</button>
               </div>
+              <button
+                type="button"
+                class="btn-outline ls7-settings-replay"
+                style="width:100%;min-height:46px;margin-top:8px;"
+                onclick="replayLiveScroll7Pulse()"
+              >◈ Volver a ver LiveScroll 7 · El Pulso</button>
             </div>
 
             <div style="border:1px solid rgba(103,232,249,.25);border-radius:14px;padding:13px;background:rgba(103,232,249,.045);">
@@ -2343,7 +2349,8 @@ function closeMobileMenu() {
 // ============================================================
 // 6.0.8 · EL PULSO — ADELANTO DE LIVESCROLL 7
 // ============================================================
-function openLiveScroll7Teaser() {
+function openLiveScroll7Teaser(options = {}) {
+  const isReplay = options.replay === true;
   if (document.getElementById("ls7TeaserOverlay")) return;
   const overlay = document.createElement("div");
   overlay.id = "ls7TeaserOverlay";
@@ -2368,9 +2375,9 @@ function openLiveScroll7Teaser() {
         <audio id="ls7NativeAudio" preload="auto"><source src="ls7-pulse-theme.mp3" type="audio/mpeg"></audio>
       </div>
       <div class="ls7-real-hold" id="ls7RealHold" aria-hidden="true">
-        <p>El adelanto terminó</p>
-        <button type="button" id="ls7HoldButton"><i></i><b>MANTENÉ PARA CONTINUAR</b></button>
-        <small>No sueltes hasta completar el pulso</small>
+        <p>EL FUTURO ESTÁ EN TUS MANOS</p>
+        <button type="button" id="ls7HoldButton"><i></i><b>MANTENÉ<br>EL PULSO</b></button>
+        <small>Mantené presionado hasta completar el círculo</small>
       </div>
       <div class="ls7-real-reveal" id="ls7RealReveal" aria-hidden="true">
         <span>PRÓXIMAMENTE</span><b>25 DE OCTUBRE DE 2026</b><small>LiveScroll 7</small>
@@ -2386,6 +2393,7 @@ function openLiveScroll7Teaser() {
   let holdTimer = null;
   let holdStartedAt = 0;
   let finished = false;
+  let midpointVibrated = false;
 
   const revealHold = () => {
     if (finished || holdArea.classList.contains("is-visible")) return;
@@ -2407,6 +2415,7 @@ function openLiveScroll7Teaser() {
     holdTimer = null;
     holdButton.classList.remove("is-holding");
     holdButton.style.setProperty("--ls7-hold", "0%");
+    midpointVibrated = false;
   };
   const completeHold = () => {
     if (finished) return;
@@ -2419,13 +2428,15 @@ function openLiveScroll7Teaser() {
     const reveal = overlay.querySelector("#ls7RealReveal");
     reveal.classList.add("is-visible");
     reveal.setAttribute("aria-hidden", "false");
-    localStorage.setItem(`livescroll_ls7_pulse_seen_${currentUser.id}`, "1");
+    if (!isReplay) localStorage.setItem(`livescroll_ls7_pulse_seen_${currentUser.id}`, "1");
     setTimeout(() => {
       overlay.classList.remove("is-visible");
       setTimeout(() => {
         overlay.remove();
-        window.__lsStartupOptionalModalShown = false;
-        checkPendingContent();
+        if (!isReplay) {
+          window.__lsStartupOptionalModalShown = false;
+          checkPendingContent();
+        }
       }, 220);
     }, 3200);
   };
@@ -2438,6 +2449,10 @@ function openLiveScroll7Teaser() {
       if (!holdTimer || finished) return;
       const progress = Math.min(100, ((now - holdStartedAt) / 1800) * 100);
       holdButton.style.setProperty("--ls7-hold", `${progress}%`);
+      if (progress >= 50 && !midpointVibrated) {
+        midpointVibrated = true;
+        try { navigator.vibrate?.(24); } catch (_) {}
+      }
       if (progress < 100) requestAnimationFrame(animate);
     };
     holdTimer = setTimeout(completeHold, 1800);
@@ -2445,6 +2460,11 @@ function openLiveScroll7Teaser() {
   };
   ["pointerdown","touchstart"].forEach(name => holdButton.addEventListener(name, startHold, { passive:false }));
   ["pointerup","pointercancel","pointerleave","touchend","touchcancel"].forEach(name => holdButton.addEventListener(name, cancelHold));
+}
+
+function replayLiveScroll7Pulse() {
+  document.getElementById("globalModalWrap").innerHTML = "";
+  setTimeout(() => openLiveScroll7Teaser({ replay:true }), 120);
 }
 
 function closeLiveScroll7Teaser() {

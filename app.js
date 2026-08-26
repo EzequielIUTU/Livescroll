@@ -3400,6 +3400,7 @@ async function renderApp() {
   // un pequeño espacio libre para no competir con el primer video.
   subscribeToNotifications();
   startLiveScroll6UpdateWatcher();
+  startLiveScroll7UpdateWatcher();
 
   const startupUserId = currentUser?.id;
   const loadSecondaryStartupData = () => {
@@ -3483,7 +3484,7 @@ function showLiveScroll6UpdatePrompt(requiredBuild, requiredBuildCode) {
 }
 
 async function restartLiveScrollForUpdate() {
-  const button = document.getElementById("ls6UpdateNow");
+  const button = document.getElementById("ls6UpdateNow") || document.getElementById("ls7UpdateNow");
   if (button) { button.disabled = true; button.textContent = "Actualizando…"; }
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations?.();
@@ -3510,6 +3511,68 @@ document.addEventListener("visibilitychange", () => {
 window.addEventListener("online", () => {
   checkLiveScroll6Update();
 }, { passive:true });
+
+// 7.0.1 · ACTUALIZACIONES EN VIVO
+// LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
+const LIVESCROLL7_CLIENT_BUILD = 70001;
+let ls7UpdateWatchTimer = null;
+let ls7UpdateCheckRunning = false;
+
+async function checkLiveScroll7Update() {
+  if (!isLiveScroll7App() || !currentUser || ls7UpdateCheckRunning) return;
+  if (document.getElementById("ls7LiveUpdatePrompt")) return;
+  ls7UpdateCheckRunning = true;
+  try {
+    const { data, error } = await sb.from("app_config")
+      .select("value").eq("key", "ls7_required_build").maybeSingle();
+    if (error || !data?.value) return;
+    const requiredBuildCode = Math.trunc(Number(data.value) || 0);
+    if (requiredBuildCode <= LIVESCROLL7_CLIENT_BUILD) return;
+    const snoozeUntil = Number(sessionStorage.getItem(`ls7_update_snooze_${requiredBuildCode}`) || 0);
+    if (Date.now() < snoozeUntil) return;
+    showLiveScroll7UpdatePrompt(formatLiveScrollBuild(requiredBuildCode), requiredBuildCode);
+  } catch (error) {
+    console.warn("No se pudo comprobar la versión de LiveScroll 7:", error);
+  } finally {
+    ls7UpdateCheckRunning = false;
+  }
+}
+
+function showLiveScroll7UpdatePrompt(requiredBuild, requiredBuildCode) {
+  if (document.getElementById("ls7LiveUpdatePrompt")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "ls7LiveUpdatePrompt";
+  overlay.className = "ls7-electric-update-overlay";
+  overlay.innerHTML = `
+    <div class="ls7-electric-update-card">
+      <img src="livescroll7-icon.png" alt="" class="ls7-electric-update-logo">
+      <div class="ls7-electric-update-kicker">EVOLUCIÓN ${escapeHtml(requiredBuild)}</div>
+      <h2>Nueva energía disponible</h2>
+      <p>LiveScroll 7 evolucionó mientras estabas conectado. Reiniciá para activar la experiencia más reciente.</p>
+      <div class="ls7-electric-update-actions">
+        <button id="ls7UpdateLater" class="btn-outline">Más tarde</button>
+        <button id="ls7UpdateNow" class="btn">Activar ahora</button>
+      </div>
+      <small>Tu sesión seguirá iniciada.</small>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.getElementById("ls7UpdateLater")?.addEventListener("click", () => {
+    sessionStorage.setItem(`ls7_update_snooze_${requiredBuildCode}`, String(Date.now() + 10 * 60 * 1000));
+    overlay.remove();
+  });
+  document.getElementById("ls7UpdateNow")?.addEventListener("click", restartLiveScrollForUpdate);
+}
+
+function startLiveScroll7UpdateWatcher() {
+  if (!isLiveScroll7App() || ls7UpdateWatchTimer) return;
+  checkLiveScroll7Update();
+  ls7UpdateWatchTimer = setInterval(checkLiveScroll7Update, 60000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkLiveScroll7Update();
+});
+window.addEventListener("online", checkLiveScroll7Update, { passive:true });
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
 let lsStartupChangelogHistoryCache = { data:null, at:0 };
@@ -11542,7 +11605,8 @@ async function renderProfile() {
     </div>`;
 
   main.innerHTML = `
-    <div class="profile-hero ls-profile-nova" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
+    <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
+      ${isLiveScroll7App() ? `<img class="ls7-profile-emblem" src="livescroll7-icon.png" alt="LiveScroll 7">` : ""}
       <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
         style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}'); background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
         <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
@@ -12514,7 +12578,8 @@ async function viewPublicProfile(username) {
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
-    <div class="profile-hero" style="position:relative; overflow:hidden;">
+    <div class="profile-hero${isLiveScroll7App() ? " ls7-electric-profile" : ""}" style="position:relative; overflow:hidden;">
+      ${isLiveScroll7App() ? `<img class="ls7-profile-emblem" src="livescroll7-icon.png" alt="LiveScroll 7">` : ""}
       <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
         style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}'); background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}">
       </div>
@@ -17575,6 +17640,67 @@ function ensureLiveScroll7RuntimeStyles() {
 }
 
 ensureLiveScroll7RuntimeStyles();
+
+// 7.0.1 · IDENTIDAD ELÉCTRICA
+// Esta capa está al final a propósito: reemplaza la prueba roja anterior
+// únicamente dentro de la APK LiveScroll 7.
+function ensureLiveScroll7ElectricIdentity() {
+  if (!isLiveScroll7App() || document.getElementById("ls7ElectricIdentity701")) return;
+  const style = document.createElement("style");
+  style.id = "ls7ElectricIdentity701";
+  style.textContent = `
+    html.ls7-app-runtime {
+      --ls7-cyan:#39e7ff;--ls7-blue:#2588ff;--ls7-violet:#8a55ff;--ls7-gold:#ffd66b;
+      --ink:#020610;--panel:#071426;--panel-2:#0b1d35;--gold:#39e7ff;--gold-dim:#2588ff;
+      --green:#39e7ff;--red:#8a55ff;--text:#f5fbff;--text-dim:#9eb6d1;--border:#183b61;
+    }
+    html.ls7-app-runtime body {
+      background:radial-gradient(circle at 8% -5%,rgba(57,231,255,.16),transparent 28%),radial-gradient(circle at 108% 22%,rgba(138,85,255,.18),transparent 31%),linear-gradient(155deg,#020610,#061124 55%,#030713)!important;
+    }
+    html.ls7-app-runtime nav { border-color:rgba(57,231,255,.20)!important;background:rgba(2,8,20,.88)!important;box-shadow:0 14px 44px rgba(0,0,0,.38),0 0 40px rgba(37,136,255,.055)!important; }
+    html.ls7-app-runtime .nav-brand-scroll { color:#39e7ff!important;text-shadow:0 0 18px rgba(57,231,255,.35); }
+    html.ls7-app-runtime .nav-brand b { color:#eafbff!important;background:linear-gradient(145deg,#2588ff,#8a55ff)!important;border-color:rgba(120,226,255,.55)!important;box-shadow:0 0 20px rgba(57,231,255,.28)!important; }
+    html.ls7-app-runtime .form-card,html.ls7-app-runtime .video-card,html.ls7-app-runtime .auth-box { border-color:rgba(57,231,255,.15)!important;background:linear-gradient(145deg,rgba(8,28,52,.96),rgba(4,10,25,.98))!important; }
+    html.ls7-app-runtime .btn { color:#fff!important;background:linear-gradient(125deg,#168ce8,#684dff 58%,#27d8ee)!important;border-color:rgba(120,229,255,.40)!important;box-shadow:0 10px 30px rgba(37,136,255,.18)!important; }
+    html.ls7-app-runtime .btn-outline { color:#dffaff!important;border-color:rgba(57,231,255,.28)!important;background:rgba(27,120,190,.08)!important; }
+    html.ls7-app-runtime .nav-links button.active { color:#e7fbff!important;background:linear-gradient(135deg,rgba(57,231,255,.13),rgba(138,85,255,.11))!important; }
+    html.ls7-app-runtime .nav-links button.active::after { background:linear-gradient(90deg,#39e7ff,#2588ff,#8a55ff,#ffd66b)!important; }
+
+    html.ls7-app-runtime .ls7-electric-profile {
+      isolation:isolate;border:1px solid rgba(57,231,255,.30)!important;border-radius:28px!important;
+      background:radial-gradient(circle at 90% 4%,rgba(138,85,255,.22),transparent 34%),radial-gradient(circle at 5% 72%,rgba(57,231,255,.14),transparent 35%),linear-gradient(150deg,#091d38,#050b19 62%,#100a29)!important;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 22px 65px rgba(0,0,0,.40),0 0 50px rgba(37,136,255,.08)!important;
+    }
+    html.ls7-app-runtime .ls7-electric-profile::before { content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.34;background:linear-gradient(115deg,transparent 0 42%,rgba(57,231,255,.12) 43%,transparent 44% 55%,rgba(138,85,255,.10) 56%,transparent 57%);background-size:180% 100%;animation:ls7ProfileScan 6s linear infinite; }
+    html.ls7-app-runtime .ls7-electric-profile .profile-cover { min-height:164px;border-bottom:1px solid rgba(57,231,255,.22)!important;background-color:#061529;background-image:linear-gradient(120deg,rgba(57,231,255,.12),rgba(37,136,255,.04),rgba(138,85,255,.16)); }
+    html.ls7-app-runtime .ls7-profile-emblem { position:absolute;right:15px;top:108px;z-index:6;width:66px;height:66px;object-fit:contain;filter:drop-shadow(0 0 14px rgba(57,231,255,.65)) drop-shadow(0 0 28px rgba(138,85,255,.30));animation:ls7EmblemFloat 3.5s ease-in-out infinite; }
+    html.ls7-app-runtime .ls7-electric-profile .profile-avatar-ring { padding:3px!important;border:0!important;background:conic-gradient(from 30deg,#39e7ff,#2588ff,#8a55ff,#ffd66b,#39e7ff)!important;box-shadow:0 0 0 5px rgba(5,14,31,.92),0 0 32px rgba(57,231,255,.35)!important; }
+    html.ls7-app-runtime .ls7-electric-profile .profile-name-block h1 { color:#f8fdff;letter-spacing:-.04em;text-shadow:0 0 22px rgba(57,231,255,.15); }
+    html.ls7-app-runtime .ls7-electric-profile .profile-role-badge { border:1px solid rgba(57,231,255,.26);background:linear-gradient(90deg,rgba(57,231,255,.11),rgba(138,85,255,.10));color:#caf8ff; }
+    html.ls7-app-runtime .ls7-electric-profile .profile-bio { color:#c6d8ea;line-height:1.6; }
+    html.ls7-app-runtime .ls7-electric-profile .stat-pill { border:1px solid rgba(57,231,255,.18)!important;border-radius:16px!important;background:linear-gradient(145deg,rgba(17,55,89,.52),rgba(8,15,34,.72))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+    html.ls7-app-runtime .ls7-electric-profile .stat-pill .num { color:#72efff!important;text-shadow:0 0 14px rgba(57,231,255,.28); }
+    html.ls7-app-runtime .profile-section { border-color:rgba(57,231,255,.10); }
+    html.ls7-app-runtime .profile-section-head .ico { border:1px solid rgba(57,231,255,.20);background:linear-gradient(145deg,rgba(57,231,255,.11),rgba(138,85,255,.09));box-shadow:0 0 18px rgba(37,136,255,.07); }
+    html.ls7-app-runtime .video-grid-tile { border:1px solid rgba(57,231,255,.15);border-radius:18px;overflow:hidden;background:#071326;box-shadow:0 12px 28px rgba(0,0,0,.28);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease; }
+    html.ls7-app-runtime .video-grid-tile:active { transform:scale(.965);border-color:rgba(57,231,255,.52);box-shadow:0 0 28px rgba(57,231,255,.16); }
+    html.ls7-app-runtime .ls7-electric-update-overlay { position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(1,4,13,.88);backdrop-filter:blur(13px); }
+    html.ls7-app-runtime .ls7-electric-update-card { width:min(440px,100%);padding:25px;text-align:center;color:#f7fcff;border:1px solid rgba(57,231,255,.38);border-radius:28px;background:radial-gradient(circle at 50% 0,rgba(57,231,255,.14),transparent 38%),linear-gradient(155deg,#071a31,#090817 68%,#180b35);box-shadow:0 30px 90px rgba(0,0,0,.68),0 0 55px rgba(37,136,255,.14); }
+    html.ls7-app-runtime .ls7-electric-update-logo { width:94px;height:94px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(57,231,255,.56));animation:ls7EmblemFloat 3s ease-in-out infinite; }
+    html.ls7-app-runtime .ls7-electric-update-kicker { margin:4px 0 8px;color:#66eaff;font:900 10px 'JetBrains Mono',monospace;letter-spacing:.17em; }
+    html.ls7-app-runtime .ls7-electric-update-card h2 { margin:0 0 10px;font-size:26px; }
+    html.ls7-app-runtime .ls7-electric-update-card p { margin:0 0 20px;color:#adc2d9;font-size:14px;line-height:1.55; }
+    html.ls7-app-runtime .ls7-electric-update-actions { display:grid;grid-template-columns:1fr 1.25fr;gap:10px; }
+    html.ls7-app-runtime .ls7-electric-update-actions button { min-height:49px; }
+    html.ls7-app-runtime .ls7-electric-update-card small { display:block;margin-top:13px;color:#809bb8; }
+    @keyframes ls7ProfileScan { from{background-position:180% 0}to{background-position:-180% 0} }
+    @keyframes ls7EmblemFloat { 0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)} }
+    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; } }
+    @media(prefers-reduced-motion:reduce) { html.ls7-app-runtime .ls7-electric-profile::before,html.ls7-app-runtime .ls7-profile-emblem,html.ls7-app-runtime .ls7-electric-update-logo { animation:none!important; } }
+  `;
+  document.head.appendChild(style);
+}
+ensureLiveScroll7ElectricIdentity();
 
 
 document.addEventListener("DOMContentLoaded", () => {

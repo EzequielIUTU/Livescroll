@@ -12080,6 +12080,85 @@ function startConnectedLiveRefresh() {
   }, 60000);
 }
 
+function getTwitchChannelFromUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)twitch\.tv$/i.test(parsed.hostname)) return "";
+    const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[a-z0-9_]{3,25}$/i.test(channel) ? channel.toLowerCase() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function closeLiveScrollTwitchPlayer() {
+  document.getElementById("lsTwitchLivePlayer")?.remove();
+  document.body.classList.remove("ls-live-player-open");
+}
+
+function openLiveScrollTwitchPlayer(channel, username) {
+  const safeChannel = String(channel || "").toLowerCase();
+  if (!/^[a-z0-9_]{3,25}$/.test(safeChannel)) {
+    showToast?.("No pudimos abrir este canal de Twitch.", "error");
+    return;
+  }
+
+  closeLiveScrollTwitchPlayer();
+  const parent = location.hostname || "livescroll-mocha.vercel.app";
+  const overlay = document.createElement("div");
+  overlay.id = "lsTwitchLivePlayer";
+  overlay.className = "ls-live-player-overlay";
+  overlay.innerHTML = `
+    <section class="ls-live-player-panel" role="dialog" aria-modal="true" aria-label="Directo de ${escapeHtml(username || safeChannel)}">
+      <header>
+        <div><span class="ls-live-player-dot"></span><strong>EN VIVO</strong><small>@${escapeHtml(username || safeChannel)}</small></div>
+        <button type="button" onclick="closeLiveScrollTwitchPlayer()" aria-label="Cerrar directo">✕</button>
+      </header>
+      <div class="ls-live-player-video">
+        <iframe
+          src="https://player.twitch.tv/?channel=${encodeURIComponent(safeChannel)}&parent=${encodeURIComponent(parent)}&autoplay=true&muted=false"
+          title="Directo de ${escapeHtml(username || safeChannel)}"
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowfullscreen></iframe>
+      </div>
+      <footer>
+        <span>Transmitido desde OBS por Twitch</span>
+        <a href="https://www.twitch.tv/${encodeURIComponent(safeChannel)}" target="_blank" rel="noopener">Abrir en Twitch</a>
+      </footer>
+    </section>`;
+  overlay.addEventListener("click", event => {
+    if (event.target === overlay) closeLiveScrollTwitchPlayer();
+  });
+  document.body.appendChild(overlay);
+  document.body.classList.add("ls-live-player-open");
+}
+
+window.openLiveScrollTwitchPlayer = openLiveScrollTwitchPlayer;
+window.closeLiveScrollTwitchPlayer = closeLiveScrollTwitchPlayer;
+
+function ensureLiveScrollTwitchPlayerStyles() {
+  if (document.getElementById("lsTwitchLivePlayerStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsTwitchLivePlayerStyles";
+  style.textContent = `
+    body.ls-live-player-open{overflow:hidden}
+    .ls-live-player-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));background:rgba(1,4,12,.88);backdrop-filter:blur(12px)}
+    .ls-live-player-panel{width:min(920px,100%);max-height:100%;overflow:auto;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
+    .ls-live-player-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .ls-live-player-panel header>div{display:flex;align-items:center;gap:8px}.ls-live-player-panel header strong{font-size:12px;color:#ff496f;letter-spacing:.12em}.ls-live-player-panel header small{color:#d9dce6;font-weight:800}
+    .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
+    .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
+    .ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+    .ls-live-player-panel footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;color:#8f96a8;font-size:10px}.ls-live-player-panel footer a{color:#c7a8ff;font-weight:900;text-decoration:none}
+    .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
+    @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
+    @media(max-width:640px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0}.ls-live-player-panel{margin-top:8vh;border-radius:18px 18px 0 0}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
+  `;
+  document.head.appendChild(style);
+}
+
+document.addEventListener("DOMContentLoaded", ensureLiveScrollTwitchPlayerStyles);
+
 
 
 async function renderDirectos(renderToken = lsTabRenderToken) {
@@ -12087,7 +12166,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
-    <p class="page-sub">Creadores transmitiendo ahora mismo desde Kick y Twitch.</p>
+    <p class="page-sub">Mirá dentro de LiveScroll a los creadores que transmiten desde OBS por Twitch.</p>
     <div id="directosList">Cargando...</div>`;
 
   // Conservamos exclusivamente la integración existente de Kick y Twitch.
@@ -12108,16 +12187,17 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   if (liveUsers.length) {
     html += `<section>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;">
-        <h3 style="margin:0;font-size:12px;letter-spacing:.04em;">🌐 DIRECTOS EXTERNOS</h3>
-        <span style="font-size:9px;color:var(--text-dim);">Kick / Twitch</span>
+        <h3 style="margin:0;font-size:12px;letter-spacing:.04em;">📺 DIRECTOS EN LIVESCROLL</h3>
+        <span style="font-size:9px;color:var(--text-dim);">OBS · Twitch</span>
       </div>
       ${liveUsers.map(u => {
         const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+        const twitchChannel = getTwitchChannelFromUrl(u.social_twitch);
         const watchButtons = [
           (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
             ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
-          (u.live_platform === "twitch" || u.live_platform === "both") && u.social_twitch && isSafeUrl(u.social_twitch)
-            ? `<a href="${escapeHtml(u.social_twitch)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Twitch</a>` : ""
+          (u.live_platform === "twitch" || u.live_platform === "both") && twitchChannel
+            ? `<button type="button" class="watch-btn ls-watch-inside" onclick="openLiveScrollTwitchPlayer('${escapeHtml(twitchChannel)}','${escapeHtml(u.username)}')">Ver en LiveScroll</button>` : ""
         ].join("");
         return `<div class="directo-card">
           <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>

@@ -2402,14 +2402,15 @@ function toggleMobileMenu() {
   overlay.onclick = closeMobileMenu;
 
   const panel = document.createElement("div");
-  panel.className = "mobile-menu-panel";
+  panel.className = `mobile-menu-panel${isLiveScroll7App() ? " ls7-mobile-menu-panel" : ""}`;
   panel.id = "mobileMenuPanel";
   const activeTab = currentTab || "feed";
   panel.innerHTML = `
     <div class="ls-mobile-menu-head">
-      <div><strong>LiveScroll <em>${isLiveScroll7App() ? "7" : "6"}</em></strong><small>Explorá la aplicación</small></div>
+      <div><strong>LiveScroll <em>${isLiveScroll7App() ? "7" : "6"}</em></strong><small>${isLiveScroll7App() ? "Centro de control" : "Explorá la aplicación"}</small></div>
       <button class="ls-mobile-menu-close" onclick="closeMobileMenu()" aria-label="Cerrar">✕</button>
     </div>
+    ${isLiveScroll7App() ? `<div class="ls7-menu-runtime-line"><i></i><span>SESIÓN ACTIVA</span><b>NOVA 7</b></div>` : ""}
     <div class="ls-mobile-menu-scroll">
       <div class="ls-mobile-menu-label">Principal</div>
       <button class="${activeTab === 'feed' ? 'active' : ''}" onclick="switchTab('feed'); closeMobileMenu();"><span>▶️</span><b>Mirar</b></button>
@@ -6275,10 +6276,30 @@ function switchTab(tab) {
 // Solo actúa cuando el gesto es claramente lateral y nunca dentro de videos,
 // formularios, menús o ventanas modales.
 function ensureLiveScroll7HorizontalNavigation() {
-  if (!isLiveScroll7App() || window.__ls7HorizontalNavigationReady) return;
+  if (window.__ls7HorizontalNavigationReady) return;
   const surface = document.getElementById("appView");
   if (!surface) return;
   window.__ls7HorizontalNavigationReady = true;
+
+  if (!document.getElementById("lsSharedSwipeRailStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsSharedSwipeRailStyles";
+    style.textContent = `
+      html:not(.ls7-app-runtime) #ls7SwipeRail {
+        position:fixed;left:50%;top:calc(max(64px,env(safe-area-inset-top) + 56px));z-index:74;
+        width:154px;height:29px;transform:translateX(-50%);display:flex;align-items:center;justify-content:space-between;
+        padding:0 11px;border:1px solid rgba(56,221,242,.22);border-radius:999px;
+        background:rgba(5,17,22,.80);box-shadow:0 8px 25px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.04);
+        color:#2ef27c;backdrop-filter:blur(12px);touch-action:pan-x;transition:opacity .16s ease,transform .16s ease;
+      }
+      html:not(.ls7-app-runtime) #ls7SwipeRail b { color:#d6edf1;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em; }
+      html:not(.ls7-app-runtime) #ls7SwipeRail span { font-size:16px;line-height:1; }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-left { transform:translateX(calc(-50% - 8px)); }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-right { transform:translateX(calc(-50% + 8px)); }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
+    `;
+    document.head.appendChild(style);
+  }
 
   const tabs = ["feed", "foryou", "profile"];
   let startX = 0;
@@ -6355,7 +6376,6 @@ function ensureLiveScroll7HorizontalNavigation() {
 }
 
 function syncLiveScroll7SwipeRail(tab = currentTab) {
-  if (!isLiveScroll7App()) return;
   const rail = document.getElementById("ls7SwipeRail");
   if (!rail) return;
   const names = { feed:"MIRAR", foryou:"PARA TI", profile:"PERFIL" };
@@ -8836,8 +8856,8 @@ async function renderUpload() {
   } catch (_) {}
 
   main.innerHTML = `
-    <div style="max-width:860px;margin:0 auto;">
-      <div style="
+    <div class="ls-upload-studio-shell" style="max-width:860px;margin:0 auto;">
+      <div class="ls-upload-studio-hero" style="
         position:relative;
         overflow:hidden;
         padding:22px;
@@ -8881,7 +8901,7 @@ async function renderUpload() {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+      <div class="ls-upload-studio-steps" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
         <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
           <strong style="color:var(--gold);">01</strong><br>
           <span style="color:var(--text-dim);">Elegí origen</span>
@@ -8896,7 +8916,7 @@ async function renderUpload() {
         </div>
       </div>
 
-      <div style="
+      <div class="ls-upload-mode-grid" style="
         display:grid;
         grid-template-columns:1fr 1fr;
         gap:10px;
@@ -8923,7 +8943,7 @@ async function renderUpload() {
         </button>
       </div>
 
-      <div class="form-card" style="
+      <div class="form-card ls-upload-studio-form" style="
         border-radius:16px;
         border:1px solid var(--border);
         padding:18px;
@@ -8959,7 +8979,7 @@ async function renderUpload() {
           <div class="field">
             <label>Archivo de video</label>
 
-            <button
+            <button class="ls-upload-file-drop"
               type="button"
               onclick="openLiveScrollAndroidMedia('files','uploadFile','elegir el video que querés publicar','files')"
               style="
@@ -16959,6 +16979,91 @@ function ensureLiveScroll7RuntimeStyles() {
     html.ls7-app-runtime #ls7SwipeRail.is-left { transform:translateX(calc(-50% - 8px)); }
     html.ls7-app-runtime #ls7SwipeRail.is-right { transform:translateX(calc(-50% + 8px)); }
     html.ls7-app-runtime #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
+
+    /* Menú hamburguesa LiveScroll 7 · centro de control */
+    html.ls7-app-runtime .mobile-menu-overlay { background:rgba(3,4,6,.76);backdrop-filter:blur(7px); }
+    html.ls7-app-runtime .ls7-mobile-menu-panel {
+      width:min(90%,365px);max-width:365px;padding:18px 14px 0;border-left:1px solid rgba(244,201,93,.18);
+      background:radial-gradient(circle at 110% -5%,rgba(255,77,69,.14),transparent 30%),linear-gradient(165deg,rgba(27,29,35,.99),rgba(9,10,13,.995));
+      box-shadow:-26px 0 70px rgba(0,0,0,.58),inset 1px 0 0 rgba(255,255,255,.025);
+      animation:ls7ControlCenterIn .32s cubic-bezier(.16,1,.3,1) both;
+    }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-head {
+      padding:3px 4px 15px;border-bottom:1px solid rgba(244,201,93,.13);
+    }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-head strong { font-size:24px;letter-spacing:-.055em; }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-head strong em { color:#f4c95d;text-shadow:0 0 16px rgba(244,201,93,.28); }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-head small { color:#aeb4bd;letter-spacing:.15em; }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-close {
+      border-color:rgba(201,212,223,.18);background:linear-gradient(145deg,rgba(255,255,255,.06),rgba(255,255,255,.012));color:#e6e9ed;
+    }
+    html.ls7-app-runtime .ls7-menu-runtime-line {
+      margin:11px 2px 4px;padding:8px 10px;display:flex;align-items:center;gap:7px;border:1px solid rgba(244,201,93,.12);border-radius:11px;
+      background:linear-gradient(90deg,rgba(244,201,93,.055),rgba(255,77,69,.035));font:800 7px 'JetBrains Mono',monospace;letter-spacing:.09em;color:#aeb4bd;
+    }
+    html.ls7-app-runtime .ls7-menu-runtime-line i { width:6px;height:6px;border-radius:50%;background:#ff554c;box-shadow:0 0 10px rgba(255,85,76,.75); }
+    html.ls7-app-runtime .ls7-menu-runtime-line b { margin-left:auto;color:#f4c95d; }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-label { color:#777f8a;letter-spacing:.17em;padding-top:15px; }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-scroll > button {
+      min-height:51px;margin-bottom:3px;padding:7px 10px;border:1px solid transparent;border-bottom-color:rgba(201,212,223,.065);border-radius:14px;
+      color:#d7dbe1;transition:transform .15s ease,background .15s ease,border-color .15s ease;
+    }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-scroll > button span {
+      background:linear-gradient(145deg,rgba(201,212,223,.075),rgba(255,255,255,.015));border:1px solid rgba(201,212,223,.07);filter:grayscale(.2);
+    }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-scroll > button.active {
+      color:#fff1bd;border-color:rgba(244,201,93,.19);background:linear-gradient(135deg,rgba(244,201,93,.105),rgba(255,77,69,.055));
+      box-shadow:inset 3px 0 0 #f4c95d,0 8px 22px rgba(0,0,0,.13);
+    }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-scroll > button:active { transform:scale(.975); }
+    html.ls7-app-runtime .ls7-mobile-menu-panel .ls-mobile-menu-exit { border-color:rgba(244,201,93,.13); }
+    @keyframes ls7ControlCenterIn { from{opacity:.65;transform:translate3d(38px,0,0)}to{opacity:1;transform:none} }
+
+    /* Creator Studio LiveScroll 7 · subida moderna y accesible */
+    html.ls7-app-runtime .ls-upload-studio-shell { perspective:900px; }
+    html.ls7-app-runtime .ls-upload-studio-hero {
+      border-color:rgba(244,201,93,.22)!important;border-radius:24px!important;padding:25px!important;
+      background:radial-gradient(circle at 88% 8%,rgba(255,77,69,.16),transparent 32%),radial-gradient(circle at 12% 110%,rgba(244,201,93,.09),transparent 36%),linear-gradient(145deg,rgba(35,37,44,.98),rgba(11,12,16,.98))!important;
+      box-shadow:0 24px 60px rgba(0,0,0,.30),inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    html.ls7-app-runtime .ls-upload-studio-hero::after {
+      content:"7";position:absolute;right:20px;top:-25px;color:rgba(244,201,93,.035);font:950 150px 'Space Grotesk',sans-serif;pointer-events:none;
+    }
+    html.ls7-app-runtime .ls-upload-studio-steps > div {
+      position:relative;overflow:hidden;min-height:68px!important;padding:13px!important;border-color:rgba(201,212,223,.13)!important;border-radius:15px!important;
+      background:linear-gradient(145deg,rgba(30,32,38,.94),rgba(13,14,18,.95))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 9px 23px rgba(0,0,0,.15);
+    }
+    html.ls7-app-runtime .ls-upload-studio-steps > div strong { color:#f4c95d!important;font:900 13px 'JetBrains Mono',monospace; }
+    html.ls7-app-runtime .ls-upload-mode-grid button {
+      min-height:72px;border-radius:17px!important;border:1px solid rgba(201,212,223,.16)!important;
+      background:linear-gradient(145deg,rgba(38,40,47,.96),rgba(13,14,18,.96))!important;color:#eef0f3!important;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 12px 30px rgba(0,0,0,.18)!important;
+    }
+    html.ls7-app-runtime .ls-upload-mode-grid button.btn {
+      border-color:rgba(244,201,93,.42)!important;background:linear-gradient(135deg,rgba(216,165,50,.96),rgba(255,85,76,.88))!important;color:#14100c!important;
+    }
+    html.ls7-app-runtime .ls-upload-studio-form {
+      border-radius:23px!important;padding:21px!important;border-color:rgba(201,212,223,.14)!important;
+      background:linear-gradient(155deg,rgba(27,29,35,.98),rgba(10,11,14,.985))!important;box-shadow:0 22px 55px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.035)!important;
+    }
+    html.ls7-app-runtime .ls-upload-studio-form .field label { color:#e8e9eb;font-weight:750; }
+    html.ls7-app-runtime .ls-upload-studio-form input,html.ls7-app-runtime .ls-upload-studio-form select {
+      min-height:48px;border-radius:13px!important;background:rgba(7,8,11,.78)!important;border-color:rgba(201,212,223,.20)!important;
+    }
+    html.ls7-app-runtime .ls-upload-file-drop {
+      min-height:150px!important;border:1px dashed rgba(244,201,93,.44)!important;border-radius:20px!important;
+      background:radial-gradient(circle at 50% 40%,rgba(244,201,93,.10),transparent 38%),linear-gradient(145deg,rgba(255,255,255,.025),rgba(255,77,69,.025))!important;
+      box-shadow:inset 0 0 0 5px rgba(244,201,93,.018);transition:transform .18s ease,border-color .18s ease,background .18s ease;
+    }
+    html.ls7-app-runtime .ls-upload-file-drop:active { transform:scale(.985);border-color:rgba(255,85,76,.62)!important; }
+    html.ls7-app-runtime #uploadSubmitBtn { min-height:54px;border-radius:16px!important;font-size:14px;letter-spacing:.01em; }
+    html.ls7-app-runtime #uploadProgressBar { background:linear-gradient(90deg,#f4c95d,#ff554c)!important;box-shadow:0 0 15px rgba(255,85,76,.35); }
+    @media(max-width:560px) {
+      html.ls7-app-runtime .ls-upload-studio-hero { padding:20px 17px!important; }
+      html.ls7-app-runtime .ls-upload-studio-steps { gap:5px!important; }
+      html.ls7-app-runtime .ls-upload-studio-steps > div { padding:10px 8px!important;font-size:9px!important; }
+      html.ls7-app-runtime .ls-upload-studio-form { padding:16px!important; }
+    }
 
     /* Barra inferior LiveScroll 7 · flotante, metálica y separada de LS6 */
     @media(max-width:780px) {

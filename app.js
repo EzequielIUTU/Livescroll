@@ -130,6 +130,56 @@ async function uploadMediaToR2(file) {
   return result;
 }
 
+function getR2ObjectKey(publicUrl) {
+  try {
+    const parsed = new URL(publicUrl);
+    const base = new URL("https://pub-e9c48f11ee0b4c9f8cb233e29b77f61a.r2.dev");
+    if (parsed.origin !== base.origin) return null;
+    const key = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    return key.startsWith("usuarios/") && !key.includes("..") ? key : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function deleteMediaFromR2(publicUrl) {
+  const key = getR2ObjectKey(publicUrl);
+  if (!key) return { ok:true, skipped:true };
+
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session?.access_token) return { ok:false, error:"sesion_vencida" };
+
+  try {
+    const response = await fetch(`${LIVESCROLL_MEDIA_API}/object?key=${encodeURIComponent(key)}`, {
+      method:"DELETE",
+      headers:{ "Authorization":`Bearer ${session.access_token}` }
+    });
+    const result = await response.json().catch(() => null);
+    return response.ok && result?.ok ? result : { ok:false, error:result?.error || "delete_failed" };
+  } catch (_) {
+    return { ok:false, error:"network_error" };
+  }
+}
+
+async function getVideoMediaForCleanup(videoId) {
+  const { data } = await sb.from("videos")
+    .select("video_url,thumbnail_url")
+    .eq("id", videoId)
+    .maybeSingle();
+  return data || null;
+}
+
+async function cleanupR2VideoMedia(media) {
+  if (!media) return;
+  const results = await Promise.allSettled([
+    deleteMediaFromR2(media.video_url),
+    deleteMediaFromR2(media.thumbnail_url)
+  ]);
+  if (results.some(item => item.status === "rejected" || item.value?.ok === false)) {
+    console.warn("El registro se eliminó, pero quedó un archivo pendiente de limpieza en R2.");
+  }
+}
+
 // ============================================================
 // 5.8.8 · MOBILE STABILITY
 // Altura visible real para barras móviles, teclado y zonas seguras.
@@ -5711,6 +5761,7 @@ async function handlePinVideo(videoId) {
 
 async function handleDeleteOwnVideo(videoId) {
   if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y vistas. No se puede deshacer.")) return;
+  const mediaToDelete = await getVideoMediaForCleanup(videoId);
   const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
   if (error || !data?.ok) {
     console.error("delete_own_video:", error, data);
@@ -5723,6 +5774,7 @@ async function handleDeleteOwnVideo(videoId) {
     showToast(messages[data?.error] || "No se pudo eliminar el video");
     return;
   }
+  await cleanupR2VideoMedia(mediaToDelete);
   document.getElementById(`tile-${videoId}`)?.remove();
   showToast("Video eliminado definitivamente ✓");
   lsPerfCache.profileVideos.at = 0;
@@ -5733,12 +5785,14 @@ async function handleDeleteOwnVideo(videoId) {
 async function handleAdminDeleteProfileVideo(videoId, username) {
   if (!currentProfile?.is_admin) return;
   if (!confirm("¿Eliminar este video como administrador? Esta acción no se puede deshacer.")) return;
+  const mediaToDelete = await getVideoMediaForCleanup(videoId);
   const { data, error } = await sb.rpc("admin_delete_video", { p_video_id:videoId });
   if (error || !data?.ok) {
     console.error("admin_delete_video perfil:", error, data);
     showToast(`No se pudo eliminar: ${data?.detail || data?.error || error?.message || "error desconocido"}`);
     return;
   }
+  await cleanupR2VideoMedia(mediaToDelete);
   document.getElementById(`public-tile-${videoId}`)?.remove();
   lsPerfCache.profileVideos.at = 0;
   lsPerfCache.feed.at = 0;
@@ -9539,9 +9593,11 @@ async function saveReeditedVideo(file) {
   if (progressText) progressText.textContent = "Subiendo la nueva edición de forma segura...";
   if (progressBar) progressBar.style.width = "35%";
 
+  const newR2Urls = [];
   try {
   const videoUpload = await uploadMediaToR2(file);
   const newVideoUrl = videoUpload.url;
+  newR2Urls.push(newVideoUrl);
   if (!newVideoUrl) throw new Error("No se obtuvo la URL de la nueva edición");
   if (progressBar) progressBar.style.width = "65%";
 
@@ -9551,6 +9607,7 @@ async function saveReeditedVideo(file) {
     if (thumbnailBlob) {
       const thumbUpload = await uploadMediaToR2(thumbnailBlob);
       newThumbnailUrl = thumbUpload?.url || null;
+      if (newThumbnailUrl) newR2Urls.push(newThumbnailUrl);
     }
   } catch (thumbnailError) {
     console.warn("No se pudo crear la nueva carátula:", thumbnailError);
@@ -9585,6 +9642,7 @@ async function saveReeditedVideo(file) {
   showToast(`✂️ “${editedTitle}” fue reeditado sin perder sus interacciones`);
   await renderProfile();
   } catch (error) {
+    await Promise.allSettled(newR2Urls.map(deleteMediaFromR2));
     throw error;
   }
 }
@@ -10025,7 +10083,14 @@ async function handleUploadFile() {
   btn.disabled = false;
   btn.textContent = "Publicar video";
 
-  if (insertError) { errEl.textContent = insertError.message; return; }
+  if (insertError) {
+    await Promise.allSettled([
+      deleteMediaFromR2(videoUpload?.url),
+      deleteMediaFromR2(thumbnailUrl)
+    ]);
+    errEl.textContent = insertError.message;
+    return;
+  }
   try {
     await saveVideoHashtags(createdVideo.id);
   } catch (tagError) {
@@ -14395,6 +14460,7 @@ function switchAdminPanelGroup(group, button) {
 
 async function handleDeleteVideo(videoId) {
   if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y reportes.")) return;
+  const mediaToDelete = await getVideoMediaForCleanup(videoId);
   const { data, error } = await sb.rpc("admin_delete_video", { p_video_id: videoId });
   if (error || !data?.ok) {
     console.error("admin_delete_video:", error, data);
@@ -14402,6 +14468,7 @@ async function handleDeleteVideo(videoId) {
     showToast(`No se pudo eliminar: ${detail}`);
     return;
   }
+  await cleanupR2VideoMedia(mediaToDelete);
   showToast("Video eliminado");
   renderAdmin();
 }

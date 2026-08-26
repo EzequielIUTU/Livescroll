@@ -28,9 +28,38 @@ window.isLiveScroll7App = isLiveScroll7App;
 function applyLiveScrollRuntimeBranding() {
   if (!isLiveScroll7App()) return;
   document.documentElement.classList.add("ls7-app-runtime");
-  document.querySelectorAll(".nav-brand b").forEach(node => { node.textContent = "7"; });
+  document.querySelectorAll(".nav-brand").forEach(node => {
+    node.innerHTML = '<span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>7</b>';
+    node.setAttribute("aria-label", "LiveScroll 7");
+  });
   document.title = "LiveScroll 7 — La nueva generación";
 }
+
+function updateLiveScroll7Boot(progress, message) {
+  if (!isLiveScroll7App()) return;
+  const bar = document.getElementById("ls7BootProgress");
+  const copy = document.getElementById("ls7BootCopy");
+  if (bar) bar.style.width = `${Math.max(8, Math.min(100, Number(progress) || 8))}%`;
+  if (copy && message) copy.textContent = message;
+}
+
+function finishLiveScroll7Boot({ authenticated = false } = {}) {
+  if (!isLiveScroll7App()) return;
+  const screen = document.getElementById("ls7BootScreen");
+  if (!screen || screen.dataset.finished === "1") return;
+  screen.dataset.finished = "1";
+  updateLiveScroll7Boot(100, authenticated ? "Bienvenido a LiveScroll 7" : "Todo listo");
+  screen.classList.toggle("is-welcome", authenticated);
+  const hold = authenticated ? 720 : 180;
+  window.setTimeout(() => {
+    screen.classList.add("is-leaving");
+    window.setTimeout(() => {
+      document.documentElement.classList.remove("ls7-boot-pending");
+      screen.remove();
+    }, 380);
+  }, hold);
+}
+window.finishLiveScroll7Boot = finishLiveScroll7Boot;
 
 // ============================================================
 // CONFIGURACIÓN — reemplazá con tus datos de Supabase
@@ -547,6 +576,7 @@ function exitSecurityReportScreen() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   applyLiveScrollRuntimeBranding();
+  updateLiveScroll7Boot(28, "Conectando tu cuenta…");
   if ("serviceWorker" in navigator) {
     const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
     if ("requestIdleCallback" in window) {
@@ -593,7 +623,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (currentUser && currentUser.id === session.user.id) return;
       currentUser = session.user;
       await loadProfile();
-      renderApp();
+      updateLiveScroll7Boot(66, "Preparando tu feed…");
+      await renderApp();
+      finishLiveScroll7Boot({ authenticated:true });
     } else if (event === "SIGNED_OUT") {
       currentUser = null;
       currentProfile = null;
@@ -610,11 +642,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!lsRecoveryMode) {
     if (session) {
       currentUser = session.user;
+      updateLiveScroll7Boot(52, "Recuperando tu sesión…");
       await loadProfile();
-      renderApp();
+      updateLiveScroll7Boot(72, "Organizando tus videos…");
+      await renderApp();
+      finishLiveScroll7Boot({ authenticated:true });
       if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
     } else {
       renderLanding();
+      finishLiveScroll7Boot({ authenticated:false });
     }
   }
 
@@ -13098,12 +13134,12 @@ async function renderAdmin() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
         <div style="min-width:0;flex:1;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
-            <strong style="color:var(--gold);">✨ Presentación ROAD TO 6</strong>
-            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">5.9.0</span>
+            <strong style="color:var(--gold);">${isLiveScroll7App() ? "◈ Bienvenida oficial LiveScroll 7" : "✨ Presentación ROAD TO 6"}</strong>
+            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">${isLiveScroll7App() ? "7.0.0v" : "5.9.0"}</span>
           </div>
-          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">Volvé a reproducir la presentación oficial que reciben los usuarios.</div>
+          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">${isLiveScroll7App() ? "Reproducí nuevamente la entrada visual de esta primera etapa para Android." : "Volvé a reproducir la presentación oficial que reciben los usuarios."}</div>
         </div>
-        <button class="btn" type="button" onclick="replayLiveScrollRoadTo6Intro()">▶ Volver a verla</button>
+        <button class="btn" type="button" onclick="${isLiveScroll7App() ? "replayLiveScroll7Pulse()" : "replayLiveScrollRoadTo6Intro()"}">▶ Volver a verla</button>
       </div>
     </div>
 
@@ -16653,8 +16689,44 @@ function ensureLiveScroll7RuntimeStyles() {
   const style = document.createElement("style");
   style.id = "ls7RuntimeStyles";
   style.textContent = `
-    html.ls7-app-runtime { --ls7-blue:#58d8ff;--ls7-violet:#8a5cff;--ls7-gold:#f4c95d; }
-    html.ls7-app-runtime .nav-brand b { color:var(--ls7-gold);filter:drop-shadow(0 0 8px rgba(244,201,93,.38)); }
+    html.ls7-app-runtime {
+      --ls7-blue:#58d8ff;--ls7-violet:#8a5cff;--ls7-gold:#f4c95d;
+      --ink:#050711;--panel:#0b1221;--panel-2:#111d32;--gold:#74e4ff;--gold-dim:#43b9dc;
+      --green:#7b62ff;--text:#f7f9ff;--text-dim:#aebbd1;--border:#233653;
+      color-scheme:dark;
+    }
+    html.ls7-app-runtime body {
+      background:radial-gradient(circle at 12% -10%,rgba(88,216,255,.10),transparent 30%),radial-gradient(circle at 108% 35%,rgba(138,92,255,.10),transparent 31%),var(--ink);
+    }
+    html.ls7-app-runtime nav {
+      border-color:rgba(88,216,255,.16);background:rgba(5,7,17,.88);
+      box-shadow:0 10px 34px rgba(0,0,0,.22);backdrop-filter:blur(16px) saturate(130%);
+    }
+    html.ls7-app-runtime .nav-brand { gap:0;font-size:20px;font-weight:850;letter-spacing:-.045em;color:#f7f9ff; }
+    html.ls7-app-runtime .nav-brand-live { color:#f7f9ff; }
+    html.ls7-app-runtime .nav-brand-scroll { color:var(--ls7-blue); }
+    html.ls7-app-runtime .nav-brand b {
+      color:#171003;background:linear-gradient(145deg,#fff2a8,#e7a92e);border-color:rgba(255,235,158,.64);
+      filter:drop-shadow(0 0 9px rgba(244,201,93,.38));box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 5px 18px rgba(244,201,93,.17);
+    }
+    html.ls7-app-runtime .form-card,html.ls7-app-runtime .video-card,html.ls7-app-runtime .auth-box {
+      border-color:rgba(88,216,255,.15);background:linear-gradient(145deg,rgba(15,27,47,.94),rgba(8,14,28,.96));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025),0 14px 40px rgba(0,0,0,.16);
+    }
+    html.ls7-app-runtime input,html.ls7-app-runtime textarea,html.ls7-app-runtime select {
+      border-color:rgba(118,151,194,.32);background:#080e1b;color:#f7f9ff;
+    }
+    html.ls7-app-runtime input:focus,html.ls7-app-runtime textarea:focus,html.ls7-app-runtime select:focus {
+      outline:3px solid rgba(88,216,255,.13);border-color:rgba(88,216,255,.7);
+    }
+    html.ls7-app-runtime button:focus-visible,html.ls7-app-runtime a:focus-visible {
+      outline:3px solid rgba(244,201,93,.55)!important;outline-offset:3px;
+    }
+    html.ls7-app-runtime .btn { background:linear-gradient(135deg,#43cbed,#7658ee);color:#fff;border-color:rgba(126,226,255,.35); }
+    html.ls7-app-runtime .btn-outline { border-color:rgba(88,216,255,.28);color:#dff8ff;background:rgba(88,216,255,.035); }
+    html.ls7-app-runtime .page-title { color:#f9fbff;text-shadow:0 0 26px rgba(88,216,255,.08); }
+    html.ls7-app-runtime .nav-links button.active { color:#dffaff;background:linear-gradient(135deg,rgba(88,216,255,.12),rgba(138,92,255,.10)); }
+    html.ls7-app-runtime .nav-links button.active::after { background:linear-gradient(90deg,var(--ls7-blue),var(--ls7-violet),var(--ls7-gold)); }
     html.ls7-app-runtime .ls-access-evolution {
       background:radial-gradient(circle at 20% 10%,rgba(88,216,255,.13),transparent 34%),radial-gradient(circle at 85% 80%,rgba(138,92,255,.17),transparent 38%),#050711;
     }

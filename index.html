@@ -28,14 +28,55 @@
 <meta name="twitter:title" content="LiveScroll — Mirá, subí, ganá">
 <meta name="twitter:description" content="Compartí y mirá clips de Kick, Twitch, YouTube y TikTok, y sumá puntos por cada cosa que hacés.">
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/icon-512.png">
+<script>
+  // Se ejecuta antes del primer dibujo: evita que la APK 7 muestre por un
+  // instante la pantalla compartida de LiveScroll 6 mientras recupera sesión.
+  (function () {
+    if (/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)) {
+      document.documentElement.classList.add('ls7-app-runtime','ls7-boot-pending');
+      document.title = 'LiveScroll 7';
+    }
+  })();
+</script>
+<style>
+  #ls7BootScreen{display:none}
+  html.ls7-boot-pending #ls7BootScreen{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;overflow:hidden;background:#050711;color:#f8fbff;font-family:Inter,system-ui,sans-serif}
+  html.ls7-boot-pending #ls7BootScreen:before,html.ls7-boot-pending #ls7BootScreen:after{content:"";position:absolute;width:72vmax;height:72vmax;border-radius:50%;filter:blur(70px);opacity:.18;transform:translate3d(0,0,0)}
+  html.ls7-boot-pending #ls7BootScreen:before{left:-48vmax;top:-42vmax;background:#48d7ff}
+  html.ls7-boot-pending #ls7BootScreen:after{right:-50vmax;bottom:-43vmax;background:#8858ff}
+  .ls7-boot-card{position:relative;z-index:2;width:min(86vw,390px);text-align:center}
+  .ls7-boot-symbol{width:82px;height:82px;margin:0 auto 18px;display:grid;place-items:center;border:1px solid rgba(244,201,93,.46);border-radius:27px;background:linear-gradient(145deg,rgba(72,215,255,.12),rgba(136,88,255,.16));color:#f4c95d;font:950 48px 'Space Grotesk',sans-serif;box-shadow:0 0 0 8px rgba(244,201,93,.025),0 0 48px rgba(72,215,255,.13);animation:ls7BootFloat 2.1s ease-in-out infinite}
+  .ls7-boot-kicker{color:#72e5ff;font:900 9px 'JetBrains Mono',monospace;letter-spacing:.2em;text-transform:uppercase}
+  .ls7-boot-title{margin:9px 0 6px;font:800 clamp(30px,9vw,46px) 'Space Grotesk',sans-serif;letter-spacing:-.06em}
+  .ls7-boot-title span{color:#f4c95d;text-shadow:0 0 20px rgba(244,201,93,.22)}
+  .ls7-boot-copy{min-height:18px;color:#aebbd1;font-size:12px}
+  .ls7-boot-track{height:4px;margin:24px auto 0;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.08)}
+  .ls7-boot-progress{width:14%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#48d7ff,#8858ff 62%,#f4c95d);box-shadow:0 0 16px rgba(72,215,255,.46);transition:width .38s cubic-bezier(.2,.8,.2,1)}
+  #ls7BootScreen.is-welcome .ls7-boot-symbol{animation:ls7BootWelcome .6s cubic-bezier(.16,1,.3,1) both}
+  #ls7BootScreen.is-leaving{animation:ls7BootLeave .34s ease forwards}
+  @keyframes ls7BootFloat{50%{transform:translateY(-5px);box-shadow:0 0 0 11px rgba(244,201,93,.018),0 0 58px rgba(72,215,255,.18)}}
+  @keyframes ls7BootWelcome{0%{transform:scale(.9) rotate(-5deg)}65%{transform:scale(1.08) rotate(2deg)}100%{transform:scale(1)}}
+  @keyframes ls7BootLeave{to{opacity:0;transform:scale(1.025);visibility:hidden}}
+  @media(prefers-reduced-motion:reduce){#ls7BootScreen *{animation:none!important;transition:none!important}}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.1.1v-social-clarity">
+<link rel="stylesheet" href="style.css?v=7.0.0v-interface-stability-1">
 </head>
 <body>
+
+<div id="ls7BootScreen" role="status" aria-live="polite" aria-label="Iniciando LiveScroll 7">
+  <div class="ls7-boot-card">
+    <div class="ls7-boot-symbol" aria-hidden="true">7</div>
+    <div class="ls7-boot-kicker">NUEVA GENERACIÓN · ANDROID</div>
+    <div class="ls7-boot-title">LiveScroll <span>7</span></div>
+    <div class="ls7-boot-copy" id="ls7BootCopy">Preparando tu experiencia…</div>
+    <div class="ls7-boot-track" aria-hidden="true"><div class="ls7-boot-progress" id="ls7BootProgress"></div></div>
+  </div>
+</div>
 
 <div id="introOverlay" class="ls6-cinematic" data-scene="0" role="dialog" aria-label="Presentación de LiveScroll 6">
   <div class="ls6-stars"></div>
@@ -662,7 +703,7 @@
 </script>
 
 <nav>
-  <div class="nav-brand">Live<span>Scroll</span><b>6</b></div>
+  <div class="nav-brand" aria-label="LiveScroll 6"><span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>6</b></div>
   <div class="nav-links" id="navLinks"></div>
   <div id="navRight"></div>
   <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileMenu()">☰</button>
@@ -748,6 +789,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.1.1v-ls7-runtime-1"></script>
+<script src="app.js?v=7.0.0v-interface-stability-1"></script>
 </body>
 </html>

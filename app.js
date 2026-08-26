@@ -13196,6 +13196,134 @@ async function loadAdminPendingVideoReports() {
   };
 }
 
+const LS_FINANCE_LAB_KEY = "livescroll6_finance_lab_v1";
+
+function getFinanceLabState() {
+  const empty = {
+    userCoins:0,
+    creatorPending:0,
+    creatorAvailable:0,
+    liveScrollGross:0,
+    collectedArs:0,
+    movements:[]
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_FINANCE_LAB_KEY) || "null");
+    return saved && typeof saved === "object" ? { ...empty, ...saved } : empty;
+  } catch (_) {
+    return empty;
+  }
+}
+
+function saveFinanceLabState(state) {
+  localStorage.setItem(LS_FINANCE_LAB_KEY, JSON.stringify(state));
+}
+
+function addFinanceLabMovement(state, type, detail, amount, tone="normal") {
+  state.movements.unshift({
+    id:`lab-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    detail,
+    amount,
+    tone,
+    createdAt:new Date().toISOString()
+  });
+  state.movements = state.movements.slice(0, 20);
+}
+
+function simulateFinanceLabPurchase() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  state.collectedArs += 10000;
+  state.userCoins += 10000;
+  addFinanceLabMovement(state, "COMPRA SIMULADA", "Usuario de prueba compró 10.000 monedas", 10000, "green");
+  saveFinanceLabState(state);
+  showToast("Compra ficticia agregada: 10.000 monedas");
+  renderAdmin();
+}
+
+function simulateFinanceLabGift() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  if (state.userCoins < 5000) {
+    showToast("Primero simulá una compra de monedas");
+    return;
+  }
+  state.userCoins -= 5000;
+  state.creatorPending += 3500;
+  state.liveScrollGross += 1500;
+  addFinanceLabMovement(state, "REGALO SIMULADO", "Regalo de 5.000 monedas · 70% creador / 30% LiveScroll", 5000, "gold");
+  saveFinanceLabState(state);
+  showToast("Regalo ficticio enviado: $3.500 quedaron pendientes para el creador");
+  renderAdmin();
+}
+
+function simulateFinanceLabRelease() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  if (state.creatorPending <= 0) {
+    showToast("No hay saldo pendiente para liberar");
+    return;
+  }
+  const released = state.creatorPending;
+  state.creatorPending = 0;
+  state.creatorAvailable += released;
+  addFinanceLabMovement(state, "SALDO LIBERADO", "Terminó el plazo ficticio de seguridad", released, "blue");
+  saveFinanceLabState(state);
+  showToast("Saldo ficticio disponible para el creador");
+  renderAdmin();
+}
+
+function resetFinanceLab() {
+  if (!currentProfile?.is_admin) return;
+  if (!confirm("¿Reiniciar completamente el laboratorio financiero?")) return;
+  localStorage.removeItem(LS_FINANCE_LAB_KEY);
+  showToast("Laboratorio financiero reiniciado");
+  renderAdmin();
+}
+
+function renderAdminFinancialLab() {
+  if (!currentProfile?.is_admin || isLiveScroll7App()) return "";
+  const state = getFinanceLabState();
+  const money = value => Number(value || 0).toLocaleString("es-AR");
+  return `
+    <h3 style="margin-top:24px;">🧪 Centro Financiero Experimental</h3>
+    <div class="form-card ls-finance-lab" style="margin-bottom:14px;border-color:rgba(250,204,21,.34);background:linear-gradient(145deg,rgba(250,204,21,.07),rgba(59,130,246,.045));">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+          <div style="font-weight:900;color:var(--gold);letter-spacing:.02em;">LABORATORIO PRIVADO · SOLO ADMIN</div>
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.5;margin-top:5px;max-width:680px;">
+            Sistema experimental. Los saldos son ficticios, no poseen valor monetario y no pueden canjearse por dinero.
+          </div>
+        </div>
+        <span style="padding:5px 9px;border:1px solid rgba(250,204,21,.32);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;">MODO PRUEBA</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:9px;margin-bottom:14px;">
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Cobrado ficticio</div><strong class="mono" style="font-size:18px;">$${money(state.collectedArs)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Monedas del usuario</div><strong class="mono" style="font-size:18px;color:var(--gold);">${money(state.userCoins)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Creador pendiente</div><strong class="mono" style="font-size:18px;color:#fbbf24;">$${money(state.creatorPending)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Creador disponible</div><strong class="mono" style="font-size:18px;color:#60a5fa;">$${money(state.creatorAvailable)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">LiveScroll bruto</div><strong class="mono" style="font-size:18px;color:var(--green);">$${money(state.liveScrollGross)}</strong></div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">
+        <button class="btn" onclick="simulateFinanceLabPurchase()">1 · Simular compra $10.000</button>
+        <button class="btn-outline" onclick="simulateFinanceLabGift()">2 · Enviar regalo 5.000</button>
+        <button class="btn-outline" onclick="simulateFinanceLabRelease()">3 · Liberar saldo pendiente</button>
+        <button class="btn-outline" style="color:var(--red);margin-left:auto;" onclick="resetFinanceLab()">Reiniciar</button>
+      </div>
+
+      <div style="font-size:11px;font-weight:850;margin-bottom:8px;">Últimos movimientos ficticios</div>
+      ${state.movements.length ? state.movements.map(m => `
+        <div class="ledger-row" style="gap:10px;align-items:center;">
+          <span style="min-width:0;"><strong style="font-size:10px;">${escapeHtml(m.type)}</strong><br><span style="font-size:10px;color:var(--text-dim);">${escapeHtml(m.detail)} · ${new Date(m.createdAt).toLocaleString("es-AR")}</span></span>
+          <strong class="mono" style="color:${m.tone === "green" ? "var(--green)" : m.tone === "gold" ? "var(--gold)" : m.tone === "blue" ? "#60a5fa" : "var(--text)"};">${money(m.amount)}</strong>
+        </div>
+      `).join("") : `<div style="font-size:11px;color:var(--text-dim);padding:10px 0;">Todavía no realizaste movimientos de prueba.</div>`}
+    </div>`;
+}
+
 
 async function renderAdmin() {
   const main = document.getElementById("appView");
@@ -13402,6 +13530,8 @@ async function renderAdmin() {
         No hay videos reportados pendientes. ✓
       </div>
     `}
+
+    ${renderAdminFinancialLab()}
 
     ${pendingSubs.length ? `
     <h3 style="margin-top:24px;">💳 Pagos de suscripción a confirmar</h3>
@@ -14096,7 +14226,7 @@ function organizeAdminPanel() {
 
     if (value.includes("reportes de seguridad") || value.includes("videos reportados")) return "seguridad";
     if (value.includes("solicitudes de creadores") || value.includes("cuentas nuevas") || value.includes("buscar y gestionar")) return "usuarios";
-    if (value.includes("pagos de suscripción") || value.includes("canjes pendientes") || value.includes("historial reciente")) return "finanzas";
+    if (value.includes("centro financiero experimental") || value.includes("pagos de suscripción") || value.includes("canjes pendientes") || value.includes("historial reciente")) return "finanzas";
     if (value.includes("precios de la tienda") || value.includes("emojis de la tienda") ||
         value.includes("medallas exclusivas") || value.includes("títulos de perfil") ||
         value.includes("otros artículos")) return "tienda";

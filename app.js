@@ -3527,7 +3527,8 @@ async function checkLiveScroll7Update() {
       .select("value").eq("key", "ls7_required_build").maybeSingle();
     if (error || !data?.value) return;
     const requiredBuildCode = Math.trunc(Number(data.value) || 0);
-    if (requiredBuildCode <= LIVESCROLL7_CLIENT_BUILD) return;
+    const installedBuildCode = getLiveScroll7InstalledBuild();
+    if (requiredBuildCode <= installedBuildCode) return;
     const snoozeUntil = Number(sessionStorage.getItem(`ls7_update_snooze_${requiredBuildCode}`) || 0);
     if (Date.now() < snoozeUntil) return;
     showLiveScroll7UpdatePrompt(formatLiveScrollBuild(requiredBuildCode), requiredBuildCode);
@@ -3536,6 +3537,17 @@ async function checkLiveScroll7Update() {
   } finally {
     ls7UpdateCheckRunning = false;
   }
+}
+
+function getLiveScroll7InstalledBuild() {
+  try {
+    const installedVersion = String(window.AndroidBridge?.getAppVersion?.() || "");
+    const parts = installedVersion.match(/(\d+)\.(\d+)\.(\d+)/);
+    if (parts) {
+      return (Number(parts[1]) * 10000) + (Number(parts[2]) * 100) + Number(parts[3]);
+    }
+  } catch (_) {}
+  return LIVESCROLL7_CLIENT_BUILD;
 }
 
 function showLiveScroll7UpdatePrompt(requiredBuild, requiredBuildCode) {
@@ -11606,7 +11618,6 @@ async function renderProfile() {
 
   main.innerHTML = `
     <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
-      ${isLiveScroll7App() ? `<img class="ls7-profile-emblem" src="livescroll7-icon.png" alt="LiveScroll 7">` : ""}
       <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
         style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}'); background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
         <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
@@ -12579,7 +12590,6 @@ async function viewPublicProfile(username) {
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
 
     <div class="profile-hero${isLiveScroll7App() ? " ls7-electric-profile" : ""}" style="position:relative; overflow:hidden;">
-      ${isLiveScroll7App() ? `<img class="ls7-profile-emblem" src="livescroll7-icon.png" alt="LiveScroll 7">` : ""}
       <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
         style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}'); background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}">
       </div>

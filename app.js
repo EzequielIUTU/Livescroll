@@ -3514,7 +3514,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70002;
+const LIVESCROLL7_CLIENT_BUILD = 70003;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -11309,14 +11309,18 @@ function ensureIdentityExperience593Styles() {
 
 function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount = 0, totalViews = 0, own = false }) {
   if (!isLiveScroll7App()) return "";
-  const featured = videos[0] || null;
+  const visualStyle = ["electric","cosmic","minimal"].includes(profile?.profile_visual_style) ? profile.profile_visual_style : "electric";
+  const featured = videos.find(video => video.id === profile?.profile_featured_video_id) || videos[0] || null;
   const latestLabel = featured?.created_at ? lsTimeAgo(featured.created_at) : "Sin publicaciones";
   const statusLabel = profile?.is_live ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
   return `
-    <section class="ls7-living-profile" aria-label="Perfil Vivo LiveScroll 7">
+    <section class="ls7-living-profile ls7-profile-style-${visualStyle}" aria-label="Perfil Vivo LiveScroll 7">
       <div class="ls7-living-head">
         <div><small>◈ PERFIL VIVO 7</small><h2>Ahora mismo</h2></div>
-        <span class="${profile?.is_live ? "is-live" : ""}"><i></i>${statusLabel}</span>
+        <div class="ls7-living-head-actions">
+          ${own ? `<button class="ls7-profile-customize-btn" onclick="openLiveScroll7ProfileCustomizer()">Personalizar</button>` : ""}
+          <span class="${profile?.is_live ? "is-live" : ""}"><i></i>${statusLabel}</span>
+        </div>
       </div>
       <div class="ls7-living-grid">
         ${featured ? `
@@ -11342,6 +11346,74 @@ function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount =
         </div>
       </div>
     </section>`;
+}
+
+function openLiveScroll7ProfileCustomizer() {
+  if (!isLiveScroll7App()) return;
+  const videos = Array.isArray(window.__profileFeedVideos) ? window.__profileFeedVideos : [];
+  const selectedVideo = currentProfile?.profile_featured_video_id || videos[0]?.id || "";
+  const selectedStyle = ["electric","cosmic","minimal"].includes(currentProfile?.profile_visual_style) ? currentProfile.profile_visual_style : "electric";
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked ls7-profile-customizer-overlay" data-modal-locked="1">
+      <div class="modal-box ls7-profile-customizer-box">
+        <div class="modal-box-head"><div><small>PERFIL VIVO 7</small><h2>Tu perfil, tus reglas</h2></div><button onclick="closeLiveScroll7ProfileCustomizer()">✕</button></div>
+        <div class="modal-box-body">
+          <label class="ls7-customizer-label">Video protagonista</label>
+          <select id="ls7FeaturedVideoSelect">
+            ${videos.length ? videos.map(video => `<option value="${video.id}" ${video.id === selectedVideo ? "selected" : ""}>${escapeHtml(video.title || "Video sin título")}</option>`).join("") : `<option value="">Todavía no hay videos</option>`}
+          </select>
+          <label class="ls7-customizer-label">Estilo visual</label>
+          <div class="ls7-style-picker" id="ls7StylePicker">
+            ${[
+              ["electric","⚡","Eléctrico","Cian, azul y energía viva"],
+              ["cosmic","◉","Cósmico","Violeta profundo y estrellas"],
+              ["minimal","◇","Minimal","Oscuro, limpio y elegante"]
+            ].map(([value,icon,name,copy]) => `<button class="${value === selectedStyle ? "active" : ""}" data-style="${value}" onclick="selectLiveScroll7ProfileStyle('${value}')"><b>${icon}</b><span><strong>${name}</strong><small>${copy}</small></span></button>`).join("")}
+          </div>
+          <div class="ls7-style-preview ls7-profile-style-${selectedStyle}" id="ls7StylePreview"><i></i><div><small>VISTA PREVIA</small><strong>@${escapeHtml(currentProfile?.username || "usuario")}</strong><span>Así se sentirá tu Perfil Vivo.</span></div></div>
+        </div>
+        <div class="modal-box-actions"><button class="btn-outline" onclick="closeLiveScroll7ProfileCustomizer()">Cancelar</button><button class="btn" id="ls7SaveProfileStyle" onclick="saveLiveScroll7ProfileCustomization()">Guardar cambios</button></div>
+      </div>
+    </div>`;
+}
+
+function selectLiveScroll7ProfileStyle(style) {
+  if (!["electric","cosmic","minimal"].includes(style)) return;
+  document.querySelectorAll("#ls7StylePicker button").forEach(button => button.classList.toggle("active", button.dataset.style === style));
+  const preview = document.getElementById("ls7StylePreview");
+  if (preview) preview.className = `ls7-style-preview ls7-profile-style-${style}`;
+}
+
+function closeLiveScroll7ProfileCustomizer() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = "";
+}
+
+async function saveLiveScroll7ProfileCustomization() {
+  const button = document.getElementById("ls7SaveProfileStyle");
+  const featuredVideoId = document.getElementById("ls7FeaturedVideoSelect")?.value || null;
+  const visualStyle = document.querySelector("#ls7StylePicker button.active")?.dataset.style || "electric";
+  if (button) { button.disabled = true;button.textContent = "Guardando…"; }
+  const { data, error } = await sb.rpc("set_my_ls7_profile_customization", {
+    p_featured_video_id:featuredVideoId,
+    p_visual_style:visualStyle
+  });
+  if (error) {
+    if (button) { button.disabled = false;button.textContent = "Guardar cambios"; }
+    showToast("No se pudo guardar. Ejecutá primero el SQL 7.0.3v.");
+    return;
+  }
+  if (data?.ok === false) {
+    if (button) { button.disabled = false;button.textContent = "Guardar cambios"; }
+    showToast(data.error === "video_invalido" ? "Ese video no pertenece a tu perfil." : "No se pudo guardar el perfil.");
+    return;
+  }
+  currentProfile.profile_featured_video_id = featuredVideoId;
+  currentProfile.profile_visual_style = visualStyle;
+  closeLiveScroll7ProfileCustomizer();
+  showToast("Perfil Vivo actualizado");
+  renderProfile();
 }
 
 async function renderProfile() {
@@ -12590,7 +12662,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("*").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
 
   const [
@@ -17761,6 +17833,10 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .ls7-living-head > span { display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid rgba(57,231,255,.20);border-radius:999px;color:#a9c7df;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em;background:rgba(4,14,30,.72); }
     html.ls7-app-runtime .ls7-living-head > span i { width:7px;height:7px;border-radius:50%;background:#39e7ff;box-shadow:0 0 13px #39e7ff;animation:ls7SignalPulse 1.6s ease-in-out infinite; }
     html.ls7-app-runtime .ls7-living-head > span.is-live i { background:#ffd66b;box-shadow:0 0 15px #ffd66b; }
+    html.ls7-app-runtime .ls7-living-head-actions { display:flex;align-items:center;gap:8px; }
+    html.ls7-app-runtime .ls7-living-head-actions > span { display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid rgba(57,231,255,.20);border-radius:999px;color:#a9c7df;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em;background:rgba(4,14,30,.72); }
+    html.ls7-app-runtime .ls7-living-head-actions > span i { width:7px;height:7px;border-radius:50%;background:#39e7ff;box-shadow:0 0 13px #39e7ff;animation:ls7SignalPulse 1.6s ease-in-out infinite; }
+    html.ls7-app-runtime .ls7-profile-customize-btn { min-height:31px;padding:0 11px;border:1px solid rgba(138,85,255,.35);border-radius:999px;background:linear-gradient(135deg,rgba(57,231,255,.10),rgba(138,85,255,.16));color:#e9faff;font:850 8px 'JetBrains Mono',monospace;letter-spacing:.07em;cursor:pointer; }
     html.ls7-app-runtime .ls7-living-grid { display:grid;grid-template-columns:minmax(0,1.45fr) minmax(220px,.55fr);gap:13px; }
     html.ls7-app-runtime .ls7-featured-video { min-height:260px;padding:0;position:relative;overflow:hidden;border:1px solid rgba(57,231,255,.22);border-radius:21px;background:#040a16;color:#fff;text-align:left;cursor:pointer;box-shadow:0 18px 35px rgba(0,0,0,.30); }
     html.ls7-app-runtime .ls7-featured-cover,html.ls7-app-runtime .ls7-featured-cover > * { position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important; }
@@ -17783,6 +17859,24 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .ls7-data-pair b { color:#eefbff;font-size:15px;overflow:hidden;text-overflow:ellipsis; }
     html.ls7-app-runtime .ls7-live-data > p { color:#a9c0d7;font-size:9px;line-height:1.45;display:flex;align-items:center;gap:7px; }
     html.ls7-app-runtime .ls7-live-data > p i { flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:#8a55ff;box-shadow:0 0 10px #8a55ff; }
+    html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-cosmic { border-color:rgba(181,117,255,.34);background:radial-gradient(circle at 82% 2%,rgba(175,103,255,.24),transparent 34%),radial-gradient(circle at 8% 82%,rgba(37,136,255,.14),transparent 35%),linear-gradient(145deg,#100a2c,#050717 66%,#071a35); }
+    html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-minimal { border-color:rgba(174,203,225,.15);background:linear-gradient(155deg,#0b1019,#05070c);box-shadow:0 18px 45px rgba(0,0,0,.32)!important; }
+    html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-minimal::after { display:none; }
+    html.ls7-app-runtime .ls7-profile-customizer-overlay { background:rgba(1,4,12,.88);backdrop-filter:blur(12px); }
+    html.ls7-app-runtime .ls7-profile-customizer-box { width:min(520px,100%);border:1px solid rgba(57,231,255,.28);border-radius:26px;background:linear-gradient(155deg,#07172b,#090719 72%,#150b2b);box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 50px rgba(37,136,255,.10); }
+    html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-head small { color:#57eaff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.16em; }
+    html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-head h2 { margin:4px 0 0; }
+    html.ls7-app-runtime .ls7-customizer-label { display:block;margin:5px 0 7px;color:#9fb9d2;font:850 8px 'JetBrains Mono',monospace;letter-spacing:.10em;text-transform:uppercase; }
+    html.ls7-app-runtime #ls7FeaturedVideoSelect { width:100%;margin-bottom:18px; }
+    html.ls7-app-runtime .ls7-style-picker { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px; }
+    html.ls7-app-runtime .ls7-style-picker button { min-height:86px;padding:10px;border:1px solid rgba(57,231,255,.13);border-radius:15px;background:rgba(8,20,38,.72);color:#eaf8ff;text-align:left;display:flex;align-items:flex-start;gap:8px;cursor:pointer; }
+    html.ls7-app-runtime .ls7-style-picker button.active { border-color:rgba(57,231,255,.56);background:linear-gradient(145deg,rgba(57,231,255,.14),rgba(138,85,255,.14));box-shadow:0 0 24px rgba(37,136,255,.10),inset 0 1px 0 rgba(255,255,255,.06); }
+    html.ls7-app-runtime .ls7-style-picker button > b { font-size:20px;color:#63edff; }html.ls7-app-runtime .ls7-style-picker button span { display:flex;flex-direction:column;gap:4px; }html.ls7-app-runtime .ls7-style-picker button strong { font-size:11px; }html.ls7-app-runtime .ls7-style-picker button small { color:#8fa9c2;font-size:8px;line-height:1.35; }
+    html.ls7-app-runtime .ls7-style-preview { min-height:104px;padding:15px;border:1px solid rgba(57,231,255,.22);border-radius:17px;display:flex;align-items:center;gap:13px;background:linear-gradient(145deg,#092241,#090a1b);transition:background .2s ease,border-color .2s ease; }
+    html.ls7-app-runtime .ls7-style-preview > i { width:48px;height:48px;border-radius:50%;background:conic-gradient(#39e7ff,#2588ff,#8a55ff,#ffd66b,#39e7ff);box-shadow:0 0 24px rgba(57,231,255,.28); }
+    html.ls7-app-runtime .ls7-style-preview > div { display:flex;flex-direction:column;gap:3px; }html.ls7-app-runtime .ls7-style-preview small { color:#62edff;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.1em; }html.ls7-app-runtime .ls7-style-preview strong { font-size:18px; }html.ls7-app-runtime .ls7-style-preview span { color:#9fb4c9;font-size:9px; }
+    html.ls7-app-runtime .ls7-style-preview.ls7-profile-style-cosmic { border-color:rgba(173,103,255,.38);background:radial-gradient(circle at 85% 5%,rgba(160,82,255,.28),transparent 40%),linear-gradient(145deg,#190d3a,#08091a); }
+    html.ls7-app-runtime .ls7-style-preview.ls7-profile-style-minimal { border-color:rgba(180,205,225,.16);background:linear-gradient(145deg,#111720,#06080d); }
     html.ls7-app-runtime .ls7-electric-update-overlay { position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(1,4,13,.88);backdrop-filter:blur(13px); }
     html.ls7-app-runtime .ls7-electric-update-card { width:min(440px,100%);padding:25px;text-align:center;color:#f7fcff;border:1px solid rgba(57,231,255,.38);border-radius:28px;background:radial-gradient(circle at 50% 0,rgba(57,231,255,.14),transparent 38%),linear-gradient(155deg,#071a31,#090817 68%,#180b35);box-shadow:0 30px 90px rgba(0,0,0,.68),0 0 55px rgba(37,136,255,.14); }
     html.ls7-app-runtime .ls7-electric-update-logo { width:94px;height:94px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(57,231,255,.56));animation:ls7EmblemFloat 3s ease-in-out infinite; }
@@ -17796,7 +17890,7 @@ function ensureLiveScroll7ElectricIdentity() {
     @keyframes ls7EmblemFloat { 0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)} }
     @keyframes ls7LivingOrbit { to{transform:rotate(360deg)} }
     @keyframes ls7SignalPulse { 50%{opacity:.4;transform:scale(.75)} }
-    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; }html.ls7-app-runtime .ls7-living-profile{padding:14px;border-radius:22px}html.ls7-app-runtime .ls7-living-grid{grid-template-columns:1fr}html.ls7-app-runtime .ls7-featured-video{min-height:230px}html.ls7-app-runtime .ls7-live-data{display:grid;grid-template-columns:1fr 1fr}html.ls7-app-runtime .ls7-live-data>div:first-child,html.ls7-app-runtime .ls7-live-data>p{grid-column:1/-1} }
+    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; }html.ls7-app-runtime .ls7-living-profile{padding:14px;border-radius:22px}html.ls7-app-runtime .ls7-living-grid{grid-template-columns:1fr}html.ls7-app-runtime .ls7-featured-video{min-height:230px}html.ls7-app-runtime .ls7-live-data{display:grid;grid-template-columns:1fr 1fr}html.ls7-app-runtime .ls7-live-data>div:first-child,html.ls7-app-runtime .ls7-live-data>p{grid-column:1/-1}html.ls7-app-runtime .ls7-style-picker{grid-template-columns:1fr}html.ls7-app-runtime .ls7-style-picker button{min-height:64px}html.ls7-app-runtime .ls7-living-head{align-items:flex-start}html.ls7-app-runtime .ls7-living-head-actions{flex-direction:column;align-items:flex-end} }
     @media(prefers-reduced-motion:reduce) { html.ls7-app-runtime .ls7-electric-profile::before,html.ls7-app-runtime .ls7-profile-emblem,html.ls7-app-runtime .ls7-electric-update-logo { animation:none!important; } }
   `;
   document.head.appendChild(style);

@@ -2421,7 +2421,6 @@ function toggleMobileMenu() {
       <button class="${activeTab === 'directos' ? 'active' : ''}" onclick="switchTab('directos'); closeMobileMenu();"><span>🔴</span><b>Directos</b></button>
       <div class="ls-mobile-menu-label">Mi cuenta</div>
       ${!window.__navWalletLocked ? `<button class="${activeTab === 'wallet' ? 'active' : ''}" onclick="switchTab('wallet'); closeMobileMenu();"><span>💰</span><b>Billetera</b></button>` : ""}
-      ${!window.__navPlansLocked ? `<button class="${activeTab === 'plans' ? 'active' : ''}" onclick="switchTab('plans'); closeMobileMenu();"><span>💎</span><b>Planes</b></button>` : ""}
       <button class="${activeTab === 'store' ? 'active' : ''}" onclick="switchTab('store'); closeMobileMenu();"><span>🛍️</span><b>Tienda</b></button>
       <button class="${activeTab === 'ranking' ? 'active' : ''}" onclick="switchTab('ranking'); closeMobileMenu();"><span>🏆</span><b>Ranking</b></button>
       <div class="ls-mobile-menu-label">Ayuda y ajustes</div>
@@ -3281,7 +3280,6 @@ async function renderApp() {
     <button id="tab-users" onclick="switchTab('users')">👥 Usuarios</button>
     <button id="tab-directos" onclick="switchTab('directos')" style="color:var(--red)">🔴 Directos</button>
     ${!walletLocked ? `<button id="tab-wallet" onclick="switchTab('wallet')">Billetera</button>` : ""}
-    ${!plansLocked ? `<button id="tab-plans" onclick="switchTab('plans')">Planes</button>` : ""}
     <button id="tab-store" onclick="switchTab('store')">🛍️ Tienda</button>
     <button id="tab-ranking" onclick="switchTab('ranking')">🏆 Ranking</button>
     ${currentProfile.is_admin ? `<button id="tab-admin" onclick="switchTab('admin')" style="color:var(--green)">🛠 Admin</button>` : ""}`;
@@ -6218,6 +6216,9 @@ function lsCacheFresh(entry, maxAgeMs) {
 }
 
 function switchTab(tab) {
+  // Los planes siguen disponibles dentro de Tienda, pero ya no existen como
+  // apartado independiente. Los accesos viejos también terminan allí.
+  if (tab === "plans") tab = "store";
   stopConnectedLiveRefresh();
 
   clearAllWatchIntervals();
@@ -6254,7 +6255,6 @@ function switchTab(tab) {
   if (tab === "users") renderUsersDirectory();
   if (tab === "directos") renderDirectos(renderToken);
   if (tab === "wallet") renderWallet();
-  if (tab === "plans") renderPlans(renderToken);
   if (tab === "store") renderStore();
   if (tab === "ranking") renderRanking();
   if (tab === "admin") renderAdmin();
@@ -10017,7 +10017,7 @@ function renderBoostBox(plan, status) {
   if (!status || !status.has_boost_plan) {
     return `
       <div class="form-card" style="margin-bottom:24px; text-align:center; color:var(--text-dim); font-size:13px;">
-        Tu plan (${plan.name}) no incluye boost activable. <button onclick="switchTab('plans')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Mejorá tu plan →</button>
+        Tu plan (${plan.name}) no incluye boost activable. <button onclick="switchTab('store')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Ver planes en Tienda →</button>
       </div>`;
   }
   if (status.active) {
@@ -13640,18 +13640,8 @@ async function renderAdmin() {
       </div>
     </div>
 
-    <h3 style="margin-top:32px;">🔒 Acceso a Planes y Billetera</h3>
+    <h3 style="margin-top:32px;">🔒 Acceso a Billetera</h3>
     <div class="form-card" style="margin-bottom:14px;padding:0;overflow:hidden;">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
-        <div style="flex:1;min-width:190px;">
-          <div style="font-size:13px;font-weight:700;">💎 Planes</div>
-          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Mostrá u ocultá la sección para los demás usuarios.</div>
-        </div>
-        <button class="btn" id="plansLockBtn" onclick="handleTogglePlansLock()">Cargando...</button>
-      </div>
-
-      <div style="border-top:1px solid var(--border);"></div>
-
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
         <div style="flex:1;min-width:190px;">
           <div style="font-size:13px;font-weight:700;">👛 Billetera</div>
@@ -13661,7 +13651,7 @@ async function renderAdmin() {
       </div>
 
       <div style="padding:0 14px 12px;color:var(--text-dim);font-size:10px;">
-        Tu cuenta de administrador mantiene acceso a ambas secciones.
+        Tu cuenta de administrador mantiene acceso a la Billetera aunque esté pausada para los demás usuarios.
       </div>
     </div>
 
@@ -13886,7 +13876,6 @@ async function renderAdmin() {
 
   organizeAdminPanel();
   loadStreakWeeksOverview();
-  loadPlansLockStatus();
   loadWalletLockStatus();
   setTimeout(syncSeasonalAdminControls, 0);
   loadStoreEmojisList();
@@ -14230,7 +14219,7 @@ function organizeAdminPanel() {
     if (value.includes("precios de la tienda") || value.includes("emojis de la tienda") ||
         value.includes("medallas exclusivas") || value.includes("títulos de perfil") ||
         value.includes("otros artículos")) return "tienda";
-    if (value.includes("eventos visuales") || value.includes("acceso a planes") ||
+    if (value.includes("eventos visuales") || value.includes("acceso a billetera") ||
         value.includes("novedades y términos") || value.includes("racha semanal")) return "sistema";
 
     return "resumen";
@@ -15891,7 +15880,7 @@ function showPaymentCodeModal(code, amount) {
       <p style="font-size:13px; color:var(--text-dim);">Transferí <strong style="color:var(--green)">$${amount.toLocaleString("es-AR")}</strong> y poné este código EXACTO en el concepto de la transferencia:</p>
       <div class="mono" style="background:var(--ink); border:1px solid var(--gold); border-radius:10px; padding:14px; text-align:center; font-size:20px; color:var(--gold); margin:14px 0;">${code}</div>
       <p style="font-size:12px; color:var(--text-dim);">Sin ese código no podemos confirmar que la transferencia es tuya. Guardalo hasta que te confirmemos (5 a 10 min según el tránsito 🚦).</p>
-      <button class="btn" style="width:100%; margin-top:10px;" onclick="this.closest('div[style*=fixed]').remove(); switchTab('plans');">Listo, ya lo anoté</button>
+      <button class="btn" style="width:100%; margin-top:10px;" onclick="this.closest('div[style*=fixed]').remove(); switchTab('store');">Listo, ya lo anoté</button>
     </div>`;
   document.body.appendChild(modal);
 }

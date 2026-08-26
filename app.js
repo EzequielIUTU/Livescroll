@@ -48,7 +48,6 @@ function finishLiveScroll7Boot({ authenticated = false } = {}) {
   const screen = document.getElementById("ls7BootScreen");
   if (!screen || screen.dataset.finished === "1") return;
   screen.dataset.finished = "1";
-  updateLiveScroll7Boot(100, authenticated ? "Bienvenido a LiveScroll 7" : "Todo listo");
   screen.classList.toggle("is-welcome", authenticated);
   const hold = authenticated ? 720 : 180;
   window.setTimeout(() => {
@@ -576,7 +575,6 @@ function exitSecurityReportScreen() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   applyLiveScrollRuntimeBranding();
-  updateLiveScroll7Boot(28, "Conectando tu cuenta…");
   if ("serviceWorker" in navigator) {
     const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
     if ("requestIdleCallback" in window) {
@@ -623,7 +621,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (currentUser && currentUser.id === session.user.id) return;
       currentUser = session.user;
       await loadProfile();
-      updateLiveScroll7Boot(66, "Preparando tu feed…");
       await renderApp();
       finishLiveScroll7Boot({ authenticated:true });
     } else if (event === "SIGNED_OUT") {
@@ -642,9 +639,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!lsRecoveryMode) {
     if (session) {
       currentUser = session.user;
-      updateLiveScroll7Boot(52, "Recuperando tu sesión…");
       await loadProfile();
-      updateLiveScroll7Boot(72, "Organizando tus videos…");
       await renderApp();
       finishLiveScroll7Boot({ authenticated:true });
       if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
@@ -690,10 +685,10 @@ function showPostLoginIntro() {
     const seasonEmoji = isLs7 ? "7" : (seasonal?.emoji || "✦");
     const introKicker = isLs7 ? "LIVESCROLL 7 · ANDROID" : "LiveScroll";
     const introTitle = isLs7
-      ? (username ? `El futuro te espera, @${escapeHtml(username)}` : "Bienvenido a LiveScroll 7")
+      ? (username ? `Cargando tu mundo, @${escapeHtml(username)}` : "Cargando LiveScroll 7")
       : (username ? `Hola, @${escapeHtml(username)}` : "Bienvenido");
     const introSubtitle = isLs7
-      ? "Abriendo tu próxima generación…"
+      ? "Preparando tu feed y sincronizando tu cuenta…"
       : "Preparando tu LiveScroll…";
 
     const reducedMotion =
@@ -3304,6 +3299,7 @@ async function renderApp() {
     <button class="btn-outline nav-logout-btn" style="margin-left:10px" onclick="handleLogout()">Salir</button>`;
 
   ensureNavigationEvolution597();
+  ensureLiveScroll7HorizontalNavigation();
 
 
   // Lo visible primero.
@@ -6244,6 +6240,54 @@ function switchTab(tab) {
 
 }
 
+// LiveScroll 7 · navegación horizontal con intención.
+// Solo actúa cuando el gesto es claramente lateral y nunca dentro de videos,
+// formularios, menús o ventanas modales.
+function ensureLiveScroll7HorizontalNavigation() {
+  if (!isLiveScroll7App() || window.__ls7HorizontalNavigationReady) return;
+  const surface = document.getElementById("appView");
+  if (!surface) return;
+  window.__ls7HorizontalNavigationReady = true;
+
+  const tabs = ["feed", "foryou", "profile"];
+  let startX = 0;
+  let startY = 0;
+  let startedAt = 0;
+  let blocked = false;
+
+  surface.addEventListener("touchstart", event => {
+    const touch = event.touches?.[0];
+    if (!touch || event.touches.length !== 1) return;
+    const target = event.target;
+    blocked = !!target?.closest?.("button,a,input,textarea,select,video,iframe,.modal-overlay,.ls-comments-overlay-611,.mobile-menu-panel");
+    startX = touch.clientX;
+    startY = touch.clientY;
+    startedAt = performance.now();
+  }, { passive:true });
+
+  surface.addEventListener("touchend", event => {
+    if (blocked) return;
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const elapsed = performance.now() - startedAt;
+    if (elapsed > 760 || Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+
+    const index = tabs.indexOf(currentTab);
+    if (index < 0) return;
+    const nextIndex = dx < 0 ? index + 1 : index - 1;
+    if (nextIndex < 0 || nextIndex >= tabs.length) return;
+
+    surface.classList.remove("ls7-swipe-left", "ls7-swipe-right");
+    surface.classList.add(dx < 0 ? "ls7-swipe-left" : "ls7-swipe-right");
+    window.setTimeout(() => {
+      switchTab(tabs[nextIndex]);
+      surface.classList.remove("ls7-swipe-left", "ls7-swipe-right");
+    }, 115);
+  }, { passive:true });
+}
+
 function updateBalanceUI() {
   const el = document.getElementById("navBalance");
   if (el) {
@@ -6548,9 +6592,9 @@ async function renderFeed(renderToken = lsTabRenderToken) {
             <div class="feed-actions">
               <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
               <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-              <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
-              ${!isMine ? `<button class="feed-action-btn" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${v.id}')">🙈</button>` : ""}
-              ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
+              <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
+              ${!isMine ? `<button class="feed-action-btn ls7-action-hide" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${v.id}')"><span>−</span><i>OCULTAR</i></button>` : ""}
+              ${!isMine ? `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')"><span>!</span><i>REPORTE</i></button>` : ""}
             </div>
             <div class="feed-overlay">
               <div>
@@ -6925,8 +6969,8 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
               <div class="feed-actions">
                 <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
                 <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-                <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
-                ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
+                <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
+                ${!isMine ? `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')"><span>!</span><i>REPORTE</i></button>` : ""}
               </div>
               <div class="feed-overlay">
                 <div>
@@ -11389,7 +11433,7 @@ async function renderForYou(renderToken = lsTabRenderToken) {
             <div class="feed-actions">
               <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
               <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-              <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
+              <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
             </div>
             <div class="feed-overlay">
               <div>
@@ -16771,6 +16815,68 @@ function ensureLiveScroll7RuntimeStyles() {
     .ls7-runtime-roadmap b { color:var(--text);font-size:11px; }
     .ls7-runtime-notice blockquote { margin:14px 0 0;color:var(--text-dim);font-size:13px;line-height:1.55; }
     .ls7-runtime-notice blockquote strong { color:var(--ls7-gold); }
+
+    /* INTERFACE MOTION 2 · identidad grafito, titanio, dorado y rojo eléctrico */
+    html.ls7-app-runtime {
+      --ls7-blue:#c9d4df;--ls7-violet:#ff4d45;--ls7-gold:#f4c95d;
+      --ink:#090a0d;--panel:#121419;--panel-2:#1b1e24;--gold:#f4c95d;--gold-dim:#c99c36;
+      --green:#ff554c;--text:#f7f5ef;--text-dim:#b9bec6;--border:#32363e;
+    }
+    html.ls7-app-runtime body {
+      background:radial-gradient(circle at 12% -10%,rgba(244,201,93,.09),transparent 28%),radial-gradient(circle at 108% 38%,rgba(255,77,69,.075),transparent 30%),linear-gradient(145deg,#090a0d,#0d0f13 52%,#08090b);
+    }
+    html.ls7-app-runtime nav {
+      border-color:rgba(244,201,93,.16);background:rgba(9,10,13,.90);
+      box-shadow:0 12px 38px rgba(0,0,0,.34),inset 0 -1px 0 rgba(255,255,255,.018);backdrop-filter:blur(18px) saturate(120%);
+    }
+    html.ls7-app-runtime .nav-brand-scroll { color:#d9dee5; }
+    html.ls7-app-runtime .form-card,html.ls7-app-runtime .video-card,html.ls7-app-runtime .auth-box {
+      border-color:rgba(201,212,223,.13);background:linear-gradient(145deg,rgba(26,28,34,.96),rgba(13,14,18,.97));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 18px 45px rgba(0,0,0,.24);
+    }
+    html.ls7-app-runtime input,html.ls7-app-runtime textarea,html.ls7-app-runtime select {
+      border-color:rgba(201,212,223,.25);background:#0d0f13;color:#f7f5ef;
+    }
+    html.ls7-app-runtime input:focus,html.ls7-app-runtime textarea:focus,html.ls7-app-runtime select:focus {
+      outline:3px solid rgba(244,201,93,.13);border-color:rgba(244,201,93,.66);
+    }
+    html.ls7-app-runtime .btn { background:linear-gradient(135deg,#dbab3e,#ff554c);color:#111;border-color:rgba(255,225,145,.38);box-shadow:0 10px 28px rgba(255,85,76,.12); }
+    html.ls7-app-runtime .btn-outline { border-color:rgba(201,212,223,.25);color:#edf0f4;background:linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012)); }
+    html.ls7-app-runtime .page-title { color:#fbf8ef;text-shadow:0 0 28px rgba(244,201,93,.07); }
+    html.ls7-app-runtime .nav-links button.active { color:#fff2c1;background:linear-gradient(135deg,rgba(244,201,93,.11),rgba(255,77,69,.07)); }
+    html.ls7-app-runtime .nav-links button.active::after { background:linear-gradient(90deg,#d9dee5,var(--ls7-gold),#ff554c); }
+
+    html.ls7-app-runtime .feed-actions {
+      gap:8px!important;padding:8px 6px;border:1px solid rgba(201,212,223,.13);border-radius:26px;
+      background:linear-gradient(160deg,rgba(25,27,33,.76),rgba(8,9,12,.70));
+      box-shadow:0 18px 44px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.045);
+      backdrop-filter:blur(15px) saturate(125%);
+    }
+    html.ls7-app-runtime .feed-action-btn {
+      width:50px!important;min-height:50px!important;height:50px!important;padding:5px!important;border-radius:17px!important;
+      border:1px solid rgba(201,212,223,.16)!important;background:linear-gradient(145deg,rgba(40,43,51,.88),rgba(14,15,19,.92))!important;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.055),0 8px 18px rgba(0,0,0,.25)!important;
+      color:#edf0f4!important;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    }
+    html.ls7-app-runtime .feed-action-btn > span { font:850 22px 'Space Grotesk',sans-serif;line-height:1; }
+    html.ls7-app-runtime .feed-action-btn > i { color:#aeb4bd;font:850 6px 'JetBrains Mono',monospace;letter-spacing:.05em; }
+    html.ls7-app-runtime .feed-action-btn:active { transform:scale(.88)!important;box-shadow:inset 0 3px 12px rgba(0,0,0,.35)!important; }
+    html.ls7-app-runtime .feed-action-btn.liked {
+      border-color:rgba(255,82,74,.65)!important;background:linear-gradient(145deg,#c92f31,#6d151d)!important;
+      box-shadow:0 0 0 3px rgba(255,82,74,.12),0 10px 25px rgba(201,47,49,.28)!important;
+    }
+    html.ls7-app-runtime .ls7-action-share > span { color:#f4c95d; }
+    html.ls7-app-runtime .ls7-action-hide > span { color:#c9d4df; }
+    html.ls7-app-runtime .ls7-action-report { border-color:rgba(255,82,74,.25)!important; }
+    html.ls7-app-runtime .ls7-action-report > span { color:#ff6259;font-weight:950; }
+    html.ls7-app-runtime #appView.ls7-swipe-left { animation:ls7SwipeLeft .13s ease both; }
+    html.ls7-app-runtime #appView.ls7-swipe-right { animation:ls7SwipeRight .13s ease both; }
+    @keyframes ls7SwipeLeft { to{opacity:.55;transform:translate3d(-22px,0,0) scale(.995)} }
+    @keyframes ls7SwipeRight { to{opacity:.55;transform:translate3d(22px,0,0) scale(.995)} }
+    @media(max-width:700px) {
+      html.ls7-app-runtime .feed-actions { right:8px!important;padding:6px 5px; }
+      html.ls7-app-runtime .feed-action-btn { width:46px!important;min-height:46px!important;height:46px!important;border-radius:15px!important; }
+    }
   `;
   document.head.appendChild(style);
 }

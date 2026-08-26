@@ -3421,18 +3421,13 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = "6.1.2";
+const LIVESCROLL6_CLIENT_BUILD = 60102;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
-function compareBuildVersions(a, b) {
-  const left = String(a || "0").replace(/[^0-9.]/g, "").split(".").map(Number);
-  const right = String(b || "0").replace(/[^0-9.]/g, "").split(".").map(Number);
-  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
-    const difference = (left[index] || 0) - (right[index] || 0);
-    if (difference !== 0) return difference;
-  }
-  return 0;
+function formatLiveScrollBuild(code) {
+  const value = Math.max(0, Math.trunc(Number(code) || 0));
+  return `${Math.trunc(value / 10000)}.${Math.trunc((value % 10000) / 100)}.${value % 100}`;
 }
 
 async function checkLiveScroll6Update() {
@@ -3447,12 +3442,13 @@ async function checkLiveScroll6Update() {
       .maybeSingle();
     if (error || !data?.value) return;
 
-    const requiredBuild = String(data.value).trim();
-    if (compareBuildVersions(requiredBuild, LIVESCROLL6_CLIENT_BUILD) <= 0) return;
+    const requiredBuildCode = Math.trunc(Number(data.value) || 0);
+    if (requiredBuildCode <= LIVESCROLL6_CLIENT_BUILD) return;
+    const requiredBuild = formatLiveScrollBuild(requiredBuildCode);
 
-    const snoozeUntil = Number(sessionStorage.getItem(`ls6_update_snooze_${requiredBuild}`) || 0);
+    const snoozeUntil = Number(sessionStorage.getItem(`ls6_update_snooze_${requiredBuildCode}`) || 0);
     if (Date.now() < snoozeUntil) return;
-    showLiveScroll6UpdatePrompt(requiredBuild);
+    showLiveScroll6UpdatePrompt(requiredBuild, requiredBuildCode);
   } catch (error) {
     console.warn("No se pudo comprobar la versión de LiveScroll 6:", error);
   } finally {
@@ -3460,7 +3456,7 @@ async function checkLiveScroll6Update() {
   }
 }
 
-function showLiveScroll6UpdatePrompt(requiredBuild) {
+function showLiveScroll6UpdatePrompt(requiredBuild, requiredBuildCode) {
   if (document.getElementById("ls6LiveUpdatePrompt")) return;
   const overlay = document.createElement("div");
   overlay.id = "ls6LiveUpdatePrompt";
@@ -3480,7 +3476,7 @@ function showLiveScroll6UpdatePrompt(requiredBuild) {
   document.body.appendChild(overlay);
 
   document.getElementById("ls6UpdateLater")?.addEventListener("click", () => {
-    sessionStorage.setItem(`ls6_update_snooze_${requiredBuild}`, String(Date.now() + 10 * 60 * 1000));
+    sessionStorage.setItem(`ls6_update_snooze_${requiredBuildCode}`, String(Date.now() + 10 * 60 * 1000));
     overlay.remove();
   });
   document.getElementById("ls6UpdateNow")?.addEventListener("click", restartLiveScrollForUpdate);

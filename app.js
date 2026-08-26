@@ -3399,6 +3399,7 @@ async function renderApp() {
   // Realtime se conecta enseguida. El resto espera a que el navegador tenga
   // un pequeño espacio libre para no competir con el primer video.
   subscribeToNotifications();
+  startLiveScroll6UpdateWatcher();
 
   const startupUserId = currentUser?.id;
   const loadSecondaryStartupData = () => {
@@ -3416,6 +3417,99 @@ async function renderApp() {
     setTimeout(loadSecondaryStartupData, 250);
   }
 }
+
+// 6.1.2 · NUBE LIVESCROLL
+// Desde esta versión, una publicación futura puede avisar a quienes todavía
+// tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
+const LIVESCROLL6_CLIENT_BUILD = "6.1.2";
+let ls6UpdateWatchTimer = null;
+let ls6UpdateCheckRunning = false;
+
+function compareBuildVersions(a, b) {
+  const left = String(a || "0").replace(/[^0-9.]/g, "").split(".").map(Number);
+  const right = String(b || "0").replace(/[^0-9.]/g, "").split(".").map(Number);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] || 0) - (right[index] || 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+async function checkLiveScroll6Update() {
+  if (isLiveScroll7App() || !currentUser || ls6UpdateCheckRunning) return;
+  if (document.getElementById("ls6LiveUpdatePrompt")) return;
+
+  ls6UpdateCheckRunning = true;
+  try {
+    const { data, error } = await sb.from("app_config")
+      .select("value")
+      .eq("key", "ls6_required_build")
+      .maybeSingle();
+    if (error || !data?.value) return;
+
+    const requiredBuild = String(data.value).trim();
+    if (compareBuildVersions(requiredBuild, LIVESCROLL6_CLIENT_BUILD) <= 0) return;
+
+    const snoozeUntil = Number(sessionStorage.getItem(`ls6_update_snooze_${requiredBuild}`) || 0);
+    if (Date.now() < snoozeUntil) return;
+    showLiveScroll6UpdatePrompt(requiredBuild);
+  } catch (error) {
+    console.warn("No se pudo comprobar la versión de LiveScroll 6:", error);
+  } finally {
+    ls6UpdateCheckRunning = false;
+  }
+}
+
+function showLiveScroll6UpdatePrompt(requiredBuild) {
+  if (document.getElementById("ls6LiveUpdatePrompt")) return;
+  const overlay = document.createElement("div");
+  overlay.id = "ls6LiveUpdatePrompt";
+  overlay.style.cssText = "position:fixed;inset:0;z-index:2147483000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(10px)";
+  overlay.innerHTML = `
+    <div style="width:min(430px,100%);border:1px solid rgba(250,204,21,.36);border-radius:22px;padding:24px;background:linear-gradient(150deg,#111827,#07131d);box-shadow:0 28px 90px rgba(0,0,0,.65),0 0 45px rgba(34,197,94,.12);color:#f8fafc;text-align:center;">
+      <div style="font-size:38px;margin-bottom:10px;">☁️</div>
+      <div style="font:800 11px 'JetBrains Mono',monospace;letter-spacing:.16em;color:#facc15;margin-bottom:8px;">ACTUALIZACIÓN ${escapeHtml(requiredBuild)}</div>
+      <h2 style="margin:0 0 10px;font-size:24px;">Nueva actualización disponible</h2>
+      <p style="margin:0 0 20px;color:#cbd5e1;font-size:14px;line-height:1.55;">LiveScroll recibió mejoras mientras estabas usando la aplicación. Reiniciá para cargar la versión más reciente.</p>
+      <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;">
+        <button id="ls6UpdateLater" class="btn-outline" style="min-height:48px;">Más tarde</button>
+        <button id="ls6UpdateNow" class="btn" style="min-height:48px;">Reiniciar ahora</button>
+      </div>
+      <p style="margin:13px 0 0;color:#94a3b8;font-size:11px;">Tu sesión continuará iniciada.</p>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  document.getElementById("ls6UpdateLater")?.addEventListener("click", () => {
+    sessionStorage.setItem(`ls6_update_snooze_${requiredBuild}`, String(Date.now() + 10 * 60 * 1000));
+    overlay.remove();
+  });
+  document.getElementById("ls6UpdateNow")?.addEventListener("click", restartLiveScrollForUpdate);
+}
+
+async function restartLiveScrollForUpdate() {
+  const button = document.getElementById("ls6UpdateNow");
+  if (button) { button.disabled = true; button.textContent = "Actualizando…"; }
+  try {
+    const registrations = await navigator.serviceWorker?.getRegistrations?.();
+    await Promise.allSettled((registrations || []).map(registration => registration.update()));
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.allSettled(keys.map(key => caches.delete(key)));
+    }
+  } catch (_) {}
+  const cleanUrl = `${location.pathname}${location.search}${location.search ? "&" : "?"}update=${Date.now()}`;
+  location.replace(cleanUrl);
+}
+
+function startLiveScroll6UpdateWatcher() {
+  if (isLiveScroll7App() || ls6UpdateWatchTimer) return;
+  checkLiveScroll6Update();
+  ls6UpdateWatchTimer = setInterval(checkLiveScroll6Update, 60000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") checkLiveScroll6Update();
+});
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
 let lsStartupChangelogHistoryCache = { data:null, at:0 };

@@ -17,8 +17,11 @@ const LIVESCROLL_PROJECT_IDENTITY = Object.freeze({
 // Así LiveScroll 6 conserva su experiencia y LiveScroll 7 recibe la propia.
 const LIVESCROLL_RUNTIME = Object.freeze({
   isAndroid7:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent),
+  isAndroid6:/LiveScrollAndroid\/6(?:\.|\/|\s)/i.test(navigator.userAgent),
   generation:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent) ? 7 : 6
 });
+
+if (LIVESCROLL_RUNTIME.isAndroid6) document.documentElement.classList.add("ls6-app-runtime");
 
 function isLiveScroll7App() {
   return LIVESCROLL_RUNTIME.isAndroid7 === true;
@@ -3431,7 +3434,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60104;
+const LIVESCROLL6_CLIENT_BUILD = 60105;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -3523,7 +3526,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70003;
+const LIVESCROLL7_CLIENT_BUILD = 70004;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -3549,14 +3552,16 @@ async function checkLiveScroll7Update() {
 }
 
 function getLiveScroll7InstalledBuild() {
+  let installedBuild = 0;
   try {
     const installedVersion = String(window.AndroidBridge?.getAppVersion?.() || "");
     const parts = installedVersion.match(/(\d+)\.(\d+)\.(\d+)/);
     if (parts) {
-      return (Number(parts[1]) * 10000) + (Number(parts[2]) * 100) + Number(parts[3]);
+      installedBuild = (Number(parts[1]) * 10000) + (Number(parts[2]) * 100) + Number(parts[3]);
     }
   } catch (_) {}
-  return LIVESCROLL7_CLIENT_BUILD;
+  // El cliente web puede avanzar sin exigir una APK nueva.
+  return Math.max(installedBuild, LIVESCROLL7_CLIENT_BUILD);
 }
 
 function showLiveScroll7UpdatePrompt(requiredBuild, requiredBuildCode) {
@@ -12091,14 +12096,79 @@ function getTwitchChannelFromUrl(value) {
   }
 }
 
+let lsLiveChatChannel = null;
+let lsLiveChatUserId = null;
+
 function closeLiveScrollTwitchPlayer() {
+  if (lsLiveChatChannel) sb.removeChannel(lsLiveChatChannel);
+  lsLiveChatChannel = null;
+  lsLiveChatUserId = null;
   document.getElementById("lsTwitchLivePlayer")?.remove();
   document.body.classList.remove("ls-live-player-open");
 }
 
-function openLiveScrollTwitchPlayer(channel, username) {
+function renderLiveChatMessage(message) {
+  const own = currentUser?.id && message.sender_id === currentUser.id;
+  return `<article class="ls-live-chat-message${own ? " own" : ""}" data-message-id="${escapeHtml(message.id)}">
+    <strong>@${escapeHtml(message.sender_username || "usuario")}</strong>
+    <span>${escapeHtml(message.message || "")}</span>
+  </article>`;
+}
+
+async function loadLiveScrollChat(liveUserId) {
+  const list = document.getElementById("lsLiveChatMessages");
+  if (!list) return;
+  const { data, error } = await sb.rpc("get_live_chat_messages", { p_live_user_id:liveUserId, p_limit:80 });
+  if (!document.getElementById("lsLiveChatMessages") || lsLiveChatUserId !== liveUserId) return;
+  if (error) {
+    list.innerHTML = `<div class="ls-live-chat-empty">El chat estará disponible después de ejecutar el SQL.</div>`;
+    return;
+  }
+  list.innerHTML = data?.length
+    ? data.map(renderLiveChatMessage).join("")
+    : `<div class="ls-live-chat-empty">Todavía no hay mensajes. ¡Saludá al creador!</div>`;
+  list.scrollTop = list.scrollHeight;
+}
+
+function subscribeLiveScrollChat(liveUserId) {
+  if (lsLiveChatChannel) sb.removeChannel(lsLiveChatChannel);
+  lsLiveChatUserId = liveUserId;
+  lsLiveChatChannel = sb.channel(`live-chat-${liveUserId}-${Date.now()}`)
+    .on("postgres_changes", {
+      event:"INSERT", schema:"public", table:"live_chat_messages", filter:`live_user_id=eq.${liveUserId}`
+    }, payload => {
+      const list = document.getElementById("lsLiveChatMessages");
+      if (!list || lsLiveChatUserId !== liveUserId) return;
+      list.querySelector(".ls-live-chat-empty")?.remove();
+      list.insertAdjacentHTML("beforeend", renderLiveChatMessage(payload.new));
+      list.scrollTop = list.scrollHeight;
+    }).subscribe();
+}
+
+async function sendLiveScrollChatMessage(event) {
+  event?.preventDefault?.();
+  if (!currentUser?.id || !lsLiveChatUserId) return;
+  const input = document.getElementById("lsLiveChatInput");
+  const button = document.getElementById("lsLiveChatSend");
+  const message = input?.value.trim() || "";
+  if (!message) return;
+  if (button) button.disabled = true;
+  const { data, error } = await sb.rpc("send_live_chat_message", {
+    p_live_user_id:lsLiveChatUserId,
+    p_message:message
+  });
+  if (button) button.disabled = false;
+  if (error || data?.ok === false) {
+    showToast(data?.message || "No pudimos enviar el mensaje.", "error");
+    return;
+  }
+  if (input) input.value = "";
+}
+
+function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
   const safeChannel = String(channel || "").toLowerCase();
-  if (!/^[a-z0-9_]{3,25}$/.test(safeChannel)) {
+  const safeLiveUserId = String(liveUserId || "");
+  if (!/^[a-z0-9_]{3,25}$/.test(safeChannel) || !/^[0-9a-f-]{36}$/i.test(safeLiveUserId)) {
     showToast?.("No pudimos abrir este canal de Twitch.", "error");
     return;
   }
@@ -12114,12 +12184,23 @@ function openLiveScrollTwitchPlayer(channel, username) {
         <div><span class="ls-live-player-dot"></span><strong>EN VIVO</strong><small>@${escapeHtml(username || safeChannel)}</small></div>
         <button type="button" onclick="closeLiveScrollTwitchPlayer()" aria-label="Cerrar directo">✕</button>
       </header>
-      <div class="ls-live-player-video">
-        <iframe
-          src="https://player.twitch.tv/?channel=${encodeURIComponent(safeChannel)}&parent=${encodeURIComponent(parent)}&autoplay=true&muted=false"
-          title="Directo de ${escapeHtml(username || safeChannel)}"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowfullscreen></iframe>
+      <div class="ls-live-player-content">
+        <div class="ls-live-player-video">
+          <iframe
+            src="https://player.twitch.tv/?channel=${encodeURIComponent(safeChannel)}&parent=${encodeURIComponent(parent)}&autoplay=true&muted=true"
+            title="Directo de ${escapeHtml(username || safeChannel)}"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowfullscreen></iframe>
+          <div class="ls-live-autoplay-note">El directo inicia silenciado · tocá el sonido en el reproductor</div>
+        </div>
+        <aside class="ls-live-chat">
+          <div class="ls-live-chat-head"><strong>Chat de LiveScroll</strong><span>EN VIVO</span></div>
+          <div id="lsLiveChatMessages" class="ls-live-chat-messages"><div class="ls-live-chat-empty">Conectando chat…</div></div>
+          <form class="ls-live-chat-compose" onsubmit="sendLiveScrollChatMessage(event)">
+            <input id="lsLiveChatInput" maxlength="240" autocomplete="off" placeholder="Escribí un mensaje…" aria-label="Mensaje para el chat">
+            <button id="lsLiveChatSend" type="submit" aria-label="Enviar mensaje">➤</button>
+          </form>
+        </aside>
       </div>
       <footer>
         <span>Transmitido desde OBS por Twitch</span>
@@ -12131,10 +12212,13 @@ function openLiveScrollTwitchPlayer(channel, username) {
   });
   document.body.appendChild(overlay);
   document.body.classList.add("ls-live-player-open");
+  loadLiveScrollChat(safeLiveUserId);
+  subscribeLiveScrollChat(safeLiveUserId);
 }
 
 window.openLiveScrollTwitchPlayer = openLiveScrollTwitchPlayer;
 window.closeLiveScrollTwitchPlayer = closeLiveScrollTwitchPlayer;
+window.sendLiveScrollChatMessage = sendLiveScrollChatMessage;
 
 function ensureLiveScrollTwitchPlayerStyles() {
   if (document.getElementById("lsTwitchLivePlayerStyles")) return;
@@ -12143,16 +12227,20 @@ function ensureLiveScrollTwitchPlayerStyles() {
   style.textContent = `
     body.ls-live-player-open{overflow:hidden}
     .ls-live-player-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));background:rgba(1,4,12,.88);backdrop-filter:blur(12px)}
-    .ls-live-player-panel{width:min(920px,100%);max-height:100%;overflow:auto;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
+    .ls-live-player-panel{width:min(1120px,100%);max-height:100%;overflow:auto;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
     .ls-live-player-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid rgba(255,255,255,.08)}
     .ls-live-player-panel header>div{display:flex;align-items:center;gap:8px}.ls-live-player-panel header strong{font-size:12px;color:#ff496f;letter-spacing:.12em}.ls-live-player-panel header small{color:#d9dce6;font-weight:800}
     .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
     .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
-    .ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 310px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
+    .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
+    .ls-live-chat-messages{flex:1;min-height:220px;max-height:460px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}.ls-live-chat-message{padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;line-height:1.35}.ls-live-chat-message.own{background:rgba(145,70,255,.15)}.ls-live-chat-message strong{display:block;margin-bottom:2px;color:#c7a8ff;font-size:9px}.ls-live-chat-message span{color:#eef0f6;overflow-wrap:anywhere}.ls-live-chat-empty{margin:auto;padding:18px;color:#7f8798;text-align:center;font-size:9px}
+    .ls-live-chat-compose{display:flex;gap:7px;padding:9px;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-compose input{min-width:0;flex:1;padding:10px 11px;border:1px solid rgba(145,70,255,.28);border-radius:11px;background:#050811;color:#fff;font-size:11px}.ls-live-chat-compose button{width:40px;border:0;border-radius:11px;background:linear-gradient(135deg,#6d2ee8,#9146ff);color:#fff;font-size:16px}
     .ls-live-player-panel footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;color:#8f96a8;font-size:10px}.ls-live-player-panel footer a{color:#c7a8ff;font-weight:900;text-decoration:none}
     .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
-    @media(max-width:640px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0}.ls-live-player-panel{margin-top:8vh;border-radius:18px 18px 0 0}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
+    html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
+    @media(max-width:760px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0}.ls-live-player-panel{margin-top:3vh;border-radius:18px 18px 0 0}.ls-live-player-content{grid-template-columns:1fr}.ls-live-chat{border-left:0;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-messages{min-height:190px;max-height:32dvh}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
   `;
   document.head.appendChild(style);
 }
@@ -12197,7 +12285,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
           (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
             ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
           (u.live_platform === "twitch" || u.live_platform === "both") && twitchChannel
-            ? `<button type="button" class="watch-btn ls-watch-inside" onclick="openLiveScrollTwitchPlayer('${escapeHtml(twitchChannel)}','${escapeHtml(u.username)}')">Ver en LiveScroll</button>` : ""
+            ? `<button type="button" class="watch-btn ls-watch-inside" onclick="openLiveScrollTwitchPlayer('${escapeHtml(twitchChannel)}','${escapeHtml(u.username)}','${escapeHtml(u.id)}')">Ver en LiveScroll</button>` : ""
         ].join("");
         return `<div class="directo-card">
           <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>

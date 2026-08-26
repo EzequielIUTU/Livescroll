@@ -3514,7 +3514,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70001;
+const LIVESCROLL7_CLIENT_BUILD = 70002;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -11307,6 +11307,43 @@ function ensureIdentityExperience593Styles() {
   document.head.appendChild(style);
 }
 
+function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount = 0, totalViews = 0, own = false }) {
+  if (!isLiveScroll7App()) return "";
+  const featured = videos[0] || null;
+  const latestLabel = featured?.created_at ? lsTimeAgo(featured.created_at) : "Sin publicaciones";
+  const statusLabel = profile?.is_live ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
+  return `
+    <section class="ls7-living-profile" aria-label="Perfil Vivo LiveScroll 7">
+      <div class="ls7-living-head">
+        <div><small>◈ PERFIL VIVO 7</small><h2>Ahora mismo</h2></div>
+        <span class="${profile?.is_live ? "is-live" : ""}"><i></i>${statusLabel}</span>
+      </div>
+      <div class="ls7-living-grid">
+        ${featured ? `
+          <button class="ls7-featured-video" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${featured.id}', window.__profileFeedAuthor)" aria-label="Reproducir video destacado">
+            <div class="ls7-featured-cover">${getGridCoverHtml(featured)}</div>
+            <div class="ls7-featured-shade"></div>
+            <div class="ls7-featured-copy">
+              <small>VIDEO PROTAGONISTA</small>
+              <strong>${escapeHtml(featured.title || "Última publicación")}</strong>
+              <span>▶ Reproducir · ${escapeHtml(latestLabel)}</span>
+            </div>
+          </button>` : `
+          <div class="ls7-featured-empty">
+            <b>Tu señal empieza acá</b>
+            <span>${own ? "Publicá tu primer video y convertí tu perfil en una experiencia." : "Este Usuario todavía no publicó su primera señal."}</span>
+            ${own ? `<button class="btn" onclick="switchTab('upload')">Crear señal</button>` : ""}
+          </div>`}
+        <div class="ls7-live-data">
+          <div><small>ENERGÍA DEL PERFIL</small><strong>${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%</strong><i><b style="width:${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%"></b></i></div>
+          <div class="ls7-data-pair"><span><b>${videos.length}</b><small>Señales</small></span><span><b>${followersCount}</b><small>Conexiones</small></span></div>
+          <div class="ls7-data-pair"><span><b>${totalViews}</b><small>Impactos</small></span><span><b>${profile?.is_creator ? "CREATOR" : "USER"}</b><small>Nivel</small></span></div>
+          <p><i></i>${profile?.is_live ? "Transmitiendo ahora en LiveScroll." : featured ? `Último movimiento: ${escapeHtml(latestLabel)}.` : "Esperando la primera publicación."}</p>
+        </div>
+      </div>
+    </section>`;
+}
+
 async function renderProfile() {
   ensureIdentityExperience593Styles();
   const main = document.getElementById("appView");
@@ -11616,6 +11653,14 @@ async function renderProfile() {
       </div>
     </div>`;
 
+  const livingProfileHtml = renderLiveScroll7LivingProfile({
+    profile:currentProfile,
+    videos,
+    followersCount,
+    totalViews:totalFromViews,
+    own:true
+  });
+
   main.innerHTML = `
     <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
       <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
@@ -11686,6 +11731,8 @@ async function renderProfile() {
         </div>
       </div>
     </div>
+
+    ${livingProfileHtml}
 
     ${collectionSummaryHtml}
     ${recentActivityHtml}
@@ -12585,6 +12632,15 @@ async function viewPublicProfile(username) {
   (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
 
   const isFollowing = !!amIFollowing;
+  window.__profileFeedVideos = videos;
+  window.__profileFeedAuthor = { username:profile.username, plan_id:profile.plan_id };
+  const livingProfileHtml = renderLiveScroll7LivingProfile({
+    profile,
+    videos,
+    followersCount:(followers || []).length,
+    totalViews:Object.values(viewsByVideo).reduce((sum, viewers) => sum + viewers.size, 0),
+    own:false
+  });
 
   main.innerHTML = `
     <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
@@ -12624,6 +12680,8 @@ async function viewPublicProfile(username) {
         </div>
       </div>
     </div>
+
+    ${livingProfileHtml}
 
     ${theirBadges && theirBadges.length ? `
       <div class="profile-section">
@@ -17694,6 +17752,37 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .profile-section-head .ico { border:1px solid rgba(57,231,255,.20);background:linear-gradient(145deg,rgba(57,231,255,.11),rgba(138,85,255,.09));box-shadow:0 0 18px rgba(37,136,255,.07); }
     html.ls7-app-runtime .video-grid-tile { border:1px solid rgba(57,231,255,.15);border-radius:18px;overflow:hidden;background:#071326;box-shadow:0 12px 28px rgba(0,0,0,.28);transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease; }
     html.ls7-app-runtime .video-grid-tile:active { transform:scale(.965);border-color:rgba(57,231,255,.52);box-shadow:0 0 28px rgba(57,231,255,.16); }
+    html.ls7-app-runtime .ls7-living-profile { margin:18px 0 22px;padding:18px;border:1px solid rgba(57,231,255,.22);border-radius:26px;background:radial-gradient(circle at 4% 0,rgba(57,231,255,.10),transparent 30%),linear-gradient(150deg,rgba(8,28,53,.96),rgba(5,9,23,.98));box-shadow:0 20px 48px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden;position:relative; }
+    html.ls7-app-runtime .ls7-living-profile::after { content:"";position:absolute;inset:-60% -30%;pointer-events:none;background:conic-gradient(from 90deg,transparent,rgba(57,231,255,.06),transparent 18%,rgba(138,85,255,.06),transparent 36%);animation:ls7LivingOrbit 13s linear infinite; }
+    html.ls7-app-runtime .ls7-living-head,html.ls7-app-runtime .ls7-living-grid { position:relative;z-index:1; }
+    html.ls7-app-runtime .ls7-living-head { display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px; }
+    html.ls7-app-runtime .ls7-living-head small { color:#55eaff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.17em; }
+    html.ls7-app-runtime .ls7-living-head h2 { margin:4px 0 0;font-size:24px;letter-spacing:-.045em; }
+    html.ls7-app-runtime .ls7-living-head > span { display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid rgba(57,231,255,.20);border-radius:999px;color:#a9c7df;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em;background:rgba(4,14,30,.72); }
+    html.ls7-app-runtime .ls7-living-head > span i { width:7px;height:7px;border-radius:50%;background:#39e7ff;box-shadow:0 0 13px #39e7ff;animation:ls7SignalPulse 1.6s ease-in-out infinite; }
+    html.ls7-app-runtime .ls7-living-head > span.is-live i { background:#ffd66b;box-shadow:0 0 15px #ffd66b; }
+    html.ls7-app-runtime .ls7-living-grid { display:grid;grid-template-columns:minmax(0,1.45fr) minmax(220px,.55fr);gap:13px; }
+    html.ls7-app-runtime .ls7-featured-video { min-height:260px;padding:0;position:relative;overflow:hidden;border:1px solid rgba(57,231,255,.22);border-radius:21px;background:#040a16;color:#fff;text-align:left;cursor:pointer;box-shadow:0 18px 35px rgba(0,0,0,.30); }
+    html.ls7-app-runtime .ls7-featured-cover,html.ls7-app-runtime .ls7-featured-cover > * { position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important; }
+    html.ls7-app-runtime .ls7-featured-shade { position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,7,18,.05),rgba(3,8,19,.30) 45%,rgba(3,8,20,.95)); }
+    html.ls7-app-runtime .ls7-featured-copy { position:absolute;left:17px;right:17px;bottom:16px;display:flex;flex-direction:column;gap:4px; }
+    html.ls7-app-runtime .ls7-featured-copy small { color:#62edff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.14em; }
+    html.ls7-app-runtime .ls7-featured-copy strong { font-size:20px;line-height:1.15;text-shadow:0 2px 10px #000; }
+    html.ls7-app-runtime .ls7-featured-copy span { color:#c4d6e6;font-size:10px; }
+    html.ls7-app-runtime .ls7-featured-empty { min-height:240px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;padding:24px;border:1px dashed rgba(57,231,255,.30);border-radius:21px;background:linear-gradient(145deg,rgba(57,231,255,.06),rgba(138,85,255,.05)); }
+    html.ls7-app-runtime .ls7-featured-empty b { font-size:21px; }html.ls7-app-runtime .ls7-featured-empty span { color:#9eb6d1;font-size:12px;line-height:1.5; }
+    html.ls7-app-runtime .ls7-live-data { display:flex;flex-direction:column;gap:10px; }
+    html.ls7-app-runtime .ls7-live-data > div,html.ls7-app-runtime .ls7-live-data > p { margin:0;padding:13px;border:1px solid rgba(57,231,255,.14);border-radius:16px;background:linear-gradient(145deg,rgba(22,59,94,.35),rgba(8,14,31,.72)); }
+    html.ls7-app-runtime .ls7-live-data > div:first-child { display:grid;grid-template-columns:1fr auto;align-items:center;gap:7px; }
+    html.ls7-app-runtime .ls7-live-data small { color:#89a6c2;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.08em; }
+    html.ls7-app-runtime .ls7-live-data strong { color:#71efff;font:900 19px 'Space Grotesk',sans-serif; }
+    html.ls7-app-runtime .ls7-live-data > div:first-child > i { grid-column:1/-1;height:4px;border-radius:99px;background:#07101f;overflow:hidden; }
+    html.ls7-app-runtime .ls7-live-data > div:first-child > i b { display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#39e7ff,#2588ff,#8a55ff);box-shadow:0 0 12px #2588ff; }
+    html.ls7-app-runtime .ls7-data-pair { display:grid!important;grid-template-columns:1fr 1fr;gap:9px; }
+    html.ls7-app-runtime .ls7-data-pair span { display:flex;flex-direction:column;gap:3px;min-width:0; }
+    html.ls7-app-runtime .ls7-data-pair b { color:#eefbff;font-size:15px;overflow:hidden;text-overflow:ellipsis; }
+    html.ls7-app-runtime .ls7-live-data > p { color:#a9c0d7;font-size:9px;line-height:1.45;display:flex;align-items:center;gap:7px; }
+    html.ls7-app-runtime .ls7-live-data > p i { flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:#8a55ff;box-shadow:0 0 10px #8a55ff; }
     html.ls7-app-runtime .ls7-electric-update-overlay { position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(1,4,13,.88);backdrop-filter:blur(13px); }
     html.ls7-app-runtime .ls7-electric-update-card { width:min(440px,100%);padding:25px;text-align:center;color:#f7fcff;border:1px solid rgba(57,231,255,.38);border-radius:28px;background:radial-gradient(circle at 50% 0,rgba(57,231,255,.14),transparent 38%),linear-gradient(155deg,#071a31,#090817 68%,#180b35);box-shadow:0 30px 90px rgba(0,0,0,.68),0 0 55px rgba(37,136,255,.14); }
     html.ls7-app-runtime .ls7-electric-update-logo { width:94px;height:94px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(57,231,255,.56));animation:ls7EmblemFloat 3s ease-in-out infinite; }
@@ -17705,7 +17794,9 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .ls7-electric-update-card small { display:block;margin-top:13px;color:#809bb8; }
     @keyframes ls7ProfileScan { from{background-position:180% 0}to{background-position:-180% 0} }
     @keyframes ls7EmblemFloat { 0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)} }
-    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; } }
+    @keyframes ls7LivingOrbit { to{transform:rotate(360deg)} }
+    @keyframes ls7SignalPulse { 50%{opacity:.4;transform:scale(.75)} }
+    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; }html.ls7-app-runtime .ls7-living-profile{padding:14px;border-radius:22px}html.ls7-app-runtime .ls7-living-grid{grid-template-columns:1fr}html.ls7-app-runtime .ls7-featured-video{min-height:230px}html.ls7-app-runtime .ls7-live-data{display:grid;grid-template-columns:1fr 1fr}html.ls7-app-runtime .ls7-live-data>div:first-child,html.ls7-app-runtime .ls7-live-data>p{grid-column:1/-1} }
     @media(prefers-reduced-motion:reduce) { html.ls7-app-runtime .ls7-electric-profile::before,html.ls7-app-runtime .ls7-profile-emblem,html.ls7-app-runtime .ls7-electric-update-logo { animation:none!important; } }
   `;
   document.head.appendChild(style);

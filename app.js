@@ -2792,7 +2792,12 @@ function ensureNavigationEvolution597() {
     dock.id = "lsMobileDock";
     dock.className = "ls-mobile-dock";
     dock.setAttribute("aria-label", "Navegación principal");
-    dock.innerHTML = `
+    dock.innerHTML = isLiveScroll7App() ? `
+      <button data-tab="feed" onclick="switchTab('feed')" aria-label="Mirar"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM10 9l5 3-5 3z"/></svg></span><small>Mirar</small></button>
+      <button data-tab="foryou" onclick="switchTab('foryou')" aria-label="Para Ti"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span><small>Para Ti</small></button>
+      <button data-tab="upload" class="ls-dock-create" onclick="switchTab('upload')" aria-label="Subir video"><span class="ls7-dock-create-core"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><small>Crear</small></button>
+      <button data-tab="profile" onclick="switchTab('profile')" aria-label="Perfil"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20c.8-4 3-6 6.5-6s5.7 2 6.5 6"/></svg></span><small>Perfil</small></button>
+      <button data-tab="more" onclick="toggleMobileMenu()" aria-label="Más opciones"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></span><small>Más</small></button>` : `
       <button data-tab="feed" onclick="switchTab('feed')"><span>▶</span><small>Mirar</small></button>
       <button data-tab="foryou" onclick="switchTab('foryou')"><span>✦</span><small>Para Ti</small></button>
       <button data-tab="upload" class="ls-dock-create" onclick="switchTab('upload')"><span>＋</span><small>Subir</small></button>
@@ -16954,6 +16959,89 @@ function ensureLiveScroll7RuntimeStyles() {
     html.ls7-app-runtime #ls7SwipeRail.is-left { transform:translateX(calc(-50% - 8px)); }
     html.ls7-app-runtime #ls7SwipeRail.is-right { transform:translateX(calc(-50% + 8px)); }
     html.ls7-app-runtime #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
+
+    /* Barra inferior LiveScroll 7 · flotante, metálica y separada de LS6 */
+    @media(max-width:700px) {
+      html.ls7-app-runtime body.ls-navigation-ready .ls-mobile-dock {
+        left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;height:68px;
+        padding:7px 8px 6px;border:1px solid rgba(218,224,232,.16);border-radius:24px;
+        background:linear-gradient(165deg,rgba(33,35,42,.94),rgba(10,11,14,.96));
+        box-shadow:0 20px 48px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.065),inset 0 -1px 0 rgba(0,0,0,.65);
+        backdrop-filter:blur(20px) saturate(130%);
+      }
+      html.ls7-app-runtime .ls-mobile-dock::before {
+        content:"";position:absolute;left:14%;right:14%;top:-1px;height:1px;
+        background:linear-gradient(90deg,transparent,rgba(244,201,93,.62),rgba(255,77,69,.52),transparent);
+      }
+      html.ls7-app-runtime .ls-mobile-dock button {
+        min-height:52px;border-radius:17px;color:#9299a4;transition:transform .18s cubic-bezier(.2,.8,.2,1),color .18s ease,background .18s ease;
+      }
+      html.ls7-app-runtime .ls-mobile-dock button small { font:800 7px 'JetBrains Mono',monospace;letter-spacing:.035em; }
+      html.ls7-app-runtime .ls-mobile-dock button.active {
+        color:#f5f1e7;background:linear-gradient(145deg,rgba(244,201,93,.11),rgba(255,77,69,.055));
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+      }
+      html.ls7-app-runtime .ls-mobile-dock button.active::after {
+        bottom:1px;width:22px;height:2px;background:linear-gradient(90deg,#f4c95d,#ff554c);box-shadow:0 0 10px rgba(244,201,93,.36);
+      }
+      html.ls7-app-runtime .ls7-dock-icon { width:25px;height:25px;display:grid;place-items:center; }
+      html.ls7-app-runtime .ls7-dock-icon svg { width:21px;height:21px;overflow:visible;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round; }
+      html.ls7-app-runtime .ls-mobile-dock button.active .ls7-dock-icon { filter:drop-shadow(0 0 7px rgba(244,201,93,.30));animation:ls7DockIconIn .3s cubic-bezier(.16,1,.3,1) both; }
+      html.ls7-app-runtime .ls-mobile-dock .ls-dock-create { overflow:visible;background:transparent!important;box-shadow:none!important; }
+      html.ls7-app-runtime .ls-mobile-dock .ls-dock-create::after { display:none; }
+      html.ls7-app-runtime .ls7-dock-create-core {
+        width:45px;height:45px;margin-top:-25px;display:grid;place-items:center;border:1px solid rgba(255,231,159,.58);border-radius:16px;
+        background:linear-gradient(145deg,#ffe594,#d49a29 58%,#ff554c);color:#15100a;
+        box-shadow:0 10px 27px rgba(0,0,0,.42),0 0 0 5px rgba(9,10,13,.9),inset 0 1px 0 rgba(255,255,255,.58);
+        transform:rotate(45deg);transition:transform .2s cubic-bezier(.2,.8,.2,1);
+      }
+      html.ls7-app-runtime .ls7-dock-create-core svg { width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;transform:rotate(-45deg); }
+      html.ls7-app-runtime .ls-dock-create.active .ls7-dock-create-core { transform:rotate(45deg) scale(1.07);box-shadow:0 12px 32px rgba(0,0,0,.48),0 0 0 5px rgba(9,10,13,.92),0 0 22px rgba(255,85,76,.24),inset 0 1px 0 rgba(255,255,255,.62); }
+      html.ls7-app-runtime .ls-mobile-dock .ls-dock-create small { margin-top:2px;color:#d8dde4; }
+      @keyframes ls7DockIconIn { from{transform:translateY(3px) scale(.86);opacity:.7}to{transform:none;opacity:1} }
+    }
+
+    /* Medallas LiveScroll 7 · metal, grabado, relieve y textura por rareza */
+    html.ls7-app-runtime .ls-equipped-medal,
+    html.ls7-app-runtime .ls-store-badge-icon,
+    html.ls7-app-runtime .ls-medal-detail-icon,
+    html.ls7-app-runtime .ls-medal-picker-icon {
+      --ls7-medal-a:#e7ebef;--ls7-medal-b:#69717c;--ls7-medal-edge:#cbd2d9;--ls7-medal-glow:rgba(203,210,217,.14);
+      position:relative;isolation:isolate;border-color:var(--ls7-medal-edge)!important;
+      background:
+        radial-gradient(circle at 29% 20%,rgba(255,255,255,.80) 0 3%,rgba(255,255,255,.18) 9%,transparent 24%),
+        repeating-conic-gradient(from 18deg,rgba(255,255,255,.055) 0 4deg,rgba(0,0,0,.035) 4deg 8deg),
+        radial-gradient(circle at 50% 48%,var(--ls7-medal-a),var(--ls7-medal-b) 74%,#23262c 100%)!important;
+      box-shadow:
+        inset 0 0 0 2px rgba(8,9,12,.34),inset 0 0 0 4px rgba(255,255,255,.085),
+        inset 3px 4px 8px rgba(255,255,255,.12),inset -4px -5px 9px rgba(0,0,0,.44),
+        0 8px 17px rgba(0,0,0,.40),0 0 22px var(--ls7-medal-glow)!important;
+      text-shadow:0 1px 0 rgba(255,255,255,.38),0 2px 5px rgba(0,0,0,.56);
+      filter:saturate(1.08) contrast(1.04);
+    }
+    html.ls7-app-runtime .ls-medal-rarity-rara,
+    html.ls7-app-runtime .ls-rarity-rara { --ls7-medal-a:#d7f5ff;--ls7-medal-b:#2387a8;--ls7-medal-edge:#83e2ff;--ls7-medal-glow:rgba(70,202,241,.28); }
+    html.ls7-app-runtime .ls-medal-rarity-epica,
+    html.ls7-app-runtime .ls-rarity-epica { --ls7-medal-a:#efd9ff;--ls7-medal-b:#6f2aa1;--ls7-medal-edge:#d59cff;--ls7-medal-glow:rgba(190,101,255,.31); }
+    html.ls7-app-runtime .ls-medal-rarity-legendaria,
+    html.ls7-app-runtime .ls-rarity-legendaria { --ls7-medal-a:#fff0a8;--ls7-medal-b:#b16d09;--ls7-medal-edge:#ffd65e;--ls7-medal-glow:rgba(244,190,48,.34); }
+    html.ls7-app-runtime .ls-medal-rarity-exclusiva,
+    html.ls7-app-runtime .ls-rarity-exclusiva { --ls7-medal-a:#ffd4df;--ls7-medal-b:#a32e57;--ls7-medal-edge:#ff8daa;--ls7-medal-glow:rgba(255,87,137,.34); }
+    html.ls7-app-runtime .ls-medal-rarity-mitica,
+    html.ls7-app-runtime .ls-rarity-mitica {
+      --ls7-medal-a:#ffcc73;--ls7-medal-b:#a70d27;--ls7-medal-edge:#ff3c4f;--ls7-medal-glow:rgba(255,42,67,.50);
+      background:
+        radial-gradient(circle at 29% 18%,rgba(255,245,183,.88) 0 3%,rgba(255,194,103,.22) 9%,transparent 23%),
+        repeating-conic-gradient(from 12deg,rgba(255,212,93,.14) 0 5deg,rgba(75,0,13,.09) 5deg 10deg),
+        radial-gradient(circle at 50% 48%,#ffbd56,#c31535 58%,#5d0717 83%,#d9a62b 100%)!important;
+    }
+    html.ls7-app-runtime .ls-equipped-medal { font-size:18px; }
+    html.ls7-app-runtime .ls-equipped-medal > *,html.ls7-app-runtime .ls-store-badge-icon > * { position:relative;z-index:2; }
+    html.ls7-app-runtime .ls-store-badge-icon { width:76px;height:76px;border-width:2px;font-size:39px; }
+    html.ls7-app-runtime .ls-medal-detail-icon { width:88px;height:88px;border-width:2px;font-size:48px; }
+    html.ls7-app-runtime .ls-medal-picker-icon { width:43px;height:43px;display:grid;place-items:center;border:1px solid;border-radius:50%;font-size:25px; }
+    html.ls7-app-runtime .ls-medal-picker-item { background:linear-gradient(155deg,rgba(37,39,46,.90),rgba(14,15,19,.94));box-shadow:inset 0 1px 0 rgba(255,255,255,.035),0 9px 22px rgba(0,0,0,.18); }
+    html.ls7-app-runtime .ls-equipped-medal:hover { transform:translateY(-3px) rotateX(7deg) rotateY(-6deg) scale(1.08); }
     @keyframes ls7SwipeLeft { to{opacity:.55;transform:translate3d(-22px,0,0) scale(.995)} }
     @keyframes ls7SwipeRight { to{opacity:.55;transform:translate3d(22px,0,0) scale(.995)} }
     @media(max-width:700px) {

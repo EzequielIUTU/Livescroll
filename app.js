@@ -3421,7 +3421,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60103;
+const LIVESCROLL6_CLIENT_BUILD = 60104;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -3506,6 +3506,10 @@ function startLiveScroll6UpdateWatcher() {
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") checkLiveScroll6Update();
 });
+
+window.addEventListener("online", () => {
+  checkLiveScroll6Update();
+}, { passive:true });
 
 const CHANGELOG_AUTO_BASELINE_VERSION = 24; // 5.8.1: desde la 25 en adelante el aviso tiene fallback automático
 let lsStartupChangelogHistoryCache = { data:null, at:0 };

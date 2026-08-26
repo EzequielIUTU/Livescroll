@@ -16961,9 +16961,11 @@ function ensureLiveScroll7RuntimeStyles() {
     html.ls7-app-runtime #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
 
     /* Barra inferior LiveScroll 7 · flotante, metálica y separada de LS6 */
-    @media(max-width:700px) {
+    @media(max-width:780px) {
       html.ls7-app-runtime body.ls-navigation-ready .ls-mobile-dock {
-        left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));width:auto;height:68px;
+        left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));
+        bottom:max(10px,env(safe-area-inset-bottom));width:auto;max-width:520px;height:68px;margin:0 auto;
+        transform:none!important;
         padding:7px 8px 6px;border:1px solid rgba(218,224,232,.16);border-radius:24px;
         background:linear-gradient(165deg,rgba(33,35,42,.94),rgba(10,11,14,.96));
         box-shadow:0 20px 48px rgba(0,0,0,.48),inset 0 1px 0 rgba(255,255,255,.065),inset 0 -1px 0 rgba(0,0,0,.65);

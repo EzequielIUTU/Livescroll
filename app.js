@@ -1205,6 +1205,7 @@ async function handleLogout() {
     notifRealtimeChannel = null;
   }
   notifRealtimeUserId = null;
+  stopNotificationFallback();
   if (notifUiRefreshFrame) {
     cancelAnimationFrame(notifUiRefreshFrame);
     notifUiRefreshFrame = null;
@@ -2100,7 +2101,30 @@ async function openHiddenVideosManager() {
       </div>
     </div>
   </div>`;
-  const { data, error } = await sb.rpc("get_my_hidden_videos");
+  let { data, error } = await sb.rpc("get_my_hidden_videos");
+  // Recuperación para instalaciones donde la función anterior quedó desactualizada.
+  if (error) {
+    const hiddenResult = await sb
+      .from("user_hidden_videos")
+      .select("video_id,created_at")
+      .eq("user_id", currentUser.id)
+      .order("created_at", { ascending:false });
+    if (!hiddenResult.error) {
+      const rows = hiddenResult.data || [];
+      const ids = rows.map(row => row.video_id);
+      const videoResult = ids.length
+        ? await sb.from("videos").select("id,title,thumbnail_url").in("id", ids)
+        : { data:[], error:null };
+      const byId = new Map((videoResult.data || []).map(video => [video.id, video]));
+      data = rows.map(row => ({
+        video_id:row.video_id,
+        title:byId.get(row.video_id)?.title || "Video",
+        thumbnail_url:byId.get(row.video_id)?.thumbnail_url || null,
+        hidden_at:row.created_at
+      }));
+      error = videoResult.error;
+    }
+  }
   const list = document.getElementById("hiddenVideosList");
   if (!list) return;
   if (error) { list.textContent = "No pudimos cargar los videos ocultos."; return; }
@@ -2116,6 +2140,8 @@ async function restoreHiddenVideo(videoId) {
   document.getElementById(`hidden-video-${videoId}`)?.remove();
   lsPerfCache.feed = { data:null, at:0 };
   showToast("Video restaurado ✓");
+  if (currentTab === "feed") renderFeed();
+  else openHiddenVideosManager();
 }
 window.restoreHiddenVideo = restoreHiddenVideo;
 
@@ -2125,7 +2151,8 @@ async function restoreAllHiddenVideos() {
   if (error || !data?.ok) return showToast("No se pudieron restaurar los videos");
   lsPerfCache.feed = { data:null, at:0 };
   showToast(`${Number(data.restored || 0)} video(s) restaurado(s)`);
-  openHiddenVideosManager();
+  if (currentTab === "feed") renderFeed();
+  else openHiddenVideosManager();
 }
 window.restoreAllHiddenVideos = restoreAllHiddenVideos;
 
@@ -5430,12 +5457,40 @@ async function handlePinVideo(videoId) {
 async function handleDeleteOwnVideo(videoId) {
   if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y vistas. No se puede deshacer.")) return;
   const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
-  if (error || !data.ok) { showToast("No se pudo eliminar el video"); return; }
-  showToast("Video eliminado");
+  if (error || !data?.ok) {
+    console.error("delete_own_video:", error, data);
+    const messages = {
+      no_autenticado:"Tu sesión venció. Volvé a ingresar.",
+      no_autorizado:"Solamente el dueño puede eliminar este video.",
+      video_no_encontrado:"El video ya no existe.",
+      delete_failed:"No pudimos completar la eliminación. Probá nuevamente."
+    };
+    showToast(messages[data?.error] || "No se pudo eliminar el video");
+    return;
+  }
+  document.getElementById(`tile-${videoId}`)?.remove();
+  showToast("Video eliminado definitivamente ✓");
   lsPerfCache.profileVideos.at = 0;
   lsPerfCache.feed.at = 0;
   renderProfile();
 }
+
+async function handleAdminDeleteProfileVideo(videoId, username) {
+  if (!currentProfile?.is_admin) return;
+  if (!confirm("¿Eliminar este video como administrador? Esta acción no se puede deshacer.")) return;
+  const { data, error } = await sb.rpc("admin_delete_video", { p_video_id:videoId });
+  if (error || !data?.ok) {
+    console.error("admin_delete_video perfil:", error, data);
+    showToast(`No se pudo eliminar: ${data?.detail || data?.error || error?.message || "error desconocido"}`);
+    return;
+  }
+  document.getElementById(`public-tile-${videoId}`)?.remove();
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
+  showToast("Video eliminado por administración ✓");
+  await viewPublicProfile(username);
+}
+window.handleAdminDeleteProfileVideo = handleAdminDeleteProfileVideo;
 
 
 function checkBlockedStatus() {
@@ -6408,8 +6463,8 @@ async function renderFeed(renderToken = lsTabRenderToken) {
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
             <div class="feed-actions">
-              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
-              <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+              <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+              <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
               <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
               ${!isMine ? `<button class="feed-action-btn" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${v.id}')">🙈</button>` : ""}
               ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
@@ -6785,8 +6840,8 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
               <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
               ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
               <div class="feed-actions">
-                <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
-                <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+                <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+                <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
                 <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
                 ${!isMine ? `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')">🚩</button>` : ""}
               </div>
@@ -8396,13 +8451,31 @@ function renderVideoHashtags(video) {
 }
 
 async function hideVideoFromDiscovery(videoId) {
-  const { error } = await sb.rpc("hide_video_for_user", { p_video_id: videoId });
-  if (error) return showToast("No se pudo ocultar el video");
+  const { data, error } = await sb.rpc("hide_video_for_user", { p_video_id: videoId });
+  if (error || data?.ok === false) return showToast("No se pudo ocultar el video");
   document.querySelector(`.feed-item[data-video-id="${videoId}"]`)?.remove();
   lsPerfCache.feed = { data:null, at:0 };
-  showToast("Entendido: te mostraremos menos contenido así");
+  showHiddenVideoUndo(videoId);
 }
 window.hideVideoFromDiscovery = hideVideoFromDiscovery;
+
+function showHiddenVideoUndo(videoId) {
+  document.getElementById("lsHiddenUndo")?.remove();
+  const bar = document.createElement("div");
+  bar.id = "lsHiddenUndo";
+  bar.className = "ls-hidden-undo-611";
+  bar.innerHTML = `<span><strong>Video ocultado</strong><small>Ya no aparecerá en tu inicio.</small></span><button type="button">Deshacer</button>`;
+  bar.querySelector("button").onclick = async () => {
+    const { data, error } = await sb.rpc("restore_hidden_video", { p_video_id:videoId });
+    if (error || !data?.ok) return showToast("No se pudo restablecer el video");
+    bar.remove();
+    lsPerfCache.feed = { data:null, at:0 };
+    showToast("Video restablecido ✓");
+    if (currentTab === "feed") renderFeed();
+  };
+  document.body.appendChild(bar);
+  setTimeout(() => bar.remove(), 6500);
+}
 
 async function openHashtagFeed(rawSlug) {
   const slug = normalizeHashtag(rawSlug);
@@ -11035,6 +11108,7 @@ async function renderProfile() {
 
 async function handleLike(videoId) {
   const btn = document.getElementById(`like-${videoId}`);
+  if (!btn) return;
   if (btn.classList.contains("liked")) return;
 
   const { data, error } = await sb.rpc("give_like", { p_video_id: videoId, p_user_id: currentUser.id });
@@ -11045,6 +11119,14 @@ async function handleLike(videoId) {
   }
 
   btn.classList.add("liked");
+  btn.dataset.label = "Te gusta";
+  btn.title = "Te gusta";
+  btn.setAttribute("aria-label", "Te gusta");
+  btn.setAttribute("aria-pressed", "true");
+  const icon = btn.querySelector("span");
+  const label = btn.querySelector("i");
+  if (icon) icon.textContent = "♥";
+  if (label) label.textContent = "TU LIKE";
   safePulseElement(btn, "ls-like-pop-safe");
   currentProfile.points_balance += data.points;
   updateBalanceUI();
@@ -11074,16 +11156,16 @@ async function handleShare(videoId, url) {
 async function openComments(videoId, focusCommentId = null) {
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:flex-end; justify-content:center;" onclick="if(event.target===this) closeComments()">
-      <div style="background:var(--panel); width:100%; max-width:420px; max-height:70vh; max-height:70dvh; border-radius:20px 20px 0 0; padding:20px; padding-bottom:max(20px, env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden;">
+    <div class="ls-comments-overlay-611" onclick="if(event.target===this) closeComments()">
+      <div class="ls-comments-panel-611">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
           <h3 style="margin:0;">💬 Comentarios</h3>
           <button onclick="closeComments()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
         </div>
         <div id="commentsList" style="overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto; min-height:0; margin-bottom:14px;">Cargando...</div>
-        <div style="display:flex; gap:8px; flex-shrink:0;">
-          <input id="newCommentInput" placeholder="Escribí un comentario..." style="flex:1; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:inherit;">
-          <button class="btn" onclick="submitComment('${videoId}')">Enviar</button>
+        <div class="ls-comment-compose-611">
+          <input id="newCommentInput" placeholder="Escribí un comentario..." maxlength="500" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${videoId}');}">
+          <button class="btn" onclick="submitComment('${videoId}')">Enviar ➜</button>
         </div>
       </div>
     </div>`;
@@ -11222,8 +11304,8 @@ async function renderForYou(renderToken = lsTabRenderToken) {
             <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
             <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
             <div class="feed-actions">
-              <button class="feed-action-btn ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="Me gusta" aria-label="Me gusta" title="Me gusta" onclick="handleLike('${v.id}')">❤️</button>
-              <button class="feed-action-btn" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')">💬</button>
+              <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+              <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
               <button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')">🔗</button>
             </div>
             <div class="feed-overlay">
@@ -11977,8 +12059,9 @@ async function viewPublicProfile(username) {
         return `
         <div class="video-grid">
           ${videos.map(v => `
-            <div class="video-grid-tile" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
+            <div class="video-grid-tile" id="public-tile-${v.id}" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
               ${getGridCoverHtml(v)}
+              ${currentProfile.is_admin ? `<button class="ls-admin-profile-delete-611" title="Eliminar como administrador" aria-label="Eliminar video como administrador" onclick="event.stopPropagation();handleAdminDeleteProfileVideo('${v.id}','${escapeHtml(profile.username)}')">🗑</button>` : ""}
               <div class="grid-overlay">
                 <div class="grid-stats">
                   <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
@@ -12039,7 +12122,41 @@ let notifRealtimeUserId = null;
 let notifUiRefreshFrame = null;
 let notifVisibleCount = 18;
 let notifSoundContext = null;
+let notifRealtimeConnected = false;
+let notifFallbackTimer = null;
 const LS_NOTIFICATION_SOUND_KEY = "livescroll_notification_sound_v598";
+
+function stopNotificationFallback() {
+  if (notifFallbackTimer) clearInterval(notifFallbackTimer);
+  notifFallbackTimer = null;
+  notifRealtimeConnected = false;
+}
+
+async function pollNotificationsFallback() {
+  if (!currentUser?.id || document.hidden || notifRealtimeConnected) return;
+  const newestAt = notifCache[0]?.created_at || new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .gt("created_at", newestAt)
+    .order("created_at", { ascending:false })
+    .limit(20);
+  if (error || !data?.length) return;
+  const known = new Set(notifCache.map(n => n.id));
+  const fresh = data.filter(n => !known.has(n.id));
+  if (!fresh.length) return;
+  notifCache = [...fresh, ...notifCache].slice(0, 60);
+  scheduleNotificationUIRefresh();
+  playLiveScrollNotificationSound();
+  const latest = fresh[0];
+  showToast(`${getNotificationIcon(latest.type)} ${latest.message || "Nueva notificación"}`);
+}
+
+function startNotificationFallback() {
+  if (notifFallbackTimer) return;
+  notifFallbackTimer = setInterval(pollNotificationsFallback, 8000);
+}
 
 function isNotificationSoundEnabled() {
   try { return localStorage.getItem(LS_NOTIFICATION_SOUND_KEY) === "1"; }
@@ -12132,6 +12249,8 @@ function subscribeToNotifications() {
   }
 
   notifRealtimeUserId = currentUser.id;
+  notifRealtimeConnected = false;
+  startNotificationFallback();
   notifRealtimeChannel = sb
     .channel(`notifications-${currentUser.id}`)
     .on("postgres_changes", {
@@ -12148,10 +12267,17 @@ function subscribeToNotifications() {
       showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
     })
     .subscribe(status => {
-      if (status === "SUBSCRIBED") console.log("Notificaciones Realtime conectadas");
+      if (status === "SUBSCRIBED") {
+        notifRealtimeConnected = true;
+        console.log("Notificaciones Realtime conectadas");
+      }
       if (status === "CHANNEL_ERROR" || status === "CLOSED") {
+        notifRealtimeConnected = false;
         notifRealtimeChannel = null;
         notifRealtimeUserId = null;
+        setTimeout(() => {
+          if (currentUser?.id && !document.hidden) subscribeToNotifications();
+        }, 1800);
       }
     });
 }
@@ -16371,6 +16497,109 @@ document.addEventListener("DOMContentLoaded", () => {
 if (document.readyState !== "loading") {
   setTimeout(applySeasonalTheme, 80);
 }
+
+// 6.1.1v · SOCIAL CLARITY
+function ensureSocialClarity611Styles() {
+  if (document.getElementById("lsSocialClarity611Styles")) return;
+  const style = document.createElement("style");
+  style.id = "lsSocialClarity611Styles";
+  style.textContent = `
+    .feed-action-btn.ls-like-action-611,
+    .feed-action-btn.ls-comment-action-611 {
+      width:58px !important;
+      min-height:54px;
+      height:auto !important;
+      padding:7px 4px 6px !important;
+      border-radius:18px !important;
+      display:flex !important;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:2px;
+    }
+    .feed-action-btn.ls-like-action-611 > span,
+    .feed-action-btn.ls-comment-action-611 > span {
+      font-size:25px;
+      line-height:1;
+      font-style:normal;
+    }
+    .feed-action-btn.ls-like-action-611 > i,
+    .feed-action-btn.ls-comment-action-611 > i {
+      font:900 7px 'JetBrains Mono',monospace;
+      letter-spacing:.055em;
+      color:rgba(255,255,255,.72);
+    }
+    .feed-action-btn.ls-like-action-611.liked {
+      color:#fff !important;
+      border-color:rgba(255,78,111,.88) !important;
+      background:linear-gradient(145deg,#ff416c,#821b42) !important;
+      box-shadow:0 0 0 3px rgba(255,65,108,.16),0 10px 28px rgba(255,65,108,.38) !important;
+    }
+    .feed-action-btn.ls-like-action-611.liked > span {
+      filter:drop-shadow(0 0 8px rgba(255,255,255,.62));
+    }
+    .feed-action-btn.ls-like-action-611.liked > i { color:#fff; }
+    .feed-action-btn.ls-comment-action-611 {
+      border-color:rgba(72,221,242,.38) !important;
+      background:linear-gradient(145deg,rgba(20,92,112,.82),rgba(5,31,43,.88)) !important;
+    }
+    .ls-comments-overlay-611 {
+      position:fixed;inset:0;z-index:300;display:flex;align-items:flex-end;justify-content:center;
+      padding-top:40px;background:rgba(0,0,0,.76);backdrop-filter:blur(7px);
+    }
+    .ls-comments-panel-611 {
+      width:min(100%,520px);max-height:78vh;max-height:78dvh;padding:20px;
+      padding-bottom:max(20px,env(safe-area-inset-bottom));display:flex;flex-direction:column;overflow:hidden;
+      border:1px solid rgba(72,221,242,.24);border-bottom:0;border-radius:26px 26px 0 0;
+      background:linear-gradient(180deg,rgba(18,27,34,.98),rgba(7,12,17,.99));
+      box-shadow:0 -24px 70px rgba(0,0,0,.48),0 0 32px rgba(72,221,242,.07);
+    }
+    .ls-comment-compose-611 { display:flex;gap:9px;flex-shrink:0;align-items:center; }
+    .ls-comment-compose-611 input {
+      flex:1;min-width:0;padding:13px 14px;border:1px solid rgba(72,221,242,.22);border-radius:14px;
+      background:rgba(2,9,13,.74);color:var(--text);font-family:inherit;outline:none;
+    }
+    .ls-comment-compose-611 input:focus {
+      border-color:rgba(72,221,242,.72);box-shadow:0 0 0 3px rgba(72,221,242,.09);
+    }
+    .ls-hidden-undo-611 {
+      position:fixed;left:50%;bottom:max(22px,env(safe-area-inset-bottom));z-index:800;
+      width:min(calc(100% - 28px),440px);transform:translateX(-50%);display:flex;align-items:center;gap:12px;
+      padding:12px 13px;border:1px solid rgba(103,232,249,.35);border-radius:16px;
+      background:rgba(5,15,21,.96);box-shadow:0 16px 45px rgba(0,0,0,.48);backdrop-filter:blur(14px);
+      animation:lsUndoIn611 .22s ease both;
+    }
+    .ls-hidden-undo-611 span { min-width:0;flex:1;display:flex;flex-direction:column;gap:2px; }
+    .ls-hidden-undo-611 strong { color:var(--text);font-size:13px; }
+    .ls-hidden-undo-611 small { color:var(--text-dim);font-size:10px; }
+    .ls-hidden-undo-611 button {
+      flex:none;padding:9px 12px;border:1px solid rgba(103,232,249,.48);border-radius:11px;
+      background:rgba(103,232,249,.10);color:#67e8f9;font:900 11px 'JetBrains Mono',monospace;cursor:pointer;
+    }
+    .ls-admin-profile-delete-611 {
+      position:absolute;top:8px;right:8px;z-index:12;width:38px;height:38px;border-radius:12px;
+      border:1px solid rgba(255,90,110,.62);background:rgba(80,8,22,.90);color:#fff;font-size:16px;cursor:pointer;
+      box-shadow:0 8px 22px rgba(0,0,0,.34);
+    }
+    @keyframes lsUndoIn611 { from{opacity:0;transform:translate(-50%,12px)} to{opacity:1;transform:translate(-50%,0)} }
+    .ls-legacy .feed-action-btn.ls-like-action-611,
+    .ls-legacy .feed-action-btn.ls-comment-action-611 { box-shadow:none !important;backdrop-filter:none !important; }
+    @media(max-width:700px) {
+      .feed-action-btn.ls-like-action-611,.feed-action-btn.ls-comment-action-611 { width:54px !important;min-height:51px; }
+      .ls-comments-panel-611 { max-height:82dvh;padding:17px 15px max(16px,env(safe-area-inset-bottom)); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && currentUser?.id) {
+    pollNotificationsFallback();
+    if (!notifRealtimeChannel) subscribeToNotifications();
+  }
+});
+
+ensureSocialClarity611Styles();
 
 
 document.addEventListener("DOMContentLoaded", () => {

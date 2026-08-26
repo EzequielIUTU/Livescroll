@@ -359,6 +359,18 @@
     var portal = document.getElementById('ls6LaunchPortal');
     if (!portal) return;
 
+    // La APK LiveScroll 7 comparte backend y WebApp, pero nunca reproduce
+    // presentaciones de LiveScroll 6.
+    var isLiveScroll7App = /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent);
+    if (isLiveScroll7App) {
+      portal.remove();
+      var legacySixIntro = document.getElementById('introOverlay');
+      if (legacySixIntro) legacySixIntro.remove();
+      window.__ls6StartupPresentationActive = false;
+      try { window.dispatchEvent(new CustomEvent('livescroll6:presentation-finished')); } catch (_) {}
+      return;
+    }
+
     // El portal oficial y la animación corta de apertura nunca se superponen.
     // Cuando el portal ya fue visto, conservamos la apertura LiveScroll 6 -> Feed.
     window.__ls6StartupPresentationActive = !isPreview;
@@ -736,6 +748,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.1.1v-social-clarity"></script>
+<script src="app.js?v=6.1.1v-ls7-runtime-1"></script>
 </body>
 </html>

@@ -13,6 +13,25 @@ const LIVESCROLL_PROJECT_IDENTITY = Object.freeze({
   signature:"3124cab98d0f0fd3cd465d3c05c49b4d789c2549719dadd127e631d6db287b76"
 });
 
+// La WebApp es compartida, pero la APK 7 anuncia su identidad en el User-Agent.
+// Así LiveScroll 6 conserva su experiencia y LiveScroll 7 recibe la propia.
+const LIVESCROLL_RUNTIME = Object.freeze({
+  isAndroid7:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent),
+  generation:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent) ? 7 : 6
+});
+
+function isLiveScroll7App() {
+  return LIVESCROLL_RUNTIME.isAndroid7 === true;
+}
+window.isLiveScroll7App = isLiveScroll7App;
+
+function applyLiveScrollRuntimeBranding() {
+  if (!isLiveScroll7App()) return;
+  document.documentElement.classList.add("ls7-app-runtime");
+  document.querySelectorAll(".nav-brand b").forEach(node => { node.textContent = "7"; });
+  document.title = "LiveScroll 7 — La nueva generación";
+}
+
 // ============================================================
 // CONFIGURACIÓN — reemplazá con tus datos de Supabase
 // (Project Settings > API en tu dashboard de Supabase)
@@ -527,6 +546,7 @@ function exitSecurityReportScreen() {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  applyLiveScrollRuntimeBranding();
   if ("serviceWorker" in navigator) {
     const registerSW = () => navigator.serviceWorker.register("sw.js").catch(() => {});
     if ("requestIdleCallback" in window) {
@@ -621,6 +641,7 @@ function showPostLoginIntro() {
     }
 
     const username = currentProfile?.username || currentUser?.email?.split("@")[0] || "";
+    const isLs7 = isLiveScroll7App();
     const seasonalKey = typeof getSeasonalThemeKey === "function"
       ? getSeasonalThemeKey()
       : "normal";
@@ -629,8 +650,15 @@ function showPostLoginIntro() {
       ? (LS_SEASONAL_THEMES[seasonalKey] || LS_SEASONAL_THEMES.normal)
       : null;
 
-    const accent = seasonal?.accent || "var(--gold)";
-    const seasonEmoji = seasonal?.emoji || "✦";
+    const accent = isLs7 ? "#58d8ff" : (seasonal?.accent || "var(--gold)");
+    const seasonEmoji = isLs7 ? "7" : (seasonal?.emoji || "✦");
+    const introKicker = isLs7 ? "LIVESCROLL 7 · ANDROID" : "LiveScroll";
+    const introTitle = isLs7
+      ? (username ? `El futuro te espera, @${escapeHtml(username)}` : "Bienvenido a LiveScroll 7")
+      : (username ? `Hola, @${escapeHtml(username)}` : "Bienvenido");
+    const introSubtitle = isLs7
+      ? "Abriendo tu próxima generación…"
+      : "Preparando tu LiveScroll…";
 
     const reducedMotion =
       window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ||
@@ -647,7 +675,7 @@ function showPostLoginIntro() {
         padding:22px;
         background:
           radial-gradient(circle at 50% 36%, color-mix(in srgb, ${accent} 14%, transparent), transparent 32%),
-          rgba(7,10,14,.96);
+          ${isLs7 ? "linear-gradient(145deg,rgba(4,8,22,.98),rgba(21,8,46,.98))" : "rgba(7,10,14,.96)"};
         backdrop-filter:blur(12px);
         -webkit-backdrop-filter:blur(12px);
       ">
@@ -678,7 +706,7 @@ function showPostLoginIntro() {
             color:${accent};
             font-weight:900;
             margin-bottom:8px;
-          ">LiveScroll</div>
+          ">${introKicker}</div>
 
           <div style="
             font-size:clamp(23px,6vw,34px);
@@ -686,14 +714,14 @@ function showPostLoginIntro() {
             letter-spacing:-.035em;
             line-height:1.05;
           ">
-            ${username ? `Hola, @${escapeHtml(username)}` : "Bienvenido"}
+            ${introTitle}
           </div>
 
           <div style="
             font-size:12px;
             color:var(--text-dim);
             margin-top:8px;
-          ">Preparando tu LiveScroll…</div>
+          ">${introSubtitle}</div>
 
           <div style="
             width:min(230px,68vw);
@@ -841,14 +869,15 @@ function saveRememberedLoginEmail() {
 function renderAuthForm(mode) {
   const wrap = document.getElementById("globalModalWrap");
   const isSignup = mode === "signup";
+  const runtimeGeneration = isLiveScroll7App() ? 7 : 6;
   wrap.innerHTML = `
     <div class="ls-access-evolution" onclick="if(event.target===this) closeAuthModal()">
       <div class="ls-access-orb ls-access-orb-a" aria-hidden="true"></div>
       <div class="ls-access-orb ls-access-orb-b" aria-hidden="true"></div>
       <div class="auth-box ls-access-card">
         <button class="ls-access-close" onclick="closeAuthModal()" aria-label="Cerrar">✕</button>
-        <div class="ls-access-brand" aria-label="LiveScroll 6">
-          <div class="ls-access-logo">6</div>
+        <div class="ls-access-brand" aria-label="LiveScroll ${runtimeGeneration}">
+          <div class="ls-access-logo">${runtimeGeneration}</div>
           <div>
             <div class="ls-access-word">Live<span>Scroll</span></div>
             <small>${isSignup ? "CREÁ TU IDENTIDAD" : "VOLVÉ A CONECTAR"}</small>
@@ -1999,39 +2028,21 @@ function openLiveScrollSettings() {
               >Restablecer valores</button>
             </div>
 
-            <div style="
-              border:1px solid rgba(250,204,21,.28);
-              border-radius:14px;
-              padding:13px;
-              background:linear-gradient(135deg,rgba(250,204,21,.07),rgba(72,221,242,.045));
-            ">
-              <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:var(--gold);">
-                ✨ Portal LiveScroll 6
-              </div>
-              <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">
-                Probá nuevamente la puerta, el acceso mantenido y el viaje hacia la nueva era. En Legacy se abre una versión liviana.
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                <button
-                  type="button"
-                  class="btn-outline"
-                  style="min-height:44px;padding:9px;"
-                  onclick="replayLiveScrollRoadTo6Intro()"
-                >▶ Presentación completa</button>
-                <button
-                  type="button"
-                  class="btn-outline"
-                  style="min-height:44px;padding:9px;"
-                  onclick="replayLiveScrollPortalOnly()"
-                >🌀 Solo portal</button>
-              </div>
-              <button
-                type="button"
-                class="btn-outline ls7-settings-replay"
-                style="width:100%;min-height:46px;margin-top:8px;"
-                onclick="replayLiveScroll7Pulse()"
-              >◈ Volver a ver LiveScroll 7 · El Pulso</button>
-            </div>
+            ${isLiveScroll7App() ? `
+              <div class="ls7-runtime-settings-card">
+                <div class="ls7-runtime-settings-head"><span>7</span><div><strong>Experiencia LiveScroll 7</strong><small>Entrada exclusiva de la aplicación Android</small></div></div>
+                <p>Esta versión reemplaza el antiguo Portal 6 por una bienvenida propia, más directa y preparada para la nueva generación.</p>
+                <button type="button" class="btn-outline" style="width:100%;min-height:46px;" onclick="replayLiveScroll7LoginWelcome()">▶ Volver a ver la bienvenida</button>
+              </div>` : `
+              <div style="border:1px solid rgba(250,204,21,.28);border-radius:14px;padding:13px;background:linear-gradient(135deg,rgba(250,204,21,.07),rgba(72,221,242,.045));">
+                <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:var(--gold);">✨ Portal LiveScroll 6</div>
+                <div style="font-size:10px;line-height:1.45;color:var(--text-dim);margin-bottom:10px;">Probá nuevamente la puerta, el acceso mantenido y el viaje hacia la nueva era. En Legacy se abre una versión liviana.</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                  <button type="button" class="btn-outline" style="min-height:44px;padding:9px;" onclick="replayLiveScrollRoadTo6Intro()">▶ Presentación completa</button>
+                  <button type="button" class="btn-outline" style="min-height:44px;padding:9px;" onclick="replayLiveScrollPortalOnly()">🌀 Solo portal</button>
+                </div>
+                <button type="button" class="btn-outline ls7-settings-replay" style="width:100%;min-height:46px;margin-top:8px;" onclick="replayLiveScroll7Pulse()">◈ Volver a ver LiveScroll 7 · El Pulso</button>
+              </div>`}
 
             <div style="border:1px solid rgba(103,232,249,.25);border-radius:14px;padding:13px;background:rgba(103,232,249,.045);">
               <div style="font-size:12px;font-weight:900;margin-bottom:4px;color:#67e8f9;">🙈 Videos ocultos</div>
@@ -2041,11 +2052,17 @@ function openLiveScrollSettings() {
               <button type="button" class="btn-outline" style="width:100%;min-height:44px;" onclick="openHiddenVideosManager()">Administrar videos ocultos</button>
             </div>
 
-            <div class="ls6-active-support-card">
-              <div class="ls6-active-support-head"><span></span><strong>LiveScroll 6 · Activo y con soporte</strong></div>
-              <p>Las nuevas funciones están pausadas mientras construimos LiveScroll 7. LiveScroll 6 continúa funcionando y recibirá mantenimiento, seguridad y correcciones urgentes.</p>
-              <button type="button" class="btn-outline" onclick="showLiveScroll6BridgeNotice({manual:true})">Leer comunicado</button>
-            </div>
+            ${isLiveScroll7App() ? `
+              <div class="ls7-runtime-status-card">
+                <div class="ls7-runtime-status-head"><span></span><strong>LiveScroll 7 · Desarrollo activo</strong></div>
+                <p>Estás dentro de la primera etapa real de LiveScroll 7 para Android. La cuenta y el contenido siguen sincronizados mientras renovamos cada apartado.</p>
+                <button type="button" class="btn-outline" onclick="showLiveScroll7AppNotice()">Conocer esta etapa</button>
+              </div>` : `
+              <div class="ls6-active-support-card">
+                <div class="ls6-active-support-head"><span></span><strong>LiveScroll 6 · Activo y con soporte</strong></div>
+                <p>Las nuevas funciones están pausadas mientras construimos LiveScroll 7. LiveScroll 6 continúa funcionando y recibirá mantenimiento, seguridad y correcciones urgentes.</p>
+                <button type="button" class="btn-outline" onclick="showLiveScroll6BridgeNotice({manual:true})">Leer comunicado</button>
+              </div>`}
           </div>
         </div>
 
@@ -2334,11 +2351,12 @@ document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 function getLiveScroll6ModeMenuMarkup() {
   const mode = window.__liveScrollExperienceMode || "nova";
   const isLegacy = mode === "legacy";
+  const generation = isLiveScroll7App() ? 7 : 6;
   return `
     <button type="button" class="ls-menu-mode-button ${isLegacy ? "is-legacy" : "is-nova"}"
-      onclick="openLiveScrollModeInfo()" aria-label="Información sobre LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}">
+      onclick="openLiveScrollModeInfo()" aria-label="Información sobre LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}">
       <span>${isLegacy ? "🪶" : "✦"}</span>
-      <b>LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}</b>
+      <b>LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}</b>
     </button>`;
 }
 
@@ -2358,7 +2376,7 @@ function toggleMobileMenu() {
   const activeTab = currentTab || "feed";
   panel.innerHTML = `
     <div class="ls-mobile-menu-head">
-      <div><strong>LiveScroll <em>6</em></strong><small>Explorá la aplicación</small></div>
+      <div><strong>LiveScroll <em>${isLiveScroll7App() ? "7" : "6"}</em></strong><small>Explorá la aplicación</small></div>
       <button class="ls-mobile-menu-close" onclick="closeMobileMenu()" aria-label="Cerrar">✕</button>
     </div>
     <div class="ls-mobile-menu-scroll">
@@ -2518,6 +2536,32 @@ function replayLiveScroll7Pulse() {
   document.getElementById("globalModalWrap").innerHTML = "";
   setTimeout(() => openLiveScroll7Teaser({ replay:true }), 120);
 }
+
+async function replayLiveScroll7LoginWelcome() {
+  document.getElementById("globalModalWrap").innerHTML = "";
+  await showPostLoginIntro();
+}
+window.replayLiveScroll7LoginWelcome = replayLiveScroll7LoginWelcome;
+
+function showLiveScroll7AppNotice() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked ls7-runtime-notice-overlay" data-modal-locked="1" style="z-index:310;">
+      <section class="modal-box ls7-runtime-notice" role="dialog" aria-modal="true" aria-label="Primera etapa de LiveScroll 7">
+        <div class="modal-box-body">
+          <div class="ls7-runtime-notice-mark">7</div>
+          <small>PRIMERA ETAPA · ANDROID</small>
+          <h2>Bienvenido a la evolución</h2>
+          <p>LiveScroll 7 ya comenzó. Esta primera versión conserva tus cuentas, videos y funciones esenciales mientras construimos una experiencia Android cada vez más nativa.</p>
+          <div class="ls7-runtime-roadmap"><span>AHORA</span><b>Nueva identidad y entrada</b><span>PRÓXIMO</span><b>Interfaz y rendimiento nativos</b></div>
+          <blockquote>Tu contenido continúa.<br><strong>La experiencia evoluciona.</strong></blockquote>
+        </div>
+        <div class="modal-box-footer"><button class="btn" style="width:100%;min-height:48px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Entrar a LiveScroll 7</button></div>
+      </section>
+    </div>`;
+}
+window.showLiveScroll7AppNotice = showLiveScroll7AppNotice;
 
 // ============================================================
 // 6.1.0 · EL PUENTE — CONTINUIDAD DE LIVESCROLL 6
@@ -2784,6 +2828,7 @@ function closeLiveScrollModeInfo() {
 
 function openLiveScrollModeInfo() {
   const mode = window.__liveScrollExperienceMode || "nova";
+  const generation = isLiveScroll7App() ? 7 : 6;
   closeLiveScrollModeInfo();
 
   const overlay = document.createElement("div");
@@ -2802,13 +2847,13 @@ function openLiveScrollModeInfo() {
       <div class="ls-mode-head">
         <div class="ls-mode-icon">${isLegacy ? "🪶" : "✨"}</div>
         <div class="ls-mode-title">
-          <strong>LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}</strong>
+          <strong>LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}</strong>
           <span>${isLegacy ? "Experiencia optimizada" : "Experiencia completa"}</span>
         </div>
       </div>
 
       <div class="ls-mode-current">
-        <strong>Este dispositivo está usando LiveScroll 6 ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
+        <strong>Este dispositivo está usando LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
         LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo.
       </div>
 
@@ -3121,12 +3166,12 @@ function initLiveScrollExperienceMode() {
 
     if (mode === "legacy") {
       toast.innerHTML = `
-        <strong>🪶 LiveScroll 6 Legacy activado</strong>
+        <strong>🪶 LiveScroll ${isLiveScroll7App() ? "7" : "6"} Legacy activado</strong>
         Optimizamos automáticamente la experiencia para que LiveScroll funcione mejor en este dispositivo.
       `;
     } else {
       toast.innerHTML = `
-        <strong>✨ LiveScroll 6 Nova</strong>
+        <strong>✨ LiveScroll ${isLiveScroll7App() ? "7" : "6"} Nova</strong>
         Estás usando la experiencia completa de LiveScroll.
       `;
     }
@@ -3143,6 +3188,7 @@ function initLiveScrollExperienceMode() {
 
 async function renderApp() {
   ensureMobileStabilityLayer();
+  applyLiveScrollRuntimeBranding();
   if (landingOdometerRefreshTimer) {
     clearInterval(landingOdometerRefreshTimer);
     landingOdometerRefreshTimer = null;
@@ -3433,7 +3479,7 @@ async function checkPendingContent() {
     Promise.resolve(sb.rpc("mark_my_bridge_notice_seen")).catch(() => {});
   }
   if (cloudBridgeSeen && !localBridgeSeen) localStorage.setItem(bridgeKey,"1");
-  if (!localBridgeSeen && !cloudBridgeSeen && !window.__lsStartupOptionalModalShown) {
+  if (!isLiveScroll7App() && !localBridgeSeen && !cloudBridgeSeen && !window.__lsStartupOptionalModalShown) {
     window.__lsStartupOptionalModalShown = true;
     window.__lsBridgeShownVersion = latestInternal;
     showLiveScroll6BridgeNotice();
@@ -3449,6 +3495,7 @@ async function checkPendingContent() {
   if (localPulseSeen && !cloudPulseSeen) Promise.resolve(sb.rpc("mark_my_ls7_pulse_seen")).catch(() => {});
   if (cloudPulseSeen && !localPulseSeen) localStorage.setItem(ls7PulseKey,"1");
   if (
+    !isLiveScroll7App() &&
     !ls7PulseSeen &&
     !window.__lsStartupOptionalModalShown
   ) {
@@ -16600,6 +16647,63 @@ document.addEventListener("visibilitychange", () => {
 });
 
 ensureSocialClarity611Styles();
+
+function ensureLiveScroll7RuntimeStyles() {
+  if (!isLiveScroll7App() || document.getElementById("ls7RuntimeStyles")) return;
+  const style = document.createElement("style");
+  style.id = "ls7RuntimeStyles";
+  style.textContent = `
+    html.ls7-app-runtime { --ls7-blue:#58d8ff;--ls7-violet:#8a5cff;--ls7-gold:#f4c95d; }
+    html.ls7-app-runtime .nav-brand b { color:var(--ls7-gold);filter:drop-shadow(0 0 8px rgba(244,201,93,.38)); }
+    html.ls7-app-runtime .ls-access-evolution {
+      background:radial-gradient(circle at 20% 10%,rgba(88,216,255,.13),transparent 34%),radial-gradient(circle at 85% 80%,rgba(138,92,255,.17),transparent 38%),#050711;
+    }
+    html.ls7-app-runtime .ls-access-logo {
+      color:var(--ls7-gold);border-color:rgba(88,216,255,.48);
+      background:linear-gradient(145deg,rgba(88,216,255,.15),rgba(138,92,255,.16));
+      box-shadow:0 0 28px rgba(88,216,255,.14);
+    }
+    .ls7-runtime-settings-card,.ls7-runtime-status-card {
+      border:1px solid rgba(88,216,255,.28);border-radius:16px;padding:14px;
+      background:linear-gradient(145deg,rgba(20,64,92,.14),rgba(68,34,116,.13));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+    .ls7-runtime-settings-head { display:flex;align-items:center;gap:11px;margin-bottom:9px; }
+    .ls7-runtime-settings-head > span {
+      width:42px;height:42px;display:grid;place-items:center;border-radius:14px;
+      border:1px solid rgba(244,201,93,.48);color:var(--ls7-gold);font:950 24px 'Space Grotesk',sans-serif;
+      background:rgba(244,201,93,.07);box-shadow:0 0 24px rgba(244,201,93,.10);
+    }
+    .ls7-runtime-settings-head div { min-width:0;display:flex;flex-direction:column;gap:2px; }
+    .ls7-runtime-settings-head strong { color:#f8fbff;font-size:13px; }
+    .ls7-runtime-settings-head small { color:#8ea9c7;font-size:9px; }
+    .ls7-runtime-settings-card p,.ls7-runtime-status-card p { margin:0 0 11px;color:var(--text-dim);font-size:10px;line-height:1.5; }
+    .ls7-runtime-status-card { border-color:rgba(138,92,255,.34); }
+    .ls7-runtime-status-head { display:flex;align-items:center;gap:8px;margin-bottom:6px; }
+    .ls7-runtime-status-head span { width:8px;height:8px;border-radius:50%;background:#58d8ff;box-shadow:0 0 14px #58d8ff; }
+    .ls7-runtime-status-head strong { color:#c8f4ff;font-size:12px; }
+    .ls7-runtime-notice-overlay { background:rgba(1,3,10,.86);backdrop-filter:blur(10px); }
+    .ls7-runtime-notice { max-width:480px;border:1px solid rgba(88,216,255,.30);background:linear-gradient(165deg,#0a1425,#130b29); }
+    .ls7-runtime-notice .modal-box-body { text-align:center;padding-top:26px; }
+    .ls7-runtime-notice-mark {
+      width:84px;height:84px;margin:0 auto 14px;display:grid;place-items:center;border-radius:26px;
+      border:1px solid rgba(244,201,93,.55);color:var(--ls7-gold);font:950 54px 'Space Grotesk',sans-serif;
+      background:radial-gradient(circle,rgba(244,201,93,.13),rgba(88,216,255,.05));
+      box-shadow:0 0 50px rgba(88,216,255,.10);
+    }
+    .ls7-runtime-notice small { color:var(--ls7-blue);font:900 9px 'JetBrains Mono',monospace;letter-spacing:.16em; }
+    .ls7-runtime-notice h2 { margin:9px 0 12px;font-size:28px; }
+    .ls7-runtime-notice p { color:var(--text-dim);font-size:13px;line-height:1.55; }
+    .ls7-runtime-roadmap { display:grid;grid-template-columns:auto 1fr;gap:8px 11px;margin:18px 0;padding:13px;border:1px solid rgba(88,216,255,.16);border-radius:14px;text-align:left; }
+    .ls7-runtime-roadmap span { color:var(--ls7-blue);font:900 8px 'JetBrains Mono',monospace; }
+    .ls7-runtime-roadmap b { color:var(--text);font-size:11px; }
+    .ls7-runtime-notice blockquote { margin:14px 0 0;color:var(--text-dim);font-size:13px;line-height:1.55; }
+    .ls7-runtime-notice blockquote strong { color:var(--ls7-gold); }
+  `;
+  document.head.appendChild(style);
+}
+
+ensureLiveScroll7RuntimeStyles();
 
 
 document.addEventListener("DOMContentLoaded", () => {

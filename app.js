@@ -17798,6 +17798,7 @@ function ensureLiveScroll7ElectricIdentity() {
       background:radial-gradient(circle at 8% -5%,rgba(57,231,255,.16),transparent 28%),radial-gradient(circle at 108% 22%,rgba(138,85,255,.18),transparent 31%),linear-gradient(155deg,#020610,#061124 55%,#030713)!important;
     }
     html.ls7-app-runtime nav { border-color:rgba(57,231,255,.20)!important;background:rgba(2,8,20,.88)!important;box-shadow:0 14px 44px rgba(0,0,0,.38),0 0 40px rgba(37,136,255,.055)!important; }
+    html.ls7-app-runtime nav { top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important; }
     html.ls7-app-runtime .nav-brand-scroll { color:#39e7ff!important;text-shadow:0 0 18px rgba(57,231,255,.35); }
     html.ls7-app-runtime .nav-brand b { color:#eafbff!important;background:linear-gradient(145deg,#2588ff,#8a55ff)!important;border-color:rgba(120,226,255,.55)!important;box-shadow:0 0 20px rgba(57,231,255,.28)!important; }
     html.ls7-app-runtime .form-card,html.ls7-app-runtime .video-card,html.ls7-app-runtime .auth-box { border-color:rgba(57,231,255,.15)!important;background:linear-gradient(145deg,rgba(8,28,52,.96),rgba(4,10,25,.98))!important; }
@@ -17877,7 +17878,7 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .ls7-style-preview > div { display:flex;flex-direction:column;gap:3px; }html.ls7-app-runtime .ls7-style-preview small { color:#62edff;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.1em; }html.ls7-app-runtime .ls7-style-preview strong { font-size:18px; }html.ls7-app-runtime .ls7-style-preview span { color:#9fb4c9;font-size:9px; }
     html.ls7-app-runtime .ls7-style-preview.ls7-profile-style-cosmic { border-color:rgba(173,103,255,.38);background:radial-gradient(circle at 85% 5%,rgba(160,82,255,.28),transparent 40%),linear-gradient(145deg,#190d3a,#08091a); }
     html.ls7-app-runtime .ls7-style-preview.ls7-profile-style-minimal { border-color:rgba(180,205,225,.16);background:linear-gradient(145deg,#111720,#06080d); }
-    html.ls7-app-runtime .ls7-electric-update-overlay { position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px;background:rgba(1,4,13,.88);backdrop-filter:blur(13px); }
+    html.ls7-app-runtime .ls7-electric-update-overlay { position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:20px 20px calc(20px + 9vh);background:rgba(1,4,13,.88);backdrop-filter:blur(13px); }
     html.ls7-app-runtime .ls7-electric-update-card { width:min(440px,100%);padding:25px;text-align:center;color:#f7fcff;border:1px solid rgba(57,231,255,.38);border-radius:28px;background:radial-gradient(circle at 50% 0,rgba(57,231,255,.14),transparent 38%),linear-gradient(155deg,#071a31,#090817 68%,#180b35);box-shadow:0 30px 90px rgba(0,0,0,.68),0 0 55px rgba(37,136,255,.14); }
     html.ls7-app-runtime .ls7-electric-update-logo { width:94px;height:94px;object-fit:contain;filter:drop-shadow(0 0 18px rgba(57,231,255,.56));animation:ls7EmblemFloat 3s ease-in-out infinite; }
     html.ls7-app-runtime .ls7-electric-update-kicker { margin:4px 0 8px;color:#66eaff;font:900 10px 'JetBrains Mono',monospace;letter-spacing:.17em; }

@@ -6194,6 +6194,7 @@ function switchTab(tab) {
     previousTabForAndroidBack = currentTab;
   }
   currentTab = tab;
+  syncLiveScroll7SwipeRail(tab);
   const renderToken = ++lsTabRenderToken;
 
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
@@ -6286,6 +6287,51 @@ function ensureLiveScroll7HorizontalNavigation() {
       surface.classList.remove("ls7-swipe-left", "ls7-swipe-right");
     }, 115);
   }, { passive:true });
+
+  // Los reproductores embebidos consumen los gestos antes de que lleguen a
+  // la página. Esta pequeña franja queda por encima del video y ofrece un
+  // lugar seguro para cambiar de apartado sin pelear con el scroll vertical.
+  const rail = document.createElement("div");
+  rail.id = "ls7SwipeRail";
+  rail.setAttribute("role", "navigation");
+  rail.setAttribute("aria-label", "Deslizar entre Mirar, Para Ti y Perfil");
+  rail.innerHTML = '<span>‹</span><b id="ls7SwipeRailLabel">MIRAR · DESLIZÁ</b><span>›</span>';
+  document.body.appendChild(rail);
+
+  let railX = 0;
+  let railY = 0;
+  rail.addEventListener("touchstart", event => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    railX = touch.clientX;
+    railY = touch.clientY;
+  }, { passive:true });
+  rail.addEventListener("touchend", event => {
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const dx = touch.clientX - railX;
+    const dy = touch.clientY - railY;
+    if (Math.abs(dx) < 42 || Math.abs(dx) < Math.abs(dy) * 1.1) return;
+    const index = tabs.indexOf(currentTab);
+    const nextIndex = dx < 0 ? index + 1 : index - 1;
+    if (index < 0 || nextIndex < 0 || nextIndex >= tabs.length) return;
+    rail.classList.add(dx < 0 ? "is-left" : "is-right");
+    window.setTimeout(() => {
+      rail.classList.remove("is-left", "is-right");
+      switchTab(tabs[nextIndex]);
+    }, 105);
+  }, { passive:true });
+  syncLiveScroll7SwipeRail(currentTab);
+}
+
+function syncLiveScroll7SwipeRail(tab = currentTab) {
+  if (!isLiveScroll7App()) return;
+  const rail = document.getElementById("ls7SwipeRail");
+  if (!rail) return;
+  const names = { feed:"MIRAR", foryou:"PARA TI", profile:"PERFIL" };
+  rail.classList.toggle("is-hidden", !names[tab]);
+  const label = document.getElementById("ls7SwipeRailLabel");
+  if (label && names[tab]) label.textContent = `${names[tab]} · DESLIZÁ`;
 }
 
 function updateBalanceUI() {
@@ -16871,6 +16917,18 @@ function ensureLiveScroll7RuntimeStyles() {
     html.ls7-app-runtime .ls7-action-report > span { color:#ff6259;font-weight:950; }
     html.ls7-app-runtime #appView.ls7-swipe-left { animation:ls7SwipeLeft .13s ease both; }
     html.ls7-app-runtime #appView.ls7-swipe-right { animation:ls7SwipeRight .13s ease both; }
+    html.ls7-app-runtime #ls7SwipeRail {
+      position:fixed;left:50%;top:calc(max(64px,env(safe-area-inset-top) + 56px));z-index:74;
+      width:154px;height:29px;transform:translateX(-50%);display:flex;align-items:center;justify-content:space-between;
+      padding:0 11px;border:1px solid rgba(244,201,93,.22);border-radius:999px;
+      background:rgba(12,13,17,.78);box-shadow:0 8px 25px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04);
+      color:#f4c95d;backdrop-filter:blur(12px);touch-action:pan-x;transition:opacity .16s ease,transform .16s ease;
+    }
+    html.ls7-app-runtime #ls7SwipeRail b { color:#d8dce2;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em; }
+    html.ls7-app-runtime #ls7SwipeRail span { font-size:16px;line-height:1; }
+    html.ls7-app-runtime #ls7SwipeRail.is-left { transform:translateX(calc(-50% - 8px)); }
+    html.ls7-app-runtime #ls7SwipeRail.is-right { transform:translateX(calc(-50% + 8px)); }
+    html.ls7-app-runtime #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
     @keyframes ls7SwipeLeft { to{opacity:.55;transform:translate3d(-22px,0,0) scale(.995)} }
     @keyframes ls7SwipeRight { to{opacity:.55;transform:translate3d(22px,0,0) scale(.995)} }
     @media(max-width:700px) {

@@ -66,6 +66,7 @@ window.finishLiveScroll7Boot = finishLiveScroll7Boot;
 // ============================================================
 const SUPABASE_URL = "https://lxpjqvlphvjyygifedeb.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4cGpxdmxwaHZqeXlnaWZlZGViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MTMyMTMsImV4cCI6MjA5ODk4OTIxM30.9ovZlNQ-XKdSszZuMYb6PzRnXtX5eejuzBeqpKgkVnk";
+const LIVESCROLL_MEDIA_API = "https://livescroll-media-api.ezequielmarcosrodriguez.workers.dev";
 
 let sb;
 try {
@@ -94,6 +95,40 @@ let watchIntervals = {}; // video_id -> intervalId
 let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
+
+async function uploadMediaToR2(file) {
+  if (!(file instanceof Blob) || !file.size) throw new Error("El archivo está vacío");
+
+  const { data:{ session }, error:sessionError } = await sb.auth.getSession();
+  if (sessionError || !session?.access_token) {
+    throw new Error("Tu sesión venció. Volvé a iniciar sesión para subir el archivo.");
+  }
+
+  const response = await fetch(`${LIVESCROLL_MEDIA_API}/upload`, {
+    method:"POST",
+    headers:{
+      "Authorization":`Bearer ${session.access_token}`,
+      "Content-Type":file.type || "application/octet-stream"
+    },
+    body:file
+  });
+
+  let result = null;
+  try { result = await response.json(); } catch (_) {}
+
+  if (!response.ok || !result?.ok || !result?.url) {
+    const messages = {
+      usuario_no_autorizado:"Tu sesión venció. Volvé a iniciar sesión.",
+      tipo_de_archivo_no_permitido:"Ese formato todavía no está permitido.",
+      archivo_demasiado_grande:`El archivo supera el límite de ${result?.max_mb || 95} MB.`,
+      origen_no_autorizado:"LiveScroll no pudo validar el origen de la subida.",
+      configuracion_incompleta:"El servidor de archivos todavía no terminó de configurarse."
+    };
+    throw new Error(messages[result?.error] || "No se pudo guardar el archivo en el servidor.");
+  }
+
+  return result;
+}
 
 // ============================================================
 // 5.8.8 · MOBILE STABILITY
@@ -3411,10 +3446,18 @@ async function checkPendingContent() {
       ? pendingResult.value?.data
       : null;
 
-  const history =
+  const rawHistory =
     historyResult.status === "fulfilled" && Array.isArray(historyResult.value?.data)
       ? historyResult.value.data
       : [];
+
+  // La 6 y la 7 comparten backend, pero no comparten relato de versiones.
+  // Cada runtime ve solamente la familia de novedades que le corresponde.
+  const history = rawHistory.filter(entry => {
+    const display = String(entry?.display_version || "");
+    const isVersion7 = /^7(?:\.|$)/.test(display);
+    return isLiveScroll7App() ? isVersion7 : !isVersion7;
+  });
 
   const syncState =
     syncResult.status === "fulfilled" && !syncResult.value?.error
@@ -3562,8 +3605,17 @@ async function checkPendingContent() {
     !window.__lsStartupOptionalModalShown
   ) {
     let entries = Array.isArray(pendingData.changelog_entries)
-      ? [...pendingData.changelog_entries]
+      ? pendingData.changelog_entries.filter(entry => {
+          const display = String(entry?.display_version || "");
+          const isVersion7 = /^7(?:\.|$)/.test(display);
+          return isLiveScroll7App() ? isVersion7 : !isVersion7;
+        })
       : [];
+
+    // El backend compartido puede avisar que existe una versión pendiente de
+    // la otra aplicación. Si este runtime no tiene nada nuevo, no repetimos su
+    // última novedad ni confirmamos contenido ajeno.
+    if (!unseenRows.length && !entries.length) return;
 
     // Historial como respaldo: agregamos versiones no vistas que el backend
     // no haya incluido, evitando duplicados.
@@ -3576,6 +3628,8 @@ async function checkPendingContent() {
       );
       if (!duplicate) entries.push(row);
     });
+
+    if (!entries.length) return;
 
     window.__lsChangelogShownVersion = Math.max(
       latestInternal,
@@ -4769,7 +4823,10 @@ function showChangelogModal(entries) {
   // LiveScroll 7 utiliza una experiencia propia. LiveScroll 6 conserva su
   // cartel clásico y todo el comportamiento de confirmación existente.
   if (isLiveScroll7App()) {
-    showLiveScroll7PulseUpdate(allEntries);
+    const version7Entries = allEntries.filter(entry =>
+      /^7(?:\.|$)/.test(String(entry?.display_version || ""))
+    );
+    if (version7Entries.length) showLiveScroll7PulseUpdate(version7Entries);
     return;
   }
   const secondaryEntries = allEntries.filter(isSecondaryRevisionEntry);
@@ -5112,12 +5169,18 @@ async function openChangelogHistory() {
   };
 
   // Reutiliza el historial que ya pudo cargar el inicio y evita otra consulta igual.
-  const { data: entries, error } = await loadStartupChangelogHistory();
+  const { data: allHistoryEntries, error } = await loadStartupChangelogHistory();
   const list = document.getElementById("changelogHistoryList");
   if (!list) return;
 
+  const entries = (Array.isArray(allHistoryEntries) ? allHistoryEntries : []).filter(entry => {
+    const display = String(entry?.display_version || "");
+    const isVersion7 = /^7(?:\.|$)/.test(display);
+    return isLiveScroll7App() ? isVersion7 : !isVersion7;
+  });
+
   if (error || !entries || !entries.length) {
-    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">Todavía no hay novedades publicadas.</p>`;
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">${isLiveScroll7App() ? "La primera evolución de LiveScroll 7 todavía no fue publicada." : "Todavía no hay novedades publicadas."}</p>`;
     return;
   }
 
@@ -9476,22 +9539,9 @@ async function saveReeditedVideo(file) {
   if (progressText) progressText.textContent = "Subiendo la nueva edición de forma segura...";
   if (progressBar) progressBar.style.width = "35%";
 
-  const extension = file.type.includes("mp4") ? "mp4" : "webm";
-  const stamp = Date.now();
-  const newVideoPath = `${currentUser.id}/revisions/${context.videoId}/${stamp}-revision.${extension}`;
-  const uploadedPaths = [];
-  let mediaCommitted = false;
-
   try {
-  const { error:uploadError } = await sb.storage.from("clip-videos").upload(newVideoPath, file, {
-    cacheControl:"3600",
-    upsert:false,
-    contentType:file.type || undefined
-  });
-  if (uploadError) throw uploadError;
-  uploadedPaths.push(newVideoPath);
-  const { data:videoPublic } = sb.storage.from("clip-videos").getPublicUrl(newVideoPath);
-  const newVideoUrl = videoPublic?.publicUrl;
+  const videoUpload = await uploadMediaToR2(file);
+  const newVideoUrl = videoUpload.url;
   if (!newVideoUrl) throw new Error("No se obtuvo la URL de la nueva edición");
   if (progressBar) progressBar.style.width = "65%";
 
@@ -9499,17 +9549,8 @@ async function saveReeditedVideo(file) {
   try {
     const thumbnailBlob = await createVideoThumbnailBlob(file);
     if (thumbnailBlob) {
-      const thumbPath = `${currentUser.id}/thumbnails/${stamp}-revision.jpg`;
-      const { error:thumbError } = await sb.storage.from("clip-videos").upload(thumbPath, thumbnailBlob, {
-        cacheControl:"3600",
-        contentType:"image/jpeg",
-        upsert:false
-      });
-      if (!thumbError) {
-        uploadedPaths.push(thumbPath);
-        const { data:thumbPublic } = sb.storage.from("clip-videos").getPublicUrl(thumbPath);
-        newThumbnailUrl = thumbPublic?.publicUrl || null;
-      }
+      const thumbUpload = await uploadMediaToR2(thumbnailBlob);
+      newThumbnailUrl = thumbUpload?.url || null;
     }
   } catch (thumbnailError) {
     console.warn("No se pudo crear la nueva carátula:", thumbnailError);
@@ -9522,10 +9563,8 @@ async function saveReeditedVideo(file) {
     p_thumbnail_url:newThumbnailUrl
   });
   if (updateError || !updateResult?.ok) {
-    await sb.storage.from("clip-videos").remove(uploadedPaths).catch(() => {});
     throw updateError || new Error(updateResult?.error || "No se pudo guardar la edición");
   }
-  mediaCommitted = true;
   if (progressBar) progressBar.style.width = "100%";
 
   const oldPaths = [
@@ -9546,9 +9585,6 @@ async function saveReeditedVideo(file) {
   showToast(`✂️ “${editedTitle}” fue reeditado sin perder sus interacciones`);
   await renderProfile();
   } catch (error) {
-    if (!mediaCommitted && uploadedPaths.length) {
-      await sb.storage.from("clip-videos").remove(uploadedPaths).catch(() => {});
-    }
     throw error;
   }
 }
@@ -9956,38 +9992,23 @@ async function handleUploadFile() {
   btn.textContent = "Subiendo...";
   document.getElementById("uploadProgress").classList.remove("hidden");
 
-  const path = `${currentUser.id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-
-  const { error: uploadError } = await sb.storage.from("clip-videos").upload(path, file, {
-    cacheControl: "3600",
-    upsert: false
-  });
-
-  if (uploadError) {
+  let videoUpload;
+  try {
+    videoUpload = await uploadMediaToR2(file);
+  } catch (uploadError) {
     errEl.textContent = "Error al subir: " + uploadError.message;
     btn.disabled = false;
     btn.textContent = "Publicar video";
     return;
   }
 
-  const { data: publicUrlData } = sb.storage.from("clip-videos").getPublicUrl(path);
-
   let thumbnailUrl = null;
   try {
     const thumbnailBlob = await createVideoThumbnailBlob(file);
 
     if (thumbnailBlob) {
-      const thumbPath = `${currentUser.id}/thumbnails/${Date.now()}-thumb.jpg`;
-      const { error: thumbUploadError } = await sb.storage.from("clip-videos").upload(thumbPath, thumbnailBlob, {
-        cacheControl: "3600",
-        contentType: "image/jpeg",
-        upsert: false
-      });
-
-      if (!thumbUploadError) {
-        const { data: thumbPublic } = sb.storage.from("clip-videos").getPublicUrl(thumbPath);
-        thumbnailUrl = thumbPublic?.publicUrl || null;
-      }
+      const thumbUpload = await uploadMediaToR2(thumbnailBlob);
+      thumbnailUrl = thumbUpload?.url || null;
     }
   } catch (thumbErr) {
     console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
@@ -9997,7 +10018,7 @@ async function handleUploadFile() {
     user_id: currentUser.id,
     platform: "upload",
     title,
-    video_url: publicUrlData.publicUrl,
+    video_url: videoUpload.url,
     thumbnail_url: thumbnailUrl
   }).select("id").single();
 

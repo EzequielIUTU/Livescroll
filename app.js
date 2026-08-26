@@ -1392,14 +1392,23 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const [profileResult, statusResult, creatorResult] = await Promise.all([
+  const [profileResult, statusResult, creatorResult, ls7CustomizationResult] = await Promise.all([
     sb.rpc("get_my_profile_data"),
     sb.rpc("get_my_status"),
-    sb.rpc("get_my_creator_access")
+    sb.rpc("get_my_creator_access"),
+    isLiveScroll7App()
+      ? sb.rpc("get_my_ls7_profile_customization")
+      : Promise.resolve({ data:null, error:null })
   ]);
 
   if (!profileResult.error && profileResult.data?.ok) {
     currentProfile = profileResult.data.profile;
+    if (!ls7CustomizationResult?.error && ls7CustomizationResult?.data?.ok) {
+      currentProfile.profile_featured_video_id = ls7CustomizationResult.data.profile_featured_video_id || null;
+      currentProfile.profile_visual_style = ["electric","cosmic","minimal"].includes(ls7CustomizationResult.data.profile_visual_style)
+        ? ls7CustomizationResult.data.profile_visual_style
+        : "electric";
+    }
   } else {
     console.error("No se pudo cargar el perfil privado:", profileResult.error || profileResult.data?.error);
     currentProfile = null;
@@ -11409,8 +11418,10 @@ async function saveLiveScroll7ProfileCustomization() {
     showToast(data.error === "video_invalido" ? "Ese video no pertenece a tu perfil." : "No se pudo guardar el perfil.");
     return;
   }
-  currentProfile.profile_featured_video_id = featuredVideoId;
-  currentProfile.profile_visual_style = visualStyle;
+  currentProfile.profile_featured_video_id = data?.profile_featured_video_id || featuredVideoId;
+  currentProfile.profile_visual_style = ["electric","cosmic","minimal"].includes(data?.profile_visual_style)
+    ? data.profile_visual_style
+    : visualStyle;
   closeLiveScroll7ProfileCustomizer();
   showToast("Perfil Vivo actualizado");
   renderProfile();
@@ -17863,8 +17874,11 @@ function ensureLiveScroll7ElectricIdentity() {
     html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-cosmic { border-color:rgba(181,117,255,.34);background:radial-gradient(circle at 82% 2%,rgba(175,103,255,.24),transparent 34%),radial-gradient(circle at 8% 82%,rgba(37,136,255,.14),transparent 35%),linear-gradient(145deg,#100a2c,#050717 66%,#071a35); }
     html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-minimal { border-color:rgba(174,203,225,.15);background:linear-gradient(155deg,#0b1019,#05070c);box-shadow:0 18px 45px rgba(0,0,0,.32)!important; }
     html.ls7-app-runtime .ls7-living-profile.ls7-profile-style-minimal::after { display:none; }
-    html.ls7-app-runtime .ls7-profile-customizer-overlay { background:rgba(1,4,12,.88);backdrop-filter:blur(12px); }
-    html.ls7-app-runtime .ls7-profile-customizer-box { width:min(520px,100%);border:1px solid rgba(57,231,255,.28);border-radius:26px;background:linear-gradient(155deg,#07172b,#090719 72%,#150b2b);box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 50px rgba(37,136,255,.10); }
+    html.ls7-app-runtime .ls7-profile-customizer-overlay { align-items:flex-start;justify-content:center;padding:clamp(24px,6vh,58px) 12px max(76px,calc(env(safe-area-inset-bottom) + 64px));background:rgba(1,4,12,.88);backdrop-filter:blur(12px);overflow:hidden; }
+    html.ls7-app-runtime .ls7-profile-customizer-box { width:min(520px,100%);max-height:calc(100dvh - max(116px,calc(env(safe-area-inset-bottom) + 102px)));display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(57,231,255,.28);border-radius:26px;background:linear-gradient(155deg,#07172b,#090719 72%,#150b2b);box-shadow:0 30px 90px rgba(0,0,0,.65),0 0 50px rgba(37,136,255,.10); }
+    html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-head { flex:0 0 auto; }
+    html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-body { flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:18px; }
+    html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-actions { position:relative;z-index:2;flex:0 0 auto;margin:0;padding:12px 16px max(15px,env(safe-area-inset-bottom));border-top:1px solid rgba(57,231,255,.14);background:linear-gradient(180deg,rgba(7,13,31,.96),#080b1c);box-shadow:0 -12px 25px rgba(1,4,12,.34); }
     html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-head small { color:#57eaff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.16em; }
     html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-head h2 { margin:4px 0 0; }
     html.ls7-app-runtime .ls7-customizer-label { display:block;margin:5px 0 7px;color:#9fb9d2;font:850 8px 'JetBrains Mono',monospace;letter-spacing:.10em;text-transform:uppercase; }
@@ -17891,7 +17905,7 @@ function ensureLiveScroll7ElectricIdentity() {
     @keyframes ls7EmblemFloat { 0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-6px) rotate(2deg)} }
     @keyframes ls7LivingOrbit { to{transform:rotate(360deg)} }
     @keyframes ls7SignalPulse { 50%{opacity:.4;transform:scale(.75)} }
-    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; }html.ls7-app-runtime .ls7-living-profile{padding:14px;border-radius:22px}html.ls7-app-runtime .ls7-living-grid{grid-template-columns:1fr}html.ls7-app-runtime .ls7-featured-video{min-height:230px}html.ls7-app-runtime .ls7-live-data{display:grid;grid-template-columns:1fr 1fr}html.ls7-app-runtime .ls7-live-data>div:first-child,html.ls7-app-runtime .ls7-live-data>p{grid-column:1/-1}html.ls7-app-runtime .ls7-style-picker{grid-template-columns:1fr}html.ls7-app-runtime .ls7-style-picker button{min-height:64px}html.ls7-app-runtime .ls7-living-head{align-items:flex-start}html.ls7-app-runtime .ls7-living-head-actions{flex-direction:column;align-items:flex-end} }
+    @media(max-width:700px) { html.ls7-app-runtime .ls7-electric-profile { border-radius:22px!important; }html.ls7-app-runtime .ls7-profile-emblem { width:56px;height:56px;top:116px;right:11px; }html.ls7-app-runtime .ls7-living-profile{padding:14px;border-radius:22px}html.ls7-app-runtime .ls7-living-grid{grid-template-columns:1fr}html.ls7-app-runtime .ls7-featured-video{min-height:230px}html.ls7-app-runtime .ls7-live-data{display:grid;grid-template-columns:1fr 1fr}html.ls7-app-runtime .ls7-live-data>div:first-child,html.ls7-app-runtime .ls7-live-data>p{grid-column:1/-1}html.ls7-app-runtime .ls7-style-picker{grid-template-columns:1fr}html.ls7-app-runtime .ls7-style-picker button{min-height:64px}html.ls7-app-runtime .ls7-living-head{align-items:flex-start}html.ls7-app-runtime .ls7-living-head-actions{flex-direction:column;align-items:flex-end}html.ls7-app-runtime .ls7-profile-customizer-overlay{padding-top:max(20px,calc(env(safe-area-inset-top) + 14px));padding-bottom:max(82px,calc(env(safe-area-inset-bottom) + 70px))}html.ls7-app-runtime .ls7-profile-customizer-box{max-height:calc(100dvh - max(122px,calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + 100px)));border-radius:22px}html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-actions{display:grid;grid-template-columns:.8fr 1.2fr;gap:9px}html.ls7-app-runtime .ls7-profile-customizer-box .modal-box-actions button{min-height:50px} }
     @media(prefers-reduced-motion:reduce) { html.ls7-app-runtime .ls7-electric-profile::before,html.ls7-app-runtime .ls7-profile-emblem,html.ls7-app-runtime .ls7-electric-update-logo { animation:none!important; } }
   `;
   document.head.appendChild(style);

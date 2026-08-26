@@ -4661,9 +4661,117 @@ function cleanChangelogContent(content) {
   return value;
 }
 
+function showLiveScroll7PulseUpdate(entries) {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const categoryMeta = {
+    nuevo:{ label:"NUEVO", icon:"✦", color:"#ff435c" },
+    actualizado:{ label:"EVOLUCIÓN", icon:"↗", color:"#f4c95d" },
+    emergencia:{ label:"ALERTA RESUELTA", icon:"!", color:"#fb923c" },
+    reparado:{ label:"ESTABILIZADO", icon:"✓", color:"#7dd3fc" },
+    proximamente:{ label:"PRÓXIMA EVOLUCIÓN", icon:"◌", color:"#c4b5fd" }
+  };
+  const byVersion = {};
+
+  (Array.isArray(entries) ? entries : []).forEach(entry => {
+    const internal = Number(entry.version || 0);
+    if (!byVersion[internal]) {
+      byVersion[internal] = {
+        display:String(entry.display_version || `${internal}.0.0`),
+        releaseDate:entry.release_date || null,
+        lines:[]
+      };
+    }
+    const content = cleanChangelogContent(entry.content);
+    const duplicate = byVersion[internal].lines.some(line =>
+      line.category === entry.category && line.content === content
+    );
+    if (content && !duplicate) {
+      byVersion[internal].lines.push({ category:String(entry.category || "actualizado"), content });
+    }
+  });
+
+  const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
+  const newest = versions.at(-1) || 0;
+  const newestLabel = byVersion[newest]?.display || "7";
+  const multipleVersions = versions.length > 1;
+  const totalSignals = versions.reduce((sum, version) => sum + byVersion[version].lines.length, 0);
+  window.__lsChangelogShownVersion = Math.max(Number(window.__lsChangelogShownVersion || 0), newest);
+
+  const formatDate = value => {
+    if (!value) return "";
+    const date = new Date(`${value}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("es-AR", { day:"2-digit", month:"short", year:"numeric" });
+  };
+
+  wrap.innerHTML = `
+    <div id="changelogOverlay" class="ls7-pulse-update-overlay ls-modal-locked" data-modal-locked="1">
+      <div class="ls7-pulse-update-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div id="changelogBox" class="ls7-pulse-update-box">
+        <div class="ls7-pulse-update-scan" aria-hidden="true"></div>
+        <header class="ls7-pulse-update-head">
+          <div class="ls7-pulse-update-core" aria-hidden="true">
+            <span>7</span><i></i><b></b>
+          </div>
+          <div class="ls7-pulse-update-copy">
+            <div class="ls7-pulse-update-kicker"><i></i> EVOLUCIÓN DE LIVESCROLL 7</div>
+            <h2>${multipleVersions ? "LiveScroll 7 evolucionó" : "Nueva evolución disponible"}</h2>
+            <p>${multipleVersions
+              ? `Hay nuevas mejoras esperando por vos. Reunimos ${versions.length} etapas y ${totalSignals} cambios desde tu última visita.`
+              : `Hay nuevas mejoras esperando por vos. La experiencia avanzó a ${escapeHtml(newestLabel)}.`}</p>
+          </div>
+        </header>
+
+        <div class="ls7-pulse-update-progress" aria-hidden="true"><span></span><i></i><b></b></div>
+
+        <div class="ls7-pulse-update-body">
+          ${versions.map((version, versionIndex) => {
+            const info = byVersion[version];
+            return `
+              <section class="ls7-pulse-update-version" style="--pulse-delay:${versionIndex * 85}ms">
+                <div class="ls7-pulse-update-version-head">
+                  <div>
+                    <small>ETAPA ${String(versionIndex + 1).padStart(2,"0")}</small>
+                    <strong>LiveScroll ${escapeHtml(info.display)}</strong>
+                  </div>
+                  <div>
+                    ${info.releaseDate ? `<time>${escapeHtml(formatDate(info.releaseDate))}</time>` : ""}
+                    ${version === newest ? `<span>ACTUAL</span>` : ""}
+                  </div>
+                </div>
+                <div class="ls7-pulse-update-lines">
+                  ${info.lines.map((line, lineIndex) => {
+                    const meta = categoryMeta[line.category] || { label:String(line.category || "CAMBIO").toUpperCase(), icon:"•", color:"#a3a3a3" };
+                    return `
+                      <div class="ls7-pulse-update-line" style="--line-color:${meta.color};--line-delay:${(versionIndex * 85) + (lineIndex * 45)}ms">
+                        <span>${meta.icon}</span>
+                        <div><small>${escapeHtml(meta.label)}</small><p>${escapeHtml(line.content)}</p></div>
+                      </div>`;
+                  }).join("")}
+                </div>
+              </section>`;
+          }).join("")}
+        </div>
+
+        <footer class="ls7-pulse-update-foot">
+          <button onclick="handleAcceptChangelog()"><span>Descubrir los cambios</span><b>→</b></button>
+          <small>LIVE<span>SCROLL</span> 7 · TU EXPERIENCIA SIGUE EVOLUCIONANDO</small>
+        </footer>
+      </div>
+    </div>`;
+}
+
 function showChangelogModal(entries) {
   applyLiveScrollSettings();
   const allEntries = Array.isArray(entries) ? entries : [];
+
+  // LiveScroll 7 utiliza una experiencia propia. LiveScroll 6 conserva su
+  // cartel clásico y todo el comportamiento de confirmación existente.
+  if (isLiveScroll7App()) {
+    showLiveScroll7PulseUpdate(allEntries);
+    return;
+  }
   const secondaryEntries = allEntries.filter(isSecondaryRevisionEntry);
 
   // Si este aviso corresponde SOLO a una revisión secundaria,
@@ -4976,13 +5084,14 @@ async function openChangelogHistory() {
   applyLiveScrollSettings();
   const wrap = document.getElementById("globalModalWrap");
   wrap.innerHTML = `
-    <div class="modal-overlay ls-modal-locked" style="z-index:100;backdrop-filter:none;-webkit-backdrop-filter:none;" data-modal-locked="1">
-      <div class="modal-box" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+    <div class="modal-overlay ls-modal-locked${isLiveScroll7App() ? " ls7-pulse-archive-overlay" : ""}" style="z-index:100;backdrop-filter:none;-webkit-backdrop-filter:none;" data-modal-locked="1">
+      <div class="modal-box${isLiveScroll7App() ? " ls7-pulse-archive-box" : ""}" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
         <div class="modal-box-header">
           <div>
-            <h2 style="margin:0;">📢 Novedades</h2>
+            ${isLiveScroll7App() ? `<div class="ls7-pulse-archive-kicker"><i></i> LIVESCROLL 7</div>` : ""}
+            <h2 style="margin:0;">${isLiveScroll7App() ? "Historial de Evolución" : "📢 Novedades"}</h2>
             <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
-              Versiones y revisiones publicadas
+              ${isLiveScroll7App() ? "Hay nuevas mejoras esperando por vos." : "Versiones y revisiones publicadas"}
             </div>
           </div>
           <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
@@ -5185,7 +5294,7 @@ async function openChangelogHistory() {
     const dateText = formatReleaseDate(info.releaseDate);
 
     return `
-      <section class="ls-changelog-history-version" style="
+      <section class="ls-changelog-history-version${isLiveScroll7App() ? " ls7-pulse-archive-version" : ""}" style="
         margin-bottom:18px;
         padding-bottom:18px;
         border-bottom:1px solid var(--border);
@@ -5222,8 +5331,8 @@ async function openChangelogHistory() {
             ? `<span style="
                 font-size:9px;
                 font-weight:900;
-                color:#12130f;
-                background:var(--green);
+                color:${isLiveScroll7App() ? "#fff" : "#12130f"};
+                background:${isLiveScroll7App() ? "linear-gradient(135deg,#ff2345,#a70020)" : "var(--green)"};
                 padding:3px 8px;
                 border-radius:20px;
                 letter-spacing:.04em;

@@ -6182,6 +6182,31 @@ function renderFastSkeleton(lines = 5, type = "generic") {
   return `<div class="ls-fast-skeleton">${Array.from({length:lines}, () => "<i></i>").join("")}</div>`;
 }
 
+function renderRuntimeShareButton(video) {
+  const videoId = escapeHtml(String(video?.id || ""));
+  const encodedUrl = encodeURIComponent(video?.video_url || "");
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${videoId}', '${encodedUrl}')">🔗</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${videoId}', '${encodedUrl}')"><span>↗</span><i>ENVIAR</i></button>`;
+}
+
+function renderRuntimeHideButton(videoId) {
+  const safeId = escapeHtml(String(videoId || ""));
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${safeId}')">🙈</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-hide" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${safeId}')"><span>−</span><i>OCULTAR</i></button>`;
+}
+
+function renderRuntimeReportButton(videoId) {
+  const safeId = escapeHtml(String(videoId || ""));
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${safeId}')">🚩</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${safeId}')"><span>!</span><i>REPORTE</i></button>`;
+}
+
 function lsCacheFresh(entry, maxAgeMs) {
   return !!entry?.data && (Date.now() - entry.at) < maxAgeMs;
 }
@@ -6638,9 +6663,9 @@ async function renderFeed(renderToken = lsTabRenderToken) {
             <div class="feed-actions">
               <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
               <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-              <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
-              ${!isMine ? `<button class="feed-action-btn ls7-action-hide" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${v.id}')"><span>−</span><i>OCULTAR</i></button>` : ""}
-              ${!isMine ? `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')"><span>!</span><i>REPORTE</i></button>` : ""}
+              ${renderRuntimeShareButton(v)}
+              ${!isMine ? renderRuntimeHideButton(v.id) : ""}
+              ${!isMine ? renderRuntimeReportButton(v.id) : ""}
             </div>
             <div class="feed-overlay">
               <div>
@@ -7015,8 +7040,8 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
               <div class="feed-actions">
                 <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
                 <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-                <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
-                ${!isMine ? `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${v.id}')"><span>!</span><i>REPORTE</i></button>` : ""}
+                ${renderRuntimeShareButton(v)}
+                ${!isMine ? renderRuntimeReportButton(v.id) : ""}
               </div>
               <div class="feed-overlay">
                 <div>
@@ -11479,7 +11504,7 @@ async function renderForYou(renderToken = lsTabRenderToken) {
             <div class="feed-actions">
               <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
               <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
-              <button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${v.id}', '${encodeURIComponent(v.video_url)}')"><span>↗</span><i>ENVIAR</i></button>
+              ${renderRuntimeShareButton(v)}
             </div>
             <div class="feed-overlay">
               <div>

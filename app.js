@@ -3595,19 +3595,6 @@ async function checkPendingContent() {
       ? historyResult.value.data
       : [];
 
-  // La 6 y la 7 comparten backend, pero no comparten relato de versiones.
-  // Cada runtime ve solamente la familia de novedades que le corresponde.
-  const history = rawHistory.filter(entry => {
-    const display = String(entry?.display_version || "");
-    const isVersion7 = /^7(?:\.|$)/.test(display);
-    return isLiveScroll7App() ? isVersion7 : !isVersion7;
-  });
-
-  const syncState =
-    syncResult.status === "fulfilled" && !syncResult.value?.error
-      ? (syncResult.value?.data || {})
-      : {};
-
   const semverParts = (value) => String(value || "0.0.0")
     .split(".")
     .map(n => Number.parseInt(n, 10) || 0);
@@ -3623,6 +3610,20 @@ async function checkPendingContent() {
     }
     return 0;
   };
+
+  // La 6 y la 7 comparten backend, pero no comparten relato de versiones.
+  // Cada runtime ve solamente la familia de novedades que le corresponde.
+  const history = rawHistory.filter(entry => {
+    const display = String(entry?.display_version || "");
+    const isVersion7 = /^7(?:\.|$)/.test(display);
+    if (isLiveScroll7App()) return isVersion7;
+    return !isVersion7 && compareSemver(display, "6.1.2") >= 0;
+  });
+
+  const syncState =
+    syncResult.status === "fulfilled" && !syncResult.value?.error
+      ? (syncResult.value?.data || {})
+      : {};
 
   const latestInternal = history.reduce(
     (max, e) => Math.max(max, Number(e.version || 0)),
@@ -3749,10 +3750,11 @@ async function checkPendingContent() {
     !window.__lsStartupOptionalModalShown
   ) {
     let entries = Array.isArray(pendingData.changelog_entries)
-      ? pendingData.changelog_entries.filter(entry => {
+        ? pendingData.changelog_entries.filter(entry => {
           const display = String(entry?.display_version || "");
           const isVersion7 = /^7(?:\.|$)/.test(display);
-          return isLiveScroll7App() ? isVersion7 : !isVersion7;
+          if (isLiveScroll7App()) return isVersion7;
+          return !isVersion7 && compareSemver(display, "6.1.2") >= 0;
         })
       : [];
 
@@ -5188,7 +5190,10 @@ function showChangelogModal(entries) {
     "5.9.9":"VIDEO REVISION",
     "6.0.0":"NEW ERA",
     "6.0.1v":"CORE REVIEW",
-    "6.0.2v":"ANDROID READY"
+    "6.0.2v":"ANDROID READY",
+    "6.1.2":"NUBE LIVESCROLL",
+    "6.1.3":"ACTUALIZACIÓN EN VIVO",
+    "6.1.4":"CONEXIÓN CONTINUA"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
 
@@ -5262,7 +5267,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : newestLabel.startsWith("6.") ? "Continuar en LiveScroll 6 →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">5.4.6 → 5.5.7 → 5.6.8 → 5.7.9 → 5.8.0 → 5.8.1 → 5.8.2 → 5.9.0 → 5.9.1 → 5.9.2 → 5.9.3 → 5.9.4 → 5.9.5 → 5.9.6 → 5.9.7 → 5.9.8 → 5.9.9 → 6.0.0 → 6.0.1v → 6.0.2v</div>
+          <div class="ls-next-era-road">6.1.2 NUBE LIVESCROLL → 6.1.3 ACTUALIZACIÓN EN VIVO → 6.1.4 CONEXIÓN CONTINUA</div>
         </div>
       </div>
     </div>`;

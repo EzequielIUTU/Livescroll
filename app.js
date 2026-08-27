@@ -3434,7 +3434,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60106;
+const LIVESCROLL6_CLIENT_BUILD = 60107;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -3526,7 +3526,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70005;
+const LIVESCROLL7_CLIENT_BUILD = 70006;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -12136,6 +12136,7 @@ function closeLiveScrollTwitchPlayer() {
   if (lsLiveChatChannel) sb.removeChannel(lsLiveChatChannel);
   lsLiveChatChannel = null;
   lsLiveChatUserId = null;
+  window.__lsActiveTwitchPlayer = null;
   document.getElementById("lsTwitchLivePlayer")?.remove();
   document.body.classList.remove("ls-live-player-open");
 }
@@ -12210,6 +12211,41 @@ function switchLiveChatMode(mode) {
   document.getElementById("lsChatTabTwitch")?.classList.toggle("active", twitch);
 }
 
+function mountInteractiveTwitchPlayer(channel, parent) {
+  const start = () => {
+    const target = document.getElementById("lsInteractiveTwitchPlayer");
+    if (!target || !window.Twitch?.Player) return;
+    try {
+      const player = new window.Twitch.Player("lsInteractiveTwitchPlayer", {
+        channel,
+        parent:[parent],
+        width:"100%",
+        height:"100%",
+        autoplay:true,
+        muted:true
+      });
+      player.addEventListener(window.Twitch.Player.READY, () => {
+        try { player.setMuted(true); player.play(); } catch (_) {}
+        setTimeout(() => { try { player.play(); } catch (_) {} }, 450);
+      });
+      window.__lsActiveTwitchPlayer = player;
+    } catch (error) {
+      console.warn("No se pudo iniciar el reproductor interactivo:", error);
+    }
+  };
+
+  if (window.Twitch?.Player) { start(); return; }
+  let script = document.getElementById("lsTwitchPlayerSdk");
+  if (!script) {
+    script = document.createElement("script");
+    script.id = "lsTwitchPlayerSdk";
+    script.src = "https://player.twitch.tv/js/embed/v1.js";
+    script.async = true;
+    document.head.appendChild(script);
+  }
+  script.addEventListener("load", start, { once:true });
+}
+
 async function sendLiveScrollChatMessage(event) {
   event?.preventDefault?.();
   if (!currentUser?.id || !lsLiveChatUserId) return;
@@ -12251,11 +12287,7 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
       </header>
       <div class="ls-live-player-content">
         <div class="ls-live-player-video">
-          <iframe
-            src="https://player.twitch.tv/?channel=${encodeURIComponent(safeChannel)}&parent=${encodeURIComponent(parent)}&autoplay=true&muted=true"
-            title="Directo de ${escapeHtml(username || safeChannel)}"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowfullscreen></iframe>
+          <div id="lsInteractiveTwitchPlayer" class="ls-interactive-twitch-player" aria-label="Directo de ${escapeHtml(username || safeChannel)}"></div>
           <div class="ls-live-autoplay-note">El directo inicia silenciado · tocá el sonido en el reproductor</div>
         </div>
         <aside class="ls-live-chat">
@@ -12286,6 +12318,7 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
   });
   document.body.appendChild(overlay);
   document.body.classList.add("ls-live-player-open");
+  mountInteractiveTwitchPlayer(safeChannel, parent);
   loadLiveScrollChat(safeLiveUserId);
   subscribeLiveScrollChat(safeLiveUserId);
 }
@@ -12302,12 +12335,12 @@ function ensureLiveScrollTwitchPlayerStyles() {
   style.textContent = `
     body.ls-live-player-open{overflow:hidden}
     .ls-live-player-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));background:rgba(1,4,12,.88);backdrop-filter:blur(12px)}
-    .ls-live-player-panel{width:min(1120px,100%);max-height:100%;overflow:auto;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
+    .ls-live-player-panel{width:min(1120px,100%);max-height:100%;overflow:hidden;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
     .ls-live-player-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid rgba(255,255,255,.08)}
     .ls-live-player-panel header>div{display:flex;align-items:center;gap:8px}.ls-live-player-panel header strong{font-size:12px;color:#ff496f;letter-spacing:.12em}.ls-live-player-panel header small{color:#d9dce6;font-weight:800}
     .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
     .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
-    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
+    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-interactive-twitch-player,.ls-interactive-twitch-player iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
     .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
     .ls-live-chat-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px;background:#060913;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-tabs button{min-height:34px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:#0d1220;color:#949bad;font-size:9px;font-weight:900}.ls-live-chat-tabs button.active{border-color:rgba(145,70,255,.55);background:rgba(145,70,255,.18);color:#fff}.ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-live-chat-pane.hidden{display:none!important}.ls-twitch-chat-frame{width:100%;min-height:410px;flex:1;border:0;background:#0e0e10}
     .ls-live-chat-messages{flex:1;min-height:220px;max-height:460px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}.ls-live-chat-message{padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;line-height:1.35}.ls-live-chat-message.own{background:rgba(145,70,255,.15)}.ls-live-chat-message strong{display:block;margin-bottom:2px;color:#c7a8ff;font-size:9px}.ls-live-chat-message span{color:#eef0f6;overflow-wrap:anywhere}.ls-live-chat-empty{margin:auto;padding:18px;color:#7f8798;text-align:center;font-size:9px}
@@ -12320,7 +12353,7 @@ function ensureLiveScrollTwitchPlayerStyles() {
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
     @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
     html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
-    @media(max-width:760px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0}.ls-live-player-panel{margin-top:3vh;border-radius:18px 18px 0 0}.ls-live-player-content{grid-template-columns:1fr}.ls-live-chat{border-left:0;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-messages{min-height:190px;max-height:32dvh}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
+    @media(max-width:760px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0;overflow-y:auto}.ls-live-player-panel{margin-top:3vh;border-radius:18px 18px 0 0;overflow:visible}.ls-live-player-content{grid-template-columns:1fr}.ls-live-chat{border-left:0;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-messages{min-height:190px;max-height:32dvh}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
   `;
   document.head.appendChild(style);
 }
@@ -13240,6 +13273,13 @@ async function loadNotifications() {
   notifCache = data || [];
   updateNotificationBadge();
   if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+  if (!window.__lsLiveStartupAlertShown) {
+    const recentLive = notifCache.find(n => n.type === "live" && !n.read && Date.now() - new Date(n.created_at).getTime() < 3 * 60 * 1000);
+    if (recentLive) {
+      window.__lsLiveStartupAlertShown = true;
+      showLiveStartAnimation(recentLive);
+    }
+  }
 }
 
 function subscribeToNotifications() {

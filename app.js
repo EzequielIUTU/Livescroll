@@ -3434,7 +3434,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60105;
+const LIVESCROLL6_CLIENT_BUILD = 60106;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -3526,7 +3526,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70004;
+const LIVESCROLL7_CLIENT_BUILD = 70005;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -11863,15 +11863,48 @@ async function handleLike(videoId) {
 
 async function handleShare(videoId, url) {
   const shareUrl = `${window.location.origin}${window.location.pathname}?video=${videoId}`;
+  let shared = false;
   if (navigator.share) {
-    try { await navigator.share({ title: "Mirá este clip en LiveScroll", url: shareUrl }); } catch (e) { /* cancelado, seguimos igual */ }
+    try {
+      const { data:video } = await sb.from("videos")
+        .select("title,thumbnail_url,profiles!videos_user_id_fkey(username)")
+        .eq("id",videoId).maybeSingle();
+      const title = video?.title || "Mirá este video en LiveScroll";
+      const creator = video?.profiles?.username ? ` de @${video.profiles.username}` : "";
+      const shareData = { title, text:`Mirá “${title}”${creator} en LiveScroll`, url:shareUrl };
+
+      if (video?.thumbnail_url && isSafeUrl(video.thumbnail_url) && window.File && navigator.canShare) {
+        try {
+          const response = await fetch(video.thumbnail_url, { cache:"no-store" });
+          if (response.ok) {
+            const blob = await response.blob();
+            const extension = blob.type.includes("png") ? "png" : "jpg";
+            const cover = new File([blob], `livescroll-portada-${videoId}.${extension}`, { type:blob.type || "image/jpeg" });
+            if (navigator.canShare({ files:[cover] })) shareData.files = [cover];
+          }
+        } catch (_) {}
+      }
+
+      try {
+        await navigator.share(shareData);
+      } catch (shareError) {
+        if (shareError?.name === "AbortError" || !shareData.files) throw shareError;
+        delete shareData.files;
+        await navigator.share(shareData);
+      }
+      shared = true;
+    } catch (e) {
+      if (e?.name !== "AbortError") showToast("No pudimos abrir el menú para compartir.", "error");
+    }
   } else {
     try {
       await navigator.clipboard.writeText(shareUrl);
       showToast("Link copiado para compartir");
+      shared = true;
     } catch (e) { /* nada */ }
   }
 
+  if (!shared) return;
   const { data, error } = await sb.rpc("give_share", { p_video_id: videoId, p_user_id: currentUser.id });
   if (error || !data.ok) return; // ya compartido antes, o tope diario: no molestamos con error
   currentProfile.points_balance += data.points;
@@ -12115,6 +12148,29 @@ function renderLiveChatMessage(message) {
   </article>`;
 }
 
+function playLiveScrollChatSound() {
+  if (!isNotificationSoundEnabled() || document.hidden) return;
+  try {
+    const AudioEngine = window.AudioContext || window.webkitAudioContext;
+    if (!AudioEngine) return;
+    notifSoundContext = notifSoundContext || new AudioEngine();
+    const ctx = notifSoundContext;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    [760, 1040].forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(frequency, now + index * .07);
+      gain.gain.setValueAtTime(.0001, now + index * .07);
+      gain.gain.exponentialRampToValueAtTime(.075, now + .02 + index * .07);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + .16 + index * .07);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(now + index * .07); osc.stop(now + .19 + index * .07);
+    });
+  } catch (_) {}
+}
+
 async function loadLiveScrollChat(liveUserId) {
   const list = document.getElementById("lsLiveChatMessages");
   if (!list) return;
@@ -12142,7 +12198,16 @@ function subscribeLiveScrollChat(liveUserId) {
       list.querySelector(".ls-live-chat-empty")?.remove();
       list.insertAdjacentHTML("beforeend", renderLiveChatMessage(payload.new));
       list.scrollTop = list.scrollHeight;
+      if (payload.new?.sender_id !== currentUser?.id) playLiveScrollChatSound();
     }).subscribe();
+}
+
+function switchLiveChatMode(mode) {
+  const twitch = mode === "twitch";
+  document.getElementById("lsLiveScrollChatPane")?.classList.toggle("hidden", twitch);
+  document.getElementById("lsTwitchChatPane")?.classList.toggle("hidden", !twitch);
+  document.getElementById("lsChatTabLiveScroll")?.classList.toggle("active", !twitch);
+  document.getElementById("lsChatTabTwitch")?.classList.toggle("active", twitch);
 }
 
 async function sendLiveScrollChatMessage(event) {
@@ -12194,12 +12259,21 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
           <div class="ls-live-autoplay-note">El directo inicia silenciado · tocá el sonido en el reproductor</div>
         </div>
         <aside class="ls-live-chat">
-          <div class="ls-live-chat-head"><strong>Chat de LiveScroll</strong><span>EN VIVO</span></div>
-          <div id="lsLiveChatMessages" class="ls-live-chat-messages"><div class="ls-live-chat-empty">Conectando chat…</div></div>
-          <form class="ls-live-chat-compose" onsubmit="sendLiveScrollChatMessage(event)">
-            <input id="lsLiveChatInput" maxlength="240" autocomplete="off" placeholder="Escribí un mensaje…" aria-label="Mensaje para el chat">
-            <button id="lsLiveChatSend" type="submit" aria-label="Enviar mensaje">➤</button>
-          </form>
+          <div class="ls-live-chat-tabs">
+            <button id="lsChatTabLiveScroll" type="button" class="active" onclick="switchLiveChatMode('livescroll')">LiveScroll</button>
+            <button id="lsChatTabTwitch" type="button" onclick="switchLiveChatMode('twitch')">Twitch oficial</button>
+          </div>
+          <div id="lsLiveScrollChatPane" class="ls-live-chat-pane">
+            <div class="ls-live-chat-head"><strong>Chat de LiveScroll</strong><span>EN VIVO</span></div>
+            <div id="lsLiveChatMessages" class="ls-live-chat-messages"><div class="ls-live-chat-empty">Conectando chat…</div></div>
+            <form class="ls-live-chat-compose" onsubmit="sendLiveScrollChatMessage(event)">
+              <input id="lsLiveChatInput" maxlength="240" autocomplete="off" placeholder="Escribí un mensaje…" aria-label="Mensaje para el chat">
+              <button id="lsLiveChatSend" type="submit" aria-label="Enviar mensaje">➤</button>
+            </form>
+          </div>
+          <div id="lsTwitchChatPane" class="ls-live-chat-pane hidden">
+            <iframe class="ls-twitch-chat-frame" src="https://www.twitch.tv/embed/${encodeURIComponent(safeChannel)}/chat?parent=${encodeURIComponent(parent)}&darkpopout" title="Chat oficial de Twitch"></iframe>
+          </div>
         </aside>
       </div>
       <footer>
@@ -12219,6 +12293,7 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
 window.openLiveScrollTwitchPlayer = openLiveScrollTwitchPlayer;
 window.closeLiveScrollTwitchPlayer = closeLiveScrollTwitchPlayer;
 window.sendLiveScrollChatMessage = sendLiveScrollChatMessage;
+window.switchLiveChatMode = switchLiveChatMode;
 
 function ensureLiveScrollTwitchPlayerStyles() {
   if (document.getElementById("lsTwitchLivePlayerStyles")) return;
@@ -12232,13 +12307,18 @@ function ensureLiveScrollTwitchPlayerStyles() {
     .ls-live-player-panel header>div{display:flex;align-items:center;gap:8px}.ls-live-player-panel header strong{font-size:12px;color:#ff496f;letter-spacing:.12em}.ls-live-player-panel header small{color:#d9dce6;font-weight:800}
     .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
     .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
-    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 310px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
+    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-live-player-video iframe{position:absolute;inset:0;width:100%;height:100%;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
     .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
+    .ls-live-chat-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px;background:#060913;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-tabs button{min-height:34px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:#0d1220;color:#949bad;font-size:9px;font-weight:900}.ls-live-chat-tabs button.active{border-color:rgba(145,70,255,.55);background:rgba(145,70,255,.18);color:#fff}.ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-live-chat-pane.hidden{display:none!important}.ls-twitch-chat-frame{width:100%;min-height:410px;flex:1;border:0;background:#0e0e10}
     .ls-live-chat-messages{flex:1;min-height:220px;max-height:460px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}.ls-live-chat-message{padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;line-height:1.35}.ls-live-chat-message.own{background:rgba(145,70,255,.15)}.ls-live-chat-message strong{display:block;margin-bottom:2px;color:#c7a8ff;font-size:9px}.ls-live-chat-message span{color:#eef0f6;overflow-wrap:anywhere}.ls-live-chat-empty{margin:auto;padding:18px;color:#7f8798;text-align:center;font-size:9px}
     .ls-live-chat-compose{display:flex;gap:7px;padding:9px;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-compose input{min-width:0;flex:1;padding:10px 11px;border:1px solid rgba(145,70,255,.28);border-radius:11px;background:#050811;color:#fff;font-size:11px}.ls-live-chat-compose button{width:40px;border:0;border-radius:11px;background:linear-gradient(135deg,#6d2ee8,#9146ff);color:#fff;font-size:16px}
     .ls-live-player-panel footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;color:#8f96a8;font-size:10px}.ls-live-player-panel footer a{color:#c7a8ff;font-weight:900;text-decoration:none}
     .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
+    .ls-live-start-alert{position:fixed;z-index:2147482500;top:max(72px,calc(env(safe-area-inset-top) + 58px));left:50%;width:min(440px,calc(100% - 24px));transform:translateX(-50%);display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:11px;padding:11px 12px;border-radius:17px;color:#fff;text-align:left;box-shadow:0 18px 55px rgba(0,0,0,.55);animation:lsLiveAlertIn .5s cubic-bezier(.16,1,.3,1) both;overflow:hidden}
+    .ls-live-start-alert.ls6{border:1px solid rgba(255,62,92,.48);background:linear-gradient(135deg,rgba(20,26,38,.98),rgba(50,12,25,.98))}.ls-live-start-alert.ls7{border:1px solid rgba(57,231,255,.48);background:radial-gradient(circle at 0 0,rgba(57,231,255,.20),transparent 42%),linear-gradient(135deg,#06162b,#160a32);box-shadow:0 18px 60px rgba(0,0,0,.62),0 0 35px rgba(57,231,255,.16)}
+    .ls-live-start-alert.ls7::after{content:"";position:absolute;inset:-80% -20%;background:linear-gradient(110deg,transparent 42%,rgba(57,231,255,.22) 49%,transparent 56%);animation:lsLiveAlertScan 2.2s linear infinite;pointer-events:none}.ls-live-start-avatar{position:relative;z-index:1;width:48px;height:48px;display:grid;place-items:center;border:2px solid #ff315c;border-radius:50%;background:#101522;font-size:24px;overflow:hidden;box-shadow:0 0 18px rgba(255,49,92,.34)}.ls-live-start-alert.ls7 .ls-live-start-avatar{border-color:#39e7ff;box-shadow:0 0 22px rgba(57,231,255,.45)}.ls-live-start-avatar img{width:100%;height:100%;object-fit:cover}.ls-live-start-copy{position:relative;z-index:1;min-width:0;display:flex;flex-direction:column;gap:2px}.ls-live-start-copy small{color:#ff718d;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.14em}.ls-live-start-alert.ls7 small{color:#58efff}.ls-live-start-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ls-live-start-copy em{color:#aeb7c8;font-size:8px;font-style:normal}.ls-live-start-alert>i{position:relative;z-index:1;padding:6px 7px;border-radius:8px;background:#ff315c;color:#fff;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.08em;font-style:normal;animation:lsLivePulse 1.1s infinite}
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
+    @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
     html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
     @media(max-width:760px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0}.ls-live-player-panel{margin-top:3vh;border-radius:18px 18px 0 0}.ls-live-player-content{grid-template-columns:1fr}.ls-live-chat{border-left:0;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-messages{min-height:190px;max-height:32dvh}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
   `;
@@ -13052,6 +13132,7 @@ async function pollNotificationsFallback() {
   playLiveScrollNotificationSound();
   const latest = fresh[0];
   showToast(`${getNotificationIcon(latest.type)} ${latest.message || "Nueva notificación"}`);
+  if (latest.type === "live") showLiveStartAnimation(latest);
 }
 
 function startNotificationFallback() {
@@ -13079,7 +13160,7 @@ function playLiveScrollNotificationSound() {
     osc.frequency.setValueAtTime(620, now);
     osc.frequency.exponentialRampToValueAtTime(940, now + .12);
     gain.gain.setValueAtTime(.0001, now);
-    gain.gain.exponentialRampToValueAtTime(.045, now + .018);
+    gain.gain.exponentialRampToValueAtTime(.085, now + .018);
     gain.gain.exponentialRampToValueAtTime(.0001, now + .20);
     osc.connect(gain); gain.connect(ctx.destination);
     osc.start(now); osc.stop(now + .22);
@@ -13104,8 +13185,29 @@ function scheduleNotificationUIRefresh() {
 }
 
 function getNotificationIcon(type) {
-  const icons = { like: "❤️", comment: "💬", follow: "👤", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
+  const icons = { like: "❤️", comment: "💬", follow: "👤", live: "🔴", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
   return icons[type] || "🔔";
+}
+
+async function showLiveStartAnimation(notification) {
+  if (!notification?.actor_id || document.getElementById("lsLiveStartedAlert")) return;
+  const { data:creator } = await sb.from("profiles")
+    .select("username,avatar_url,avatar_emoji,live_platform")
+    .eq("id",notification.actor_id).maybeSingle();
+  if (!creator) return;
+
+  const isLs7 = isLiveScroll7App();
+  const alert = document.createElement("button");
+  alert.id = "lsLiveStartedAlert";
+  alert.type = "button";
+  alert.className = `ls-live-start-alert ${isLs7 ? "ls7" : "ls6"}`;
+  alert.onclick = () => { alert.remove(); switchTab("directos"); };
+  alert.innerHTML = `
+    <span class="ls-live-start-avatar">${creator.avatar_url ? `<img src="${escapeHtml(creator.avatar_url)}" alt="">` : escapeHtml(creator.avatar_emoji || "🎬")}</span>
+    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL ELÉCTRICA DETECTADA" : "NUEVO DIRECTO"}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para mirar en LiveScroll</em></span>
+    <i>EN VIVO</i>`;
+  document.body.appendChild(alert);
+  setTimeout(() => alert.remove(), 12000);
 }
 
 function updateNotificationBadge() {
@@ -13166,6 +13268,7 @@ function subscribeToNotifications() {
       scheduleNotificationUIRefresh();
       playLiveScrollNotificationSound();
       showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
+      if (notification.type === "live") showLiveStartAnimation(notification);
     })
     .subscribe(status => {
       if (status === "SUBSCRIBED") {
@@ -13319,6 +13422,10 @@ async function handleNotificationClick(notificationId) {
   }
   if (notification.type === "like" && notification.video_id) {
     await openSharedVideo(notification.video_id);
+    return;
+  }
+  if (notification.type === "live") {
+    switchTab("directos");
     return;
   }
   if (notification.type === "follow" && notification.actor_id) {

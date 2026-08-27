@@ -6898,6 +6898,15 @@ function ensureFeedPolishStyles() {
   style.textContent = `
     .mobile-menu-panel{padding-top:calc(22px + env(safe-area-inset-top,0px))!important}
     .ls-mobile-menu-head{flex:0 0 auto}
+    html:not(.ls7-app-runtime) .mobile-menu-panel{
+      top:0!important;bottom:0!important;height:100dvh!important;max-height:100dvh!important;
+      box-sizing:border-box!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;
+    }
+    html:not(.ls7-app-runtime) .mobile-menu-panel .ls-mobile-menu-scroll{
+      flex:1 1 auto!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important;
+      padding-bottom:calc(34px + env(safe-area-inset-bottom,0px))!important;
+      overscroll-behavior-y:contain!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch!important;
+    }
     #feedVertical,#profileFeedVertical,#foryouList .feed-vertical{
       overscroll-behavior-y:contain;scroll-snap-type:y mandatory!important;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
     }

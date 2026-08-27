@@ -3434,7 +3434,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60107;
+const LIVESCROLL6_CLIENT_BUILD = 60108;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -3526,7 +3526,7 @@ window.addEventListener("online", () => {
 
 // 7.0.1 · ACTUALIZACIONES EN VIVO
 // LiveScroll 7 usa su propio canal de versión para no interferir con la 6.
-const LIVESCROLL7_CLIENT_BUILD = 70006;
+const LIVESCROLL7_CLIENT_BUILD = 70007;
 let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
@@ -12115,7 +12115,7 @@ function startConnectedLiveRefresh() {
     if (document.hidden || currentTab !== "directos") return;
     lsPerfCache.directos = { data:null, at:0 };
     renderDirectos(lsTabRenderToken);
-  }, 60000);
+  }, 20000);
 }
 
 function getTwitchChannelFromUrl(value) {
@@ -12211,7 +12211,40 @@ function switchLiveChatMode(mode) {
   document.getElementById("lsChatTabTwitch")?.classList.toggle("active", twitch);
 }
 
-function mountInteractiveTwitchPlayer(channel, parent) {
+let lsTwitchOfflineHandledAt = 0;
+
+async function handleTwitchPlayerOffline(liveUserId) {
+  if (Date.now() - lsTwitchOfflineHandledAt < 8000) return;
+  lsTwitchOfflineHandledAt = Date.now();
+
+  const video = document.querySelector(".ls-live-player-video");
+  if (video) {
+    video.innerHTML = `<div class="ls-live-ended-card">
+      <span>■</span><strong>El directo finalizó</strong>
+      <p>Twitch confirmó que esta transmisión ya no está en vivo.</p>
+      <button type="button" onclick="closeLiveScrollTwitchPlayer()">Volver a Directos</button>
+    </div>`;
+  }
+  document.getElementById("lsTwitchChatPane")?.replaceChildren();
+  showToast("■ El directo finalizó");
+
+  // Evita que cada espectador invoque el verificador a la vez. El Creador
+  // dueño del directo (o el administrador) solicita la comprobación inmediata.
+  if (currentUser?.id === liveUserId || currentProfile?.is_admin === true) {
+    try {
+      await sb.functions.invoke("check-live-status", {
+        body:{ reason:"player_offline", creator_id:liveUserId }
+      });
+    } catch (_) {}
+  }
+
+  lsPerfCache.directos = { data:null, at:0 };
+  setTimeout(() => {
+    if (currentTab === "directos") renderDirectos(lsTabRenderToken);
+  }, 1600);
+}
+
+function mountInteractiveTwitchPlayer(channel, parent, liveUserId) {
   const start = () => {
     const target = document.getElementById("lsInteractiveTwitchPlayer");
     if (!target || !window.Twitch?.Player) return;
@@ -12227,6 +12260,9 @@ function mountInteractiveTwitchPlayer(channel, parent) {
       player.addEventListener(window.Twitch.Player.READY, () => {
         try { player.setMuted(true); player.play(); } catch (_) {}
         setTimeout(() => { try { player.play(); } catch (_) {} }, 450);
+      });
+      player.addEventListener(window.Twitch.Player.OFFLINE, () => {
+        handleTwitchPlayerOffline(liveUserId);
       });
       window.__lsActiveTwitchPlayer = player;
     } catch (error) {
@@ -12318,7 +12354,7 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
   });
   document.body.appendChild(overlay);
   document.body.classList.add("ls-live-player-open");
-  mountInteractiveTwitchPlayer(safeChannel, parent);
+  mountInteractiveTwitchPlayer(safeChannel, parent, safeLiveUserId);
   loadLiveScrollChat(safeLiveUserId);
   subscribeLiveScrollChat(safeLiveUserId);
 }
@@ -12341,6 +12377,7 @@ function ensureLiveScrollTwitchPlayerStyles() {
     .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
     .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
     .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-interactive-twitch-player,.ls-interactive-twitch-player iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
+    .ls-live-ended-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 15%,rgba(255,49,92,.14),transparent 42%),#05070c;color:#fff}.ls-live-ended-card>span{color:#ff315c;font-size:26px}.ls-live-ended-card strong{font-size:22px}.ls-live-ended-card p{margin:0 0 7px;color:#aeb7c8;font-size:11px}.ls-live-ended-card button{min-height:42px;padding:0 17px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:#121724;color:#fff;font-weight:900}
     .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
     .ls-live-chat-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px;background:#060913;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-tabs button{min-height:34px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:#0d1220;color:#949bad;font-size:9px;font-weight:900}.ls-live-chat-tabs button.active{border-color:rgba(145,70,255,.55);background:rgba(145,70,255,.18);color:#fff}.ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-live-chat-pane.hidden{display:none!important}.ls-twitch-chat-frame{width:100%;min-height:410px;flex:1;border:0;background:#0e0e10}
     .ls-live-chat-messages{flex:1;min-height:220px;max-height:460px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}.ls-live-chat-message{padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;line-height:1.35}.ls-live-chat-message.own{background:rgba(145,70,255,.15)}.ls-live-chat-message strong{display:block;margin-bottom:2px;color:#c7a8ff;font-size:9px}.ls-live-chat-message span{color:#eef0f6;overflow-wrap:anywhere}.ls-live-chat-empty{margin:auto;padding:18px;color:#7f8798;text-align:center;font-size:9px}

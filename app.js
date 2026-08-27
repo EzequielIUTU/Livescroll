@@ -6806,13 +6806,102 @@ function updateBalanceUI() {
   }
 }
 
-function showToast(msg) {
+function ensureModernToastStyles() {
+  if (document.getElementById("lsModernToastStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsModernToastStyles";
+  style.textContent = `
+    #toastWrap{
+      position:fixed!important;
+      z-index:2147482500!important;
+      left:50%!important;
+      right:auto!important;
+      bottom:calc(104px + env(safe-area-inset-bottom, 0px))!important;
+      width:min(92vw,430px)!important;
+      display:flex!important;
+      flex-direction:column!important;
+      gap:9px!important;
+      pointer-events:none!important;
+      transform:translateX(-50%)!important;
+    }
+    #toastWrap .ls-modern-toast{
+      --toast-accent:#f2c94c;
+      position:relative;
+      display:grid;
+      grid-template-columns:42px minmax(0,1fr);
+      align-items:center;
+      gap:11px;
+      width:100%;
+      min-height:66px;
+      padding:10px 14px 10px 11px;
+      overflow:hidden;
+      border:1px solid color-mix(in srgb,var(--toast-accent) 43%,transparent);
+      border-radius:19px;
+      background:linear-gradient(125deg,rgba(12,18,22,.97),rgba(8,11,14,.96));
+      color:#f7f8fa;
+      box-shadow:0 16px 42px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+      backdrop-filter:blur(18px) saturate(1.3);
+      -webkit-backdrop-filter:blur(18px) saturate(1.3);
+      animation:lsToastArrive .38s cubic-bezier(.16,1,.3,1) both;
+      pointer-events:auto;
+    }
+    #toastWrap .ls-modern-toast:before{
+      content:"";position:absolute;inset:0 auto 0 0;width:3px;
+      background:var(--toast-accent);box-shadow:0 0 18px var(--toast-accent);
+    }
+    #toastWrap .ls-toast-icon{
+      width:42px;height:42px;display:grid;place-items:center;border-radius:14px;
+      color:var(--toast-accent);font:900 19px/1 Inter,system-ui,sans-serif;
+      background:color-mix(in srgb,var(--toast-accent) 13%,rgba(255,255,255,.025));
+      border:1px solid color-mix(in srgb,var(--toast-accent) 30%,transparent);
+    }
+    #toastWrap .ls-toast-copy{min-width:0;text-align:left}
+    #toastWrap .ls-toast-title{display:block;margin-bottom:3px;color:var(--toast-accent);font:800 10px/1.2 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase}
+    #toastWrap .ls-toast-message{display:block;color:#f3f5f7;font:700 13px/1.35 Inter,system-ui,sans-serif;overflow-wrap:anywhere}
+    #toastWrap .ls-modern-toast.is-success{--toast-accent:#45e6a8}
+    #toastWrap .ls-modern-toast.is-error{--toast-accent:#ff5875}
+    #toastWrap .ls-modern-toast.is-info{--toast-accent:#59d8ff}
+    #toastWrap .ls-modern-toast.is-leaving{animation:lsToastLeave .22s ease forwards}
+    html.ls7-app-runtime #toastWrap .ls-modern-toast{
+      background:linear-gradient(125deg,rgba(10,12,20,.98),rgba(18,10,25,.97));
+      border-radius:21px;
+    }
+    @keyframes lsToastArrive{from{opacity:0;transform:translate3d(0,24px,0) scale(.94)}to{opacity:1;transform:none}}
+    @keyframes lsToastLeave{to{opacity:0;transform:translate3d(0,12px,0) scale(.97)}}
+    @media(min-width:760px){#toastWrap{bottom:28px!important;left:auto!important;right:28px!important;transform:none!important;width:min(390px,calc(100vw - 56px))!important}}
+    @media(prefers-reduced-motion:reduce){#toastWrap .ls-modern-toast{animation:none!important}}
+  `;
+  document.head.appendChild(style);
+}
+
+function showToast(msg, type = "") {
+  ensureModernToastStyles();
   const wrap = document.getElementById("toastWrap");
+  if (!wrap) return;
+  const message = String(msg || "Aviso");
+  const normalized = String(type || "").toLowerCase();
+  const isError = normalized === "error" || /no se pudo|error|cancelad|bloquead/i.test(message);
+  const isSuccess = normalized === "success" || /✓|listo|publicad|actualizad|guardad|activad|enviad|copiad|restaurad/i.test(message);
+  const kind = isError ? "error" : (isSuccess ? "success" : "info");
+  const meta = {
+    error:{ icon:"!", title:"Revisá esto" },
+    success:{ icon:"✓", title:"Todo listo" },
+    info:{ icon:"i", title:"LiveScroll" }
+  }[kind];
   const t = document.createElement("div");
-  t.className = "toast mono";
-  t.textContent = msg;
+  t.className = `ls-modern-toast is-${kind}`;
+  t.setAttribute("role", kind === "error" ? "alert" : "status");
+  t.innerHTML = `<span class="ls-toast-icon" aria-hidden="true">${meta.icon}</span><span class="ls-toast-copy"><strong class="ls-toast-title">${meta.title}</strong><span class="ls-toast-message"></span></span>`;
+  t.querySelector(".ls-toast-message").textContent = message;
   wrap.appendChild(t);
-  setTimeout(() => t.remove(), 2200);
+  while (wrap.children.length > 3) wrap.firstElementChild?.remove();
+  const removeToast = () => {
+    if (!t.isConnected) return;
+    t.classList.add("is-leaving");
+    setTimeout(() => t.remove(), 240);
+  };
+  t.addEventListener("click", removeToast, { once:true });
+  setTimeout(removeToast, kind === "error" ? 4200 : 3000);
 }
 
 // ============================================================

@@ -3762,8 +3762,15 @@ async function checkPendingContent() {
 
   // Si el usuario se perdió varias versiones, mostramos TODAS juntas
   // en "Mientras no estabas..." en lugar de abrir un popup por versión.
-  const unseenRows = history
-    .filter(e => Number(e.version || 0) > locallySeen)
+  const allUnseenRows = history
+    .filter(e => Number(e.version || 0) > locallySeen);
+  const lastFourUnseenVersions = [...new Set(allUnseenRows
+    .map(e => Number(e.version || 0))
+    .filter(Boolean))]
+    .sort((a,b) => b - a)
+    .slice(0,4);
+  const unseenRows = allUnseenRows
+    .filter(e => lastFourUnseenVersions.includes(Number(e.version || 0)))
     .sort((a, b) => {
       const va = Number(a.version || 0);
       const vb = Number(b.version || 0);
@@ -3863,6 +3870,11 @@ async function checkPendingContent() {
       );
       if (!duplicate) entries.push(row);
     });
+
+    const allowedVersions = [...new Set(entries.map(e => Number(e.version || 0)).filter(Boolean))]
+      .sort((a,b) => b - a)
+      .slice(0,4);
+    entries = entries.filter(e => allowedVersions.includes(Number(e.version || 0)));
 
     if (!entries.length) return;
 
@@ -6816,7 +6828,7 @@ function ensureModernToastStyles() {
       z-index:2147482500!important;
       left:50%!important;
       right:auto!important;
-      bottom:calc(104px + env(safe-area-inset-bottom, 0px))!important;
+      bottom:calc(154px + env(safe-area-inset-bottom, 0px))!important;
       width:min(92vw,430px)!important;
       display:flex!important;
       flex-direction:column!important;
@@ -6865,6 +6877,11 @@ function ensureModernToastStyles() {
     html.ls7-app-runtime #toastWrap .ls-modern-toast{
       background:linear-gradient(125deg,rgba(10,12,20,.98),rgba(18,10,25,.97));
       border-radius:21px;
+      box-shadow:0 18px 50px rgba(0,0,0,.54),0 0 26px color-mix(in srgb,var(--toast-accent) 13%,transparent),inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    html:not(.ls7-app-runtime) #toastWrap .ls-modern-toast{
+      border-color:rgba(244,201,93,.38);background:linear-gradient(125deg,rgba(24,21,10,.98),rgba(10,12,13,.98));
+      box-shadow:0 18px 48px rgba(0,0,0,.52),0 0 24px rgba(244,201,93,.10),inset 0 1px 0 rgba(255,244,190,.07);
     }
     @keyframes lsToastArrive{from{opacity:0;transform:translate3d(0,24px,0) scale(.94)}to{opacity:1;transform:none}}
     @keyframes lsToastLeave{to{opacity:0;transform:translate3d(0,12px,0) scale(.97)}}
@@ -6872,6 +6889,99 @@ function ensureModernToastStyles() {
     @media(prefers-reduced-motion:reduce){#toastWrap .ls-modern-toast{animation:none!important}}
   `;
   document.head.appendChild(style);
+}
+
+function ensureFeedPolishStyles() {
+  if (document.getElementById("lsFeedPolishStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsFeedPolishStyles";
+  style.textContent = `
+    .mobile-menu-panel{padding-top:calc(22px + env(safe-area-inset-top,0px))!important}
+    .ls-mobile-menu-head{flex:0 0 auto}
+    #feedVertical,#profileFeedVertical,#foryouList .feed-vertical{
+      overscroll-behavior-y:contain;scroll-snap-type:y mandatory!important;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
+    }
+    #feedVertical>.feed-item,#profileFeedVertical>.feed-item,#foryouList .feed-vertical>.feed-item{
+      scroll-snap-align:start!important;scroll-snap-stop:always!important;transform:translateZ(0);
+    }
+    .feed-item.ls-upload-feed-item video{transform:translateZ(0);backface-visibility:hidden;image-rendering:auto}
+    .feed-item.ls-upload-feed-item.ls-feed-active video{will-change:transform}
+    .ls-mp4-sound{
+      position:absolute;left:14px;top:58px;z-index:16;display:flex;align-items:center;gap:7px;
+      min-height:40px;padding:0 12px;border:1px solid rgba(255,255,255,.33);border-radius:999px;
+      background:rgba(3,6,9,.82);color:#fff;font:850 10px 'JetBrains Mono',monospace;letter-spacing:.06em;
+      box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 18px rgba(89,216,255,.20);backdrop-filter:blur(9px);
+      animation:lsSoundGlow 1.8s ease-in-out infinite;cursor:pointer;
+    }
+    .ls-mp4-sound span{font-size:19px;filter:drop-shadow(0 0 7px #59d8ff)}
+    .ls-mp4-sound.is-on{border-color:rgba(69,230,168,.72);color:#bfffe6;animation:none;box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 20px rgba(69,230,168,.24)}
+    @keyframes lsSoundGlow{50%{border-color:rgba(89,216,255,.78);box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 26px rgba(89,216,255,.36)}}
+    html.ls7-app-runtime #appView,.ls7-mobile-menu-panel{transform:translateZ(0);backface-visibility:hidden}
+    html.ls7-app-runtime .feed-action-btn,html.ls7-app-runtime .nav-btn,html.ls7-app-runtime button{transition-timing-function:cubic-bezier(.22,.8,.25,1)!important}
+    html.ls7-app-runtime .feed-phone{box-shadow:0 12px 34px rgba(0,0,0,.32)!important}
+    html.ls7-app-runtime .feed-item.ls-upload-feed-item .feed-phone:after{
+      content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+      box-shadow:inset 0 0 55px rgba(86,105,255,.055),inset 0 -90px 90px rgba(0,0,0,.18);
+    }
+    @media(max-width:700px){
+      html.ls7-app-runtime .feed-action-btn{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+      html.ls7-app-runtime .feed-phone{contain:layout paint style}
+    }
+    @media(prefers-reduced-motion:reduce){.ls-mp4-sound{animation:none}}
+  `;
+  document.head.appendChild(style);
+}
+
+document.addEventListener("DOMContentLoaded", ensureFeedPolishStyles);
+
+function toggleFeedVideoSound(button) {
+  const video = button?.closest(".dbltap-like-zone")?.querySelector("video");
+  if (!video) return;
+  video.muted = !video.muted;
+  video.volume = 1;
+  button.classList.toggle("is-on", !video.muted);
+  button.querySelector("span").textContent = video.muted ? "🔇" : "🔊";
+  button.querySelector("b").textContent = video.muted ? "ACTIVAR SONIDO" : "SONIDO ACTIVO";
+  if (!video.muted) video.play().catch(() => {});
+}
+
+function setupOneVideoScroll(container) {
+  if (!container || container.dataset.oneVideoScroll === "1") return;
+  container.dataset.oneVideoScroll = "1";
+  let startIndex = 0, startY = 0, settling = false;
+  const items = () => Array.from(container.children).filter(el => el.classList.contains("feed-item"));
+  const nearestIndex = () => {
+    const rows = items();
+    let best = 0, distance = Infinity;
+    rows.forEach((row,index) => {
+      const d = Math.abs(row.offsetTop - container.scrollTop);
+      if (d < distance) { distance = d; best = index; }
+    });
+    return best;
+  };
+  const go = index => {
+    const rows = items();
+    const target = rows[Math.max(0,Math.min(rows.length - 1,index))];
+    if (!target) return;
+    settling = true;
+    container.scrollTo({ top:target.offsetTop, behavior:"smooth" });
+    setTimeout(() => { settling = false; }, 420);
+  };
+  container.addEventListener("touchstart", event => {
+    startIndex = nearestIndex();
+    startY = event.touches[0]?.clientY || 0;
+  }, { passive:true });
+  container.addEventListener("touchend", event => {
+    const endY = event.changedTouches[0]?.clientY || startY;
+    const delta = startY - endY;
+    if (Math.abs(delta) < 34) return go(startIndex);
+    requestAnimationFrame(() => go(startIndex + (delta > 0 ? 1 : -1)));
+  }, { passive:true });
+  container.addEventListener("wheel", event => {
+    if (settling || Math.abs(event.deltaY) < 8) return;
+    event.preventDefault();
+    go(nearestIndex() + (event.deltaY > 0 ? 1 : -1));
+  }, { passive:false });
 }
 
 function showToast(msg, type = "") {
@@ -7224,6 +7334,7 @@ function fitMobileFeedViewport(containerId = "feedVertical") {
 
   const container = document.getElementById(containerId);
   if (!container) return;
+  setupOneVideoScroll(container);
 
   const viewportHeight = window.visualViewport?.height || window.innerHeight;
   const top = Math.max(0, container.getBoundingClientRect().top);
@@ -7366,8 +7477,9 @@ function preloadFeedVideo(video) {
 
   if (saveData || slowNetwork || isLegacyMode) return;
 
-  el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;">
+  el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;position:relative;">
     <video src="${escapeHtml(video.video_url)}" controls muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+    <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
   </div>`;
   loadedEmbeds.add(video.id);
 }
@@ -7438,12 +7550,14 @@ function setupFeedObserver(videos) {
     entries.forEach(entry => {
       const videoId = String(entry.target.dataset.videoId);
       if (entry.isIntersecting && entry.intersectionRatio > 0.58) {
+        entry.target.classList.add("ls-feed-active");
         pauseAllFeedMediaExcept(videoId);
         loadEmbed(videoMap[videoId]);
         activateLoadedEmbed(videoMap[videoId]);
         keepWarmAround(videoId);
         startWatching(videoMap[videoId]);
       } else if (entry.intersectionRatio < 0.25) {
+        entry.target.classList.remove("ls-feed-active");
         pauseFeedMedia(videoId);
         stopWatching(videoId);
       }
@@ -7512,8 +7626,9 @@ function getEmbedHtml(video) {
     return `<div class="feed-fallback"><p>Link de video inválido.</p></div>`;
   }
   if (video.platform === "upload") {
-    return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%;">
+    return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%; position:relative;">
       <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+      <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
     </div>`;
   }
   if (video.platform === "youtube") {
@@ -13389,7 +13504,7 @@ async function loadNotifications() {
     .select("*")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false })
-    .limit(30);
+    .limit(20);
 
   if (error) {
     console.error("Error cargando notificaciones:", error);

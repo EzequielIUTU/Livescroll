@@ -138,3 +138,53 @@ grant execute on function public.create_moment(text,text,text) to authenticated;
 grant execute on function public.get_active_moments() to authenticated;
 grant execute on function public.record_moment_view(uuid) to authenticated;
 grant execute on function public.react_to_moment(uuid,text) to authenticated;
+
+
+-- Etapa 2 · herramientas del creador
+create or replace function public.get_moment_viewers(p_moment_id uuid)
+returns jsonb
+language sql security definer set search_path=public
+as $$
+  select case
+    when not exists(
+      select 1 from public.moments m
+      where m.id=p_moment_id and m.user_id=auth.uid()
+    ) then jsonb_build_object('ok',false,'error','not_owner')
+    else jsonb_build_object(
+      'ok',true,
+      'viewers',coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id',p.id,'username',p.username,'avatar_url',p.avatar_url,
+          'avatar_emoji',p.avatar_emoji,'viewed_at',v.viewed_at
+        ) order by v.viewed_at desc)
+        from public.moment_views v
+        join public.profiles p on p.id=v.viewer_id
+        where v.moment_id=p_moment_id
+      ),'[]'::jsonb)
+    )
+  end;
+$$;
+
+create or replace function public.delete_my_moment(p_moment_id uuid)
+returns jsonb
+language plpgsql security definer set search_path=public
+as $$
+declare v_media_url text;
+begin
+  if auth.uid() is null then
+    return jsonb_build_object('ok',false,'error','not_authenticated');
+  end if;
+  delete from public.moments
+  where id=p_moment_id and user_id=auth.uid()
+  returning media_url into v_media_url;
+  if not found then
+    return jsonb_build_object('ok',false,'error','not_owner');
+  end if;
+  return jsonb_build_object('ok',true,'media_url',v_media_url);
+end;
+$$;
+
+revoke all on function public.get_moment_viewers(uuid) from public;
+revoke all on function public.delete_my_moment(uuid) from public;
+grant execute on function public.get_moment_viewers(uuid) to authenticated;
+grant execute on function public.delete_my_moment(uuid) to authenticated;

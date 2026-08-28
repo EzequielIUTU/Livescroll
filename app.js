@@ -13770,7 +13770,9 @@ function renderNotificationPanelContent() {
         ? `follow:${n.actor_id || n.message || n.id}`
         : n.type === "comment"
           ? `comment:${n.video_id || ""}:${n.actor_id || n.id}`
-          : `${n.type || "system"}:${n.message || n.id}`;
+          : n.type === "live"
+            ? `live:${n.actor_id || n.message || n.id}`
+            : `${n.type || "system"}:${n.message || n.id}`;
     let group = groupsByKey.get(key);
     if (!group) {
       group = { ...n, members:[], groupUnread:false };

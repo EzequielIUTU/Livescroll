@@ -5198,7 +5198,7 @@ function showChangelogModal(entries) {
 
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
-    actualizado: { title: "🔄 Actualizado", color: "var(--gold)" },
+    actualizado: { title: "🔄 Mejora", color: "var(--gold)" },
     emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
@@ -5221,8 +5221,12 @@ function showChangelogModal(entries) {
     if (e.release_date && !byVersion[version].releaseDate) {
       byVersion[version].releaseDate = e.release_date;
     }
-    byVersion[version].cats[e.category] = byVersion[version].cats[e.category] || [];
-    byVersion[version].cats[e.category].push(cleanChangelogContent(e.content));
+    const normalizedCategory = e.category === "emergencia" ? "reparado" : e.category;
+    byVersion[version].cats[normalizedCategory] = byVersion[version].cats[normalizedCategory] || [];
+    const cleanedContent = cleanChangelogContent(e.content);
+    if (cleanedContent && !byVersion[version].cats[normalizedCategory].includes(cleanedContent)) {
+      byVersion[version].cats[normalizedCategory].push(cleanedContent);
+    }
   });
 
   const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
@@ -5253,10 +5257,10 @@ function showChangelogModal(entries) {
               const label=info.display || `${v}.0.0`;
               return `<div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
                 <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll ${escapeHtml(label)}</div>
-                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
+                ${["nuevo","actualizado","reparado","proximamente"].map(cat => (info.cats[cat]?.length || cat === "reparado") ? `
                   <div style="margin-bottom:11px;">
                     <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
+                    ${(info.cats[cat]?.length ? info.cats[cat] : ["No hubo ninguna reparación en esta actualización."]).map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
             }).join("")}
@@ -5355,10 +5359,10 @@ function showChangelogModal(entries) {
                   </div>
                   ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
                 </div>
-                ${["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => info.cats[cat] ? `
+                ${["nuevo","actualizado","reparado","proximamente"].map(cat => (info.cats[cat]?.length || cat === "reparado") ? `
                   <div class="ls-next-era-category">
                     <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
-                    ${info.cats[cat].map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
+                    ${(info.cats[cat]?.length ? info.cats[cat] : ["No hubo ninguna reparación en esta actualización."]).map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
                   </div>`:"").join("")}
               </div>`;
           }).join("")}
@@ -5412,7 +5416,7 @@ async function openChangelogHistory() {
 
   const labels = {
     nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
-    actualizado: { title: "🔄 Mejoras", color: "var(--gold)" },
+    actualizado: { title: "🔄 Mejora", color: "var(--gold)" },
     emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
     reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
     proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
@@ -5569,9 +5573,12 @@ async function openChangelogHistory() {
   };
 
   const renderMainRevision = (revision) => {
-    return ["emergencia","nuevo","actualizado","reparado","proximamente"].map(cat => {
+    return ["nuevo","actualizado","reparado","proximamente"].map(cat => {
       const lines = revision.cats[cat] || [];
-      if (!lines.length) return "";
+      if (!lines.length && cat !== "reparado") return "";
+      const visibleLines = lines.length
+        ? lines
+        : ["No hubo ninguna reparación en esta actualización."];
 
       return `
         <div style="margin-bottom:12px;">
@@ -5584,7 +5591,7 @@ async function openChangelogHistory() {
             ${labels[cat]?.title || escapeHtml(cat)}
           </div>
 
-          ${lines.map(c => `
+          ${visibleLines.map(c => `
             <div style="
               font-size:12px;
               color:var(--text-dim);
@@ -5603,6 +5610,19 @@ async function openChangelogHistory() {
 
     const secondary = revisions.filter(r => r.secondary);
     const main = revisions.filter(r => !r.secondary);
+    const groupedMain = { cats:{} };
+
+    main.forEach(revision => {
+      Object.entries(revision.cats || {}).forEach(([category, lines]) => {
+        const normalizedCategory = category === "emergencia" ? "reparado" : category;
+        groupedMain.cats[normalizedCategory] = groupedMain.cats[normalizedCategory] || [];
+        (lines || []).forEach(line => {
+          if (line && !groupedMain.cats[normalizedCategory].includes(line)) {
+            groupedMain.cats[normalizedCategory].push(line);
+          }
+        });
+      });
+    });
 
     const dateText = formatReleaseDate(info.releaseDate);
 
@@ -5659,7 +5679,7 @@ async function openChangelogHistory() {
           <div style="
             padding:${secondary.length ? "4px 2px 0" : "0 2px"};
           ">
-            ${main.map(renderMainRevision).join("")}
+            ${renderMainRevision(groupedMain)}
           </div>
         ` : ""}
       </section>`;

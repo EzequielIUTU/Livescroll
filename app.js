@@ -38,6 +38,27 @@ function applyLiveScrollRuntimeBranding() {
   document.title = "LiveScroll 7 — La nueva generación";
 }
 
+function installLiveScroll7NativeFeel() {
+  if (!isLiveScroll7App() || window.__ls7NativeFeelInstalled) return;
+  window.__ls7NativeFeelInstalled = true;
+  let lastPulseAt = 0;
+
+  document.addEventListener("pointerup", event => {
+    const control = event.target?.closest?.("button,[role='button'],a[href],.feed-action-btn");
+    if (!control || control.disabled || control.getAttribute("aria-disabled") === "true") return;
+    const now = performance.now();
+    if (now - lastPulseAt < 70) return;
+    lastPulseAt = now;
+
+    const strong = control.classList.contains("liked") ||
+      control.classList.contains("ls-dock-create") ||
+      /delete|remove|report|danger/i.test(control.className || "");
+    try {
+      window.LiveScrollAndroid?.hapticFeedback?.(strong ? "confirm" : "tap");
+    } catch (_) {}
+  }, { passive:true, capture:true });
+}
+
 function updateLiveScroll7Boot(progress, message) {
   if (!isLiveScroll7App()) return;
   const bar = document.getElementById("ls7BootProgress");
@@ -2480,11 +2501,14 @@ function getLiveScroll6ModeMenuMarkup() {
   const mode = window.__liveScrollExperienceMode || "nova";
   const isLegacy = mode === "legacy";
   const generation = isLiveScroll7App() ? 7 : 6;
+  const modeName = isLiveScroll7App()
+    ? (isLegacy ? "Fluido" : "Inmersivo")
+    : (isLegacy ? "Legacy" : "Nova");
   return `
     <button type="button" class="ls-menu-mode-button ${isLegacy ? "is-legacy" : "is-nova"}"
-      onclick="openLiveScrollModeInfo()" aria-label="Información sobre LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}">
-      <span>${isLegacy ? "🪶" : "✦"}</span>
-      <b>LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}</b>
+      onclick="openLiveScrollModeInfo()" aria-label="Experiencia LiveScroll ${generation} ${modeName}">
+      <span>${isLegacy ? "⚡" : "✦"}</span>
+      <b>LiveScroll ${generation} ${modeName}</b>
     </button>`;
 }
 
@@ -2507,7 +2531,7 @@ function toggleMobileMenu() {
       <div><strong>LiveScroll <em>${isLiveScroll7App() ? "7" : "6"}</em></strong><small>${isLiveScroll7App() ? "Centro de control" : "Explorá la aplicación"}</small></div>
       <button class="ls-mobile-menu-close" onclick="closeMobileMenu()" aria-label="Cerrar">✕</button>
     </div>
-    ${isLiveScroll7App() ? `<div class="ls7-menu-runtime-line"><i></i><span>SESIÓN ACTIVA</span><b>NOVA 7</b></div>` : ""}
+    ${isLiveScroll7App() ? `<div class="ls7-menu-runtime-line"><i></i><span>SESIÓN ACTIVA</span><b>${window.__liveScrollExperienceMode === "legacy" ? "FLUIDO" : "INMERSIVO"} 7</b></div>` : ""}
     <div class="ls-mobile-menu-scroll">
       <div class="ls-mobile-menu-label">Principal</div>
       <button class="${activeTab === 'feed' ? 'active' : ''}" onclick="switchTab('feed'); closeMobileMenu();"><span>▶️</span><b>Mirar</b></button>
@@ -2930,6 +2954,14 @@ function updateNavigationEvolution597(tab) {
 // el navegador/dispositivo parece antiguo o muy limitado.
 // ============================================================
 function detectLiveScrollExperience() {
+  if (isLiveScroll7App()) {
+    try {
+      const preference = localStorage.getItem("livescroll7-experience-preference") || "automatic";
+      if (preference === "immersive") return "nova";
+      if (preference === "fluid") return "legacy";
+    } catch (_) {}
+  }
+
   let legacy = false;
 
   try {
@@ -2972,23 +3004,35 @@ function openLiveScrollModeInfo() {
   });
 
   const isLegacy = mode === "legacy";
+  const isSeven = isLiveScroll7App();
+  const modeName = isSeven ? (isLegacy ? "Fluido" : "Inmersivo") : (isLegacy ? "Legacy" : "Nova");
+  let preference = "automatic";
+  try { preference = localStorage.getItem("livescroll7-experience-preference") || "automatic"; } catch (_) {}
 
   overlay.innerHTML = `
     <div class="ls-mode-panel" role="dialog" aria-modal="true" aria-label="Modo de experiencia LiveScroll">
       <div class="ls-mode-handle"></div>
 
       <div class="ls-mode-head">
-        <div class="ls-mode-icon">${isLegacy ? "🪶" : "✨"}</div>
+        <div class="ls-mode-icon">${isLegacy ? "⚡" : "✨"}</div>
         <div class="ls-mode-title">
-          <strong>LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}</strong>
-          <span>${isLegacy ? "Experiencia optimizada" : "Experiencia completa"}</span>
+          <strong>LiveScroll ${generation} ${modeName}</strong>
+          <span>${isLegacy ? "Máxima fluidez y estabilidad" : "Experiencia visual completa"}</span>
         </div>
       </div>
 
       <div class="ls-mode-current">
-        <strong>Este dispositivo está usando LiveScroll ${generation} ${isLegacy ? "Legacy" : "Nova"}.</strong><br>
-        LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo.
+        <strong>Este dispositivo está usando LiveScroll ${generation} ${modeName}.</strong><br>
+        ${isSeven ? "Podés dejar que LiveScroll decida o elegir tu experiencia visual." : "LiveScroll elige automáticamente el modo que mejor se adapta al dispositivo."}
       </div>
+
+      ${isSeven ? `
+        <div class="ls-mode-selector" role="group" aria-label="Elegir experiencia visual">
+          <button type="button" class="${preference === "automatic" ? "active" : ""}" onclick="setLiveScrollExperiencePreference('automatic')"><b>Automático</b><span>Se adapta al celular</span></button>
+          <button type="button" class="${preference === "immersive" ? "active" : ""}" onclick="setLiveScrollExperiencePreference('immersive')"><b>Inmersivo</b><span>Todos los efectos</span></button>
+          <button type="button" class="${preference === "fluid" ? "active" : ""}" onclick="setLiveScrollExperiencePreference('fluid')"><b>Fluido</b><span>Prioriza estabilidad</span></button>
+        </div>
+      ` : ""}
 
       ${isLegacy ? `
         <div class="ls-mode-feature">
@@ -3014,7 +3058,7 @@ function openLiveScrollModeInfo() {
         </div>
         <div class="ls-mode-feature">
           <div class="ico">🔄</div>
-          <div><strong>Adaptación automática</strong><span>Si LiveScroll detecta un dispositivo limitado, puede activar Legacy automáticamente.</span></div>
+          <div><strong>Adaptación automática</strong><span>Si LiveScroll detecta un dispositivo limitado, puede activar el modo Fluido automáticamente.</span></div>
         </div>
       `}
 
@@ -3030,6 +3074,24 @@ function openLiveScrollModeInfo() {
   document.body.appendChild(overlay);
 }
 
+function setLiveScrollExperiencePreference(preference) {
+  if (!isLiveScroll7App() || !["automatic", "immersive", "fluid"].includes(preference)) return;
+  try { localStorage.setItem("livescroll7-experience-preference", preference); } catch (_) {}
+
+  const mode = detectLiveScrollExperience();
+  window.__liveScrollExperienceMode = mode;
+  window.__liveScrollLegacyMode = mode === "legacy";
+  document.documentElement.classList.toggle("ls-legacy", mode === "legacy");
+  document.documentElement.classList.toggle("ls-nova", mode === "nova");
+  document.documentElement.classList.toggle("ls7-fluid", mode === "legacy");
+  document.documentElement.classList.toggle("ls7-immersive", mode === "nova");
+
+  closeLiveScrollModeInfo();
+  closeMobileMenu();
+  applySeasonalTheme();
+  showToast(`Experiencia ${mode === "legacy" ? "Fluido" : "Inmersivo"} activada`);
+}
+
 function initLiveScrollExperienceMode() {
   const mode = detectLiveScrollExperience();
   window.__liveScrollExperienceMode = mode;
@@ -3037,6 +3099,8 @@ function initLiveScrollExperienceMode() {
 
   document.documentElement.classList.toggle("ls-legacy", mode === "legacy");
   document.documentElement.classList.toggle("ls-nova", mode === "nova");
+  document.documentElement.classList.toggle("ls7-fluid", isLiveScroll7App() && mode === "legacy");
+  document.documentElement.classList.toggle("ls7-immersive", isLiveScroll7App() && mode === "nova");
 
   if (!document.getElementById("lsExperienceStyles")) {
     const style = document.createElement("style");
@@ -3160,6 +3224,35 @@ function initLiveScrollExperienceMode() {
         font-size:12px;
         line-height:1.5;
       }
+
+      .ls-mode-selector {
+        display:grid;
+        grid-template-columns:repeat(3,minmax(0,1fr));
+        gap:7px;
+        margin:0 0 12px;
+      }
+
+      .ls-mode-selector button {
+        min-width:0;
+        min-height:62px;
+        padding:9px 7px;
+        border:1px solid var(--border);
+        border-radius:13px;
+        background:var(--panel-2);
+        color:var(--text);
+        font-family:inherit;
+        cursor:pointer;
+      }
+
+      .ls-mode-selector button.active {
+        border-color:rgba(57,231,255,.65);
+        background:linear-gradient(145deg,rgba(57,231,255,.14),rgba(138,85,255,.16));
+        box-shadow:0 0 20px rgba(57,231,255,.10),inset 0 1px 0 rgba(255,255,255,.08);
+      }
+
+      .ls-mode-selector b,.ls-mode-selector span { display:block; }
+      .ls-mode-selector b { font-size:11px; }
+      .ls-mode-selector span { margin-top:4px;color:var(--text-dim);font-size:8px;line-height:1.25; }
 
       .ls-mode-feature {
         display:flex;
@@ -3299,12 +3392,12 @@ function initLiveScrollExperienceMode() {
 
     if (mode === "legacy") {
       toast.innerHTML = `
-        <strong>🪶 LiveScroll ${isLiveScroll7App() ? "7" : "6"} Legacy activado</strong>
+        <strong>⚡ LiveScroll ${isLiveScroll7App() ? "7 Fluido" : "6 Legacy"} activado</strong>
         Optimizamos automáticamente la experiencia para que LiveScroll funcione mejor en este dispositivo.
       `;
     } else {
       toast.innerHTML = `
-        <strong>✨ LiveScroll ${isLiveScroll7App() ? "7" : "6"} Nova</strong>
+        <strong>✨ LiveScroll ${isLiveScroll7App() ? "7 Inmersivo" : "6 Nova"}</strong>
         Estás usando la experiencia completa de LiveScroll.
       `;
     }
@@ -3322,6 +3415,7 @@ function initLiveScrollExperienceMode() {
 async function renderApp() {
   ensureMobileStabilityLayer();
   applyLiveScrollRuntimeBranding();
+  installLiveScroll7NativeFeel();
   if (landingOdometerRefreshTimer) {
     clearInterval(landingOdometerRefreshTimer);
     landingOdometerRefreshTimer = null;
@@ -17666,6 +17760,22 @@ const LS_SEASONAL_THEMES = {
   }
 };
 
+// LiveScroll 7 · atmósferas con luz, profundidad y materiales propios.
+// Se mantienen las mismas temporadas y fechas; esta capa solo eleva su apariencia.
+const LS_SEASONAL_ATMOSPHERES = {
+  spring:{sky:"rgba(255,126,190,.18)",light:"rgba(137,255,200,.13)",surface:"rgba(255,220,237,.07)"},
+  halloween:{sky:"rgba(255,102,21,.20)",light:"rgba(107,49,190,.20)",surface:"rgba(255,151,57,.06)"},
+  christmas:{sky:"rgba(24,153,121,.16)",light:"rgba(218,45,66,.17)",surface:"rgba(235,250,255,.09)"},
+  newyear:{sky:"rgba(255,203,74,.19)",light:"rgba(128,91,255,.18)",surface:"rgba(255,245,194,.08)"},
+  reyes:{sky:"rgba(160,96,255,.17)",light:"rgba(255,202,62,.18)",surface:"rgba(245,225,255,.08)"},
+  valentines:{sky:"rgba(255,73,137,.18)",light:"rgba(179,61,255,.13)",surface:"rgba(255,222,234,.08)"},
+  patria:{sky:"rgba(71,185,255,.18)",light:"rgba(255,236,146,.14)",surface:"rgba(225,247,255,.09)"},
+  father:{sky:"rgba(55,135,255,.17)",light:"rgba(76,224,216,.12)",surface:"rgba(220,238,255,.07)"},
+  childhood:{sky:"rgba(50,220,167,.15)",light:"rgba(255,191,58,.17)",surface:"rgba(232,255,247,.08)"},
+  mother:{sky:"rgba(255,112,163,.17)",light:"rgba(255,206,228,.13)",surface:"rgba(255,230,240,.08)"},
+  easter:{sky:"rgba(164,112,255,.17)",light:"rgba(255,209,98,.16)",surface:"rgba(244,231,255,.08)"}
+};
+
 function lsArgentinaDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone:"America/Argentina/Buenos_Aires",
@@ -17787,6 +17897,7 @@ function clearSeasonalDecorations() {
   document.getElementById("lsSeasonalStyle")?.remove();
   document.getElementById("lsSeasonalLogoDecor")?.remove();
   document.getElementById("lsSeasonalAmbient")?.remove();
+  document.getElementById("lsSeasonalAtmosphere")?.remove();
   document.body?.removeAttribute("data-ls-season");
 }
 
@@ -17797,6 +17908,11 @@ function applySeasonalTheme() {
 
   const key = getSeasonalThemeKey();
   const theme = LS_SEASONAL_THEMES[key] || LS_SEASONAL_THEMES.normal;
+  const atmosphere = LS_SEASONAL_ATMOSPHERES[key] || {
+    sky:theme.glow,
+    light:"rgba(255,255,255,.04)",
+    surface:"rgba(255,255,255,.035)"
+  };
 
   // Varias zonas pueden pedir sincronizar el tema durante el arranque.
   // Si ya está completo, lo reutilizamos sin quitar estilos ni reconstruir DOM.
@@ -17804,8 +17920,9 @@ function applySeasonalTheme() {
   const navExists = !!document.querySelector("nav");
   const seasonalStyleReady = key === "normal" || !!document.getElementById("lsSeasonalStyle");
   const navDecorationReady = key === "normal" || !navExists || !!document.getElementById("lsSeasonalLogoDecor");
+  const atmosphereReady = key === "normal" || !!document.getElementById("lsSeasonalAtmosphere");
 
-  if (sameTheme && seasonalStyleReady && navDecorationReady) {
+  if (sameTheme && seasonalStyleReady && navDecorationReady && atmosphereReady) {
     syncSeasonalAdminControls();
     window.__lsSeasonalApplying = false;
     return;
@@ -17846,6 +17963,41 @@ function applySeasonalTheme() {
         var(--ink) !important;
     }
 
+    #lsSeasonalAtmosphere {
+      position:fixed;
+      inset:0;
+      z-index:0;
+      overflow:hidden;
+      pointer-events:none;
+      background:
+        radial-gradient(ellipse at 16% 3%,${atmosphere.sky},transparent 37%),
+        radial-gradient(ellipse at 88% 26%,${atmosphere.light},transparent 42%),
+        linear-gradient(118deg,transparent 18%,${atmosphere.surface} 49%,transparent 72%);
+      opacity:.92;
+      transform:translateZ(0);
+    }
+
+    #lsSeasonalAtmosphere::before,
+    #lsSeasonalAtmosphere::after {
+      content:"";
+      position:absolute;
+      inset:-25%;
+      pointer-events:none;
+    }
+
+    #lsSeasonalAtmosphere::before {
+      background:conic-gradient(from 110deg,transparent,${atmosphere.surface},transparent 19%,${atmosphere.sky},transparent 42%);
+      opacity:.36;
+      animation:lsSeasonalLightOrbit 26s linear infinite;
+    }
+
+    #lsSeasonalAtmosphere::after {
+      background-image:radial-gradient(circle,rgba(255,255,255,.24) 0 1px,transparent 1.4px);
+      background-size:46px 46px;
+      opacity:.055;
+      transform:rotate(9deg);
+    }
+
     body[data-ls-season="${key}"] nav {
       border-bottom-color:color-mix(in srgb, ${theme.accent} 25%, var(--border)) !important;
       box-shadow:0 8px 30px ${theme.glow};
@@ -17862,6 +18014,7 @@ function applySeasonalTheme() {
       box-shadow:
         0 16px 42px rgba(0,0,0,.22),
         0 0 24px ${theme.glow};
+      background-image:linear-gradient(145deg,${atmosphere.surface},transparent 46%) !important;
     }
 
     .ls-seasonal-logo-decor {
@@ -17890,8 +18043,18 @@ function applySeasonalTheme() {
       z-index:8;
       pointer-events:none;
       font-size:13px;
-      opacity:.30;
+      opacity:.34;
       will-change:transform, opacity;
+      filter:drop-shadow(0 6px 9px rgba(0,0,0,.28));
+    }
+
+    .ls-seasonal-ambient-item:nth-child(3n+1) { filter:blur(.25px) drop-shadow(0 8px 12px rgba(0,0,0,.28));transform:scale(.82);opacity:.22; }
+    .ls-seasonal-ambient-item:nth-child(3n+2) { font-size:18px;opacity:.40; }
+
+    @keyframes lsSeasonalLightOrbit {
+      from { transform:rotate(0deg) scale(1); }
+      50% { transform:rotate(180deg) scale(1.08); }
+      to { transform:rotate(360deg) scale(1); }
     }
 
     .ls-seasonal-fall {
@@ -17961,19 +18124,29 @@ function applySeasonalTheme() {
 
     @media (prefers-reduced-motion:reduce) {
       .ls-seasonal-logo-decor,
-      .ls-seasonal-ambient-item {
+      .ls-seasonal-ambient-item,
+      #lsSeasonalAtmosphere::before {
         animation:none !important;
       }
       .ls-seasonal-ambient-item { display:none !important; }
     }
 
-    body.ls-legacy .ls-seasonal-ambient-item {
+    html.ls-legacy .ls-seasonal-ambient-item {
       display:none !important;
     }
+
+    html.ls-legacy #lsSeasonalAtmosphere::before,
+    html.ls-legacy #lsSeasonalAtmosphere::after { display:none !important; }
+    html.ls-legacy #lsSeasonalAtmosphere { opacity:.42; }
 
     ${springExtra}
   `;
   document.head.appendChild(style);
+
+  const atmosphereLayer = document.createElement("div");
+  atmosphereLayer.id = "lsSeasonalAtmosphere";
+  atmosphereLayer.setAttribute("aria-hidden", "true");
+  document.body.prepend(atmosphereLayer);
 
   // Decoramos el logo/área de marca SIN reemplazarlo.
   const nav = document.querySelector("nav");

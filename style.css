@@ -1,3 +1,8 @@
+/* LiveScroll 6.2.1 · visor fluido de Momentos */
+.ls-moment-progress-segment{height:3px;min-width:10px;flex:1;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.22)}
+.ls-moment-progress-segment i{display:block;height:100%;border-radius:inherit;background:#fff}
+.ls-moment-viewer button[aria-label^="Momento"]:focus-visible{outline:2px solid var(--gold);outline-offset:-3px}
+
 :root {
   --ink: #071116;
   --panel: #0D2028;

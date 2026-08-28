@@ -5943,6 +5943,7 @@ async function handleAcceptChangelog() {
 }
 
 let lsMomentsCache = [];
+let lsMomentPreviewUrl = null;
 
 async function loadLiveScrollMoments() {
   const wrap = document.getElementById("lsMomentsWrap");
@@ -5967,17 +5968,46 @@ function openCreateMomentModal() {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap || isLiveScroll7App()) return;
   wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:280;"><div class="modal-box" style="max-width:430px;">
-    <div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">✨ Nuevo Momento</h2><button onclick="closeManagedModal()" class="btn-outline">✕</button></div>
+    <div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">✨ Nuevo Momento</h2><button onclick="closeMomentComposer()" class="btn-outline">✕</button></div>
     <div class="modal-box-body">
       <textarea id="momentContent" maxlength="280" placeholder="¿Qué querés compartir?" style="width:100%;min-height:100px;resize:vertical;"></textarea>
       <label style="display:block;margin-top:12px;font-size:10px;color:var(--text-dim);">Foto o video opcional</label>
       <input id="momentMediaFile" type="file" accept="image/*,video/*" onchange="updateMomentFileStatus(this)" style="width:100%;margin-top:6px;">
       <small id="momentFileStatus" style="display:block;margin-top:7px;color:var(--text-dim);">Máximo 25 MB · una foto o un video</small>
+      <div id="momentMediaPreview" hidden style="position:relative;margin-top:10px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#000;">
+        <div id="momentMediaPreviewContent"></div>
+        <button type="button" onclick="clearMomentFile()" aria-label="Quitar archivo" style="position:absolute;z-index:2;top:8px;right:8px;width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(0,0,0,.72);color:#fff;font-size:16px;">✕</button>
+      </div>
       <div id="momentUploadProgress" hidden style="height:7px;margin-top:10px;border-radius:999px;overflow:hidden;background:var(--panel-2);"><span style="display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--gold),#ff4d85);transition:width .18s ease;"></span></div>
       <div id="momentCreateError" class="error-msg" style="margin-top:8px;"></div>
       <button id="momentPublishBtn" class="btn" style="width:100%;min-height:46px;margin-top:12px;" onclick="publishMoment()">Publicar por 24 horas</button>
     </div>
   </div></div>`;
+}
+
+function releaseMomentPreviewUrl() {
+  if (!lsMomentPreviewUrl) return;
+  URL.revokeObjectURL(lsMomentPreviewUrl);
+  lsMomentPreviewUrl = null;
+}
+
+function closeMomentComposer() {
+  releaseMomentPreviewUrl();
+  closeManagedModal();
+}
+
+function clearMomentFile() {
+  const input = document.getElementById("momentMediaFile");
+  if (input) input.value = "";
+  releaseMomentPreviewUrl();
+  const preview = document.getElementById("momentMediaPreview");
+  const content = document.getElementById("momentMediaPreviewContent");
+  const status = document.getElementById("momentFileStatus");
+  const errorEl = document.getElementById("momentCreateError");
+  if (preview) preview.hidden = true;
+  if (content) content.innerHTML = "";
+  if (status) { status.textContent = "Máximo 25 MB · una foto o un video"; status.style.color = "var(--text-dim)"; }
+  if (errorEl) errorEl.textContent = "";
 }
 
 function formatMomentFileSize(bytes) {
@@ -6000,6 +6030,19 @@ function updateMomentFileStatus(input) {
   if (!status) return;
   status.textContent = file ? `${file.type.startsWith("video/") ? "Video" : "Foto"} · ${formatMomentFileSize(file.size)}` : "Máximo 25 MB · una foto o un video";
   status.style.color = error ? "var(--red)" : "var(--text-dim)";
+  releaseMomentPreviewUrl();
+  const preview = document.getElementById("momentMediaPreview");
+  const previewContent = document.getElementById("momentMediaPreviewContent");
+  if (!file || error || !preview || !previewContent) {
+    if (preview) preview.hidden = true;
+    if (previewContent) previewContent.innerHTML = "";
+    return;
+  }
+  lsMomentPreviewUrl = URL.createObjectURL(file);
+  previewContent.innerHTML = file.type.startsWith("video/")
+    ? `<video src="${lsMomentPreviewUrl}" controls muted playsinline preload="metadata" style="display:block;width:100%;max-height:300px;object-fit:contain;"></video>`
+    : `<img src="${lsMomentPreviewUrl}" alt="Vista previa del Momento" style="display:block;width:100%;max-height:300px;object-fit:contain;">`;
+  preview.hidden = false;
 }
 
 async function publishMoment() {
@@ -6029,7 +6072,7 @@ async function publishMoment() {
     }
     const { data,error } = await sb.rpc("create_moment",{p_content:content||null,p_media_url:mediaUrl,p_media_type:mediaType});
     if (error || !data?.ok) throw new Error(data?.error || error?.message || "create_failed");
-    closeManagedModal();
+    closeMomentComposer();
     showToast("Momento publicado por 24 horas ✨");
     loadLiveScrollMoments();
   } catch (error) {
@@ -6042,6 +6085,8 @@ async function publishMoment() {
 }
 
 window.updateMomentFileStatus = updateMomentFileStatus;
+window.clearMomentFile = clearMomentFile;
+window.closeMomentComposer = closeMomentComposer;
 
 let lsMomentAdvanceTimer = null;
 let lsMomentPointerStartX = null;
@@ -6999,6 +7044,7 @@ function ensureSafeMobileUpgradeStyles() {
 }
 
 function closeManagedModal() {
+  releaseMomentPreviewUrl();
   if (document.querySelector(".ls-moment-viewer") && typeof stopMomentPlayback === "function") {
     stopMomentPlayback();
     lsMomentCurrentIndex = -1;

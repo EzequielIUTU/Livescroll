@@ -120,7 +120,7 @@ let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
-async function uploadMediaToR2(file, options = {}) {
+async function uploadMediaToR2(file) {
   if (!(file instanceof Blob) || !file.size) throw new Error("El archivo está vacío");
 
   const { data:{ session }, error:sessionError } = await sb.auth.getSession();
@@ -128,40 +128,19 @@ async function uploadMediaToR2(file, options = {}) {
     throw new Error("Tu sesión venció. Volvé a iniciar sesión para subir el archivo.");
   }
 
-  let responseOk = false;
-  let result = null;
-  if (typeof options.onProgress === "function") {
-    result = await new Promise((resolve, reject) => {
-      const request = new XMLHttpRequest();
-      request.open("POST", `${LIVESCROLL_MEDIA_API}/upload`);
-      request.timeout = Number(options.timeoutMs) || 120000;
-      request.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
-      request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-      request.upload.onprogress = event => {
-        if (event.lengthComputable) options.onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
-      };
-      request.onload = () => {
-        responseOk = request.status >= 200 && request.status < 300;
-        try { resolve(JSON.parse(request.responseText || "null")); } catch (_) { resolve(null); }
-      };
-      request.onerror = () => reject(new Error("Se cortó la conexión durante la subida."));
-      request.ontimeout = () => reject(new Error("La subida tardó demasiado. Revisá tu conexión e intentá nuevamente."));
-      request.send(file);
-    });
-  } else {
-    const response = await fetch(`${LIVESCROLL_MEDIA_API}/upload`, {
-      method:"POST",
-      headers:{
-        "Authorization":`Bearer ${session.access_token}`,
-        "Content-Type":file.type || "application/octet-stream"
-      },
-      body:file
-    });
-    responseOk = response.ok;
-    try { result = await response.json(); } catch (_) {}
-  }
+  const response = await fetch(`${LIVESCROLL_MEDIA_API}/upload`, {
+    method:"POST",
+    headers:{
+      "Authorization":`Bearer ${session.access_token}`,
+      "Content-Type":file.type || "application/octet-stream"
+    },
+    body:file
+  });
 
-  if (!responseOk || !result?.ok || !result?.url) {
+  let result = null;
+  try { result = await response.json(); } catch (_) {}
+
+  if (!response.ok || !result?.ok || !result?.url) {
     const messages = {
       usuario_no_autorizado:"Tu sesión venció. Volvé a iniciar sesión.",
       tipo_de_archivo_no_permitido:"Ese formato todavía no está permitido.",
@@ -5942,266 +5921,6 @@ async function handleAcceptChangelog() {
   }
 }
 
-let lsMomentsCache = [];
-let lsMomentPreviewUrl = null;
-
-async function loadLiveScrollMoments() {
-  const wrap = document.getElementById("lsMomentsWrap");
-  if (!wrap || isLiveScroll7App()) return;
-  try {
-    const { data, error } = await sb.rpc("get_active_moments");
-    if (error || !Array.isArray(data)) { wrap.innerHTML = ""; return; }
-    lsMomentsCache = data;
-    const items = data.slice(0,18);
-    wrap.innerHTML = `
-      <section style="margin-bottom:12px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;"><strong style="font-size:11px;">Momentos</strong><small style="color:var(--text-dim);font-size:8px;">DURAN 24 H</small></div>
-        <div style="display:flex;gap:10px;overflow-x:auto;padding:2px 1px 7px;scrollbar-width:none;">
-          <button type="button" onclick="openCreateMomentModal()" style="flex:0 0 58px;border:0;background:none;color:var(--text);padding:0;cursor:pointer;"><span style="width:52px;height:52px;display:grid;place-items:center;margin:auto;border:1px dashed var(--gold);border-radius:50%;background:var(--panel);font-size:24px;">＋</span><small style="display:block;margin-top:4px;font-size:8px;">Crear</small></button>
-          ${items.map((moment,index) => `<button type="button" onclick="openMomentViewer(${index})" style="flex:0 0 58px;border:0;background:none;color:var(--text);padding:0;cursor:pointer;"><span style="width:52px;height:52px;display:grid;place-items:center;margin:auto;padding:2px;border-radius:50%;background:linear-gradient(135deg,#f2c94c,#ff4d85,#7c5cff);"><span style="width:100%;height:100%;display:grid;place-items:center;border:2px solid var(--ink);border-radius:50%;overflow:hidden;background:var(--panel);font-size:21px;">${moment.avatar_url ? `<img src="${escapeHtml(moment.avatar_url)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;">` : escapeHtml(moment.avatar_emoji || "🎬")}</span></span><small style="display:block;margin-top:4px;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@${escapeHtml(moment.username)}</small></button>`).join("")}
-        </div>
-      </section>`;
-  } catch (_) { wrap.innerHTML = ""; }
-}
-
-function openCreateMomentModal() {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap || isLiveScroll7App()) return;
-  wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:280;"><div class="modal-box" style="max-width:430px;">
-    <div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">✨ Nuevo Momento</h2><button onclick="closeMomentComposer()" class="btn-outline">✕</button></div>
-    <div class="modal-box-body">
-      <textarea id="momentContent" maxlength="280" placeholder="¿Qué querés compartir?" style="width:100%;min-height:100px;resize:vertical;"></textarea>
-      <label style="display:block;margin-top:12px;font-size:10px;color:var(--text-dim);">Foto o video opcional</label>
-      <input id="momentMediaFile" type="file" accept="image/*,video/*" onchange="updateMomentFileStatus(this)" style="width:100%;margin-top:6px;">
-      <small id="momentFileStatus" style="display:block;margin-top:7px;color:var(--text-dim);">Máximo 25 MB · una foto o un video</small>
-      <div id="momentMediaPreview" hidden style="position:relative;margin-top:10px;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#000;">
-        <div id="momentMediaPreviewContent"></div>
-        <button type="button" onclick="clearMomentFile()" aria-label="Quitar archivo" style="position:absolute;z-index:2;top:8px;right:8px;width:34px;height:34px;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(0,0,0,.72);color:#fff;font-size:16px;">✕</button>
-      </div>
-      <div id="momentUploadProgress" hidden style="height:7px;margin-top:10px;border-radius:999px;overflow:hidden;background:var(--panel-2);"><span style="display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--gold),#ff4d85);transition:width .18s ease;"></span></div>
-      <div id="momentCreateError" class="error-msg" style="margin-top:8px;"></div>
-      <button id="momentPublishBtn" class="btn" style="width:100%;min-height:46px;margin-top:12px;" onclick="publishMoment()">Publicar por 24 horas</button>
-    </div>
-  </div></div>`;
-}
-
-function releaseMomentPreviewUrl() {
-  if (!lsMomentPreviewUrl) return;
-  URL.revokeObjectURL(lsMomentPreviewUrl);
-  lsMomentPreviewUrl = null;
-}
-
-function closeMomentComposer() {
-  releaseMomentPreviewUrl();
-  closeManagedModal();
-}
-
-function clearMomentFile() {
-  const input = document.getElementById("momentMediaFile");
-  if (input) input.value = "";
-  releaseMomentPreviewUrl();
-  const preview = document.getElementById("momentMediaPreview");
-  const content = document.getElementById("momentMediaPreviewContent");
-  const status = document.getElementById("momentFileStatus");
-  const errorEl = document.getElementById("momentCreateError");
-  if (preview) preview.hidden = true;
-  if (content) content.innerHTML = "";
-  if (status) { status.textContent = "Máximo 25 MB · una foto o un video"; status.style.color = "var(--text-dim)"; }
-  if (errorEl) errorEl.textContent = "";
-}
-
-function formatMomentFileSize(bytes) {
-  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
-}
-
-function validateMomentFile(file) {
-  if (!file) return "";
-  if (!file.type?.startsWith("image/") && !file.type?.startsWith("video/")) return "Elegí una foto o un video válido.";
-  if (file.size > 25 * 1024 * 1024) return "El archivo supera los 25 MB.";
-  return "";
-}
-
-function updateMomentFileStatus(input) {
-  const file = input?.files?.[0] || null;
-  const status = document.getElementById("momentFileStatus");
-  const errorEl = document.getElementById("momentCreateError");
-  const error = validateMomentFile(file);
-  if (errorEl) errorEl.textContent = error;
-  if (!status) return;
-  status.textContent = file ? `${file.type.startsWith("video/") ? "Video" : "Foto"} · ${formatMomentFileSize(file.size)}` : "Máximo 25 MB · una foto o un video";
-  status.style.color = error ? "var(--red)" : "var(--text-dim)";
-  releaseMomentPreviewUrl();
-  const preview = document.getElementById("momentMediaPreview");
-  const previewContent = document.getElementById("momentMediaPreviewContent");
-  if (!file || error || !preview || !previewContent) {
-    if (preview) preview.hidden = true;
-    if (previewContent) previewContent.innerHTML = "";
-    return;
-  }
-  lsMomentPreviewUrl = URL.createObjectURL(file);
-  previewContent.innerHTML = file.type.startsWith("video/")
-    ? `<video src="${lsMomentPreviewUrl}" controls muted playsinline preload="metadata" style="display:block;width:100%;max-height:300px;object-fit:contain;"></video>`
-    : `<img src="${lsMomentPreviewUrl}" alt="Vista previa del Momento" style="display:block;width:100%;max-height:300px;object-fit:contain;">`;
-  preview.hidden = false;
-}
-
-async function publishMoment() {
-  const content = document.getElementById("momentContent")?.value?.trim() || "";
-  const file = document.getElementById("momentMediaFile")?.files?.[0] || null;
-  const errorEl = document.getElementById("momentCreateError");
-  const button = document.getElementById("momentPublishBtn");
-  if (!content && !file) { if (errorEl) errorEl.textContent="Escribí algo o elegí un archivo."; return; }
-  const fileError = validateMomentFile(file);
-  if (fileError) { if (errorEl) errorEl.textContent=fileError; return; }
-  if (button) { button.disabled=true; button.textContent=file ? "Subiendo..." : "Publicando..."; }
-  if (errorEl) errorEl.textContent="";
-
-  let mediaUrl=null, mediaType=null;
-  try {
-    if (file) {
-      const progress = document.getElementById("momentUploadProgress");
-      const progressBar = progress?.querySelector("span");
-      if (progress) progress.hidden=false;
-      const uploaded = await uploadMediaToR2(file, { onProgress:percent => {
-        if (progressBar) progressBar.style.width=`${percent}%`;
-        if (button) button.textContent=`Subiendo ${percent}%`;
-      }});
-      mediaUrl = uploaded?.url || null;
-      mediaType = file.type.startsWith("video/") ? "video" : "image";
-      if (!mediaUrl) throw new Error("No recibimos la confirmación del archivo. Intentá nuevamente.");
-    }
-    const { data,error } = await sb.rpc("create_moment",{p_content:content||null,p_media_url:mediaUrl,p_media_type:mediaType});
-    if (error || !data?.ok) throw new Error(data?.error || error?.message || "create_failed");
-    closeMomentComposer();
-    showToast("Momento publicado por 24 horas ✨");
-    loadLiveScrollMoments();
-  } catch (error) {
-    if (mediaUrl) deleteMediaFromR2(mediaUrl).catch(()=>{});
-    if (errorEl) errorEl.textContent=error?.message || "No pudimos publicar el Momento. Revisá tu conexión e intentá nuevamente.";
-    const progress = document.getElementById("momentUploadProgress");
-    if (progress) progress.hidden=true;
-    if (button) { button.disabled=false; button.textContent="Reintentar publicación"; }
-  }
-}
-
-window.updateMomentFileStatus = updateMomentFileStatus;
-window.clearMomentFile = clearMomentFile;
-window.closeMomentComposer = closeMomentComposer;
-
-let lsMomentAdvanceTimer = null;
-let lsMomentPointerStartX = null;
-let lsMomentCurrentIndex = -1;
-
-function stopMomentPlayback() {
-  if (lsMomentAdvanceTimer) clearTimeout(lsMomentAdvanceTimer);
-  lsMomentAdvanceTimer = null;
-  document.getElementById("lsMomentActiveVideo")?.pause?.();
-}
-
-function closeMomentViewer() {
-  stopMomentPlayback();
-  lsMomentCurrentIndex = -1;
-  closeManagedModal();
-}
-
-function startMomentProgress(duration = 6000) {
-  if (lsMomentAdvanceTimer) clearTimeout(lsMomentAdvanceTimer);
-  const bar = document.querySelector(".ls-moment-progress-segment.is-active i");
-  if (bar) {
-    bar.style.transition = "none";
-    bar.style.width = "0";
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      bar.style.transition = `width ${duration}ms linear`;
-      bar.style.width = "100%";
-    }));
-  }
-  lsMomentAdvanceTimer = setTimeout(() => moveMoment(1), duration);
-}
-
-function moveMoment(direction) {
-  stopMomentPlayback();
-  const next = lsMomentCurrentIndex + Number(direction || 0);
-  if (next < 0) return openMomentViewer(0);
-  if (next >= lsMomentsCache.length) return closeMomentViewer();
-  openMomentViewer(next);
-}
-
-function handleMomentPointerDown(event) {
-  lsMomentPointerStartX = event?.clientX ?? null;
-}
-
-function handleMomentPointerUp(event) {
-  if (lsMomentPointerStartX === null) return;
-  const distance = (event?.clientX ?? lsMomentPointerStartX) - lsMomentPointerStartX;
-  lsMomentPointerStartX = null;
-  if (Math.abs(distance) < 55) return;
-  moveMoment(distance < 0 ? 1 : -1);
-}
-
-function openMomentViewer(index) {
-  const moment=lsMomentsCache[index];
-  if (!moment) return;
-  stopMomentPlayback();
-  lsMomentCurrentIndex=index;
-  const isOwner=String(moment.user_id)===String(currentUser?.id);
-  if (!isOwner) sb.rpc("record_moment_view",{p_moment_id:moment.id}).then(()=>{},()=>{});
-  const wrap=document.getElementById("globalModalWrap");
-  if (!wrap) return;
-  const media = moment.media_type==="video"
-    ? `<video id="lsMomentActiveVideo" src="${escapeHtml(moment.media_url)}" controls autoplay playsinline onplay="startMomentProgress(Math.max(1000,(this.duration||6)*1000))" onended="moveMoment(1)" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;"></video>`
-    : moment.media_type==="image"
-      ? `<img src="${escapeHtml(moment.media_url)}" alt="Momento de @${escapeHtml(moment.username)}" decoding="async" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;">`
-      : "";
-  const progress=lsMomentsCache.map((_,itemIndex)=>`<span class="ls-moment-progress-segment${itemIndex===index ? " is-active" : ""}"><i style="width:${itemIndex<index ? "100%" : "0"};"></i></span>`).join("");
-  wrap.innerHTML=`<div class="modal-overlay" style="z-index:285;background:rgba(0,0,0,.92);" onclick="if(event.target===this) closeMomentViewer()"><div class="ls-moment-viewer" onpointerdown="handleMomentPointerDown(event)" onpointerup="handleMomentPointerUp(event)" style="position:relative;width:min(430px,100%);max-height:92dvh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:var(--panel);touch-action:pan-y;">
-    <div style="display:flex;gap:4px;padding:9px 10px 0;">${progress}</div>
-    <header style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 13px 11px;"><strong>@${escapeHtml(moment.username)}</strong><span style="display:flex;gap:7px;">${isOwner ? `<button onclick="event.stopPropagation();deleteOwnMoment('${moment.id}')" class="btn-outline" style="color:var(--red);">Eliminar</button>` : ""}<button onclick="event.stopPropagation();closeMomentViewer()" class="btn-outline">✕</button></span></header>
-    <div style="position:relative;">${media}<button type="button" aria-label="Momento anterior" onclick="event.stopPropagation();moveMoment(-1)" style="position:absolute;z-index:2;inset:0 auto 46px 0;width:25%;border:0;background:transparent;"></button><button type="button" aria-label="Momento siguiente" onclick="event.stopPropagation();moveMoment(1)" style="position:absolute;z-index:2;inset:0 0 46px auto;width:25%;border:0;background:transparent;"></button></div>
-    ${moment.content ? `<p style="padding:13px;margin:0;line-height:1.5;">${escapeHtml(moment.content)}</p>` : ""}
-    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${isOwner ? `<button class="btn-outline" onclick="event.stopPropagation();openMomentViewers('${moment.id}')">👁 ${Number(moment.view_count||0)} espectadores</button>` : ["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="event.stopPropagation();reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}${!isOwner ? `<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small>` : ""}</div>
-  </div></div>`;
-  if (moment.media_type!=="video") startMomentProgress(moment.media_type==="image" ? 6500 : 8000);
-}
-
-window.closeMomentViewer=closeMomentViewer;
-window.startMomentProgress=startMomentProgress;
-window.moveMoment=moveMoment;
-window.handleMomentPointerDown=handleMomentPointerDown;
-window.handleMomentPointerUp=handleMomentPointerUp;
-
-async function openMomentViewers(momentId) {
-  stopMomentPlayback();
-  const wrap=document.getElementById("globalModalWrap");
-  if(!wrap) return;
-  wrap.innerHTML=`<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:290;"><div class="modal-box" style="max-width:430px;"><div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">👁 Espectadores</h2><button class="btn-outline" onclick="closeManagedModal()">✕</button></div><div id="momentViewersList" class="modal-box-body">Cargando...</div></div></div>`;
-  const {data,error}=await sb.rpc("get_moment_viewers",{p_moment_id:momentId});
-  const list=document.getElementById("momentViewersList");
-  if(!list) return;
-  if(error||!data?.ok){list.textContent="No pudimos cargar los espectadores.";return;}
-  const viewers=data.viewers||[];
-  if(!viewers.length){list.innerHTML=`<div style="padding:24px;text-align:center;color:var(--text-dim);">Todavía nadie vio este Momento.</div>`;return;}
-  list.innerHTML=viewers.map(viewer=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);"><span style="width:38px;height:38px;display:grid;place-items:center;border-radius:50%;overflow:hidden;background:var(--panel-2);">${viewer.avatar_url?`<img src="${escapeHtml(viewer.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;">`:escapeHtml(viewer.avatar_emoji||"🎬")}</span><strong style="font-size:11px;">@${escapeHtml(viewer.username)}</strong></div>`).join("");
-}
-
-async function deleteOwnMoment(momentId) {
-  stopMomentPlayback();
-  if(!confirm("¿Eliminar este Momento?")) return;
-  const {data,error}=await sb.rpc("delete_my_moment",{p_moment_id:momentId});
-  if(error||!data?.ok){showToast("No pudimos eliminar el Momento");return;}
-  if(data.media_url) await deleteMediaFromR2(data.media_url);
-  closeManagedModal();
-  lsMomentsCache=lsMomentsCache.filter(moment=>moment.id!==momentId);
-  loadLiveScrollMoments();
-  showToast("Momento eliminado");
-}
-
-async function reactToMoment(momentId,emoji,button) {
-  const {data,error}=await sb.rpc("react_to_moment",{p_moment_id:momentId,p_emoji:emoji});
-  if(error||!data?.ok) return;
-  button?.classList.add("active");
-  showToast(`${emoji} Reacción enviada`);
-}
-
 async function recordDailyChallengeEvent(type, targetId) {
   if (!currentUser?.id || !targetId) return;
   try {
@@ -7044,11 +6763,6 @@ function ensureSafeMobileUpgradeStyles() {
 }
 
 function closeManagedModal() {
-  releaseMomentPreviewUrl();
-  if (document.querySelector(".ls-moment-viewer") && typeof stopMomentPlayback === "function") {
-    stopMomentPlayback();
-    lsMomentCurrentIndex = -1;
-  }
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
 }
@@ -7803,11 +7517,9 @@ async function renderFeed(renderToken = lsTabRenderToken) {
 
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
-    <div id="lsMomentsWrap"></div>
     <div id="lsDailyChallengeWrap"></div>
     <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
   checkAndShowLoginStreak();
-  loadLiveScrollMoments();
   loadDailyChallenges();
 
   const feedResult = await loadFeedVideosCached();

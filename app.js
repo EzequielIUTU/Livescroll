@@ -7658,16 +7658,49 @@ function preloadFeedVideo(video) {
 function activateLoadedEmbed(video) {
   if (!video) return;
   const player = document.querySelector(`#embed-${video.id} video`);
-  if (player) {
-    player.autoplay = true;
-    const startPlayback = () => {
-      if (!player.isConnected) return;
-      player.closest(".feed-embed-frame")?.classList.add("ls-video-frame-ready");
-      player.play().catch(() => {});
-    };
-    if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) startPlayback();
-    else player.addEventListener("loadeddata", startPlayback, { once:true });
-  }
+  if (!player) return;
+
+  // Cada activación recibe un identificador. Así una respuesta de carga antigua
+  // nunca puede volver a reproducir audio cuando la tarjeta ya salió de pantalla.
+  const requestId = String((Number(player.dataset.lsPlaybackRequest || 0) + 1));
+  player.dataset.lsPlaybackRequest = requestId;
+  player.dataset.lsPlaybackWanted = "1";
+  player.autoplay = true;
+
+  const isStillActive = () =>
+    player.isConnected &&
+    player.dataset.lsPlaybackWanted === "1" &&
+    player.dataset.lsPlaybackRequest === requestId &&
+    player.closest(".feed-item")?.classList.contains("ls-feed-active");
+
+  const markDecodedFrame = () => {
+    if (!isStillActive()) return;
+    player.closest(".feed-embed-frame")?.classList.add("ls-video-frame-ready");
+    player.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
+  };
+
+  const startPlayback = () => {
+    if (!isStillActive()) return;
+    const frame = player.closest(".feed-embed-frame");
+    frame?.classList.add("ls-video-frame-buffering");
+
+    player.play()
+      .then(() => {
+        if (!isStillActive()) {
+          try { player.pause(); } catch (_) {}
+          return;
+        }
+        if (typeof player.requestVideoFrameCallback === "function") {
+          player.requestVideoFrameCallback(markDecodedFrame);
+        } else {
+          requestAnimationFrame(markDecodedFrame);
+        }
+      })
+      .catch(() => frame?.classList.remove("ls-video-frame-buffering"));
+  };
+
+  if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) startPlayback();
+  else player.addEventListener("loadeddata", startPlayback, { once:true });
 }
 
 function pauseFeedMedia(videoId = null) {
@@ -7676,6 +7709,10 @@ function pauseFeedMedia(videoId = null) {
     : ".feed-item video, .feed-item audio";
 
   document.querySelectorAll(selector).forEach(media => {
+    media.dataset.lsPlaybackWanted = "0";
+    media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+    media.autoplay = false;
+    media.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
     try { media.pause(); } catch (_) {}
   });
 }
@@ -7685,6 +7722,10 @@ function pauseAllFeedMediaExcept(videoId) {
     const host = media.closest("[id^='embed-']");
     const hostId = host?.id?.replace("embed-", "");
     if (String(hostId) !== String(videoId)) {
+      media.dataset.lsPlaybackWanted = "0";
+      media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+      media.autoplay = false;
+      media.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
       try { media.pause(); } catch (_) {}
     }
   });
@@ -7694,6 +7735,9 @@ function releaseFeedMediaElement(el) {
   if (!el) return;
 
   el.querySelectorAll("video, audio").forEach(media => {
+    media.dataset.lsPlaybackWanted = "0";
+    media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+    media.autoplay = false;
     try { media.pause(); } catch (_) {}
     try {
       media.removeAttribute("src");
@@ -7956,8 +8000,9 @@ function initLazyProfilePreviews() {
   lsProfilePreviewBusy = false;
   const covers = document.querySelectorAll(".ls-lazy-video-cover[data-ls-preview-src]");
   document.querySelectorAll(".video-grid-tile > img").forEach((image, index) => {
+    image.decoding = "async";
     if (index < 4) image.loading = "eager";
-    image.fetchPriority = index < 2 ? "high" : "low";
+    image.fetchPriority = index < 3 ? "high" : "low";
   });
   if (!covers.length) return;
 

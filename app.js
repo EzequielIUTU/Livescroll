@@ -6043,27 +6043,89 @@ async function publishMoment() {
 
 window.updateMomentFileStatus = updateMomentFileStatus;
 
+let lsMomentAdvanceTimer = null;
+let lsMomentPointerStartX = null;
+let lsMomentCurrentIndex = -1;
+
+function stopMomentPlayback() {
+  if (lsMomentAdvanceTimer) clearTimeout(lsMomentAdvanceTimer);
+  lsMomentAdvanceTimer = null;
+  document.getElementById("lsMomentActiveVideo")?.pause?.();
+}
+
+function closeMomentViewer() {
+  stopMomentPlayback();
+  lsMomentCurrentIndex = -1;
+  closeManagedModal();
+}
+
+function startMomentProgress(duration = 6000) {
+  if (lsMomentAdvanceTimer) clearTimeout(lsMomentAdvanceTimer);
+  const bar = document.querySelector(".ls-moment-progress-segment.is-active i");
+  if (bar) {
+    bar.style.transition = "none";
+    bar.style.width = "0";
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = `width ${duration}ms linear`;
+      bar.style.width = "100%";
+    }));
+  }
+  lsMomentAdvanceTimer = setTimeout(() => moveMoment(1), duration);
+}
+
+function moveMoment(direction) {
+  stopMomentPlayback();
+  const next = lsMomentCurrentIndex + Number(direction || 0);
+  if (next < 0) return openMomentViewer(0);
+  if (next >= lsMomentsCache.length) return closeMomentViewer();
+  openMomentViewer(next);
+}
+
+function handleMomentPointerDown(event) {
+  lsMomentPointerStartX = event?.clientX ?? null;
+}
+
+function handleMomentPointerUp(event) {
+  if (lsMomentPointerStartX === null) return;
+  const distance = (event?.clientX ?? lsMomentPointerStartX) - lsMomentPointerStartX;
+  lsMomentPointerStartX = null;
+  if (Math.abs(distance) < 55) return;
+  moveMoment(distance < 0 ? 1 : -1);
+}
+
 function openMomentViewer(index) {
   const moment=lsMomentsCache[index];
   if (!moment) return;
+  stopMomentPlayback();
+  lsMomentCurrentIndex=index;
   const isOwner=String(moment.user_id)===String(currentUser?.id);
   if (!isOwner) sb.rpc("record_moment_view",{p_moment_id:moment.id}).then(()=>{},()=>{});
   const wrap=document.getElementById("globalModalWrap");
   if (!wrap) return;
   const media = moment.media_type==="video"
-    ? `<video src="${escapeHtml(moment.media_url)}" controls autoplay playsinline style="width:100%;max-height:58dvh;object-fit:contain;background:#000;"></video>`
+    ? `<video id="lsMomentActiveVideo" src="${escapeHtml(moment.media_url)}" controls autoplay playsinline onplay="startMomentProgress(Math.max(1000,(this.duration||6)*1000))" onended="moveMoment(1)" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;"></video>`
     : moment.media_type==="image"
-      ? `<img src="${escapeHtml(moment.media_url)}" alt="Momento de @${escapeHtml(moment.username)}" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;">`
+      ? `<img src="${escapeHtml(moment.media_url)}" alt="Momento de @${escapeHtml(moment.username)}" decoding="async" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;">`
       : "";
-  wrap.innerHTML=`<div class="modal-overlay" style="z-index:285;background:rgba(0,0,0,.92);" onclick="if(event.target===this) closeManagedModal()"><div style="width:min(430px,100%);max-height:92dvh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:var(--panel);">
-    <header style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 13px;"><strong>@${escapeHtml(moment.username)}</strong><span style="display:flex;gap:7px;">${isOwner ? `<button onclick="deleteOwnMoment('${moment.id}')" class="btn-outline" style="color:var(--red);">Eliminar</button>` : ""}<button onclick="closeManagedModal()" class="btn-outline">✕</button></span></header>
-    ${media}
+  const progress=lsMomentsCache.map((_,itemIndex)=>`<span class="ls-moment-progress-segment${itemIndex===index ? " is-active" : ""}"><i style="width:${itemIndex<index ? "100%" : "0"};"></i></span>`).join("");
+  wrap.innerHTML=`<div class="modal-overlay" style="z-index:285;background:rgba(0,0,0,.92);" onclick="if(event.target===this) closeMomentViewer()"><div class="ls-moment-viewer" onpointerdown="handleMomentPointerDown(event)" onpointerup="handleMomentPointerUp(event)" style="position:relative;width:min(430px,100%);max-height:92dvh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:var(--panel);touch-action:pan-y;">
+    <div style="display:flex;gap:4px;padding:9px 10px 0;">${progress}</div>
+    <header style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 13px 11px;"><strong>@${escapeHtml(moment.username)}</strong><span style="display:flex;gap:7px;">${isOwner ? `<button onclick="event.stopPropagation();deleteOwnMoment('${moment.id}')" class="btn-outline" style="color:var(--red);">Eliminar</button>` : ""}<button onclick="event.stopPropagation();closeMomentViewer()" class="btn-outline">✕</button></span></header>
+    <div style="position:relative;">${media}<button type="button" aria-label="Momento anterior" onclick="event.stopPropagation();moveMoment(-1)" style="position:absolute;z-index:2;inset:0 auto 46px 0;width:25%;border:0;background:transparent;"></button><button type="button" aria-label="Momento siguiente" onclick="event.stopPropagation();moveMoment(1)" style="position:absolute;z-index:2;inset:0 0 46px auto;width:25%;border:0;background:transparent;"></button></div>
     ${moment.content ? `<p style="padding:13px;margin:0;line-height:1.5;">${escapeHtml(moment.content)}</p>` : ""}
-    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${isOwner ? `<button class="btn-outline" onclick="openMomentViewers('${moment.id}')">👁 ${Number(moment.view_count||0)} espectadores</button>` : ["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}${!isOwner ? `<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small>` : ""}</div>
+    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${isOwner ? `<button class="btn-outline" onclick="event.stopPropagation();openMomentViewers('${moment.id}')">👁 ${Number(moment.view_count||0)} espectadores</button>` : ["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="event.stopPropagation();reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}${!isOwner ? `<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small>` : ""}</div>
   </div></div>`;
+  if (moment.media_type!=="video") startMomentProgress(moment.media_type==="image" ? 6500 : 8000);
 }
 
+window.closeMomentViewer=closeMomentViewer;
+window.startMomentProgress=startMomentProgress;
+window.moveMoment=moveMoment;
+window.handleMomentPointerDown=handleMomentPointerDown;
+window.handleMomentPointerUp=handleMomentPointerUp;
+
 async function openMomentViewers(momentId) {
+  stopMomentPlayback();
   const wrap=document.getElementById("globalModalWrap");
   if(!wrap) return;
   wrap.innerHTML=`<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:290;"><div class="modal-box" style="max-width:430px;"><div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">👁 Espectadores</h2><button class="btn-outline" onclick="closeManagedModal()">✕</button></div><div id="momentViewersList" class="modal-box-body">Cargando...</div></div></div>`;
@@ -6077,6 +6139,7 @@ async function openMomentViewers(momentId) {
 }
 
 async function deleteOwnMoment(momentId) {
+  stopMomentPlayback();
   if(!confirm("¿Eliminar este Momento?")) return;
   const {data,error}=await sb.rpc("delete_my_moment",{p_moment_id:momentId});
   if(error||!data?.ok){showToast("No pudimos eliminar el Momento");return;}
@@ -6936,6 +6999,10 @@ function ensureSafeMobileUpgradeStyles() {
 }
 
 function closeManagedModal() {
+  if (document.querySelector(".ls-moment-viewer") && typeof stopMomentPlayback === "function") {
+    stopMomentPlayback();
+    lsMomentCurrentIndex = -1;
+  }
   const wrap = document.getElementById("globalModalWrap");
   if (wrap) wrap.innerHTML = "";
 }

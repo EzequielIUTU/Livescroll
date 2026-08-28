@@ -5921,6 +5921,97 @@ async function handleAcceptChangelog() {
   }
 }
 
+let lsMomentsCache = [];
+
+async function loadLiveScrollMoments() {
+  const wrap = document.getElementById("lsMomentsWrap");
+  if (!wrap || isLiveScroll7App()) return;
+  try {
+    const { data, error } = await sb.rpc("get_active_moments");
+    if (error || !Array.isArray(data)) { wrap.innerHTML = ""; return; }
+    lsMomentsCache = data;
+    const items = data.slice(0,18);
+    wrap.innerHTML = `
+      <section style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;"><strong style="font-size:11px;">Momentos</strong><small style="color:var(--text-dim);font-size:8px;">DURAN 24 H</small></div>
+        <div style="display:flex;gap:10px;overflow-x:auto;padding:2px 1px 7px;scrollbar-width:none;">
+          <button type="button" onclick="openCreateMomentModal()" style="flex:0 0 58px;border:0;background:none;color:var(--text);padding:0;cursor:pointer;"><span style="width:52px;height:52px;display:grid;place-items:center;margin:auto;border:1px dashed var(--gold);border-radius:50%;background:var(--panel);font-size:24px;">＋</span><small style="display:block;margin-top:4px;font-size:8px;">Crear</small></button>
+          ${items.map((moment,index) => `<button type="button" onclick="openMomentViewer(${index})" style="flex:0 0 58px;border:0;background:none;color:var(--text);padding:0;cursor:pointer;"><span style="width:52px;height:52px;display:grid;place-items:center;margin:auto;padding:2px;border-radius:50%;background:linear-gradient(135deg,#f2c94c,#ff4d85,#7c5cff);"><span style="width:100%;height:100%;display:grid;place-items:center;border:2px solid var(--ink);border-radius:50%;overflow:hidden;background:var(--panel);font-size:21px;">${moment.avatar_url ? `<img src="${escapeHtml(moment.avatar_url)}" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;">` : escapeHtml(moment.avatar_emoji || "🎬")}</span></span><small style="display:block;margin-top:4px;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@${escapeHtml(moment.username)}</small></button>`).join("")}
+        </div>
+      </section>`;
+  } catch (_) { wrap.innerHTML = ""; }
+}
+
+function openCreateMomentModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap || isLiveScroll7App()) return;
+  wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:280;"><div class="modal-box" style="max-width:430px;">
+    <div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">✨ Nuevo Momento</h2><button onclick="closeManagedModal()" class="btn-outline">✕</button></div>
+    <div class="modal-box-body">
+      <textarea id="momentContent" maxlength="280" placeholder="¿Qué querés compartir?" style="width:100%;min-height:100px;resize:vertical;"></textarea>
+      <label style="display:block;margin-top:12px;font-size:10px;color:var(--text-dim);">Foto o video opcional</label>
+      <input id="momentMediaFile" type="file" accept="image/*,video/*" style="width:100%;margin-top:6px;">
+      <div id="momentCreateError" class="error-msg" style="margin-top:8px;"></div>
+      <button id="momentPublishBtn" class="btn" style="width:100%;min-height:46px;margin-top:12px;" onclick="publishMoment()">Publicar por 24 horas</button>
+    </div>
+  </div></div>`;
+}
+
+async function publishMoment() {
+  const content = document.getElementById("momentContent")?.value?.trim() || "";
+  const file = document.getElementById("momentMediaFile")?.files?.[0] || null;
+  const errorEl = document.getElementById("momentCreateError");
+  const button = document.getElementById("momentPublishBtn");
+  if (!content && !file) { if (errorEl) errorEl.textContent="Escribí algo o elegí un archivo."; return; }
+  if (file && file.size > 25 * 1024 * 1024) { if (errorEl) errorEl.textContent="El archivo supera los 25 MB."; return; }
+  if (button) { button.disabled=true; button.textContent=file ? "Subiendo..." : "Publicando..."; }
+
+  let mediaUrl=null, mediaType=null;
+  try {
+    if (file) {
+      const uploaded = await uploadMediaToR2(file);
+      mediaUrl = uploaded?.url || null;
+      mediaType = file.type.startsWith("video/") ? "video" : "image";
+      if (!mediaUrl) throw new Error("upload_failed");
+    }
+    const { data,error } = await sb.rpc("create_moment",{p_content:content||null,p_media_url:mediaUrl,p_media_type:mediaType});
+    if (error || !data?.ok) throw new Error(data?.error || error?.message || "create_failed");
+    closeManagedModal();
+    showToast("Momento publicado por 24 horas ✨");
+    loadLiveScrollMoments();
+  } catch (_) {
+    if (mediaUrl) deleteMediaFromR2(mediaUrl).catch(()=>{});
+    if (errorEl) errorEl.textContent="No pudimos publicar el Momento.";
+    if (button) { button.disabled=false; button.textContent="Publicar por 24 horas"; }
+  }
+}
+
+function openMomentViewer(index) {
+  const moment=lsMomentsCache[index];
+  if (!moment) return;
+  sb.rpc("record_moment_view",{p_moment_id:moment.id}).catch(()=>{});
+  const wrap=document.getElementById("globalModalWrap");
+  if (!wrap) return;
+  const media = moment.media_type==="video"
+    ? `<video src="${escapeHtml(moment.media_url)}" controls autoplay playsinline style="width:100%;max-height:58dvh;object-fit:contain;background:#000;"></video>`
+    : moment.media_type==="image"
+      ? `<img src="${escapeHtml(moment.media_url)}" alt="Momento de @${escapeHtml(moment.username)}" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;">`
+      : "";
+  wrap.innerHTML=`<div class="modal-overlay" style="z-index:285;background:rgba(0,0,0,.92);" onclick="if(event.target===this) closeManagedModal()"><div style="width:min(430px,100%);max-height:92dvh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:var(--panel);">
+    <header style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;"><strong>@${escapeHtml(moment.username)}</strong><button onclick="closeManagedModal()" class="btn-outline">✕</button></header>
+    ${media}
+    ${moment.content ? `<p style="padding:13px;margin:0;line-height:1.5;">${escapeHtml(moment.content)}</p>` : ""}
+    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small></div>
+  </div></div>`;
+}
+
+async function reactToMoment(momentId,emoji,button) {
+  const {data,error}=await sb.rpc("react_to_moment",{p_moment_id:momentId,p_emoji:emoji});
+  if(error||!data?.ok) return;
+  button?.classList.add("active");
+  showToast(`${emoji} Reacción enviada`);
+}
+
 async function recordDailyChallengeEvent(type, targetId) {
   if (!currentUser?.id || !targetId) return;
   try {
@@ -7517,9 +7608,11 @@ async function renderFeed(renderToken = lsTabRenderToken) {
 
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
+    <div id="lsMomentsWrap"></div>
     <div id="lsDailyChallengeWrap"></div>
     <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
   checkAndShowLoginStreak();
+  loadLiveScrollMoments();
   loadDailyChallenges();
 
   const feedResult = await loadFeedVideosCached();

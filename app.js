@@ -5989,7 +5989,7 @@ async function publishMoment() {
 function openMomentViewer(index) {
   const moment=lsMomentsCache[index];
   if (!moment) return;
-  sb.rpc("record_moment_view",{p_moment_id:moment.id}).catch(()=>{});
+  sb.rpc("record_moment_view",{p_moment_id:moment.id}).then(()=>{},()=>{});
   const wrap=document.getElementById("globalModalWrap");
   if (!wrap) return;
   const media = moment.media_type==="video"

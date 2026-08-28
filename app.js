@@ -120,7 +120,7 @@ let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
 
-async function uploadMediaToR2(file) {
+async function uploadMediaToR2(file, options = {}) {
   if (!(file instanceof Blob) || !file.size) throw new Error("El archivo está vacío");
 
   const { data:{ session }, error:sessionError } = await sb.auth.getSession();
@@ -128,19 +128,40 @@ async function uploadMediaToR2(file) {
     throw new Error("Tu sesión venció. Volvé a iniciar sesión para subir el archivo.");
   }
 
-  const response = await fetch(`${LIVESCROLL_MEDIA_API}/upload`, {
-    method:"POST",
-    headers:{
-      "Authorization":`Bearer ${session.access_token}`,
-      "Content-Type":file.type || "application/octet-stream"
-    },
-    body:file
-  });
-
+  let responseOk = false;
   let result = null;
-  try { result = await response.json(); } catch (_) {}
+  if (typeof options.onProgress === "function") {
+    result = await new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open("POST", `${LIVESCROLL_MEDIA_API}/upload`);
+      request.timeout = Number(options.timeoutMs) || 120000;
+      request.setRequestHeader("Authorization", `Bearer ${session.access_token}`);
+      request.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      request.upload.onprogress = event => {
+        if (event.lengthComputable) options.onProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+      };
+      request.onload = () => {
+        responseOk = request.status >= 200 && request.status < 300;
+        try { resolve(JSON.parse(request.responseText || "null")); } catch (_) { resolve(null); }
+      };
+      request.onerror = () => reject(new Error("Se cortó la conexión durante la subida."));
+      request.ontimeout = () => reject(new Error("La subida tardó demasiado. Revisá tu conexión e intentá nuevamente."));
+      request.send(file);
+    });
+  } else {
+    const response = await fetch(`${LIVESCROLL_MEDIA_API}/upload`, {
+      method:"POST",
+      headers:{
+        "Authorization":`Bearer ${session.access_token}`,
+        "Content-Type":file.type || "application/octet-stream"
+      },
+      body:file
+    });
+    responseOk = response.ok;
+    try { result = await response.json(); } catch (_) {}
+  }
 
-  if (!response.ok || !result?.ok || !result?.url) {
+  if (!responseOk || !result?.ok || !result?.url) {
     const messages = {
       usuario_no_autorizado:"Tu sesión venció. Volvé a iniciar sesión.",
       tipo_de_archivo_no_permitido:"Ese formato todavía no está permitido.",
@@ -5950,11 +5971,35 @@ function openCreateMomentModal() {
     <div class="modal-box-body">
       <textarea id="momentContent" maxlength="280" placeholder="¿Qué querés compartir?" style="width:100%;min-height:100px;resize:vertical;"></textarea>
       <label style="display:block;margin-top:12px;font-size:10px;color:var(--text-dim);">Foto o video opcional</label>
-      <input id="momentMediaFile" type="file" accept="image/*,video/*" style="width:100%;margin-top:6px;">
+      <input id="momentMediaFile" type="file" accept="image/*,video/*" onchange="updateMomentFileStatus(this)" style="width:100%;margin-top:6px;">
+      <small id="momentFileStatus" style="display:block;margin-top:7px;color:var(--text-dim);">Máximo 25 MB · una foto o un video</small>
+      <div id="momentUploadProgress" hidden style="height:7px;margin-top:10px;border-radius:999px;overflow:hidden;background:var(--panel-2);"><span style="display:block;width:0;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--gold),#ff4d85);transition:width .18s ease;"></span></div>
       <div id="momentCreateError" class="error-msg" style="margin-top:8px;"></div>
       <button id="momentPublishBtn" class="btn" style="width:100%;min-height:46px;margin-top:12px;" onclick="publishMoment()">Publicar por 24 horas</button>
     </div>
   </div></div>`;
+}
+
+function formatMomentFileSize(bytes) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
+}
+
+function validateMomentFile(file) {
+  if (!file) return "";
+  if (!file.type?.startsWith("image/") && !file.type?.startsWith("video/")) return "Elegí una foto o un video válido.";
+  if (file.size > 25 * 1024 * 1024) return "El archivo supera los 25 MB.";
+  return "";
+}
+
+function updateMomentFileStatus(input) {
+  const file = input?.files?.[0] || null;
+  const status = document.getElementById("momentFileStatus");
+  const errorEl = document.getElementById("momentCreateError");
+  const error = validateMomentFile(file);
+  if (errorEl) errorEl.textContent = error;
+  if (!status) return;
+  status.textContent = file ? `${file.type.startsWith("video/") ? "Video" : "Foto"} · ${formatMomentFileSize(file.size)}` : "Máximo 25 MB · una foto o un video";
+  status.style.color = error ? "var(--red)" : "var(--text-dim)";
 }
 
 async function publishMoment() {
@@ -5963,28 +6008,40 @@ async function publishMoment() {
   const errorEl = document.getElementById("momentCreateError");
   const button = document.getElementById("momentPublishBtn");
   if (!content && !file) { if (errorEl) errorEl.textContent="Escribí algo o elegí un archivo."; return; }
-  if (file && file.size > 25 * 1024 * 1024) { if (errorEl) errorEl.textContent="El archivo supera los 25 MB."; return; }
+  const fileError = validateMomentFile(file);
+  if (fileError) { if (errorEl) errorEl.textContent=fileError; return; }
   if (button) { button.disabled=true; button.textContent=file ? "Subiendo..." : "Publicando..."; }
+  if (errorEl) errorEl.textContent="";
 
   let mediaUrl=null, mediaType=null;
   try {
     if (file) {
-      const uploaded = await uploadMediaToR2(file);
+      const progress = document.getElementById("momentUploadProgress");
+      const progressBar = progress?.querySelector("span");
+      if (progress) progress.hidden=false;
+      const uploaded = await uploadMediaToR2(file, { onProgress:percent => {
+        if (progressBar) progressBar.style.width=`${percent}%`;
+        if (button) button.textContent=`Subiendo ${percent}%`;
+      }});
       mediaUrl = uploaded?.url || null;
       mediaType = file.type.startsWith("video/") ? "video" : "image";
-      if (!mediaUrl) throw new Error("upload_failed");
+      if (!mediaUrl) throw new Error("No recibimos la confirmación del archivo. Intentá nuevamente.");
     }
     const { data,error } = await sb.rpc("create_moment",{p_content:content||null,p_media_url:mediaUrl,p_media_type:mediaType});
     if (error || !data?.ok) throw new Error(data?.error || error?.message || "create_failed");
     closeManagedModal();
     showToast("Momento publicado por 24 horas ✨");
     loadLiveScrollMoments();
-  } catch (_) {
+  } catch (error) {
     if (mediaUrl) deleteMediaFromR2(mediaUrl).catch(()=>{});
-    if (errorEl) errorEl.textContent="No pudimos publicar el Momento.";
-    if (button) { button.disabled=false; button.textContent="Publicar por 24 horas"; }
+    if (errorEl) errorEl.textContent=error?.message || "No pudimos publicar el Momento. Revisá tu conexión e intentá nuevamente.";
+    const progress = document.getElementById("momentUploadProgress");
+    if (progress) progress.hidden=true;
+    if (button) { button.disabled=false; button.textContent="Reintentar publicación"; }
   }
 }
+
+window.updateMomentFileStatus = updateMomentFileStatus;
 
 function openMomentViewer(index) {
   const moment=lsMomentsCache[index];

@@ -13873,8 +13873,10 @@ async function openEditProfile() {
           <div style="display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
             ${isCreator ? `
-              <div style="display:flex; align-items:center; gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
-              <div style="display:flex; align-items:center; gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
+              <div id="streamConnectionKick" style="margin:-2px 0 6px 30px;"></div>
+              <div style="display:flex;align-items:center;gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
+              <div id="streamConnectionTwitch" style="margin:-2px 0 6px 30px;"></div>
               <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
               <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
             ` : `
@@ -13905,7 +13907,114 @@ async function openEditProfile() {
       </div>
     </div>`;
   window.selectedAvatarEmoji = currentProfile.avatar_emoji || "🎬";
+  if (isCreator) setTimeout(loadStreamAccountConnectionStatus, 0);
 }
+
+function streamConnectionEntry(payload, provider) {
+  const direct = payload?.[provider];
+  if (direct && typeof direct === "object") return direct;
+  const list = payload?.connections || payload?.data || [];
+  if (Array.isArray(list)) return list.find(item => String(item?.provider || "").toLowerCase() === provider) || null;
+  return null;
+}
+
+function renderStreamConnectionControl(provider, connection) {
+  const host = document.getElementById(`streamConnection${provider === "twitch" ? "Twitch" : "Kick"}`);
+  if (!host) return;
+  const label = provider === "twitch" ? "Twitch" : "Kick";
+  const connected = !!connection && connection.connected !== false && connection.is_connected !== false;
+  const username = connection?.provider_username || connection?.username || connection?.display_name || "";
+  host.innerHTML = connected
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);">
+         <span style="font-size:11px;color:var(--green);font-weight:800;">✓ ${label} conectado${username ? ` · @${escapeHtml(username)}` : ""}</span>
+         <button type="button" class="btn-outline" style="padding:6px 9px;font-size:11px;" onclick="disconnectStreamAccount('${provider}')">Desconectar</button>
+       </div>`
+    : `<button type="button" class="btn-outline" style="width:100%;padding:8px 10px;font-size:12px;" onclick="connectStreamAccount('${provider}')">Conectar cuenta de ${label}</button>`;
+}
+
+async function loadStreamAccountConnectionStatus() {
+  ["kick", "twitch"].forEach(provider => {
+    const host = document.getElementById(`streamConnection${provider === "twitch" ? "Twitch" : "Kick"}`);
+    if (host) host.innerHTML = `<span style="font-size:11px;color:var(--text-dim);">Comprobando conexión…</span>`;
+  });
+  const { data, error } = await sb.functions.invoke("stream-account-connect", { body:{ action:"status" } });
+  if (error || data?.ok === false) {
+    ["kick", "twitch"].forEach(provider => renderStreamConnectionControl(provider, null));
+    return;
+  }
+  renderStreamConnectionControl("kick", streamConnectionEntry(data, "kick"));
+  renderStreamConnectionControl("twitch", streamConnectionEntry(data, "twitch"));
+}
+
+async function connectStreamAccount(provider) {
+  if (!currentUser) { showToast("Primero iniciá sesión en LiveScroll"); return; }
+  showToast(`Abriendo ${provider === "twitch" ? "Twitch" : "Kick"}…`);
+  const { data, error } = await sb.functions.invoke("stream-account-connect", {
+    body:{ action:"start", provider }
+  });
+  const authorizationUrl = data?.authorization_url || data?.url;
+  if (error || data?.ok === false || !authorizationUrl) {
+    showToast(data?.error || "No se pudo iniciar la conexión");
+    return;
+  }
+  localStorage.setItem("ls_stream_oauth_pending", provider);
+  window.location.assign(authorizationUrl);
+}
+
+async function disconnectStreamAccount(provider) {
+  const label = provider === "twitch" ? "Twitch" : "Kick";
+  if (!confirm(`¿Desconectar tu cuenta de ${label}?`)) return;
+  const { data, error } = await sb.functions.invoke("stream-account-connect", {
+    body:{ action:"disconnect", provider }
+  });
+  if (error || data?.ok === false) {
+    showToast(data?.error || "No se pudo desconectar la cuenta");
+    return;
+  }
+  showToast(`${label} desconectado`);
+  loadStreamAccountConnectionStatus();
+}
+
+async function finishPendingStreamOAuth() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state");
+  const provider = localStorage.getItem("ls_stream_oauth_pending");
+  if (!code || !state || !provider) return;
+
+  let attempts = 0;
+  const waitForSession = setInterval(async () => {
+    attempts++;
+    if (!currentUser && attempts < 40) return;
+    clearInterval(waitForSession);
+    if (!currentUser) {
+      showToast("Iniciá sesión en LiveScroll para completar la conexión");
+      return;
+    }
+    const { data, error } = await sb.functions.invoke("stream-account-connect", {
+      body:{ action:"callback", provider, code, state }
+    });
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("code");
+    cleanUrl.searchParams.delete("state");
+    cleanUrl.searchParams.delete("scope");
+    history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+    localStorage.removeItem("ls_stream_oauth_pending");
+    if (error || data?.ok === false) {
+      showToast(data?.error || "No se pudo conectar la cuenta");
+      return;
+    }
+    showToast(`✓ Cuenta de ${provider === "twitch" ? "Twitch" : "Kick"} conectada`);
+    if (data?.profile_url && currentProfile) {
+      currentProfile[provider === "twitch" ? "social_twitch" : "social_kick"] = data.profile_url;
+    }
+  }, 250);
+}
+
+window.connectStreamAccount = connectStreamAccount;
+window.disconnectStreamAccount = disconnectStreamAccount;
+window.loadStreamAccountConnectionStatus = loadStreamAccountConnectionStatus;
+setTimeout(finishPendingStreamOAuth, 0);
 
 function openChangePassword() {
   const wrap = document.getElementById("globalModalWrap");

@@ -12499,86 +12499,10 @@ function getTwitchChannelFromUrl(value) {
   }
 }
 
-let lsLiveChatChannel = null;
-let lsLiveChatUserId = null;
-
 function closeLiveScrollTwitchPlayer() {
-  if (lsLiveChatChannel) sb.removeChannel(lsLiveChatChannel);
-  lsLiveChatChannel = null;
-  lsLiveChatUserId = null;
   window.__lsActiveTwitchPlayer = null;
   document.getElementById("lsTwitchLivePlayer")?.remove();
   document.body.classList.remove("ls-live-player-open");
-}
-
-function renderLiveChatMessage(message) {
-  const own = currentUser?.id && message.sender_id === currentUser.id;
-  return `<article class="ls-live-chat-message${own ? " own" : ""}" data-message-id="${escapeHtml(message.id)}">
-    <strong>@${escapeHtml(message.sender_username || "usuario")}</strong>
-    <span>${escapeHtml(message.message || "")}</span>
-  </article>`;
-}
-
-function playLiveScrollChatSound() {
-  if (!isNotificationSoundEnabled() || document.hidden) return;
-  try {
-    const AudioEngine = window.AudioContext || window.webkitAudioContext;
-    if (!AudioEngine) return;
-    notifSoundContext = notifSoundContext || new AudioEngine();
-    const ctx = notifSoundContext;
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-    [760, 1040].forEach((frequency, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(frequency, now + index * .07);
-      gain.gain.setValueAtTime(.0001, now + index * .07);
-      gain.gain.exponentialRampToValueAtTime(.075, now + .02 + index * .07);
-      gain.gain.exponentialRampToValueAtTime(.0001, now + .16 + index * .07);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now + index * .07); osc.stop(now + .19 + index * .07);
-    });
-  } catch (_) {}
-}
-
-async function loadLiveScrollChat(liveUserId) {
-  const list = document.getElementById("lsLiveChatMessages");
-  if (!list) return;
-  const { data, error } = await sb.rpc("get_live_chat_messages", { p_live_user_id:liveUserId, p_limit:80 });
-  if (!document.getElementById("lsLiveChatMessages") || lsLiveChatUserId !== liveUserId) return;
-  if (error) {
-    list.innerHTML = `<div class="ls-live-chat-empty">El chat estará disponible después de ejecutar el SQL.</div>`;
-    return;
-  }
-  list.innerHTML = data?.length
-    ? data.map(renderLiveChatMessage).join("")
-    : `<div class="ls-live-chat-empty">Todavía no hay mensajes. ¡Saludá al creador!</div>`;
-  list.scrollTop = list.scrollHeight;
-}
-
-function subscribeLiveScrollChat(liveUserId) {
-  if (lsLiveChatChannel) sb.removeChannel(lsLiveChatChannel);
-  lsLiveChatUserId = liveUserId;
-  lsLiveChatChannel = sb.channel(`live-chat-${liveUserId}-${Date.now()}`)
-    .on("postgres_changes", {
-      event:"INSERT", schema:"public", table:"live_chat_messages", filter:`live_user_id=eq.${liveUserId}`
-    }, payload => {
-      const list = document.getElementById("lsLiveChatMessages");
-      if (!list || lsLiveChatUserId !== liveUserId) return;
-      list.querySelector(".ls-live-chat-empty")?.remove();
-      list.insertAdjacentHTML("beforeend", renderLiveChatMessage(payload.new));
-      list.scrollTop = list.scrollHeight;
-      if (payload.new?.sender_id !== currentUser?.id) playLiveScrollChatSound();
-    }).subscribe();
-}
-
-function switchLiveChatMode(mode) {
-  const twitch = mode === "twitch";
-  document.getElementById("lsLiveScrollChatPane")?.classList.toggle("hidden", twitch);
-  document.getElementById("lsTwitchChatPane")?.classList.toggle("hidden", !twitch);
-  document.getElementById("lsChatTabLiveScroll")?.classList.toggle("active", !twitch);
-  document.getElementById("lsChatTabTwitch")?.classList.toggle("active", twitch);
 }
 
 let lsTwitchOfflineHandledAt = 0;
@@ -12652,26 +12576,6 @@ function mountInteractiveTwitchPlayer(channel, parent, liveUserId) {
   script.addEventListener("load", start, { once:true });
 }
 
-async function sendLiveScrollChatMessage(event) {
-  event?.preventDefault?.();
-  if (!currentUser?.id || !lsLiveChatUserId) return;
-  const input = document.getElementById("lsLiveChatInput");
-  const button = document.getElementById("lsLiveChatSend");
-  const message = input?.value.trim() || "";
-  if (!message) return;
-  if (button) button.disabled = true;
-  const { data, error } = await sb.rpc("send_live_chat_message", {
-    p_live_user_id:lsLiveChatUserId,
-    p_message:message
-  });
-  if (button) button.disabled = false;
-  if (error || data?.ok === false) {
-    showToast(data?.message || "No pudimos enviar el mensaje.", "error");
-    return;
-  }
-  if (input) input.value = "";
-}
-
 function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
   const safeChannel = String(channel || "").toLowerCase();
   const safeLiveUserId = String(liveUserId || "");
@@ -12697,19 +12601,8 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
           <div class="ls-live-autoplay-note">El directo inicia silenciado · tocá el sonido en el reproductor</div>
         </div>
         <aside class="ls-live-chat">
-          <div class="ls-live-chat-tabs">
-            <button id="lsChatTabLiveScroll" type="button" class="active" onclick="switchLiveChatMode('livescroll')">LiveScroll</button>
-            <button id="lsChatTabTwitch" type="button" onclick="switchLiveChatMode('twitch')">Twitch oficial</button>
-          </div>
-          <div id="lsLiveScrollChatPane" class="ls-live-chat-pane">
-            <div class="ls-live-chat-head"><strong>Chat de LiveScroll</strong><span>EN VIVO</span></div>
-            <div id="lsLiveChatMessages" class="ls-live-chat-messages"><div class="ls-live-chat-empty">Conectando chat…</div></div>
-            <form class="ls-live-chat-compose" onsubmit="sendLiveScrollChatMessage(event)">
-              <input id="lsLiveChatInput" maxlength="240" autocomplete="off" placeholder="Escribí un mensaje…" aria-label="Mensaje para el chat">
-              <button id="lsLiveChatSend" type="submit" aria-label="Enviar mensaje">➤</button>
-            </form>
-          </div>
-          <div id="lsTwitchChatPane" class="ls-live-chat-pane hidden">
+          <div class="ls-live-chat-head"><strong>Chat oficial de Twitch</strong><span>TWITCH</span></div>
+          <div id="lsTwitchChatPane" class="ls-live-chat-pane">
             <iframe class="ls-twitch-chat-frame" src="https://www.twitch.tv/embed/${encodeURIComponent(safeChannel)}/chat?parent=${encodeURIComponent(parent)}&darkpopout" title="Chat oficial de Twitch"></iframe>
           </div>
         </aside>
@@ -12725,14 +12618,10 @@ function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
   document.body.appendChild(overlay);
   document.body.classList.add("ls-live-player-open");
   mountInteractiveTwitchPlayer(safeChannel, parent, safeLiveUserId);
-  loadLiveScrollChat(safeLiveUserId);
-  subscribeLiveScrollChat(safeLiveUserId);
 }
 
 window.openLiveScrollTwitchPlayer = openLiveScrollTwitchPlayer;
 window.closeLiveScrollTwitchPlayer = closeLiveScrollTwitchPlayer;
-window.sendLiveScrollChatMessage = sendLiveScrollChatMessage;
-window.switchLiveChatMode = switchLiveChatMode;
 
 function ensureLiveScrollTwitchPlayerStyles() {
   if (document.getElementById("lsTwitchLivePlayerStyles")) return;
@@ -12749,9 +12638,7 @@ function ensureLiveScrollTwitchPlayerStyles() {
     .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 370px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-interactive-twitch-player,.ls-interactive-twitch-player iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
     .ls-live-ended-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 15%,rgba(255,49,92,.14),transparent 42%),#05070c;color:#fff}.ls-live-ended-card>span{color:#ff315c;font-size:26px}.ls-live-ended-card strong{font-size:22px}.ls-live-ended-card p{margin:0 0 7px;color:#aeb7c8;font-size:11px}.ls-live-ended-card button{min-height:42px;padding:0 17px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:#121724;color:#fff;font-weight:900}
     .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
-    .ls-live-chat-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px;background:#060913;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-tabs button{min-height:34px;border:1px solid rgba(255,255,255,.10);border-radius:9px;background:#0d1220;color:#949bad;font-size:9px;font-weight:900}.ls-live-chat-tabs button.active{border-color:rgba(145,70,255,.55);background:rgba(145,70,255,.18);color:#fff}.ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-live-chat-pane.hidden{display:none!important}.ls-twitch-chat-frame{position:relative;z-index:1;display:block;width:100%;height:500px;min-height:500px;flex:0 0 500px;border:0;background:#0e0e10;isolation:isolate}
-    .ls-live-chat-messages{flex:1;min-height:220px;max-height:460px;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:7px}.ls-live-chat-message{padding:8px 9px;border-radius:11px;background:rgba(255,255,255,.045);font-size:10px;line-height:1.35}.ls-live-chat-message.own{background:rgba(145,70,255,.15)}.ls-live-chat-message strong{display:block;margin-bottom:2px;color:#c7a8ff;font-size:9px}.ls-live-chat-message span{color:#eef0f6;overflow-wrap:anywhere}.ls-live-chat-empty{margin:auto;padding:18px;color:#7f8798;text-align:center;font-size:9px}
-    .ls-live-chat-compose{display:flex;gap:7px;padding:9px;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-compose input{min-width:0;flex:1;padding:10px 11px;border:1px solid rgba(145,70,255,.28);border-radius:11px;background:#050811;color:#fff;font-size:11px}.ls-live-chat-compose button{width:40px;border:0;border-radius:11px;background:linear-gradient(135deg,#6d2ee8,#9146ff);color:#fff;font-size:16px}
+    .ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-twitch-chat-frame{position:relative;z-index:1;display:block;width:100%;height:500px;min-height:500px;flex:0 0 500px;border:0;background:#0e0e10;isolation:isolate}
     .ls-live-player-panel footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;color:#8f96a8;font-size:10px}.ls-live-player-panel footer a{color:#c7a8ff;font-weight:900;text-decoration:none}
     .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
     .ls-live-start-alert{position:fixed;z-index:2147482500;top:max(72px,calc(env(safe-area-inset-top) + 58px));left:50%;width:min(440px,calc(100% - 24px));transform:translateX(-50%);display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:11px;padding:11px 12px;border-radius:17px;color:#fff;text-align:left;box-shadow:0 18px 55px rgba(0,0,0,.55);animation:lsLiveAlertIn .5s cubic-bezier(.16,1,.3,1) both;overflow:hidden}

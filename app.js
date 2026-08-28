@@ -7482,12 +7482,12 @@ function preloadFeedVideo(video) {
 
   const saveData = navigator.connection?.saveData === true;
   const slowNetwork = ["slow-2g", "2g"].includes(navigator.connection?.effectiveType);
-  const isLegacyMode = document.body.classList.contains("ls-legacy");
+  const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
 
   if (saveData || slowNetwork || isLegacyMode) return;
 
   el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;position:relative;">
-    <video src="${escapeHtml(video.video_url)}" controls muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+    <video src="${escapeHtml(video.video_url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;"></video>
     <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
   </div>`;
   loadedEmbeds.add(video.id);
@@ -7498,7 +7498,13 @@ function activateLoadedEmbed(video) {
   const player = document.querySelector(`#embed-${video.id} video`);
   if (player) {
     player.autoplay = true;
-    player.play().catch(() => {});
+    const startPlayback = () => {
+      if (!player.isConnected) return;
+      player.closest(".feed-embed-frame")?.classList.add("ls-video-frame-ready");
+      player.play().catch(() => {});
+    };
+    if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) startPlayback();
+    else player.addEventListener("loadeddata", startPlayback, { once:true });
   }
 }
 
@@ -7546,9 +7552,12 @@ function setupFeedObserver(videos) {
   const keepWarmAround = (videoId) => {
     const idx = orderedIds.indexOf(String(videoId));
     if (idx < 0) return;
-    const keep = new Set([orderedIds[idx - 1], orderedIds[idx], orderedIds[idx + 1]].filter(Boolean));
+    const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
+    const keep = new Set((isLegacyMode
+      ? [orderedIds[idx]]
+      : [orderedIds[idx], orderedIds[idx + 1]]).filter(Boolean));
     const nextId = orderedIds[idx + 1];
-    if (nextId && videoMap[nextId]) preloadFeedVideo(videoMap[nextId]);
+    if (!isLegacyMode && nextId && videoMap[nextId]) preloadFeedVideo(videoMap[nextId]);
 
     Array.from(loadedEmbeds).forEach(id => {
       if (!keep.has(String(id))) unloadEmbed(id, videoMap[String(id)]);
@@ -7571,7 +7580,10 @@ function setupFeedObserver(videos) {
         stopWatching(videoId);
       }
     });
-  }, { threshold:[0,.25,.58,1], rootMargin:"18% 0px 18% 0px" });
+  }, {
+    threshold:[0,.25,.58,1],
+    rootMargin:document.documentElement.classList.contains("ls-legacy") ? "4% 0px" : "12% 0px"
+  });
 
   document.querySelectorAll(".feed-item").forEach(el => observer.observe(el));
   feedObserverInstance = observer;
@@ -7579,7 +7591,7 @@ function setupFeedObserver(videos) {
   if (videos[0]) {
     loadEmbed(videos[0]);
     activateLoadedEmbed(videos[0]);
-    if (videos[1]) preloadFeedVideo(videos[1]);
+    if (!document.documentElement.classList.contains("ls-legacy") && videos[1]) preloadFeedVideo(videos[1]);
   }
 }
 
@@ -7635,8 +7647,9 @@ function getEmbedHtml(video) {
     return `<div class="feed-fallback"><p>Link de video inválido.</p></div>`;
   }
   if (video.platform === "upload") {
+    const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
     return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%; position:relative;">
-      <video src="${escapeHtml(url)}" controls autoplay muted loop playsinline preload="auto" style="width:100%;height:100%;object-fit:contain;"></video>
+      <video src="${escapeHtml(url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="${isLegacyMode ? "metadata" : "auto"}" style="width:100%;height:100%;object-fit:contain;"></video>
       <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
     </div>`;
   }
@@ -7780,6 +7793,10 @@ function initLazyProfilePreviews() {
   lsProfilePreviewQueue = [];
   lsProfilePreviewBusy = false;
   const covers = document.querySelectorAll(".ls-lazy-video-cover[data-ls-preview-src]");
+  document.querySelectorAll(".video-grid-tile > img").forEach((image, index) => {
+    if (index < 4) image.loading = "eager";
+    image.fetchPriority = index < 2 ? "high" : "low";
+  });
   if (!covers.length) return;
 
   if (!("IntersectionObserver" in window)) {
@@ -9253,6 +9270,12 @@ function getThumbnailHtml(video) {
   if (video.platform === "upload") {
     if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
       return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy" decoding="async">`;
+    }
+
+    // En Legacy no abrimos varios MP4 solamente para fabricar miniaturas: eso
+    // compite con el reproductor principal y en equipos antiguos deja audio sin imagen.
+    if (document.documentElement.classList.contains("ls-legacy")) {
+      return `<div class="ls-legacy-cover-placeholder"><span aria-hidden="true">▶</span><small>VIDEO</small></div>`;
     }
 
     // Videos viejos sin carátula persistida: el MP4 se activa recién cerca de la pantalla.
@@ -10748,17 +10771,30 @@ function initProfileNovaTilt() {
   const inner = document.getElementById("lsProfileNovaInner");
   if (!hero || !inner || window.matchMedia("(hover:none)").matches) return;
 
-  const move = (e) => {
+  let frame = 0;
+  let pointerX = 0;
+  let pointerY = 0;
+  const paint = () => {
+    frame = 0;
     const r = hero.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-    const y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+    const x = Math.max(0, Math.min(1, (pointerX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, (pointerY - r.top) / r.height));
     const ry = (x - .5) * 3.2;
     const rx = (.5 - y) * 2.4;
     hero.style.setProperty("--ls-glow-x", `${x*100}%`);
     hero.style.setProperty("--ls-glow-y", `${y*100}%`);
     inner.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
   };
-  const reset = () => { inner.style.transform = ""; };
+  const move = (e) => {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    if (!frame) frame = requestAnimationFrame(paint);
+  };
+  const reset = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    inner.style.transform = "";
+  };
   hero.addEventListener("mousemove", move);
   hero.addEventListener("mouseleave", reset);
 }
@@ -12221,6 +12257,10 @@ function getAvatarRingClass(planId) {
 }
 
 function renderSocialIcons(profile) {
+  const ownConnectedUrls = profile?.id === currentUser?.id ? {
+    social_kick:lsGetConnectedStreamProfileUrl("kick"),
+    social_twitch:lsGetConnectedStreamProfileUrl("twitch")
+  } : {};
   const socials = [
     { key: "social_kick", icon: "🟢", label: "Kick" },
     { key: "social_twitch", icon: "🟣", label: "Twitch" },
@@ -12228,10 +12268,13 @@ function renderSocialIcons(profile) {
     { key: "social_tiktok", icon: "⚫", label: "TikTok" },
     { key: "social_instagram", icon: "🩷", label: "Instagram" }
   ];
-  const active = socials.filter(s => profile[s.key] && isSafeUrl(profile[s.key]));
+  const active = socials.map(s => ({
+    ...s,
+    url:ownConnectedUrls[s.key] || profile[s.key] || ""
+  })).filter(s => isSafeUrl(s.url));
   if (!active.length) return "";
   return `<div class="ls-profile-socials">
-    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(profile[s.key])}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><span style="font-size:16px;">${s.icon}</span><span>${s.label}</span></a>`).join("")}
+    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><span style="font-size:16px;">${s.icon}</span><span>${s.label}</span></a>`).join("")}
   </div>`;
 }
 
@@ -13873,10 +13916,10 @@ async function openEditProfile() {
           <div style="display:flex; flex-direction:column; gap:8px;">
             <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
             ${isCreator ? `
-              <div style="display:flex;align-items:center;gap:8px;"><span>🟢</span><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Link de tu Kick" style="flex:1;"></div>
-              <div id="streamConnectionKick" style="margin:-2px 0 6px 30px;"></div>
-              <div style="display:flex;align-items:center;gap:8px;"><span>🟣</span><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Link de tu Twitch" style="flex:1;"></div>
-              <div id="streamConnectionTwitch" style="margin:-2px 0 6px 30px;"></div>
+              <div class="ls-connected-social-primary"><span>🟢</span><div id="streamConnectionKick" style="flex:1;"></div></div>
+              <details class="ls-social-secondary-link"><summary>Enlace alternativo de Kick (opcional)</summary><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Solo si querés usar otro enlace"></details>
+              <div class="ls-connected-social-primary"><span>🟣</span><div id="streamConnectionTwitch" style="flex:1;"></div></div>
+              <details class="ls-social-secondary-link"><summary>Enlace alternativo de Twitch (opcional)</summary><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Solo si querés usar otro enlace"></details>
               <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
               <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
             ` : `
@@ -13918,6 +13961,48 @@ function streamConnectionEntry(payload, provider) {
   return null;
 }
 
+const lsStreamConnections = { kick:null, twitch:null };
+
+function lsConnectionProfileUrl(connection, provider) {
+  const directUrl = connection?.profile_url || connection?.channel_url || connection?.url || "";
+  if (isSafeUrl(directUrl)) return directUrl;
+  const username = String(connection?.provider_username || connection?.username || connection?.display_name || "")
+    .trim()
+    .replace(/^@/, "");
+  if (!/^[a-zA-Z0-9_.-]{2,50}$/.test(username)) return "";
+  return provider === "twitch"
+    ? `https://www.twitch.tv/${encodeURIComponent(username)}`
+    : `https://kick.com/${encodeURIComponent(username)}`;
+}
+
+function lsGetConnectedStreamProfileUrl(provider) {
+  const connection = lsStreamConnections[provider];
+  if (!connection || connection.connected === false || connection.is_connected === false) return "";
+  const url = lsConnectionProfileUrl(connection, provider);
+  return isSafeUrl(url) ? url : "";
+}
+
+async function syncConnectedStreamProfileUrls() {
+  if (!currentUser?.id || !currentProfile) return;
+  const updates = {};
+  const kickUrl = lsGetConnectedStreamProfileUrl("kick");
+  const twitchUrl = lsGetConnectedStreamProfileUrl("twitch");
+  if (kickUrl && kickUrl !== currentProfile.social_kick) updates.social_kick = kickUrl;
+  if (twitchUrl && twitchUrl !== currentProfile.social_twitch) updates.social_twitch = twitchUrl;
+  if (!Object.keys(updates).length) return;
+
+  const { error } = await sb.from("profiles").update(updates).eq("id", currentUser.id);
+  if (error) {
+    console.warn("No se pudo sincronizar el enlace de la cuenta conectada:", error.message);
+    return;
+  }
+  Object.assign(currentProfile, updates);
+  Object.entries(updates).forEach(([key, value]) => {
+    const input = document.getElementById(key === "social_kick" ? "socialKick" : "socialTwitch");
+    if (input && !input.value) input.value = value;
+  });
+}
+
 function renderStreamConnectionControl(provider, connection) {
   const host = document.getElementById(`streamConnection${provider === "twitch" ? "Twitch" : "Kick"}`);
   if (!host) return;
@@ -13939,11 +14024,16 @@ async function loadStreamAccountConnectionStatus() {
   });
   const { data, error } = await sb.functions.invoke("stream-account-connect", { body:{ action:"status" } });
   if (error || data?.ok === false) {
+    lsStreamConnections.kick = null;
+    lsStreamConnections.twitch = null;
     ["kick", "twitch"].forEach(provider => renderStreamConnectionControl(provider, null));
     return;
   }
-  renderStreamConnectionControl("kick", streamConnectionEntry(data, "kick"));
-  renderStreamConnectionControl("twitch", streamConnectionEntry(data, "twitch"));
+  lsStreamConnections.kick = streamConnectionEntry(data, "kick");
+  lsStreamConnections.twitch = streamConnectionEntry(data, "twitch");
+  renderStreamConnectionControl("kick", lsStreamConnections.kick);
+  renderStreamConnectionControl("twitch", lsStreamConnections.twitch);
+  await syncConnectedStreamProfileUrls();
 }
 
 async function connectStreamAccount(provider) {
@@ -13972,6 +14062,7 @@ async function disconnectStreamAccount(provider) {
     return;
   }
   showToast(`${label} desconectado`);
+  lsStreamConnections[provider] = null;
   loadStreamAccountConnectionStatus();
 }
 
@@ -14006,8 +14097,11 @@ async function finishPendingStreamOAuth() {
     }
     showToast(`✓ Cuenta de ${provider === "twitch" ? "Twitch" : "Kick"} conectada`);
     if (data?.profile_url && currentProfile) {
-      currentProfile[provider === "twitch" ? "social_twitch" : "social_kick"] = data.profile_url;
+      const profileKey = provider === "twitch" ? "social_twitch" : "social_kick";
+      currentProfile[profileKey] = data.profile_url;
+      await sb.from("profiles").update({ [profileKey]:data.profile_url }).eq("id", currentUser.id);
     }
+    await loadStreamAccountConnectionStatus();
   }, 250);
 }
 
@@ -14259,8 +14353,8 @@ async function saveProfileEdits() {
     social_instagram:document.getElementById("socialInstagram").value.trim() || null
   };
   if (currentProfile.is_creator) {
-    socialPayload.social_kick = kickEl?.value.trim() || null;
-    socialPayload.social_twitch = twitchEl?.value.trim() || null;
+    socialPayload.social_kick = lsGetConnectedStreamProfileUrl("kick") || kickEl?.value.trim() || null;
+    socialPayload.social_twitch = lsGetConnectedStreamProfileUrl("twitch") || twitchEl?.value.trim() || null;
     socialPayload.social_youtube = youtubeEl?.value.trim() || null;
     socialPayload.social_tiktok = tiktokEl?.value.trim() || null;
   }
@@ -14284,8 +14378,8 @@ async function saveProfileEdits() {
   currentProfile.avatar_emoji = window.selectedAvatarEmoji;
   currentProfile.cover_position_y = coverPositionY;
   if (currentProfile.is_creator) {
-    currentProfile.social_kick = kickEl?.value.trim() || "";
-    currentProfile.social_twitch = twitchEl?.value.trim() || "";
+    currentProfile.social_kick = socialPayload.social_kick || "";
+    currentProfile.social_twitch = socialPayload.social_twitch || "";
     currentProfile.social_youtube = youtubeEl?.value.trim() || "";
     currentProfile.social_tiktok = tiktokEl?.value.trim() || "";
   }
@@ -17898,7 +17992,7 @@ function applySeasonalTheme() {
   }
 
   // Efectos ambientales suaves por evento.
-  if (!document.body.classList.contains("ls-legacy")) {
+  if (!document.documentElement.classList.contains("ls-legacy")) {
     const ambientMap = {
       spring: {
         items:["🌸","🌼","🌸","🌸","🌼","🌸"],

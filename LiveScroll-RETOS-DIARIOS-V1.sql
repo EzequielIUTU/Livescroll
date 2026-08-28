@@ -103,7 +103,7 @@ begin
     jsonb_build_object('type','profile_view','emoji','👤','title','Visitá 2 perfiles nuevos','target',2,'progress',least(coalesce(v_profiles,0),2))
   );
 
-  v_seed := mod(abs(hashtext(v_user::text || v_today::text)),3);
+  v_seed := mod(abs(hashtext(v_user::text || v_today::text)::bigint),3)::integer;
   v_rotated := case v_seed
     when 1 then jsonb_build_array(v_all->1,v_all->2,v_all->0)
     when 2 then jsonb_build_array(v_all->2,v_all->0,v_all->1)

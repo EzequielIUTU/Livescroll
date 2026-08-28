@@ -12692,7 +12692,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
           (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
             ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
           (u.live_platform === "twitch" || u.live_platform === "both") && twitchChannel
-            ? `<button type="button" class="watch-btn ls-watch-inside" onclick="openLiveScrollTwitchPlayer('${escapeHtml(twitchChannel)}','${escapeHtml(u.username)}','${escapeHtml(u.id)}')">Ver en LiveScroll</button>` : ""
+            ? `<a href="https://www.twitch.tv/${encodeURIComponent(twitchChannel)}" target="_blank" rel="noopener" class="watch-btn ls-watch-inside" style="text-decoration:none;">Ver en Twitch</a>` : ""
         ].join("");
         return `<div class="directo-card">
           <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>
@@ -13531,7 +13531,7 @@ async function showLiveStartAnimation(notification) {
   alert.onclick = () => { alert.remove(); switchTab("directos"); };
   alert.innerHTML = `
     <span class="ls-live-start-avatar">${creator.avatar_url ? `<img src="${escapeHtml(creator.avatar_url)}" alt="">` : escapeHtml(creator.avatar_emoji || "🎬")}</span>
-    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL ELÉCTRICA DETECTADA" : "NUEVO DIRECTO"}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para mirar en LiveScroll</em></span>
+    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL ELÉCTRICA DETECTADA" : "NUEVO DIRECTO"}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para ver las opciones del directo</em></span>
     <i>EN VIVO</i>`;
   document.body.appendChild(alert);
   setTimeout(() => alert.remove(), 12000);

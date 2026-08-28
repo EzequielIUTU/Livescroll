@@ -111,6 +111,8 @@ begin
   if auth.uid() is null then return jsonb_build_object('ok',false); end if;
   if not exists(select 1 from public.moments where id=p_moment_id and expires_at>now())
     then return jsonb_build_object('ok',false,'error','not_available'); end if;
+  if exists(select 1 from public.moments where id=p_moment_id and user_id=auth.uid())
+    then return jsonb_build_object('ok',true,'self_view',true); end if;
   insert into public.moment_views(moment_id,viewer_id) values(p_moment_id,auth.uid())
   on conflict do nothing;
   return jsonb_build_object('ok',true);

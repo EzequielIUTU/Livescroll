@@ -1550,7 +1550,8 @@ const LS_SETTINGS_KEY = "livescroll_ui_settings_v584";
 const LS_SETTINGS_DEFAULTS = {
   vision: "normal",
   contrast: "normal",
-  fontWeight: "normal"
+  fontWeight: "normal",
+  seasonalTheme: "auto"
 };
 
 let lsSettingsDraft = null;
@@ -2001,6 +2002,10 @@ function applyLiveScrollSettings(settings = getLiveScrollSettings()) {
 
   window.__lsLanguage = settings.language;
 
+  if (typeof applySeasonalTheme === "function") {
+    applySeasonalTheme();
+  }
+
   // La elección de idioma ahora sí se refleja inmediatamente en la interfaz.
 }
 
@@ -2104,6 +2109,29 @@ function openLiveScrollSettings() {
                 `).join("")}
               </div>
             </div>
+
+            ${isLiveScroll7App() ? `
+              <div class="ls-settings-section">
+                <div class="ls-settings-title">🌦️ Ambiente de temporada</div>
+                <div class="ls-settings-help">
+                  Automático sigue el calendario argentino. También podés elegir una temporada o apagar los efectos solo en este dispositivo.
+                </div>
+                <select
+                  id="lsPersonalSeasonalSelect"
+                  aria-label="Ambiente de temporada"
+                  onchange="setLiveScrollDraft('seasonalTheme',this.value)"
+                  style="width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);color:var(--text);font:inherit;"
+                >
+                  <option value="auto">🗓️ Automático según la fecha</option>
+                  <option value="off">⚫ Desactivado</option>
+                  ${Object.entries(LS_SEASONAL_THEMES)
+                    .filter(([key]) => key !== "normal")
+                    .map(([key, theme]) => `<option value="${key}">${theme.emoji} ${theme.label}</option>`)
+                    .join("")}
+                </select>
+                <div id="lsPersonalSeasonalStatus" style="margin-top:8px;color:var(--text-dim);font-size:9px;line-height:1.4;"></div>
+              </div>
+            ` : ""}
 
             <div>
               <div style="
@@ -2337,6 +2365,26 @@ function refreshLiveScrollSettingsUI() {
       lsSettingsDraft[btn.dataset.setting] === btn.dataset.value
     );
   });
+
+  const seasonalSelect = document.getElementById("lsPersonalSeasonalSelect");
+  if (seasonalSelect) {
+    const validSeason = lsSettingsDraft.seasonalTheme === "auto" ||
+      lsSettingsDraft.seasonalTheme === "off" ||
+      !!LS_SEASONAL_THEMES[lsSettingsDraft.seasonalTheme];
+    seasonalSelect.value = validSeason ? lsSettingsDraft.seasonalTheme : "auto";
+  }
+
+  const seasonalStatus = document.getElementById("lsPersonalSeasonalStatus");
+  if (seasonalStatus) {
+    const choice = lsSettingsDraft.seasonalTheme || "auto";
+    const automatic = getAutomaticSeasonalTheme();
+    const automaticLabel = LS_SEASONAL_THEMES[automatic]?.label || "LiveScroll normal";
+    seasonalStatus.textContent = choice === "auto"
+      ? `Ahora se aplicará: ${automaticLabel}.`
+      : choice === "off"
+        ? "Los fondos, luces y partículas estacionales quedarán apagados."
+        : `Selección manual: ${LS_SEASONAL_THEMES[choice]?.label || choice}.`;
+  }
 
   const preview = document.getElementById("lsSettingsPreviewCard");
   if (preview) {
@@ -17761,6 +17809,14 @@ function getAutomaticSeasonalTheme(date = new Date()) {
 }
 
 function getSeasonalThemeKey() {
+  // LiveScroll 7 permite una preferencia local por dispositivo.
+  // La V6 conserva exactamente la apariencia global publicada.
+  if (isLiveScroll7App()) {
+    const personal = String(getLiveScrollSettings()?.seasonalTheme || "auto");
+    if (personal === "off") return "normal";
+    if (personal !== "auto" && LS_SEASONAL_THEMES[personal]) return personal;
+  }
+
   const published = String(window.__lsGlobalSeasonalTheme || "auto");
   if (published !== "auto" && LS_SEASONAL_THEMES[published]) {
     return published;

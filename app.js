@@ -5934,6 +5934,31 @@ async function recordDailyChallengeEvent(type, targetId) {
   } catch (_) {}
 }
 
+function getDailyChallengeSummary(data) {
+  const isSeven = isLiveScroll7App();
+  const challenges = (data?.challenges || []).slice(0, isSeven ? 3 : 1);
+  const completed = challenges.filter(item => Number(item.progress) >= Number(item.target)).length;
+  const totalProgress = challenges.reduce((sum,item) => sum + Math.min(Number(item.progress),Number(item.target)),0);
+  const totalTarget = challenges.reduce((sum,item) => sum + Number(item.target),0);
+  return {
+    isSeven,
+    challenges,
+    completed,
+    percent:totalTarget ? Math.round(totalProgress / totalTarget * 100) : 0
+  };
+}
+
+function renderDailyChallengeRows(challenges) {
+  return challenges.map(item => {
+    const done = Number(item.progress) >= Number(item.target);
+    return `<div style="display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:9px;padding:10px;border:1px solid ${done ? "rgba(34,197,94,.35)" : "var(--border)"};border-radius:12px;background:rgba(255,255,255,.025);">
+      <span style="font-size:21px;text-align:center;">${done ? "✅" : item.emoji}</span>
+      <strong style="font-size:11px;">${escapeHtml(item.title)}</strong>
+      <span style="font:800 9px 'JetBrains Mono',monospace;color:${done ? "var(--green)" : "var(--text-dim)"};">${item.progress}/${item.target}</span>
+    </div>`;
+  }).join("");
+}
+
 async function loadDailyChallenges() {
   const wrap = document.getElementById("lsDailyChallengeWrap");
   if (!wrap || !currentUser?.id) return;
@@ -5945,35 +5970,51 @@ async function loadDailyChallenges() {
       return;
     }
 
-    const isSeven = isLiveScroll7App();
-    const challenges = data.challenges.slice(0, isSeven ? 3 : 1);
-    const completed = challenges.filter(item => Number(item.progress) >= Number(item.target)).length;
-    const totalProgress = challenges.reduce((sum,item) => sum + Math.min(Number(item.progress),Number(item.target)),0);
-    const totalTarget = challenges.reduce((sum,item) => sum + Number(item.target),0);
-    const percent = totalTarget ? Math.round(totalProgress / totalTarget * 100) : 0;
+    window.__lsDailyChallengeData = data;
+    const summary = getDailyChallengeSummary(data);
+    const accent = summary.isSeven ? "#58efff" : "var(--gold)";
+    const title = summary.isSeven ? "Pulso Diario" : "Reto de hoy";
 
     wrap.innerHTML = `
-      <section class="form-card" style="margin-bottom:16px;border-color:${isSeven ? "rgba(57,231,255,.34)" : "var(--gold-dim)"};background:${isSeven ? "linear-gradient(145deg,rgba(16,42,70,.72),rgba(34,12,65,.68))" : "var(--panel)"};">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
-          <div><small style="display:block;color:${isSeven ? "#58efff" : "var(--gold)"};font-weight:900;letter-spacing:.1em;">${isSeven ? "LIVESCROLL PULSE" : "RETO DIARIO"}</small><strong style="font-size:15px;">${isSeven ? "Completá tu Pulso de hoy" : "Tu misión de hoy"}</strong></div>
-          <span style="font:900 11px 'JetBrains Mono',monospace;">${completed}/${challenges.length}</span>
-        </div>
-        <div style="height:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;margin-bottom:11px;"><span style="display:block;width:${percent}%;height:100%;background:${isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};transition:width .35s ease;"></span></div>
-        <div style="display:grid;gap:7px;">
-          ${challenges.map(item => {
-            const done = Number(item.progress) >= Number(item.target);
-            return `<div style="display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:9px;padding:9px;border:1px solid ${done ? "rgba(34,197,94,.35)" : "var(--border)"};border-radius:11px;background:rgba(255,255,255,.025);">
-              <span style="font-size:20px;text-align:center;">${done ? "✅" : item.emoji}</span>
-              <strong style="font-size:11px;">${escapeHtml(item.title)}</strong>
-              <span style="font:800 9px 'JetBrains Mono',monospace;color:${done ? "var(--green)" : "var(--text-dim)"};">${item.progress}/${item.target}</span>
-            </div>`;
-          }).join("")}
-        </div>
-        <small style="display:block;margin-top:9px;color:var(--text-dim);font-size:8px;">Se renueva automáticamente cada día · etapa de prueba sin premio adicional</small>
-      </section>`;
+      <button type="button" onclick="openDailyChallengesModal()" aria-label="Abrir ${title}" style="width:100%;min-height:58px;margin-bottom:10px;padding:9px 12px;display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;border:1px solid ${summary.isSeven ? "rgba(57,231,255,.30)" : "var(--gold-dim)"};border-radius:14px;background:${summary.isSeven ? "linear-gradient(135deg,rgba(14,38,64,.82),rgba(33,13,59,.76))" : "var(--panel)"};color:var(--text);text-align:left;cursor:pointer;">
+        <span style="width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:${summary.isSeven ? "rgba(57,231,255,.12)" : "color-mix(in srgb,var(--gold) 10%,transparent)"};font-size:18px;">${summary.isSeven ? "◉" : "🎯"}</span>
+        <span style="min-width:0;">
+          <span style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><strong style="font-size:11px;">${title}</strong><small style="color:${accent};font:900 8px 'JetBrains Mono',monospace;">${summary.completed}/${summary.challenges.length}</small></span>
+          <span style="display:block;height:4px;margin-top:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;"><i style="display:block;width:${summary.percent}%;height:100%;background:${summary.isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};"></i></span>
+        </span>
+        <span style="color:var(--text-dim);font-size:16px;">›</span>
+      </button>`;
   } catch (_) {
     wrap.innerHTML = "";
   }
+}
+
+function openDailyChallengesModal() {
+  const data = window.__lsDailyChallengeData;
+  if (!data?.challenges) return;
+  const summary = getDailyChallengeSummary(data);
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:275;">
+      <div class="modal-box" style="max-width:430px;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div><small style="color:${summary.isSeven ? "#58efff" : "var(--gold)"};font-weight:900;letter-spacing:.1em;">${summary.isSeven ? "LIVESCROLL PULSE" : "RETO DIARIO"}</small><h2 style="margin:3px 0 0;">${summary.isSeven ? "Tu Pulso de hoy" : "Tu misión de hoy"}</h2></div>
+          <button type="button" onclick="closeDailyChallengesModal()" aria-label="Cerrar" style="width:40px;height:40px;border:1px solid var(--border);border-radius:50%;background:var(--panel-2);color:var(--text);font-size:18px;">✕</button>
+        </div>
+        <div class="modal-box-body">
+          <div style="display:grid;gap:8px;">${renderDailyChallengeRows(summary.challenges)}</div>
+          <div style="height:7px;margin-top:14px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;"><span style="display:block;width:${summary.percent}%;height:100%;background:${summary.isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};"></span></div>
+          <p style="margin:10px 0 0;color:var(--text-dim);font-size:9px;line-height:1.5;">Se renueva automáticamente cada día. Esta etapa prueba el progreso antes de habilitar premios adicionales.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeDailyChallengesModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
 }
 
 async function checkAndShowLoginStreak() {

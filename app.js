@@ -5921,6 +5921,61 @@ async function handleAcceptChangelog() {
   }
 }
 
+async function recordDailyChallengeEvent(type, targetId) {
+  if (!currentUser?.id || !targetId) return;
+  try {
+    const { data, error } = await sb.rpc("record_daily_challenge_event", {
+      p_event_type:type,
+      p_target_id:targetId
+    });
+    if (!error && data?.ok && document.getElementById("lsDailyChallengeWrap")) {
+      loadDailyChallenges();
+    }
+  } catch (_) {}
+}
+
+async function loadDailyChallenges() {
+  const wrap = document.getElementById("lsDailyChallengeWrap");
+  if (!wrap || !currentUser?.id) return;
+
+  try {
+    const { data, error } = await sb.rpc("get_daily_challenges");
+    if (error || !data?.ok || !Array.isArray(data.challenges)) {
+      wrap.innerHTML = "";
+      return;
+    }
+
+    const isSeven = isLiveScroll7App();
+    const challenges = data.challenges.slice(0, isSeven ? 3 : 1);
+    const completed = challenges.filter(item => Number(item.progress) >= Number(item.target)).length;
+    const totalProgress = challenges.reduce((sum,item) => sum + Math.min(Number(item.progress),Number(item.target)),0);
+    const totalTarget = challenges.reduce((sum,item) => sum + Number(item.target),0);
+    const percent = totalTarget ? Math.round(totalProgress / totalTarget * 100) : 0;
+
+    wrap.innerHTML = `
+      <section class="form-card" style="margin-bottom:16px;border-color:${isSeven ? "rgba(57,231,255,.34)" : "var(--gold-dim)"};background:${isSeven ? "linear-gradient(145deg,rgba(16,42,70,.72),rgba(34,12,65,.68))" : "var(--panel)"};">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+          <div><small style="display:block;color:${isSeven ? "#58efff" : "var(--gold)"};font-weight:900;letter-spacing:.1em;">${isSeven ? "LIVESCROLL PULSE" : "RETO DIARIO"}</small><strong style="font-size:15px;">${isSeven ? "Completá tu Pulso de hoy" : "Tu misión de hoy"}</strong></div>
+          <span style="font:900 11px 'JetBrains Mono',monospace;">${completed}/${challenges.length}</span>
+        </div>
+        <div style="height:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;margin-bottom:11px;"><span style="display:block;width:${percent}%;height:100%;background:${isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};transition:width .35s ease;"></span></div>
+        <div style="display:grid;gap:7px;">
+          ${challenges.map(item => {
+            const done = Number(item.progress) >= Number(item.target);
+            return `<div style="display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:9px;padding:9px;border:1px solid ${done ? "rgba(34,197,94,.35)" : "var(--border)"};border-radius:11px;background:rgba(255,255,255,.025);">
+              <span style="font-size:20px;text-align:center;">${done ? "✅" : item.emoji}</span>
+              <strong style="font-size:11px;">${escapeHtml(item.title)}</strong>
+              <span style="font:800 9px 'JetBrains Mono',monospace;color:${done ? "var(--green)" : "var(--text-dim)"};">${item.progress}/${item.target}</span>
+            </div>`;
+          }).join("")}
+        </div>
+        <small style="display:block;margin-top:9px;color:var(--text-dim);font-size:8px;">Se renueva automáticamente cada día · etapa de prueba sin premio adicional</small>
+      </section>`;
+  } catch (_) {
+    wrap.innerHTML = "";
+  }
+}
+
 async function checkAndShowLoginStreak() {
   const { data } = await sb.rpc("get_login_streak_status", { p_user_id: currentUser.id });
   const banner = document.getElementById("loginStreakBannerWrap");
@@ -7421,8 +7476,10 @@ async function renderFeed(renderToken = lsTabRenderToken) {
 
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
+    <div id="lsDailyChallengeWrap"></div>
     <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
   checkAndShowLoginStreak();
+  loadDailyChallenges();
 
   const feedResult = await loadFeedVideosCached();
   let videos = feedResult?.data || [];
@@ -10603,6 +10660,7 @@ async function handleUploadLink() {
     showFloatingPointsSafe(reward);
   }
 
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
   showVideoPublishedSuccess(title, earned);
 }
 
@@ -10741,6 +10799,7 @@ async function handleUploadFile() {
     showFloatingPointsSafe(reward);
   }
 
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
   showVideoPublishedSuccess(title, earned);
 }
 
@@ -12315,6 +12374,7 @@ async function handleLike(videoId) {
   updateBalanceUI();
   showFloatingPointsSafe(data.points, btn);
   showToast(`+${data.points} pt por el like`);
+  recordDailyChallengeEvent("like_video", videoId);
 }
 
 async function handleShare(videoId, url) {
@@ -13346,6 +13406,7 @@ async function viewPublicProfile(username) {
 
   const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
+  recordDailyChallengeEvent("profile_view", profile.id);
 
   const [
     videosResult,

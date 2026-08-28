@@ -5989,7 +5989,8 @@ async function publishMoment() {
 function openMomentViewer(index) {
   const moment=lsMomentsCache[index];
   if (!moment) return;
-  sb.rpc("record_moment_view",{p_moment_id:moment.id}).then(()=>{},()=>{});
+  const isOwner=String(moment.user_id)===String(currentUser?.id);
+  if (!isOwner) sb.rpc("record_moment_view",{p_moment_id:moment.id}).then(()=>{},()=>{});
   const wrap=document.getElementById("globalModalWrap");
   if (!wrap) return;
   const media = moment.media_type==="video"
@@ -5998,11 +5999,35 @@ function openMomentViewer(index) {
       ? `<img src="${escapeHtml(moment.media_url)}" alt="Momento de @${escapeHtml(moment.username)}" style="width:100%;max-height:58dvh;object-fit:contain;background:#000;">`
       : "";
   wrap.innerHTML=`<div class="modal-overlay" style="z-index:285;background:rgba(0,0,0,.92);" onclick="if(event.target===this) closeManagedModal()"><div style="width:min(430px,100%);max-height:92dvh;overflow:auto;border:1px solid var(--border);border-radius:18px;background:var(--panel);">
-    <header style="display:flex;align-items:center;justify-content:space-between;padding:11px 13px;"><strong>@${escapeHtml(moment.username)}</strong><button onclick="closeManagedModal()" class="btn-outline">✕</button></header>
+    <header style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 13px;"><strong>@${escapeHtml(moment.username)}</strong><span style="display:flex;gap:7px;">${isOwner ? `<button onclick="deleteOwnMoment('${moment.id}')" class="btn-outline" style="color:var(--red);">Eliminar</button>` : ""}<button onclick="closeManagedModal()" class="btn-outline">✕</button></span></header>
     ${media}
     ${moment.content ? `<p style="padding:13px;margin:0;line-height:1.5;">${escapeHtml(moment.content)}</p>` : ""}
-    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small></div>
+    <div style="display:flex;gap:7px;padding:10px 13px 14px;flex-wrap:wrap;">${isOwner ? `<button class="btn-outline" onclick="openMomentViewers('${moment.id}')">👁 ${Number(moment.view_count||0)} espectadores</button>` : ["❤️","🔥","👏","😂","✨"].map(emoji=>`<button class="btn-outline" onclick="reactToMoment('${moment.id}','${emoji}',this)">${emoji}</button>`).join("")}${!isOwner ? `<small style="margin-left:auto;align-self:center;color:var(--text-dim);">${Number(moment.view_count||0)} vistas</small>` : ""}</div>
   </div></div>`;
+}
+
+async function openMomentViewers(momentId) {
+  const wrap=document.getElementById("globalModalWrap");
+  if(!wrap) return;
+  wrap.innerHTML=`<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:290;"><div class="modal-box" style="max-width:430px;"><div class="modal-box-header" style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0;">👁 Espectadores</h2><button class="btn-outline" onclick="closeManagedModal()">✕</button></div><div id="momentViewersList" class="modal-box-body">Cargando...</div></div></div>`;
+  const {data,error}=await sb.rpc("get_moment_viewers",{p_moment_id:momentId});
+  const list=document.getElementById("momentViewersList");
+  if(!list) return;
+  if(error||!data?.ok){list.textContent="No pudimos cargar los espectadores.";return;}
+  const viewers=data.viewers||[];
+  if(!viewers.length){list.innerHTML=`<div style="padding:24px;text-align:center;color:var(--text-dim);">Todavía nadie vio este Momento.</div>`;return;}
+  list.innerHTML=viewers.map(viewer=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);"><span style="width:38px;height:38px;display:grid;place-items:center;border-radius:50%;overflow:hidden;background:var(--panel-2);">${viewer.avatar_url?`<img src="${escapeHtml(viewer.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;">`:escapeHtml(viewer.avatar_emoji||"🎬")}</span><strong style="font-size:11px;">@${escapeHtml(viewer.username)}</strong></div>`).join("");
+}
+
+async function deleteOwnMoment(momentId) {
+  if(!confirm("¿Eliminar este Momento?")) return;
+  const {data,error}=await sb.rpc("delete_my_moment",{p_moment_id:momentId});
+  if(error||!data?.ok){showToast("No pudimos eliminar el Momento");return;}
+  if(data.media_url) await deleteMediaFromR2(data.media_url);
+  closeManagedModal();
+  lsMomentsCache=lsMomentsCache.filter(moment=>moment.id!==momentId);
+  loadLiveScrollMoments();
+  showToast("Momento eliminado");
 }
 
 async function reactToMoment(momentId,emoji,button) {

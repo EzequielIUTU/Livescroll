@@ -262,6 +262,23 @@ html.ls-legacy .ls-social-pulse-panel { backdrop-filter:none !important;box-shad
 .ls-reedit-loading i { display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2ef27c,#38ddf2,#f4d35e);box-shadow:0 0 14px rgba(56,221,242,.35);animation:lsReeditLoading 1.05s ease-in-out infinite; }
 @keyframes lsReeditLoading { 0% { transform:translateX(-110%); } 100% { transform:translateX(345%); } }
 html.ls-legacy .ls-reedit-loading i { animation-duration:1.8s;box-shadow:none; }
+
+/* 6.x · estabilidad de reproducción y perfiles conectados */
+.feed-embed-frame{contain:layout paint style;background:#020708;transform:translateZ(0)}
+.feed-embed-frame video{backface-visibility:hidden;-webkit-backface-visibility:hidden}
+html.ls-nova .feed-item{contain:layout paint style}
+html.ls-nova .feed-item:not(.ls-feed-active) .feed-phone{box-shadow:none}
+html.ls-nova .feed-item.ls-feed-active video{transform:translateZ(0)}
+html.ls-nova #feedVertical,html.ls-nova #profileFeedVertical{overscroll-behavior-y:contain}
+.ls-legacy-cover-placeholder{width:100%;height:100%;display:grid;place-content:center;gap:5px;text-align:center;background:linear-gradient(145deg,#0b171a,#071013);color:#dce9eb}
+.ls-legacy-cover-placeholder span{font-size:26px;line-height:1}
+.ls-legacy-cover-placeholder small{font:800 8px 'JetBrains Mono',monospace;letter-spacing:.15em;color:#8da2a7}
+.ls-connected-social-primary{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:11px;background:var(--panel-2)}
+.ls-social-secondary-link{margin:-3px 0 4px 30px;color:var(--text-dim);font-size:10px}
+.ls-social-secondary-link summary{cursor:pointer;user-select:none;padding:4px 0}
+.ls-social-secondary-link input{width:100%;box-sizing:border-box;margin-top:6px}
+html.ls-legacy .feed-embed-frame,html.ls-legacy .feed-phone{transform:none!important;contain:layout paint style}
+html.ls-legacy .feed-item:not(.ls-feed-active) video{visibility:hidden}
 @media(prefers-reduced-motion:reduce) { .ls-reedit-loading i { animation:none;width:100%; } }
 
 /* ---------- 6.0.0 PREVIEW · NEW ERA PORTAL ---------- */

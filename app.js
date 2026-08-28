@@ -12737,6 +12737,9 @@ function ensureLiveScrollTwitchPlayerStyles() {
     .ls-live-start-alert{position:fixed;z-index:2147482500;top:max(72px,calc(env(safe-area-inset-top) + 58px));left:50%;width:min(440px,calc(100% - 24px));transform:translateX(-50%);display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:11px;padding:11px 12px;border-radius:17px;color:#fff;text-align:left;box-shadow:0 18px 55px rgba(0,0,0,.55);animation:lsLiveAlertIn .5s cubic-bezier(.16,1,.3,1) both;overflow:hidden}
     .ls-live-start-alert.ls6{border:1px solid rgba(255,62,92,.48);background:linear-gradient(135deg,rgba(20,26,38,.98),rgba(50,12,25,.98))}.ls-live-start-alert.ls7{border:1px solid rgba(57,231,255,.48);background:radial-gradient(circle at 0 0,rgba(57,231,255,.20),transparent 42%),linear-gradient(135deg,#06162b,#160a32);box-shadow:0 18px 60px rgba(0,0,0,.62),0 0 35px rgba(57,231,255,.16)}
     .ls-live-start-alert.ls7::after{content:"";position:absolute;inset:-80% -20%;background:linear-gradient(110deg,transparent 42%,rgba(57,231,255,.22) 49%,transparent 56%);animation:lsLiveAlertScan 2.2s linear infinite;pointer-events:none}.ls-live-start-avatar{position:relative;z-index:1;width:48px;height:48px;display:grid;place-items:center;border:2px solid #ff315c;border-radius:50%;background:#101522;font-size:24px;overflow:hidden;box-shadow:0 0 18px rgba(255,49,92,.34)}.ls-live-start-alert.ls7 .ls-live-start-avatar{border-color:#39e7ff;box-shadow:0 0 22px rgba(57,231,255,.45)}.ls-live-start-avatar img{width:100%;height:100%;object-fit:cover}.ls-live-start-copy{position:relative;z-index:1;min-width:0;display:flex;flex-direction:column;gap:2px}.ls-live-start-copy small{color:#ff718d;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.14em}.ls-live-start-alert.ls7 small{color:#58efff}.ls-live-start-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ls-live-start-copy em{color:#aeb7c8;font-size:8px;font-style:normal}.ls-live-start-alert>i{position:relative;z-index:1;padding:6px 7px;border-radius:8px;background:#ff315c;color:#fff;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.08em;font-style:normal;animation:lsLivePulse 1.1s infinite}
+    .ls-live-start-alert.platform-twitch>i{background:#9146ff}.ls-live-start-alert.platform-twitch .ls-live-start-avatar{border-color:#a970ff}
+    .ls-live-start-alert.platform-kick>i{background:#53fc18;color:#071006}.ls-live-start-alert.platform-kick .ls-live-start-avatar{border-color:#53fc18;box-shadow:0 0 22px rgba(83,252,24,.34)}
+    .ls-live-start-alert.platform-both>i{background:linear-gradient(100deg,#53fc18 0 48%,#9146ff 52%);color:#fff}.ls-live-start-alert.platform-both .ls-live-start-avatar{border-color:#c88cff}
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
     @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
     html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
@@ -12754,7 +12757,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
   const main = document.getElementById("appView");
   main.innerHTML = `
     <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
-    <p class="page-sub">Mirá dentro de LiveScroll a los creadores que transmiten desde OBS por Twitch.</p>
+    <p class="page-sub">Descubrí quién está en vivo y miralo en su canal oficial de Kick o Twitch.</p>
     <div id="directosList">Cargando...</div>`;
 
   // Conservamos exclusivamente la integración existente de Kick y Twitch.
@@ -12776,7 +12779,7 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
     html += `<section>
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;">
         <h3 style="margin:0;font-size:12px;letter-spacing:.04em;">📺 DIRECTOS EN LIVESCROLL</h3>
-        <span style="font-size:9px;color:var(--text-dim);">OBS · Twitch</span>
+        <span style="font-size:9px;color:var(--text-dim);">KICK · TWITCH</span>
       </div>
       ${liveUsers.map(u => {
         const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
@@ -13609,23 +13612,57 @@ function getNotificationIcon(type) {
   return icons[type] || "🔔";
 }
 
+const LS_LIVE_ALERT_HISTORY_KEY = "livescroll_live_alert_sessions_v1";
+
+function hasShownLiveSessionAlert(key) {
+  try {
+    const history = JSON.parse(sessionStorage.getItem(LS_LIVE_ALERT_HISTORY_KEY) || "{}");
+    const now = Date.now();
+    Object.keys(history).forEach(item => {
+      if (now - Number(history[item] || 0) > 24 * 60 * 60 * 1000) delete history[item];
+    });
+    if (history[key]) return true;
+    history[key] = now;
+    const trimmed = Object.fromEntries(Object.entries(history).slice(-40));
+    sessionStorage.setItem(LS_LIVE_ALERT_HISTORY_KEY, JSON.stringify(trimmed));
+    return false;
+  } catch (_) {
+    window.__lsLiveAlertFallbackHistory = window.__lsLiveAlertFallbackHistory || new Set();
+    if (window.__lsLiveAlertFallbackHistory.has(key)) return true;
+    window.__lsLiveAlertFallbackHistory.add(key);
+    return false;
+  }
+}
+
 async function showLiveStartAnimation(notification) {
-  if (!notification?.actor_id || document.getElementById("lsLiveStartedAlert")) return;
+  if (!notification?.actor_id) return;
   const { data:creator } = await sb.from("profiles")
-    .select("username,avatar_url,avatar_emoji,live_platform")
+    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at")
     .eq("id",notification.actor_id).maybeSingle();
   if (!creator) return;
 
+  const platform = ["kick","twitch","both"].includes(creator.live_platform)
+    ? creator.live_platform
+    : "twitch";
+  const sessionStarted = creator.live_started_at || notification.created_at || "active";
+  const sessionKey = `${notification.actor_id}:${platform}:${sessionStarted}`;
+  if (hasShownLiveSessionAlert(sessionKey)) return;
+
+  document.getElementById("lsLiveStartedAlert")?.remove();
+
+  const platformLabel = platform === "both"
+    ? "KICK + TWITCH"
+    : platform === "kick" ? "KICK" : "TWITCH";
   const isLs7 = isLiveScroll7App();
   const alert = document.createElement("button");
   alert.id = "lsLiveStartedAlert";
   alert.type = "button";
-  alert.className = `ls-live-start-alert ${isLs7 ? "ls7" : "ls6"}`;
+  alert.className = `ls-live-start-alert ${isLs7 ? "ls7" : "ls6"} platform-${platform}`;
   alert.onclick = () => { alert.remove(); switchTab("directos"); };
   alert.innerHTML = `
     <span class="ls-live-start-avatar">${creator.avatar_url ? `<img src="${escapeHtml(creator.avatar_url)}" alt="">` : escapeHtml(creator.avatar_emoji || "🎬")}</span>
-    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL ELÉCTRICA DETECTADA" : "NUEVO DIRECTO"}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para ver las opciones del directo</em></span>
-    <i>EN VIVO</i>`;
+    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL DETECTADA" : "NUEVO DIRECTO"} · ${platformLabel}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para ver las opciones del directo</em></span>
+    <i>${platformLabel}</i>`;
   document.body.appendChild(alert);
   setTimeout(() => alert.remove(), 12000);
 }
@@ -13690,7 +13727,10 @@ function subscribeToNotifications() {
       filter: `user_id=eq.${currentUser.id}`
     }, payload => {
       const notification = payload.new;
-      if (!notifCache.some(n => n.id === notification.id)) notifCache.unshift(notification);
+      // El sondeo de respaldo puede haber incorporado exactamente este aviso
+      // unos milisegundos antes. En ese caso no repetimos sonido, toast ni cartel.
+      if (notifCache.some(n => n.id === notification.id)) return;
+      notifCache.unshift(notification);
       notifCache = notifCache.slice(0, 60);
       scheduleNotificationUIRefresh();
       playLiveScrollNotificationSound();
@@ -13730,7 +13770,9 @@ function renderNotificationPanelContent() {
         ? `follow:${n.actor_id || n.message || n.id}`
         : n.type === "comment"
           ? `comment:${n.video_id || ""}:${n.actor_id || n.id}`
-          : `${n.type || "system"}:${n.message || n.id}`;
+          : n.type === "live"
+            ? `live:${n.actor_id || n.message || n.id}`
+            : `${n.type || "system"}:${n.message || n.id}`;
     let group = groupsByKey.get(key);
     if (!group) {
       group = { ...n, members:[], groupUnread:false };

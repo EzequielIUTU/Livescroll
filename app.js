@@ -5945,7 +5945,7 @@ function getArgentinaDateKey() {
       day:"2-digit"
     }).formatToParts(new Date());
     const values = Object.fromEntries(parts.map(part => [part.type,part.value]));
-    return \`${values.year}-${values.month}-${values.day}\`;
+    return `${values.year}-${values.month}-${values.day}`;
   } catch (_) {
     return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0,10);
   }

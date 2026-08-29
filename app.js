@@ -1475,6 +1475,13 @@ async function loadProfile() {
   currentProfile.creator_application_status = creatorResult?.data?.application_status || null;
   currentProfile.creator_video_count = Number(creatorResult?.data?.video_count || 0);
   currentProfile.creator_account_days = Number(creatorResult?.data?.account_days || 0);
+
+  // Una cuenta de streaming ya vinculada debe aparecer en el perfil sin que
+  // el creador tenga que abrir Editar perfil ni copiar un enlace manual.
+  if (currentProfile.is_creator && window.__lsStreamAutoSyncUserId !== currentUser?.id) {
+    window.__lsStreamAutoSyncUserId = currentUser.id;
+    setTimeout(() => loadStreamAccountConnectionStatus(), 0);
+  }
 }
 
 // ============================================================
@@ -12622,10 +12629,21 @@ function renderSocialIcons(profile) {
     { key: "social_tiktok", icon: "⚫", label: "TikTok" },
     { key: "social_instagram", icon: "🩷", label: "Instagram" }
   ];
-  const active = socials.map(s => ({
-    ...s,
-    url:ownConnectedUrls[s.key] || profile[s.key] || ""
-  })).filter(s => isSafeUrl(s.url));
+  const active = socials.map(s => {
+    const rawUrl = ownConnectedUrls[s.key] || profile[s.key] || "";
+    const kickChannel = s.key === "social_kick" ? getKickChannelFromUrl(rawUrl) : "";
+    const twitchChannel = s.key === "social_twitch" ? getTwitchChannelFromUrl(rawUrl) : "";
+    const url = kickChannel
+      ? `https://kick.com/${encodeURIComponent(kickChannel)}`
+      : twitchChannel
+        ? `https://www.twitch.tv/${encodeURIComponent(twitchChannel)}`
+        : rawUrl;
+    return { ...s, url };
+  }).filter(s => {
+    if (s.key === "social_kick") return !!getKickChannelFromUrl(s.url);
+    if (s.key === "social_twitch") return !!getTwitchChannelFromUrl(s.url);
+    return isSafeUrl(s.url);
+  });
   if (!active.length) return "";
   return `<div class="ls-profile-socials">
     ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><span style="font-size:16px;">${s.icon}</span><span>${s.label}</span></a>`).join("")}
@@ -12739,23 +12757,22 @@ function getTwitchChannelFromUrl(value) {
   }
 }
 
+function getKickChannelFromUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\\.)kick\\.com$/i.test(parsed.hostname)) return "";
+    const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[a-z0-9_.-]{2,50}$/i.test(channel) ? channel.toLowerCase() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
 function ensureLiveStartAlertStyles() {
   if (document.getElementById("lsLiveStartAlertStyles")) return;
   const style = document.createElement("style");
   style.id = "lsLiveStartAlertStyles";
   style.textContent = `
-    body.ls-live-player-open{overflow:hidden}
-    .ls-live-player-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));background:rgba(1,4,12,.88);backdrop-filter:blur(12px)}
-    .ls-live-player-panel{width:min(1120px,100%);max-height:100%;overflow:hidden;border:1px solid rgba(145,70,255,.55);border-radius:20px;background:#070a12;box-shadow:0 22px 70px rgba(0,0,0,.65),0 0 35px rgba(145,70,255,.18)}
-    .ls-live-player-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid rgba(255,255,255,.08)}
-    .ls-live-player-panel header>div{display:flex;align-items:center;gap:8px}.ls-live-player-panel header strong{font-size:12px;color:#ff496f;letter-spacing:.12em}.ls-live-player-panel header small{color:#d9dce6;font-weight:800}
-    .ls-live-player-dot{width:9px;height:9px;border-radius:50%;background:#ff315c;box-shadow:0 0 14px #ff315c;animation:lsLivePulse 1.1s infinite}
-    .ls-live-player-panel header button{width:38px;height:38px;border:1px solid rgba(255,255,255,.14);border-radius:12px;background:#111624;color:#fff;font-size:17px}
-    .ls-live-player-content{display:grid;grid-template-columns:minmax(0,1fr) 370px;min-height:0}.ls-live-player-video{position:relative;width:100%;aspect-ratio:16/9;background:#000}.ls-interactive-twitch-player,.ls-interactive-twitch-player iframe{position:absolute!important;inset:0;width:100%!important;height:100%!important;border:0}.ls-live-autoplay-note{position:absolute;left:10px;bottom:9px;z-index:2;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.66);color:#d9dce6;font-size:8px;pointer-events:none}
-    .ls-live-ended-card{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;text-align:center;background:radial-gradient(circle at 50% 15%,rgba(255,49,92,.14),transparent 42%),#05070c;color:#fff}.ls-live-ended-card>span{color:#ff315c;font-size:26px}.ls-live-ended-card strong{font-size:22px}.ls-live-ended-card p{margin:0 0 7px;color:#aeb7c8;font-size:11px}.ls-live-ended-card button{min-height:42px;padding:0 17px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:#121724;color:#fff;font-weight:900}
-    .ls-live-chat{min-height:0;display:flex;flex-direction:column;border-left:1px solid rgba(255,255,255,.08);background:#090d17}.ls-live-chat-head{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border-bottom:1px solid rgba(255,255,255,.08)}.ls-live-chat-head strong{font-size:11px}.ls-live-chat-head span{color:#ff496f;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.12em}
-    .ls-live-chat-pane{min-height:0;flex:1;display:flex;flex-direction:column}.ls-twitch-chat-frame{position:relative;z-index:1;display:block;width:100%;height:500px;min-height:500px;flex:0 0 500px;border:0;background:#0e0e10;isolation:isolate}
-    .ls-live-player-panel footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 15px;color:#8f96a8;font-size:10px}.ls-live-player-panel footer a{color:#c7a8ff;font-weight:900;text-decoration:none}
     .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
     .ls-live-start-alert{position:fixed;z-index:2147482500;top:max(72px,calc(env(safe-area-inset-top) + 58px));left:50%;width:min(440px,calc(100% - 24px));transform:translateX(-50%);display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:11px;padding:11px 12px;border-radius:17px;color:#fff;text-align:left;box-shadow:0 18px 55px rgba(0,0,0,.55);animation:lsLiveAlertIn .5s cubic-bezier(.16,1,.3,1) both;overflow:hidden}
     .ls-live-start-alert.ls6{border:1px solid rgba(255,62,92,.48);background:linear-gradient(135deg,rgba(20,26,38,.98),rgba(50,12,25,.98))}.ls-live-start-alert.ls7{border:1px solid rgba(57,231,255,.48);background:radial-gradient(circle at 0 0,rgba(57,231,255,.20),transparent 42%),linear-gradient(135deg,#06162b,#160a32);box-shadow:0 18px 60px rgba(0,0,0,.62),0 0 35px rgba(57,231,255,.16)}
@@ -12766,7 +12783,6 @@ function ensureLiveStartAlertStyles() {
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
     @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
     html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
-    @media(max-width:760px){.ls-live-player-overlay{align-items:flex-start;padding-left:0;padding-right:0;overflow-y:auto}.ls-live-player-panel{margin-top:3vh;border-radius:18px 18px 0 0;overflow:visible}.ls-live-player-content{grid-template-columns:1fr}.ls-live-chat{border-left:0;border-top:1px solid rgba(255,255,255,.08)}.ls-live-chat-messages{min-height:190px;max-height:32dvh}.ls-live-player-panel footer{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
   `;
   document.head.appendChild(style);
 }
@@ -12806,10 +12822,11 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
       </div>
       ${liveUsers.map(u => {
         const platformLabel = u.live_platform === "both" ? "🟢 Kick + 🟣 Twitch" : u.live_platform === "kick" ? "🟢 Kick" : "🟣 Twitch";
+        const kickChannel = getKickChannelFromUrl(u.social_kick);
         const twitchChannel = getTwitchChannelFromUrl(u.social_twitch);
         const watchButtons = [
-          (u.live_platform === "kick" || u.live_platform === "both") && u.social_kick && isSafeUrl(u.social_kick)
-            ? `<a href="${escapeHtml(u.social_kick)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
+          (u.live_platform === "kick" || u.live_platform === "both") && kickChannel
+            ? `<a href="https://kick.com/${encodeURIComponent(kickChannel)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
           (u.live_platform === "twitch" || u.live_platform === "both") && twitchChannel
             ? `<a href="https://www.twitch.tv/${encodeURIComponent(twitchChannel)}" target="_blank" rel="noopener" class="watch-btn ls-watch-inside" style="text-decoration:none;">Ver en Twitch</a>` : ""
         ].join("");
@@ -14522,6 +14539,14 @@ async function saveProfileEdits() {
   const invalidSocial = Object.entries(socialPayload).find(([, value]) => value && !isSafeUrl(value));
   if (invalidSocial) {
     errEl.textContent = "Los enlaces de redes deben comenzar con https:// o http://";
+    return;
+  }
+  if (socialPayload.social_kick && !getKickChannelFromUrl(socialPayload.social_kick)) {
+    errEl.textContent = "El enlace alternativo de Kick debe pertenecer a kick.com.";
+    return;
+  }
+  if (socialPayload.social_twitch && !getTwitchChannelFromUrl(socialPayload.social_twitch)) {
+    errEl.textContent = "El enlace alternativo de Twitch debe pertenecer a twitch.tv.";
     return;
   }
 

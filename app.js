@@ -7833,7 +7833,11 @@ function activateLoadedEmbed(video) {
         if (typeof player.requestVideoFrameCallback === "function") {
           player.requestVideoFrameCallback(markDecodedFrame);
         } else {
-          requestAnimationFrame(markDecodedFrame);
+          // WebViews antiguos no confirman el cuadro decodificado. Dejamos
+          // pasar dos repintados y un margen corto antes de devolver el sonido.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => setTimeout(markDecodedFrame, 90));
+          });
         }
       })
       .catch(() => frame?.classList.remove("ls-video-frame-buffering"));

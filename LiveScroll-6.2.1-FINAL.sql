@@ -144,7 +144,7 @@ GRANT EXECUTE ON FUNCTION public.get_daily_challenges() TO authenticated;
 -- El código agrupa cada categoría en una única sección visible.
 -- ------------------------------------------------------------
 
-DO $$
+DO $changelog$
 DECLARE
   v_version integer;
 BEGIN
@@ -191,7 +191,7 @@ BEGIN
   VALUES('changelog',v_version)
   ON CONFLICT(content_key) DO UPDATE
     SET current_version = EXCLUDED.current_version;
-END $;
+END $changelog$;
 
 COMMIT;
 

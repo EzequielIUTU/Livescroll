@@ -28,6 +28,38 @@ function isLiveScroll7App() {
 }
 window.isLiveScroll7App = isLiveScroll7App;
 
+function getLiveScrollClientOrigin() {
+  if (LIVESCROLL_RUNTIME.isAndroid7) return "ls7";
+  if (LIVESCROLL_RUNTIME.isAndroid6) return "ls6";
+  return "web";
+}
+
+function renderClientOriginBadge(origin, compact = false) {
+  const value = String(origin || "").toLowerCase();
+  const labels = { ls6:"LS6", ls7:"LS7", web:"WEB" };
+  if (!labels[value]) return "";
+  const title = value === "ls7"
+    ? "Publicado desde LiveScroll 7"
+    : value === "ls6"
+      ? "Publicado desde LiveScroll 6"
+      : "Publicado desde LiveScroll Web";
+  return `<span class="ls-client-origin ls-origin-${value}${compact ? " is-compact" : ""}" title="${title}" aria-label="${title}">${labels[value]}</span>`;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (document.getElementById("lsClientOriginStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsClientOriginStyles";
+  style.textContent = `
+    .ls-client-origin{display:inline-flex;align-items:center;justify-content:center;min-height:18px;padding:1px 6px;border-radius:999px;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.07em;vertical-align:middle;border:1px solid transparent;box-sizing:border-box}
+    .ls-origin-ls6{color:#eef3f7;background:linear-gradient(135deg,rgba(203,213,225,.20),rgba(71,85,105,.38));border-color:rgba(226,232,240,.42);box-shadow:0 0 10px rgba(203,213,225,.10)}
+    .ls-origin-ls7{color:#e9fcff;background:linear-gradient(135deg,rgba(57,231,255,.20),rgba(138,85,255,.34));border-color:rgba(90,235,255,.52);box-shadow:0 0 13px rgba(57,231,255,.20)}
+    .ls-origin-web{color:#a9b4bf;background:rgba(148,163,184,.09);border-color:rgba(148,163,184,.22)}
+    .ls-client-origin.is-compact{min-height:16px;padding:0 5px;font-size:7px}
+  `;
+  document.head.appendChild(style);
+}, { once:true });
+
 function applyLiveScrollRuntimeBranding() {
   if (!isLiveScroll7App()) return;
   document.documentElement.classList.add("ls7-app-runtime");
@@ -6063,6 +6095,13 @@ async function checkAndShowLoginStreak() {
   if (!data || !data.ok || !data.rewards || !data.rewards.length) { if (banner) banner.innerHTML = ""; return; }
 
   window.__loginStreakData = data;
+  if (data.new_week && data.week_start) {
+    const weekNoticeKey = `ls-week-started-${data.week_start}`;
+    if (!localStorage.getItem(weekNoticeKey)) {
+      localStorage.setItem(weekNoticeKey, "1");
+      showToast("🔥 Comenzó una nueva semana en LiveScroll");
+    }
+  }
   const claimableDay = data.current_day >= 7 ? 1 : data.current_day + 1;
 
   if (banner) {
@@ -7621,7 +7660,7 @@ async function renderFeed(renderToken = lsTabRenderToken) {
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
                 ${renderVideoHashtags(v)}
-                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')"><span>@${escapeHtml(v.profiles?.username || "usuario")}</span> ${getPlanBadgeHtml(v.profiles?.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')"><span>@${escapeHtml(v.profiles?.username || "usuario")}</span> ${getPlanBadgeHtml(v.profiles?.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
             </div>
@@ -8068,7 +8107,7 @@ async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
               <div class="feed-overlay">
                 <div>
                   <div class="title">${escapeHtml(v.title)}</div>
-                  <div class="author"><span>@${escapeHtml(authorInfo.username)}</span> ${getPlanBadgeHtml(authorInfo.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+                  <div class="author"><span>@${escapeHtml(authorInfo.username)}</span> ${getPlanBadgeHtml(authorInfo.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
                 </div>
                 <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
               </div>
@@ -10750,7 +10789,8 @@ async function handleUploadLink() {
     user_id: currentUser.id,
     platform,
     title,
-    video_url: url
+    video_url: url,
+    client_origin: getLiveScrollClientOrigin()
   }).select("id").single();
 
   if (error) { errEl.textContent = error.message; return; }
@@ -10879,7 +10919,8 @@ async function handleUploadFile() {
     platform: "upload",
     title,
     video_url: videoUpload.url,
-    thumbnail_url: thumbnailUrl
+    thumbnail_url: thumbnailUrl,
+    client_origin: getLiveScrollClientOrigin()
   }).select("id").single();
 
   btn.disabled = false;
@@ -12578,6 +12619,7 @@ async function loadComments(videoId, focusCommentId = null) {
           <div>
             <strong style="color:var(--gold); cursor:pointer;" onclick="closeComments(); viewPublicProfile('${escapeHtml(c.profiles?.username || "")}')">@${escapeHtml(c.profiles?.username || "usuario")}</strong>
             ${getPlanBadgeHtml(c.profiles?.plan_id)}
+            ${renderClientOriginBadge(c.client_origin, true)}
             <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
           </div>
           <div style="margin-top:4px; line-height:1.4;">${escapeHtml(c.content)}</div>
@@ -12604,6 +12646,12 @@ async function submitComment(videoId) {
 
   const { data, error } = await sb.rpc("add_comment", { p_video_id: videoId, p_user_id: currentUser.id, p_content: content });
   if (error || !data.ok) { showToast("No se pudo comentar"); return; }
+
+  const { error: originError } = await sb.rpc("mark_latest_comment_origin", {
+    p_video_id: videoId,
+    p_origin: getLiveScrollClientOrigin()
+  });
+  if (originError) console.warn("No se pudo registrar el origen del comentario:", originError.message);
 
   input.value = "";
   await loadComments(videoId);
@@ -12718,7 +12766,7 @@ async function renderForYou(renderToken = lsTabRenderToken) {
             <div class="feed-overlay">
               <div>
                 <div class="title">${escapeHtml(v.title)}</div>
-                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')"><span>@${escapeHtml(v.profiles.username)}</span> ${getPlanBadgeHtml(v.profiles.plan_id)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')"><span>@${escapeHtml(v.profiles.username)}</span> ${getPlanBadgeHtml(v.profiles.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
               </div>
               <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
             </div>

@@ -7237,12 +7237,15 @@ document.addEventListener("DOMContentLoaded", ensureFeedPolishStyles);
 function toggleFeedVideoSound(button) {
   const video = button?.closest(".dbltap-like-zone")?.querySelector("video");
   if (!video) return;
-  video.muted = !video.muted;
+  const wantsSound = video.dataset.lsSoundWanted !== "1";
+  video.dataset.lsSoundWanted = wantsSound ? "1" : "0";
   video.volume = 1;
-  button.classList.toggle("is-on", !video.muted);
-  button.querySelector("span").textContent = video.muted ? "🔇" : "🔊";
-  button.querySelector("b").textContent = video.muted ? "ACTIVAR SONIDO" : "SONIDO ACTIVO";
-  if (!video.muted) video.play().catch(() => {});
+  const frameReady = video.closest(".feed-embed-frame")?.classList.contains("ls-video-frame-ready");
+  video.muted = !(wantsSound && frameReady);
+  button.classList.toggle("is-on", wantsSound);
+  button.querySelector("span").textContent = wantsSound ? "🔊" : "🔇";
+  button.querySelector("b").textContent = wantsSound ? "SONIDO ACTIVO" : "ACTIVAR SONIDO";
+  if (wantsSound) video.play().catch(() => {});
 }
 
 function setupOneVideoScroll(container) {
@@ -7806,14 +7809,20 @@ function activateLoadedEmbed(video) {
 
   const markDecodedFrame = () => {
     if (!isStillActive()) return;
-    player.closest(".feed-embed-frame")?.classList.add("ls-video-frame-ready");
-    player.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
+    const frame = player.closest(".feed-embed-frame");
+    frame?.classList.add("ls-video-frame-ready");
+    frame?.classList.remove("ls-video-frame-buffering");
+    if (player.dataset.lsSoundWanted === "1") player.muted = false;
   };
 
   const startPlayback = () => {
     if (!isStillActive()) return;
     const frame = player.closest(".feed-embed-frame");
     frame?.classList.add("ls-video-frame-buffering");
+    frame?.classList.remove("ls-video-frame-ready");
+    // El audio espera al primer cuadro decodificado para no sonar sobre una
+    // pantalla negra. La preferencia del usuario se conserva en el dataset.
+    player.muted = true;
 
     player.play()
       .then(() => {

@@ -9653,8 +9653,27 @@ function getThumbnailHtml(video) {
 }
 
 function extractYoutubeId(url) {
-  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([A-Za-z0-9_-]{11})/);
-  return m ? m[1] : null;
+  if (typeof url !== "string" || !url.trim()) return null;
+
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    let candidate = null;
+
+    if (host === "youtu.be") {
+      candidate = parsed.pathname.split("/").filter(Boolean)[0];
+    } else if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (parsed.pathname === "/watch") candidate = parsed.searchParams.get("v");
+      else if (["shorts", "embed", "live"].includes(pathParts[0])) candidate = pathParts[1];
+    }
+
+    return /^[A-Za-z0-9_-]{11}$/.test(candidate || "") ? candidate : null;
+  } catch (error) {
+    // Respaldo para enlaces pegados sin protocolo.
+    const match = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([A-Za-z0-9_-]{11})(?:[?&#/]|$)/i);
+    return match ? match[1] : null;
+  }
 }
 
 const lsDiscoveryStartedVideos = new Set();

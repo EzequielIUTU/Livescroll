@@ -46,6 +46,89 @@ function renderClientOriginBadge(origin, compact = false) {
   return `<span class="ls-client-origin ls-origin-${value}${compact ? " is-compact" : ""}" title="${title}" aria-label="${title}">${labels[value]}</span>`;
 }
 
+let lsGenerationFeedFilter = ["all","ls6","ls7"].includes(localStorage.getItem("ls-generation-filter"))
+  ? localStorage.getItem("ls-generation-filter")
+  : "all";
+
+function setGenerationFeedFilter(filter) {
+  if (!["all","ls6","ls7"].includes(filter) || filter === lsGenerationFeedFilter) return;
+  lsGenerationFeedFilter = filter;
+  localStorage.setItem("ls-generation-filter", filter);
+  renderFeed(++lsTabRenderToken);
+}
+
+function renderGenerationFeedFilter() {
+  const options = [
+    ["all", "Todos"],
+    ["ls6", "LS6"],
+    ["ls7", "LS7"]
+  ];
+  return `<div class="ls-generation-filter-shell">
+    <div class="ls-generation-filter" aria-label="Filtrar por generación">${options.map(([value,label]) =>
+      `<button type="button" class="${lsGenerationFeedFilter === value ? "active" : ""}" onclick="setGenerationFeedFilter('${value}')">${label}</button>`
+    ).join("")}</div>
+    <div class="ls-generation-weekly-pulse" id="lsGenerationWeeklyPulse">Esta semana · calculando pulso…</div>
+  </div>`;
+}
+
+let lsGenerationPulseCache = { data:null, at:0 };
+
+function getArgentinaWeekStartIso() {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone:"America/Argentina/Buenos_Aires",
+    year:"numeric", month:"2-digit", day:"2-digit"
+  }).formatToParts(new Date());
+  const pick = type => Number(parts.find(part => part.type === type)?.value || 0);
+  const todayUtc = new Date(Date.UTC(pick("year"), pick("month") - 1, pick("day")));
+  const isoDay = todayUtc.getUTCDay() || 7;
+  todayUtc.setUTCDate(todayUtc.getUTCDate() - (isoDay - 1));
+  return `${todayUtc.toISOString().slice(0,10)}T03:00:00.000Z`;
+}
+
+async function loadGenerationWeeklyPulse() {
+  const target = document.getElementById("lsGenerationWeeklyPulse");
+  if (!target) return;
+  if (lsGenerationPulseCache.data && Date.now() - lsGenerationPulseCache.at < 300000) {
+    const { ls6, ls7 } = lsGenerationPulseCache.data;
+    target.innerHTML = `Esta semana · <b>LS6 ${ls6}</b><i>VS</i><b>LS7 ${ls7}</b>`;
+    return;
+  }
+  const weekStart = getArgentinaWeekStartIso();
+  const [sixResult, sevenResult] = await Promise.all([
+    sb.from("videos").select("id", { count:"exact", head:true }).eq("client_origin", "ls6").gte("created_at", weekStart),
+    sb.from("videos").select("id", { count:"exact", head:true }).eq("client_origin", "ls7").gte("created_at", weekStart)
+  ]);
+  if (!document.getElementById("lsGenerationWeeklyPulse")) return;
+  const data = { ls6:sixResult?.count || 0, ls7:sevenResult?.count || 0 };
+  lsGenerationPulseCache = { data, at:Date.now() };
+  document.getElementById("lsGenerationWeeklyPulse").innerHTML = `Esta semana · <b>LS6 ${data.ls6}</b><i>VS</i><b>LS7 ${data.ls7}</b>`;
+}
+
+function getGenerationIdentityStats(videos = []) {
+  const stats = { ls6:0, ls7:0, web:0 };
+  videos.forEach(video => {
+    if (Object.prototype.hasOwnProperty.call(stats, video?.client_origin)) stats[video.client_origin] += 1;
+  });
+  return { ...stats, both:stats.ls6 > 0 && stats.ls7 > 0 };
+}
+
+function renderGenerationIdentityCard(videos = [], own = false) {
+  const stats = getGenerationIdentityStats(videos);
+  if (!stats.ls6 && !stats.ls7 && !stats.web) return "";
+  return `<section class="ls-generation-identity${stats.both ? " is-dual" : ""}">
+    <div class="ls-generation-copy">
+      <small>IDENTIDAD GENERACIONAL</small>
+      <strong>${stats.both ? "⚡ Usuario de ambas generaciones" : stats.ls7 ? "Nueva Generación" : stats.ls6 ? "Generación Clásica" : "LiveScroll Web"}</strong>
+      <span>${stats.both ? "Publicó desde LiveScroll 6 y LiveScroll 7." : own ? "Tu historia en LiveScroll se construye con cada publicación." : "Su recorrido dentro de LiveScroll."}</span>
+    </div>
+    <div class="ls-generation-counts">
+      <div class="ls-generation-six"><b>${stats.ls6}</b><span>LS6</span></div>
+      <div class="ls-generation-seven"><b>${stats.ls7}</b><span>LS7</span></div>
+      ${stats.web ? `<div class="ls-generation-web"><b>${stats.web}</b><span>WEB</span></div>` : ""}
+    </div>
+  </section>`;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   if (document.getElementById("lsClientOriginStyles")) return;
   const style = document.createElement("style");
@@ -56,6 +139,15 @@ document.addEventListener("DOMContentLoaded", () => {
     .ls-origin-ls7{color:#e9fcff;background:linear-gradient(135deg,rgba(57,231,255,.20),rgba(138,85,255,.34));border-color:rgba(90,235,255,.52);box-shadow:0 0 13px rgba(57,231,255,.20)}
     .ls-origin-web{color:#a9b4bf;background:rgba(148,163,184,.09);border-color:rgba(148,163,184,.22)}
     .ls-client-origin.is-compact{min-height:16px;padding:0 5px;font-size:7px}
+    .ls-generation-filter-shell{position:relative;z-index:8;padding:5px 10px 8px;background:linear-gradient(180deg,var(--ink),rgba(5,9,13,.78))}.ls-generation-filter{display:flex;justify-content:center;gap:7px;padding:2px 0 5px}
+    .ls-generation-filter button{min-width:68px;height:32px;padding:0 13px;border:1px solid var(--border);border-radius:999px;background:var(--panel-2);color:var(--text-dim);font:850 9px 'JetBrains Mono',monospace;letter-spacing:.06em;cursor:pointer}
+    .ls-generation-filter button.active{color:#fff;border-color:rgba(57,231,255,.48);background:linear-gradient(135deg,rgba(203,213,225,.20),rgba(57,231,255,.18),rgba(138,85,255,.24));box-shadow:0 0 18px rgba(57,231,255,.10)}
+    .ls-generation-weekly-pulse{text-align:center;color:var(--text-dim);font:800 7px 'JetBrains Mono',monospace;letter-spacing:.06em}.ls-generation-weekly-pulse b{margin:0 5px;color:#d9f9ff}.ls-generation-weekly-pulse i{font-style:normal;color:#8b5cff}
+    .ls-generation-identity{margin:16px 0 20px;padding:16px;border:1px solid rgba(203,213,225,.24);border-radius:20px;background:linear-gradient(145deg,rgba(71,85,105,.20),rgba(8,13,20,.96));display:flex;align-items:center;justify-content:space-between;gap:15px;box-shadow:0 15px 36px rgba(0,0,0,.20)}
+    .ls-generation-identity.is-dual{border-color:rgba(57,231,255,.30);background:radial-gradient(circle at 95% 0,rgba(138,85,255,.18),transparent 42%),linear-gradient(145deg,rgba(203,213,225,.10),rgba(6,17,32,.97));box-shadow:0 18px 45px rgba(0,0,0,.24),0 0 28px rgba(57,231,255,.06)}
+    .ls-generation-copy{display:flex;flex-direction:column;gap:4px;min-width:0}.ls-generation-copy small{color:#68eaff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.12em}.ls-generation-copy strong{font-size:15px}.ls-generation-copy span{color:var(--text-dim);font-size:10px;line-height:1.4}
+    .ls-generation-counts{display:flex;gap:7px;flex:0 0 auto}.ls-generation-counts>div{min-width:47px;padding:8px 7px;border:1px solid var(--border);border-radius:13px;text-align:center;background:rgba(4,8,14,.55)}.ls-generation-counts b{display:block;font:900 18px 'JetBrains Mono',monospace}.ls-generation-counts span{display:block;margin-top:2px;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.08em}.ls-generation-six b{color:#e2e8f0}.ls-generation-seven b{color:#57eaff}.ls-generation-web b{color:#94a3b8}
+    @media(max-width:520px){.ls-generation-identity{align-items:flex-start;flex-direction:column}.ls-generation-counts{width:100%}.ls-generation-counts>div{flex:1}.ls-generation-filter{padding-top:5px}.ls-generation-filter button{min-width:62px}}
   `;
   document.head.appendChild(style);
 }, { once:true });
@@ -7600,7 +7692,9 @@ async function renderFeed(renderToken = lsTabRenderToken) {
   main.innerHTML = `
     <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
     <div id="lsDailyChallengeWrap"></div>
+    <div id="lsGenerationFeedFilterWrap">${renderGenerationFeedFilter()}</div>
     <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
+  loadGenerationWeeklyPulse();
   checkAndShowLoginStreak();
   loadDailyChallenges();
 
@@ -7619,6 +7713,10 @@ async function renderFeed(renderToken = lsTabRenderToken) {
     videos = videos.filter(video => !hiddenIds.has(video.id));
   }
 
+  if (lsGenerationFeedFilter !== "all") {
+    videos = videos.filter(video => video.client_origin === lsGenerationFeedFilter);
+  }
+
   // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
   if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;
 
@@ -7627,8 +7725,8 @@ async function renderFeed(renderToken = lsTabRenderToken) {
   if (error) { list.textContent = "Error cargando videos: " + error.message; return; }
   if (!videos.length) {
     list.innerHTML = `<div style="padding:40px 0; text-align:center;">
-      <h1 class="page-title">Mirá y ganá</h1>
-      <p style="color:var(--text-dim)">Todavía no hay videos de otros usuarios. ¡Subí el primero!</p>
+      <h1 class="page-title">${lsGenerationFeedFilter === "all" ? "Mirá y ganá" : `Generación ${lsGenerationFeedFilter.toUpperCase()}`}</h1>
+      <p style="color:var(--text-dim)">${lsGenerationFeedFilter === "all" ? "Todavía no hay videos de otros usuarios. ¡Subí el primero!" : "Todavía no hay publicaciones nuevas de esta generación."}</p>
     </div>`;
     return;
   }
@@ -12489,6 +12587,7 @@ async function renderProfile() {
       </div>
     </div>
 
+    ${renderGenerationIdentityCard(videos, true)}
     ${livingProfileHtml}
 
     ${collectionSummaryHtml}
@@ -13543,6 +13642,7 @@ async function viewPublicProfile(username) {
       </div>
     </div>
 
+    ${renderGenerationIdentityCard(videos, false)}
     ${livingProfileHtml}
 
     ${theirBadges && theirBadges.length ? `

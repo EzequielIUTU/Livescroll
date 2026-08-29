@@ -5934,6 +5934,38 @@ async function recordDailyChallengeEvent(type, targetId) {
   } catch (_) {}
 }
 
+let lsDailyChallengeRefreshTimer = null;
+
+function getArgentinaDateKey() {
+  try {
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone:"America/Argentina/Buenos_Aires",
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit"
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type,part.value]));
+    return \`${values.year}-${values.month}-${values.day}\`;
+  } catch (_) {
+    return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0,10);
+  }
+}
+
+function scheduleDailyChallengeRefresh(challengeDate) {
+  if (lsDailyChallengeRefreshTimer) clearTimeout(lsDailyChallengeRefreshTimer);
+  lsDailyChallengeRefreshTimer = setTimeout(() => {
+    if (!document.getElementById("lsDailyChallengeWrap")) {
+      lsDailyChallengeRefreshTimer = null;
+      return;
+    }
+    if (getArgentinaDateKey() !== String(challengeDate || "")) {
+      loadDailyChallenges();
+      return;
+    }
+    scheduleDailyChallengeRefresh(challengeDate);
+  }, 60000);
+}
+
 function getDailyChallengeSummary(data) {
   const isSeven = isLiveScroll7App();
   const challenges = (data?.challenges || []).slice(0, isSeven ? 3 : 1);
@@ -5971,6 +6003,7 @@ async function loadDailyChallenges() {
     }
 
     window.__lsDailyChallengeData = data;
+    scheduleDailyChallengeRefresh(data.date);
     const summary = getDailyChallengeSummary(data);
     const accent = summary.isSeven ? "#58efff" : "var(--gold)";
     const title = summary.isSeven ? "Pulso Diario" : "Reto de hoy";

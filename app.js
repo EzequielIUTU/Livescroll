@@ -12693,134 +12693,10 @@ function getTwitchChannelFromUrl(value) {
   }
 }
 
-function closeLiveScrollTwitchPlayer() {
-  window.__lsActiveTwitchPlayer = null;
-  document.getElementById("lsTwitchLivePlayer")?.remove();
-  document.body.classList.remove("ls-live-player-open");
-}
-
-let lsTwitchOfflineHandledAt = 0;
-
-async function handleTwitchPlayerOffline(liveUserId) {
-  if (Date.now() - lsTwitchOfflineHandledAt < 8000) return;
-  lsTwitchOfflineHandledAt = Date.now();
-
-  const video = document.querySelector(".ls-live-player-video");
-  if (video) {
-    video.innerHTML = `<div class="ls-live-ended-card">
-      <span>■</span><strong>El directo finalizó</strong>
-      <p>Twitch confirmó que esta transmisión ya no está en vivo.</p>
-      <button type="button" onclick="closeLiveScrollTwitchPlayer()">Volver a Directos</button>
-    </div>`;
-  }
-  document.getElementById("lsTwitchChatPane")?.replaceChildren();
-  showToast("■ El directo finalizó");
-
-  // Evita que cada espectador invoque el verificador a la vez. El Creador
-  // dueño del directo (o el administrador) solicita la comprobación inmediata.
-  if (currentUser?.id === liveUserId || currentProfile?.is_admin === true) {
-    try {
-      await sb.functions.invoke("check-live-status", {
-        body:{ reason:"player_offline", creator_id:liveUserId }
-      });
-    } catch (_) {}
-  }
-
-  lsPerfCache.directos = { data:null, at:0 };
-  setTimeout(() => {
-    if (currentTab === "directos") renderDirectos(lsTabRenderToken);
-  }, 1600);
-}
-
-function mountInteractiveTwitchPlayer(channel, parent, liveUserId) {
-  const start = () => {
-    const target = document.getElementById("lsInteractiveTwitchPlayer");
-    if (!target || !window.Twitch?.Player) return;
-    try {
-      const player = new window.Twitch.Player("lsInteractiveTwitchPlayer", {
-        channel,
-        parent:[parent],
-        width:"100%",
-        height:"100%",
-        autoplay:true,
-        muted:true
-      });
-      player.addEventListener(window.Twitch.Player.READY, () => {
-        try { player.setMuted(true); player.play(); } catch (_) {}
-        setTimeout(() => { try { player.play(); } catch (_) {} }, 450);
-      });
-      player.addEventListener(window.Twitch.Player.OFFLINE, () => {
-        handleTwitchPlayerOffline(liveUserId);
-      });
-      window.__lsActiveTwitchPlayer = player;
-    } catch (error) {
-      console.warn("No se pudo iniciar el reproductor interactivo:", error);
-    }
-  };
-
-  if (window.Twitch?.Player) { start(); return; }
-  let script = document.getElementById("lsTwitchPlayerSdk");
-  if (!script) {
-    script = document.createElement("script");
-    script.id = "lsTwitchPlayerSdk";
-    script.src = "https://player.twitch.tv/js/embed/v1.js";
-    script.async = true;
-    document.head.appendChild(script);
-  }
-  script.addEventListener("load", start, { once:true });
-}
-
-function openLiveScrollTwitchPlayer(channel, username, liveUserId) {
-  const safeChannel = String(channel || "").toLowerCase();
-  const safeLiveUserId = String(liveUserId || "");
-  if (!/^[a-z0-9_]{3,25}$/.test(safeChannel) || !/^[0-9a-f-]{36}$/i.test(safeLiveUserId)) {
-    showToast?.("No pudimos abrir este canal de Twitch.", "error");
-    return;
-  }
-
-  closeLiveScrollTwitchPlayer();
-  const parent = location.hostname || "livescroll-mocha.vercel.app";
-  const overlay = document.createElement("div");
-  overlay.id = "lsTwitchLivePlayer";
-  overlay.className = "ls-live-player-overlay";
-  overlay.innerHTML = `
-    <section class="ls-live-player-panel" role="dialog" aria-modal="true" aria-label="Directo de ${escapeHtml(username || safeChannel)}">
-      <header>
-        <div><span class="ls-live-player-dot"></span><strong>EN VIVO</strong><small>@${escapeHtml(username || safeChannel)}</small></div>
-        <button type="button" onclick="closeLiveScrollTwitchPlayer()" aria-label="Cerrar directo">✕</button>
-      </header>
-      <div class="ls-live-player-content">
-        <div class="ls-live-player-video">
-          <div id="lsInteractiveTwitchPlayer" class="ls-interactive-twitch-player" aria-label="Directo de ${escapeHtml(username || safeChannel)}"></div>
-          <div class="ls-live-autoplay-note">El directo inicia silenciado · tocá el sonido en el reproductor</div>
-        </div>
-        <aside class="ls-live-chat">
-          <div class="ls-live-chat-head"><strong>Chat oficial de Twitch</strong><span>TWITCH</span></div>
-          <div id="lsTwitchChatPane" class="ls-live-chat-pane">
-            <iframe class="ls-twitch-chat-frame" src="https://www.twitch.tv/embed/${encodeURIComponent(safeChannel)}/chat?parent=${encodeURIComponent(parent)}&darkpopout" title="Chat oficial de Twitch"></iframe>
-          </div>
-        </aside>
-      </div>
-      <footer>
-        <span>Transmitido desde OBS por Twitch</span>
-        <a href="https://www.twitch.tv/${encodeURIComponent(safeChannel)}" target="_blank" rel="noopener">Abrir en Twitch</a>
-      </footer>
-    </section>`;
-  overlay.addEventListener("click", event => {
-    if (event.target === overlay) closeLiveScrollTwitchPlayer();
-  });
-  document.body.appendChild(overlay);
-  document.body.classList.add("ls-live-player-open");
-  mountInteractiveTwitchPlayer(safeChannel, parent, safeLiveUserId);
-}
-
-window.openLiveScrollTwitchPlayer = openLiveScrollTwitchPlayer;
-window.closeLiveScrollTwitchPlayer = closeLiveScrollTwitchPlayer;
-
-function ensureLiveScrollTwitchPlayerStyles() {
-  if (document.getElementById("lsTwitchLivePlayerStyles")) return;
+function ensureLiveStartAlertStyles() {
+  if (document.getElementById("lsLiveStartAlertStyles")) return;
   const style = document.createElement("style");
-  style.id = "lsTwitchLivePlayerStyles";
+  style.id = "lsLiveStartAlertStyles";
   style.textContent = `
     body.ls-live-player-open{overflow:hidden}
     .ls-live-player-overlay{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:calc(18px + env(safe-area-inset-top)) 12px calc(18px + env(safe-area-inset-bottom));background:rgba(1,4,12,.88);backdrop-filter:blur(12px)}
@@ -12849,7 +12725,7 @@ function ensureLiveScrollTwitchPlayerStyles() {
   document.head.appendChild(style);
 }
 
-document.addEventListener("DOMContentLoaded", ensureLiveScrollTwitchPlayerStyles);
+document.addEventListener("DOMContentLoaded", ensureLiveStartAlertStyles);
 
 
 

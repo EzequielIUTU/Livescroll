@@ -4,7 +4,7 @@
 --
 -- Ejecutar UNA SOLA VEZ en Supabase > SQL Editor.
 -- Ejecutarlo únicamente cuando se decida publicar la versión.
--- Después: Admin > Novedades > Subir versión de Novedades.
+-- El cartel se activa automáticamente; no requiere usar el botón del Admin.
 -- ============================================================
 
 BEGIN;
@@ -144,7 +144,7 @@ GRANT EXECUTE ON FUNCTION public.get_daily_challenges() TO authenticated;
 -- El código agrupa cada categoría en una única sección visible.
 -- ------------------------------------------------------------
 
-DO $$
+DO $changelog$
 DECLARE
   v_version integer;
 BEGIN
@@ -183,7 +183,15 @@ BEGIN
       'Los retos diarios ahora se renuevan correctamente al cambiar el día aunque LiveScroll permanezca abierto.'),
     (v_version, '6.2.1', 'reparado',
       'Se retiraron por completo el reproductor y el chat interno antiguo de Twitch para evitar errores de compatibilidad.');
-END $$;
+
+  -- Publica automáticamente la versión recién cargada. get_pending_content
+  -- comparará este valor con la versión vista por cada usuario y mostrará
+  -- el cartel sin necesidad de pulsar "Subir versión de Novedades".
+  INSERT INTO public.content_versions(content_key,current_version)
+  VALUES('changelog',v_version)
+  ON CONFLICT(content_key) DO UPDATE
+    SET current_version = EXCLUDED.current_version;
+END $changelog$;
 
 COMMIT;
 

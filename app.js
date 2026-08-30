@@ -13051,9 +13051,10 @@ function getTikTokProfileUrl(value) {
 
 function livePlatformSet(profile) {
   const values = String(profile?.live_platform || "").toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  if (values.includes("both")) values.push("kick", "twitch");
   if (profile?.youtube_is_live) values.push("youtube");
   if (profile?.tiktok_is_live) values.push("tiktok");
-  return new Set(values);
+  return new Set(values.filter(value => ["kick","twitch","youtube","tiktok"].includes(value)));
 }
 
 function ensureLiveStartAlertStyles() {
@@ -13070,6 +13071,7 @@ function ensureLiveStartAlertStyles() {
     .ls-live-start-alert.platform-youtube>i{background:#ff0033}.ls-live-start-alert.platform-youtube .ls-live-start-avatar{border-color:#ff0033}
     .ls-live-start-alert.platform-tiktok>i{background:#111;border:1px solid #35f1e5}.ls-live-start-alert.platform-tiktok .ls-live-start-avatar{border-color:#35f1e5}
     .ls-live-start-alert.platform-both>i{background:linear-gradient(100deg,#53fc18 0 48%,#9146ff 52%);color:#fff}.ls-live-start-alert.platform-both .ls-live-start-avatar{border-color:#c88cff}
+    .ls-live-start-alert.platform-multi>i{background:linear-gradient(100deg,#53fc18,#9146ff 34%,#ff0033 67%,#35f1e5);color:#fff}.ls-live-start-alert.platform-multi .ls-live-start-avatar{border-color:#fff;box-shadow:0 0 24px rgba(103,232,249,.38)}
     @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
     @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
     html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
@@ -13976,22 +13978,21 @@ function hasShownLiveSessionAlert(key) {
 async function showLiveStartAnimation(notification) {
   if (!notification?.actor_id) return;
   const { data:creator } = await sb.from("profiles")
-    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at")
+    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at,youtube_is_live,tiktok_is_live")
     .eq("id",notification.actor_id).maybeSingle();
   if (!creator) return;
 
-  const platform = ["kick","twitch","both","youtube","tiktok"].includes(creator.live_platform)
-    ? creator.live_platform
-    : "twitch";
+  const platforms = Array.from(livePlatformSet(creator));
+  if (!platforms.length) return;
+  const platform = platforms.length > 1 ? "multi" : platforms[0];
   const sessionStarted = creator.live_started_at || notification.created_at || "active";
-  const sessionKey = `${notification.actor_id}:${platform}:${sessionStarted}`;
+  const sessionKey = `${notification.actor_id}:${platforms.sort().join("+")}:${sessionStarted}`;
   if (hasShownLiveSessionAlert(sessionKey)) return;
 
   document.getElementById("lsLiveStartedAlert")?.remove();
 
-  const platformLabel = platform === "both"
-    ? "KICK + TWITCH"
-    : platform === "kick" ? "KICK" : platform === "youtube" ? "YOUTUBE" : platform === "tiktok" ? "TIKTOK" : "TWITCH";
+  const platformNames = { kick:"KICK", twitch:"TWITCH", youtube:"YOUTUBE", tiktok:"TIKTOK" };
+  const platformLabel = platforms.map(value => platformNames[value]).filter(Boolean).join(" + ");
   const isLs7 = isLiveScroll7App();
   const alert = document.createElement("button");
   alert.id = "lsLiveStartedAlert";

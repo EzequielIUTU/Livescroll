@@ -3707,7 +3707,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60109;
+const LIVESCROLL6_CLIENT_BUILD = 60202;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 
@@ -5571,7 +5571,8 @@ function showChangelogModal(entries) {
     "6.0.2v":"ANDROID READY",
     "6.1.2":"NUBE LIVESCROLL",
     "6.1.3":"ACTUALIZACIÓN EN VIVO",
-    "6.1.4":"CONEXIÓN CONTINUA"
+    "6.1.4":"CONEXIÓN CONTINUA",
+    "6.2.2":"PROFILE PERFORMANCE"
   };
   const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
 
@@ -5645,7 +5646,7 @@ function showChangelogModal(entries) {
           <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
             ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : newestLabel.startsWith("6.") ? "Continuar en LiveScroll 6 →" : "Continuar el camino →"}
           </button>
-          <div class="ls-next-era-road">6.1.2 NUBE LIVESCROLL → 6.1.3 ACTUALIZACIÓN EN VIVO → 6.1.4 CONEXIÓN CONTINUA</div>
+          <div class="ls-next-era-road">6.1.2 NUBE LIVESCROLL → 6.1.3 ACTUALIZACIÓN EN VIVO → 6.1.4 CONEXIÓN CONTINUA → 6.2.2 PROFILE PERFORMANCE</div>
         </div>
       </div>
     </div>`;
@@ -8236,7 +8237,7 @@ function getExternalVideoCard(platform, url, reason = "") {
   const identity = getExternalVideoIdentity(platform, url);
   return `<div class="feed-fallback ls-external-video-card" data-platform="${escapeHtml(platform)}">
     <div class="ls-external-brand">
-      <div class="ls-external-brand-logo"><img src="https://cdn.simpleicons.org/${identity.brand}/${identity.color}" alt="" loading="lazy" decoding="async"></div>
+      <div class="ls-external-brand-logo"><img src="${getSocialBrandIconUrl(identity.brand,identity.color)}" alt="" loading="lazy" decoding="async"></div>
       <div class="ls-external-brand-copy"><small>CONTENIDO EN ${identity.label.toUpperCase()}</small><strong>${identity.label}</strong><span>${escapeHtml(identity.handle)}</span></div>
     </div>
     ${reason ? `<p class="ls-external-reason">${escapeHtml(reason)}</p>` : ""}
@@ -12286,6 +12287,8 @@ async function saveLiveScroll7ProfileCustomization() {
   renderProfile();
 }
 
+const LS6_PROFILE_VIDEO_COLUMNS = "id,user_id,platform,title,video_url,thumbnail_url,created_at,client_origin";
+
 async function renderProfile() {
   ensureIdentityExperience593Styles();
   const main = document.getElementById("appView");
@@ -12293,7 +12296,7 @@ async function renderProfile() {
 
   const videosPromise = lsCacheFresh(lsPerfCache.profileVideos, 30000)
     ? Promise.resolve({ data:lsPerfCache.profileVideos.data, error:null })
-    : sb.from("videos").select("*").eq("user_id", currentUser.id).order("created_at", { ascending:false });
+    : sb.from("videos").select(isLiveScroll7App() ? "*" : LS6_PROFILE_VIDEO_COLUMNS).eq("user_id", currentUser.id).order("created_at", { ascending:false });
 
   const viewsLedgerPromise = lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)
     ? Promise.resolve({ data:lsPerfCache.profileViewsLedger.data, error:null })
@@ -12870,6 +12873,15 @@ function getAvatarRingClass(planId) {
   return "";
 }
 
+function getSocialBrandIconUrl(brand, color) {
+  const safeBrand = ["kick","twitch","youtube","tiktok","instagram"].includes(brand) ? brand : "youtube";
+  // 6.2.2: LiveScroll 6 lleva los SVG dentro de la aplicación para que los
+  // logos sigan visibles con conexión inestable. LS7 conserva su entrega actual.
+  return isLiveScroll7App()
+    ? `https://cdn.simpleicons.org/${safeBrand}/${color}`
+    : `brand-${safeBrand}.svg?v=6.2.2`;
+}
+
 function renderSocialIcons(profile) {
   const ownConnectedUrls = profile?.id === currentUser?.id ? {
     social_kick:lsGetConnectedStreamProfileUrl("kick"),
@@ -12899,7 +12911,7 @@ function renderSocialIcons(profile) {
   });
   if (!active.length) return "";
   return `<div class="ls-profile-socials">
-    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><img class="ls-profile-social-logo" src="https://cdn.simpleicons.org/${s.brand}/${s.color}" alt="" loading="lazy" decoding="async"><span>${s.label}</span></a>`).join("")}
+    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><img class="ls-profile-social-logo" src="${getSocialBrandIconUrl(s.brand,s.color)}" alt="" loading="lazy" decoding="async"><span>${s.label}</span></a>`).join("")}
   </div>`;
 }
 
@@ -13681,7 +13693,7 @@ async function viewPublicProfile(username) {
     theirEquippedBadges,
     theirTitle
   ] = await Promise.all([
-    sb.from("videos").select("*").eq("user_id", profile.id).order("created_at", { ascending:false }),
+    sb.from("videos").select(isLiveScroll7App() ? "*" : LS6_PROFILE_VIDEO_COLUMNS).eq("user_id", profile.id).order("created_at", { ascending:false }),
     sb.from("follows").select("follower_id").eq("followed_id", profile.id),
     sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle(),
     sb.from("user_badges").select("*").eq("user_id", profile.id).order("earned_at", { ascending:false }),

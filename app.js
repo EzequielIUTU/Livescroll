@@ -11947,6 +11947,14 @@ function ensureIdentityExperience593Styles() {
       transition:transform .16s ease,border-color .16s ease,background .16s ease;
     }
 
+    .ls-profile-social-logo {
+      width:17px;
+      height:17px;
+      display:block;
+      flex:0 0 17px;
+      object-fit:contain;
+    }
+
     html:not(.ls-legacy) .ls-profile-social-link {
       border-color:rgba(56,221,242,.15);
       background:rgba(7,24,30,.66);
@@ -12827,11 +12835,11 @@ function renderSocialIcons(profile) {
     social_twitch:lsGetConnectedStreamProfileUrl("twitch")
   } : {};
   const socials = [
-    { key: "social_kick", icon: "🟢", label: "Kick" },
-    { key: "social_twitch", icon: "🟣", label: "Twitch" },
-    { key: "social_youtube", icon: "🔴", label: "YouTube" },
-    { key: "social_tiktok", icon: "⚫", label: "TikTok" },
-    { key: "social_instagram", icon: "🩷", label: "Instagram" }
+    { key: "social_kick", brand: "kick", color: "53FC18", label: "Kick" },
+    { key: "social_twitch", brand: "twitch", color: "9146FF", label: "Twitch" },
+    { key: "social_youtube", brand: "youtube", color: "FF0000", label: "YouTube" },
+    { key: "social_tiktok", brand: "tiktok", color: "FFFFFF", label: "TikTok" },
+    { key: "social_instagram", brand: "instagram", color: "E4405F", label: "Instagram" }
   ];
   const active = socials.map(s => {
     const rawUrl = ownConnectedUrls[s.key] || profile[s.key] || "";
@@ -12850,7 +12858,7 @@ function renderSocialIcons(profile) {
   });
   if (!active.length) return "";
   return `<div class="ls-profile-socials">
-    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><span style="font-size:16px;">${s.icon}</span><span>${s.label}</span></a>`).join("")}
+    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><img class="ls-profile-social-logo" src="https://cdn.simpleicons.org/${s.brand}/${s.color}" alt="" loading="lazy" decoding="async"><span>${s.label}</span></a>`).join("")}
   </div>`;
 }
 

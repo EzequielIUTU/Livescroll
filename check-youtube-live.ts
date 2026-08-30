@@ -26,10 +26,20 @@ async function resolveChannelId(apiKey: string, profileUrl: string) {
 }
 
 async function findLiveVideo(apiKey: string, channelId: string) {
-  const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=id&channelId=${encodeURIComponent(channelId)}&eventType=live&type=video&maxResults=1&key=${encodeURIComponent(apiKey)}`);
+  const feedResponse = await fetch(`https://www.youtube.com/feeds/videos.xml?channel_id=${encodeURIComponent(channelId)}`);
+  if (!feedResponse.ok) return null;
+  const feed = await feedResponse.text();
+  const videoIds = [...feed.matchAll(/<yt:videoId>([A-Za-z0-9_-]{6,20})<\/yt:videoId>/g)]
+    .map(match => match[1]).slice(0, 15);
+  if (!videoIds.length) return null;
+  const response = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails&id=${encodeURIComponent(videoIds.join(","))}&key=${encodeURIComponent(apiKey)}`);
   if (!response.ok) return null;
   const body = await response.json();
-  return body.items?.[0]?.id?.videoId || null;
+  const live = (body.items || []).find((item: any) =>
+    item.snippet?.liveBroadcastContent === "live" ||
+    (item.liveStreamingDetails?.actualStartTime && !item.liveStreamingDetails?.actualEndTime)
+  );
+  return live?.id || null;
 }
 
 Deno.serve(async () => {
@@ -39,15 +49,16 @@ Deno.serve(async () => {
   if (!supabaseUrl || !serviceKey || !youtubeKey) return new Response(JSON.stringify({ ok:false,error:"missing_secret" }),{ status:500,headers:cors });
   const sb = createClient(supabaseUrl, serviceKey, { auth:{ persistSession:false } });
   await sb.rpc("expire_manual_tiktok_lives");
-  const { data:profiles, error } = await sb.from("profiles").select("id,social_youtube,youtube_is_live").eq("is_creator",true).not("social_youtube","is",null);
+  const { data:profiles, error } = await sb.from("profiles").select("id,social_youtube,youtube_channel_id,youtube_is_live").eq("is_creator",true).not("social_youtube","is",null);
   if (error) return new Response(JSON.stringify({ ok:false,error:error.message }),{ status:500,headers:cors });
 
   let checked = 0;
   for (const profile of profiles || []) {
-    const channelId = await resolveChannelId(youtubeKey, profile.social_youtube);
+    const channelId = profile.youtube_channel_id || await resolveChannelId(youtubeKey, profile.social_youtube);
     if (!channelId) continue;
     const videoId = await findLiveVideo(youtubeKey, channelId);
     await sb.from("profiles").update({
+      youtube_channel_id:channelId,
       youtube_is_live:!!videoId,
       youtube_live_video_id:videoId,
       live_started_at:videoId && !profile.youtube_is_live ? new Date().toISOString() : undefined

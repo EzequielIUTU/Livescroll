@@ -3,11 +3,12 @@ BEGIN;
 
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS youtube_is_live boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS youtube_channel_id text,
   ADD COLUMN IF NOT EXISTS youtube_live_video_id text,
   ADD COLUMN IF NOT EXISTS tiktok_is_live boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS tiktok_live_until timestamptz;
 
-GRANT SELECT (youtube_is_live, youtube_live_video_id, tiktok_is_live, tiktok_live_until)
+GRANT SELECT (youtube_is_live, youtube_channel_id, youtube_live_video_id, tiktok_is_live, tiktok_live_until)
 ON public.profiles TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.set_my_tiktok_live(

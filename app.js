@@ -12964,7 +12964,7 @@ function getTwitchChannelFromUrl(value) {
 function getKickChannelFromUrl(value) {
   try {
     const parsed = new URL(String(value || "").trim());
-    if (!/(^|\\.)kick\\.com$/i.test(parsed.hostname)) return "";
+    if (!/(^|\.)kick\.com$/i.test(parsed.hostname)) return "";
     const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
     return /^[a-z0-9_.-]{2,50}$/i.test(channel) ? channel.toLowerCase() : "";
   } catch (_) {

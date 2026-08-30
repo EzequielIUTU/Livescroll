@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#05070f">
+  <title>LiveScroll 8 · Primera señal</title>
+  <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main class="world-shell">
+    <section class="signal-stage" aria-label="Presentación LiveScroll 8">
+      <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
+      <div class="signal-copy">
+        <span class="eyebrow">PRIMERA SEÑAL · 8.0.0</span>
+        <h1><span>Live</span><strong>Scroll</strong><i>8</i></h1>
+        <p>Tu mundo no empieza con un feed.<br>Empieza con una señal.</p>
+      </div>
+      <div class="pulse-core"><span></span></div>
+      <button class="discover" id="discoverBtn" type="button">DESCUBRIR LS8 <b>→</b></button>
+    </section>
+
+    <section class="access-stage" id="accessStage" aria-hidden="true">
+      <button class="back" id="backBtn" type="button" aria-label="Volver">←</button>
+      <header><span>LS / 08</span><small>ACCESO A TU MUNDO</small></header>
+      <div class="access-card">
+        <div class="mode-switch" role="tablist">
+          <button class="active" data-mode="login" type="button">Volver</button>
+          <button data-mode="signup" type="button">Empezar</button>
+        </div>
+        <h2 id="accessTitle">Tu señal sigue activa.</h2>
+        <p id="accessText">Ingresá con la misma cuenta de LiveScroll.</p>
+        <form id="authForm">
+          <label>Correo<input id="email" type="email" autocomplete="email" required placeholder="tu@correo.com"></label>
+          <label>Contraseña<input id="password" type="password" minlength="6" autocomplete="current-password" required placeholder="••••••••"></label>
+          <button class="submit" type="submit"><span id="submitText">ENTRAR A LS8</span><b>↗</b></button>
+        </form>
+        <p class="status" id="status" role="status"></p>
+        <p class="shared-note">LS8 usa tu cuenta actual. No duplica tus datos.</p>
+      </div>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

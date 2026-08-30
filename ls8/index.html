@@ -40,6 +40,30 @@
         <p class="shared-note">LS8 usa tu cuenta actual. No duplica tus datos.</p>
       </div>
     </section>
+
+    <section class="app-stage" id="appStage" aria-hidden="true">
+      <nav class="world-nav">
+        <a class="mini-brand" href="#" aria-label="LiveScroll 8"><b>LS</b><span>08</span></a>
+        <div class="nav-actions">
+          <button class="active" data-view="inicio" type="button"><i>⌂</i><span>Inicio</span></button>
+          <button data-view="explorar" type="button"><i>◇</i><span>Explorar</span></button>
+          <button data-view="perfil" type="button"><i>○</i><span>Mi mundo</span></button>
+        </div>
+        <button class="exit" id="exitBtn" type="button" title="Cerrar sesión">↗</button>
+      </nav>
+      <div class="world-view">
+        <header class="world-top">
+          <div><small>SEÑAL / ACTIVA</small><h2 id="worldGreeting">Buenas, creador.</h2></div>
+          <div class="world-avatar" id="worldAvatar">8</div>
+        </header>
+        <section class="world-hero">
+          <div><span>HOY EN TU MUNDO</span><h3>No recorrés un feed.<br><em>Descubrís señales.</em></h3></div>
+          <div class="signal-meter"><b id="signalCount">00</b><small>SEÑALES<br>RECIENTES</small></div>
+        </section>
+        <div class="section-title"><span>TRANSMISIONES CERCANAS</span><button id="refreshBtn" type="button">ACTUALIZAR ↻</button></div>
+        <div class="signal-feed" id="signalFeed"><div class="feed-loading">Buscando señales activas…</div></div>
+      </div>
+    </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./app.js"></script>

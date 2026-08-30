@@ -32,6 +32,11 @@
   // Se ejecuta antes del primer dibujo: evita que la APK 7 muestre por un
   // instante la pantalla compartida de LiveScroll 6 mientras recupera sesión.
   (function () {
+    if (/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get('ls8preview') === '1') {
+      document.documentElement.classList.add('ls8-app-runtime');
+      document.title = 'LiveScroll 8 · Worlds';
+      return;
+    }
     if (/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)) {
       document.documentElement.classList.add('ls7-app-runtime','ls7-boot-pending');
       document.title = 'LiveScroll 7';

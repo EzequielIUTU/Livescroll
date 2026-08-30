@@ -8163,6 +8163,9 @@ function getEmbedHtml(video) {
     const id = extractTikTokVideoId(url);
     if (id) return `<iframe src="https://www.tiktok.com/player/v1/${encodeURIComponent(id)}?autoplay=1&loop=1" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
   }
+  if (["kick", "twitch", "tiktok"].includes(video.platform)) {
+    return getExternalVideoCard(video.platform, url, `Este enlace se reproduce directamente en ${video.platform === "tiktok" ? "TikTok" : video.platform === "twitch" ? "Twitch" : "Kick"}.`);
+  }
   const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣" };
   return `<div class="feed-fallback">
     <div class="platform-icon">${icons[video.platform] || "▶️"}</div>
@@ -8197,10 +8200,48 @@ function extractTikTokVideoId(value) {
   } catch (_) { return null; }
 }
 
+function ensureExternalVideoCardStyles() {
+  if (document.getElementById("lsExternalVideoCardStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsExternalVideoCardStyles";
+  style.textContent = `
+    .ls-external-video-card{--platform:#53fc18;position:relative!important;isolation:isolate;overflow:hidden!important;display:flex!important;align-items:flex-start!important;justify-content:flex-end!important;gap:0!important;padding:24px 22px 28px!important;text-align:left!important;background:radial-gradient(circle at 18% 14%,color-mix(in srgb,var(--platform) 22%,transparent),transparent 38%),linear-gradient(155deg,#111720 0%,#070a0e 58%,#020304 100%)!important}
+    .ls-external-video-card[data-platform="twitch"]{--platform:#9146ff}.ls-external-video-card[data-platform="tiktok"]{--platform:#25f4ee}.ls-external-video-card::before{content:"";position:absolute;z-index:-1;width:68%;aspect-ratio:1;left:-22%;top:-24%;border:1px solid color-mix(in srgb,var(--platform) 38%,transparent);border-radius:50%;box-shadow:0 0 80px color-mix(in srgb,var(--platform) 12%,transparent);animation:lsExternalOrbit 9s linear infinite}.ls-external-video-card::after{content:"";position:absolute;z-index:-1;inset:-45% -70%;background:linear-gradient(110deg,transparent 43%,color-mix(in srgb,var(--platform) 13%,transparent) 50%,transparent 57%);animation:lsExternalScan 3.8s ease-in-out infinite}
+    .ls-external-brand{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:13px;width:100%;margin:auto 0 18px}.ls-external-brand-logo{width:52px;height:52px;padding:12px;border:1px solid color-mix(in srgb,var(--platform) 50%,transparent);border-radius:16px;background:rgba(0,0,0,.42);box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 22px color-mix(in srgb,var(--platform) 15%,transparent)}.ls-external-brand-logo img{display:block;width:100%;height:100%;object-fit:contain}.ls-external-brand-copy{min-width:0}.ls-external-brand-copy small{display:block;margin-bottom:5px;color:var(--platform);font:900 8px 'JetBrains Mono',monospace;letter-spacing:.16em}.ls-external-brand-copy strong{display:block;color:#fff;font-size:21px;line-height:1.05}.ls-external-brand-copy span{display:block;margin-top:6px;color:#aab4c2;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ls-external-video-card .ls-external-reason{max-width:330px;margin:0 0 16px!important;color:#c1c8d1!important;font-size:11px!important;line-height:1.5}.ls-external-open{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:11px 14px;border:1px solid color-mix(in srgb,var(--platform) 58%,transparent);border-radius:13px;background:color-mix(in srgb,var(--platform) 16%,rgba(0,0,0,.7));color:#fff!important;text-decoration:none;font-size:12px;font-weight:900;box-shadow:0 10px 26px rgba(0,0,0,.28);transition:transform .18s ease,background .18s ease}.ls-external-open:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--platform) 25%,rgba(0,0,0,.7))}.ls-external-open b{color:var(--platform);font-size:17px}
+    @keyframes lsExternalOrbit{to{transform:rotate(360deg)}}@keyframes lsExternalScan{0%,20%{transform:translateX(-30%)}80%,100%{transform:translateX(30%)}}
+    .ls-legacy .ls-external-video-card::before,.ls-legacy .ls-external-video-card::after{animation:none!important;display:none}.ls-legacy .ls-external-video-card{background:#10151c!important}
+    @media (prefers-reduced-motion:reduce){.ls-external-video-card::before,.ls-external-video-card::after{animation:none!important}}
+  `;
+  document.head.appendChild(style);
+}
+
+function getExternalVideoIdentity(platform, url) {
+  const config = {
+    kick:{ label:"Kick", brand:"kick", color:"53FC18" },
+    twitch:{ label:"Twitch", brand:"twitch", color:"9146FF" },
+    tiktok:{ label:"TikTok", brand:"tiktok", color:"FFFFFF" }
+  }[platform] || { label:"Plataforma", brand:"playstation", color:"FFFFFF" };
+  let handle = "Contenido externo";
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    const candidate = platform === "tiktok" && parts[0]?.startsWith("@") ? parts[0] : parts[0];
+    if (candidate && candidate.length <= 50) handle = candidate.startsWith("@") ? candidate : `@${candidate}`;
+  } catch (_) {}
+  return { ...config, handle };
+}
+
 function getExternalVideoCard(platform, url, reason = "") {
-  const label = platform === "kick" ? "Kick" : platform === "twitch" ? "Twitch" : "TikTok";
-  const icon = platform === "kick" ? "🟢" : platform === "twitch" ? "🟣" : "🎵";
-  return `<div class="feed-fallback ls-external-video-card"><div class="platform-icon">${icon}</div><strong>${label}</strong>${reason ? `<p>${escapeHtml(reason)}</p>` : ""}<a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Ver en ${label}</a></div>`;
+  ensureExternalVideoCardStyles();
+  const identity = getExternalVideoIdentity(platform, url);
+  return `<div class="feed-fallback ls-external-video-card" data-platform="${escapeHtml(platform)}">
+    <div class="ls-external-brand">
+      <div class="ls-external-brand-logo"><img src="https://cdn.simpleicons.org/${identity.brand}/${identity.color}" alt="" loading="lazy" decoding="async"></div>
+      <div class="ls-external-brand-copy"><small>CONTENIDO EN ${identity.label.toUpperCase()}</small><strong>${identity.label}</strong><span>${escapeHtml(identity.handle)}</span></div>
+    </div>
+    ${reason ? `<p class="ls-external-reason">${escapeHtml(reason)}</p>` : ""}
+    <a class="ls-external-open" href="${escapeHtml(url)}" target="_blank" rel="noopener"><span>Abrir y reproducir</span><b>↗</b></a>
+  </div>`;
 }
 
 async function openSharedVideo(videoId) {

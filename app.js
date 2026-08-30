@@ -16,19 +16,27 @@ const LIVESCROLL_PROJECT_IDENTITY = Object.freeze({
 // La WebApp es compartida, pero la APK 7 anuncia su identidad en el User-Agent.
 // Así LiveScroll 6 conserva su experiencia y LiveScroll 7 recibe la propia.
 const LIVESCROLL_RUNTIME = Object.freeze({
+  isAndroid8:/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get("ls8preview") === "1",
   isAndroid7:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent),
   isAndroid6:/LiveScrollAndroid\/6(?:\.|\/|\s)/i.test(navigator.userAgent),
-  generation:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent) ? 7 : 6
+  generation:(/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get("ls8preview") === "1") ? 8 : /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent) ? 7 : 6
 });
 
 if (LIVESCROLL_RUNTIME.isAndroid6) document.documentElement.classList.add("ls6-app-runtime");
+if (LIVESCROLL_RUNTIME.isAndroid8) document.documentElement.classList.add("ls8-app-runtime");
 
 function isLiveScroll7App() {
   return LIVESCROLL_RUNTIME.isAndroid7 === true;
 }
 window.isLiveScroll7App = isLiveScroll7App;
 
+function isLiveScroll8App() {
+  return LIVESCROLL_RUNTIME.isAndroid8 === true;
+}
+window.isLiveScroll8App = isLiveScroll8App;
+
 function getLiveScrollClientOrigin() {
+  if (LIVESCROLL_RUNTIME.isAndroid8) return "ls8";
   if (LIVESCROLL_RUNTIME.isAndroid7) return "ls7";
   if (LIVESCROLL_RUNTIME.isAndroid6) return "ls6";
   return "web";
@@ -36,9 +44,11 @@ function getLiveScrollClientOrigin() {
 
 function renderClientOriginBadge(origin, compact = false) {
   const value = String(origin || "").toLowerCase();
-  const labels = { ls6:"LS6", ls7:"LS7", web:"WEB" };
+  const labels = { ls6:"LS6", ls7:"LS7", ls8:"LS8", web:"WEB" };
   if (!labels[value]) return "";
-  const title = value === "ls7"
+  const title = value === "ls8"
+    ? "Publicado desde LiveScroll 8"
+    : value === "ls7"
     ? "Publicado desde LiveScroll 7"
     : value === "ls6"
       ? "Publicado desde LiveScroll 6"
@@ -46,12 +56,12 @@ function renderClientOriginBadge(origin, compact = false) {
   return `<span class="ls-client-origin ls-origin-${value}${compact ? " is-compact" : ""}" title="${title}" aria-label="${title}">${labels[value]}</span>`;
 }
 
-let lsGenerationFeedFilter = ["all","ls6","ls7"].includes(localStorage.getItem("ls-generation-filter"))
+let lsGenerationFeedFilter = ["all","ls6","ls7","ls8"].includes(localStorage.getItem("ls-generation-filter"))
   ? localStorage.getItem("ls-generation-filter")
   : "all";
 
 function setGenerationFeedFilter(filter) {
-  if (!["all","ls6","ls7"].includes(filter) || filter === lsGenerationFeedFilter) return;
+  if (!["all","ls6","ls7","ls8"].includes(filter) || filter === lsGenerationFeedFilter) return;
   lsGenerationFeedFilter = filter;
   localStorage.setItem("ls-generation-filter", filter);
   renderFeed(++lsTabRenderToken);
@@ -61,7 +71,8 @@ function renderGenerationFeedFilter() {
   const options = [
     ["all", "Todos"],
     ["ls6", "LS6"],
-    ["ls7", "LS7"]
+    ["ls7", "LS7"],
+    ["ls8", "LS8"]
   ];
   return `<div class="ls-generation-filter-shell">
     <div class="ls-generation-filter" aria-label="Filtrar por generación">${options.map(([value,label]) =>
@@ -137,6 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .ls-client-origin{display:inline-flex;align-items:center;justify-content:center;min-height:18px;padding:1px 6px;border-radius:999px;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.07em;vertical-align:middle;border:1px solid transparent;box-sizing:border-box}
     .ls-origin-ls6{color:#eef3f7;background:linear-gradient(135deg,rgba(203,213,225,.20),rgba(71,85,105,.38));border-color:rgba(226,232,240,.42);box-shadow:0 0 10px rgba(203,213,225,.10)}
     .ls-origin-ls7{color:#e9fcff;background:linear-gradient(135deg,rgba(57,231,255,.20),rgba(138,85,255,.34));border-color:rgba(90,235,255,.52);box-shadow:0 0 13px rgba(57,231,255,.20)}
+    .ls-origin-ls8{color:#fff5ff;background:linear-gradient(135deg,rgba(255,62,165,.30),rgba(98,255,196,.22));border-color:rgba(255,112,198,.58);box-shadow:0 0 14px rgba(255,62,165,.22)}
     .ls-origin-web{color:#a9b4bf;background:rgba(148,163,184,.09);border-color:rgba(148,163,184,.22)}
     .ls-client-origin.is-compact{min-height:16px;padding:0 5px;font-size:7px}
     .ls-generation-filter-shell{position:relative;z-index:8;padding:5px 10px 8px;background:linear-gradient(180deg,var(--ink),rgba(5,9,13,.78))}.ls-generation-filter{display:flex;justify-content:center;gap:7px;padding:2px 0 5px}
@@ -153,6 +165,15 @@ document.addEventListener("DOMContentLoaded", () => {
 }, { once:true });
 
 function applyLiveScrollRuntimeBranding() {
+  if (isLiveScroll8App()) {
+    document.documentElement.classList.add("ls8-app-runtime");
+    document.querySelectorAll(".nav-brand").forEach(node => {
+      node.innerHTML = '<span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>8</b>';
+      node.setAttribute("aria-label", "LiveScroll 8");
+    });
+    document.title = "LiveScroll 8 — Worlds";
+    return;
+  }
   if (!isLiveScroll7App()) return;
   document.documentElement.classList.add("ls7-app-runtime");
   document.querySelectorAll(".nav-brand").forEach(node => {
@@ -163,7 +184,7 @@ function applyLiveScrollRuntimeBranding() {
 }
 
 function installLiveScroll7NativeFeel() {
-  if (!isLiveScroll7App() || window.__ls7NativeFeelInstalled) return;
+  if ((!isLiveScroll7App() && !isLiveScroll8App()) || window.__ls7NativeFeelInstalled) return;
   window.__ls7NativeFeelInstalled = true;
   let lastPulseAt = 0;
 
@@ -3092,7 +3113,7 @@ function ensureNavigationEvolution597() {
     dock.id = "lsMobileDock";
     dock.className = "ls-mobile-dock";
     dock.setAttribute("aria-label", "Navegación principal");
-    dock.innerHTML = isLiveScroll7App() ? `
+    dock.innerHTML = (isLiveScroll7App() || isLiveScroll8App()) ? `
       <button data-tab="feed" onclick="switchTab('feed')" aria-label="Mirar"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v13H4zM10 9l5 3-5 3z"/></svg></span><small>Mirar</small></button>
       <button data-tab="foryou" onclick="switchTab('foryou')" aria-label="Para Ti"><span class="ls7-dock-icon"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span><small>Para Ti</small></button>
       <button data-tab="upload" class="ls-dock-create" onclick="switchTab('upload')" aria-label="Subir video"><span class="ls7-dock-create-core"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span><small>Crear</small></button>
@@ -3717,7 +3738,7 @@ function formatLiveScrollBuild(code) {
 }
 
 async function checkLiveScroll6Update() {
-  if (isLiveScroll7App() || !currentUser || ls6UpdateCheckRunning) return;
+  if (isLiveScroll7App() || isLiveScroll8App() || !currentUser || ls6UpdateCheckRunning) return;
   if (document.getElementById("ls6LiveUpdatePrompt")) return;
 
   ls6UpdateCheckRunning = true;
@@ -3784,7 +3805,7 @@ async function restartLiveScrollForUpdate() {
 }
 
 function startLiveScroll6UpdateWatcher() {
-  if (isLiveScroll7App() || ls6UpdateWatchTimer) return;
+  if (isLiveScroll7App() || isLiveScroll8App() || ls6UpdateWatchTimer) return;
   checkLiveScroll6Update();
   ls6UpdateWatchTimer = setInterval(checkLiveScroll6Update, 60000);
 }
@@ -3978,6 +3999,7 @@ async function checkPendingContent() {
   const history = rawHistory.filter(entry => {
     const display = String(entry?.display_version || "");
     const isVersion7 = /^7(?:\.|$)/.test(display);
+    if (isLiveScroll8App()) return false;
     if (isLiveScroll7App()) return isVersion7;
     return !isVersion7 && compareSemver(display, "6.1.2") >= 0;
   });
@@ -4072,7 +4094,7 @@ async function checkPendingContent() {
     Promise.resolve(sb.rpc("mark_my_bridge_notice_seen")).catch(() => {});
   }
   if (cloudBridgeSeen && !localBridgeSeen) localStorage.setItem(bridgeKey,"1");
-  if (!isLiveScroll7App() && !localBridgeSeen && !cloudBridgeSeen && !window.__lsStartupOptionalModalShown) {
+  if (!isLiveScroll7App() && !isLiveScroll8App() && !localBridgeSeen && !cloudBridgeSeen && !window.__lsStartupOptionalModalShown) {
     window.__lsStartupOptionalModalShown = true;
     window.__lsBridgeShownVersion = latestInternal;
     showLiveScroll6BridgeNotice();
@@ -4089,6 +4111,7 @@ async function checkPendingContent() {
   if (cloudPulseSeen && !localPulseSeen) localStorage.setItem(ls7PulseKey,"1");
   if (
     !isLiveScroll7App() &&
+    !isLiveScroll8App() &&
     !ls7PulseSeen &&
     !window.__lsStartupOptionalModalShown
   ) {
@@ -19274,6 +19297,58 @@ function ensureLiveScroll7ElectricIdentity() {
   document.head.appendChild(style);
 }
 ensureLiveScroll7ElectricIdentity();
+
+function ensureLiveScroll8Prototype() {
+  if (!isLiveScroll8App() || document.getElementById("ls8WorldsStyles")) return;
+  const style = document.createElement("style");
+  style.id = "ls8WorldsStyles";
+  style.textContent = `
+    html.ls8-app-runtime{--ink:#07040b;--panel:#130b18;--panel-2:#1b1022;--gold:#68ffc5;--gold-dim:#32d99a;--green:#ff45ac;--text:#fff8fd;--text-dim:#c8b7c5;--border:#38213f;color-scheme:dark}
+    html.ls8-app-runtime body{background:radial-gradient(circle at 8% -8%,rgba(98,255,196,.14),transparent 30%),radial-gradient(circle at 108% 20%,rgba(255,62,165,.18),transparent 34%),linear-gradient(150deg,#050208,#100713 55%,#050207)!important}
+    html.ls8-app-runtime nav{border-color:rgba(98,255,196,.20)!important;background:rgba(8,3,12,.90)!important;box-shadow:0 14px 48px rgba(0,0,0,.44),0 0 42px rgba(255,62,165,.06)!important}
+    html.ls8-app-runtime .nav-brand-scroll{color:#68ffc5!important;text-shadow:0 0 18px rgba(98,255,196,.34)}
+    html.ls8-app-runtime .nav-brand b{color:#fff!important;background:linear-gradient(145deg,#ff3ea5,#753cff)!important;border-color:rgba(255,129,208,.52)!important;box-shadow:0 0 22px rgba(255,62,165,.30)!important}
+    html.ls8-app-runtime .btn{color:#09050b!important;background:linear-gradient(125deg,#68ffc5,#42dfa8 46%,#ff58b5)!important;border-color:rgba(179,255,227,.45)!important;box-shadow:0 10px 30px rgba(98,255,196,.13)!important}
+    html.ls8-app-runtime .btn-outline{color:#ffeafa!important;border-color:rgba(255,87,180,.27)!important;background:rgba(255,62,165,.045)!important}
+    html.ls8-app-runtime .form-card,html.ls8-app-runtime .video-card,html.ls8-app-runtime .auth-box{border-color:rgba(255,96,188,.15)!important;background:linear-gradient(145deg,rgba(28,12,34,.96),rgba(9,5,14,.98))!important}
+    html.ls8-app-runtime .nav-links button.active{color:#fff;background:linear-gradient(135deg,rgba(98,255,196,.11),rgba(255,62,165,.12))!important}
+    html.ls8-app-runtime .nav-links button.active::after{background:linear-gradient(90deg,#68ffc5,#ff3ea5,#8a55ff)!important}
+    html.ls8-app-runtime .ls-mobile-dock{border-color:rgba(98,255,196,.18)!important;background:rgba(9,4,13,.95)!important}
+    html.ls8-app-runtime .ls-mobile-dock button.active{color:#72ffd0!important}
+    html.ls8-app-runtime .ls7-dock-create-core{background:linear-gradient(145deg,#68ffc5,#ff45ac)!important;color:#08050a!important}
+    .ls8-worlds-gate{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;padding:20px;overflow:hidden;background:radial-gradient(circle at 20% 10%,rgba(98,255,196,.18),transparent 32%),radial-gradient(circle at 86% 82%,rgba(255,62,165,.22),transparent 36%),#050208;color:#fff;font-family:Inter,system-ui,sans-serif}
+    .ls8-worlds-gate::before{content:"";position:absolute;width:70vmax;height:70vmax;border:1px solid rgba(98,255,196,.16);border-radius:50%;box-shadow:0 0 100px rgba(255,62,165,.10);animation:ls8WorldOrbit 16s linear infinite}.ls8-worlds-gate::after{content:"";position:absolute;inset:-70%;background:conic-gradient(transparent,rgba(98,255,196,.06),transparent 18%,rgba(255,62,165,.08),transparent 38%);animation:ls8WorldOrbit 22s linear infinite reverse}
+    .ls8-gate-card{position:relative;z-index:2;width:min(470px,100%);padding:34px 25px 27px;border:1px solid rgba(255,113,199,.31);border-radius:32px;text-align:center;background:linear-gradient(155deg,rgba(29,12,36,.94),rgba(7,4,12,.97));box-shadow:0 35px 110px rgba(0,0,0,.70),0 0 60px rgba(255,62,165,.10);overflow:hidden}.ls8-gate-mark{width:94px;height:94px;margin:0 auto 18px;display:grid;place-items:center;border:1px solid rgba(98,255,196,.48);border-radius:50% 50% 44% 56%;background:conic-gradient(from 30deg,rgba(98,255,196,.19),rgba(255,62,165,.22),rgba(117,60,255,.24),rgba(98,255,196,.19));color:#fff;font:950 54px 'Space Grotesk',sans-serif;box-shadow:0 0 38px rgba(98,255,196,.17);animation:ls8MarkPulse 3s ease-in-out infinite}.ls8-gate-card small{color:#6effca;font:900 9px 'JetBrains Mono',monospace;letter-spacing:.21em}.ls8-gate-card h1{margin:9px 0 5px;font-size:clamp(34px,10vw,50px);letter-spacing:-.065em}.ls8-gate-card h1 span{color:#ff58b5}.ls8-gate-card p{margin:0 auto 22px;max-width:360px;color:#cdbdca;font-size:13px;line-height:1.55}.ls8-gate-card button{width:100%;min-height:54px;border:1px solid rgba(176,255,225,.42);border-radius:17px;background:linear-gradient(125deg,#68ffc5,#ff58b5);color:#09050b;font-weight:950;letter-spacing:.04em;cursor:pointer}.ls8-gate-card em{display:block;margin-top:13px;color:#806f82;font:800 8px 'JetBrains Mono',monospace;font-style:normal;letter-spacing:.1em}
+    .ls8-worlds-gate.is-leaving{animation:ls8GateLeave .55s cubic-bezier(.4,0,.2,1) forwards}@keyframes ls8WorldOrbit{to{transform:rotate(360deg)}}@keyframes ls8MarkPulse{50%{transform:scale(1.06) rotate(3deg);box-shadow:0 0 55px rgba(255,62,165,.22)}}@keyframes ls8GateLeave{to{opacity:0;transform:scale(1.04);visibility:hidden}}
+    @media(prefers-reduced-motion:reduce){.ls8-worlds-gate::before,.ls8-worlds-gate::after,.ls8-gate-mark{animation:none!important}}
+  `;
+  document.head.appendChild(style);
+}
+
+function enterLiveScroll8Worlds() {
+  const gate = document.getElementById("ls8WorldsGate");
+  try { sessionStorage.setItem("ls8_worlds_gate_seen", "1"); } catch (_) {}
+  if (!gate) return;
+  gate.classList.add("is-leaving");
+  setTimeout(() => gate.remove(), 580);
+}
+window.enterLiveScroll8Worlds = enterLiveScroll8Worlds;
+
+function showLiveScroll8WorldsGate() {
+  if (!isLiveScroll8App() || document.getElementById("ls8WorldsGate")) return;
+  try { if (sessionStorage.getItem("ls8_worlds_gate_seen") === "1") return; } catch (_) {}
+  const gate = document.createElement("div");
+  gate.id = "ls8WorldsGate";
+  gate.className = "ls8-worlds-gate";
+  gate.innerHTML = `<div class="ls8-gate-card"><div class="ls8-gate-mark">8</div><small>PROTOTIPO DE NUEVA GENERACIÓN</small><h1>LiveScroll <span>WORLDS</span></h1><p>Cada creador tiene un mundo. Entrá a la primera prueba privada de LiveScroll 8.</p><button onclick="enterLiveScroll8Worlds()">ENTRAR AL PRIMER MUNDO</button><em>VISTA PREVIA · NO ES UNA VERSIÓN PÚBLICA</em></div>`;
+  document.body.appendChild(gate);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ensureLiveScroll8Prototype();
+  applyLiveScrollRuntimeBranding();
+  showLiveScroll8WorldsGate();
+}, { once:true });
 
 
 document.addEventListener("DOMContentLoaded", () => {

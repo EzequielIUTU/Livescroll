@@ -3,72 +3,50 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#05070f">
-  <title>LiveScroll 8 · Primera señal</title>
+  <meta name="theme-color" content="#05060a">
+  <title>LiveScroll 8</title>
   <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <main class="world-shell">
-    <section class="signal-stage" aria-label="Presentación LiveScroll 8">
-      <div class="orbit orbit-a"></div><div class="orbit orbit-b"></div>
-      <div class="signal-copy">
-        <span class="eyebrow">PRIMERA SEÑAL · 8.0.0</span>
-        <h1><span>Live</span><strong>Scroll</strong><i>8</i></h1>
-        <p>Tu mundo no empieza con un feed.<br>Empieza con una señal.</p>
-      </div>
-      <div class="pulse-core"><span></span></div>
-      <button class="discover" id="discoverBtn" type="button">DESCUBRIR LS8 <b>→</b></button>
+  <main class="app-shell">
+    <section class="auth-screen" id="authScreen">
+      <div class="auth-brand"><small>NUEVA GENERACIÓN</small><h1>LiveScroll <b>8</b></h1><p>Todo lo que seguís. Todo lo que creás.<br>En un solo movimiento.</p></div>
+      <form class="auth-card" id="authForm">
+        <div class="auth-tabs"><button class="active" data-auth-mode="login" type="button">Iniciar sesión</button><button data-auth-mode="signup" type="button">Crear cuenta</button></div>
+        <label>Correo<input id="email" type="email" autocomplete="email" required></label>
+        <label>Contraseña<input id="password" type="password" minlength="6" autocomplete="current-password" required></label>
+        <button class="primary" id="authSubmit" type="submit">ENTRAR A LS8</button>
+        <p id="authStatus" role="status"></p>
+        <small>Usá la misma cuenta de LiveScroll 6 y 7.</small>
+      </form>
     </section>
 
-    <section class="access-stage" id="accessStage" aria-hidden="true">
-      <button class="back" id="backBtn" type="button" aria-label="Volver">←</button>
-      <header><span>LS / 08</span><small>ACCESO A TU MUNDO</small></header>
-      <div class="access-card">
-        <div class="mode-switch" role="tablist">
-          <button class="active" data-mode="login" type="button">Volver</button>
-          <button data-mode="signup" type="button">Empezar</button>
-        </div>
-        <h2 id="accessTitle">Tu señal sigue activa.</h2>
-        <p id="accessText">Ingresá con la misma cuenta de LiveScroll.</p>
-        <form id="authForm">
-          <label>Correo<input id="email" type="email" autocomplete="email" required placeholder="tu@correo.com"></label>
-          <label>Contraseña<input id="password" type="password" minlength="6" autocomplete="current-password" required placeholder="••••••••"></label>
-          <button class="submit" type="submit"><span id="submitText">ENTRAR A LS8</span><b>↗</b></button>
-        </form>
-        <p class="status" id="status" role="status"></p>
-        <p class="shared-note">LS8 usa tu cuenta actual. No duplica tus datos.</p>
-      </div>
-    </section>
+    <section class="main-app" id="mainApp" aria-hidden="true">
+      <header class="topbar">
+        <a class="brand" href="#inicio" aria-label="LiveScroll 8">LiveScroll <b>8</b></a>
+        <div class="feed-tabs" id="feedTabs"><button class="active" data-feed="para-ti" type="button">Para ti</button><button data-feed="siguiendo" type="button">Siguiendo</button></div>
+        <button class="avatar" id="topAvatar" type="button" aria-label="Abrir perfil">8</button>
+      </header>
 
-    <section class="app-stage" id="appStage" aria-hidden="true">
-      <nav class="world-nav">
-        <a class="mini-brand" href="#" aria-label="LiveScroll 8"><b>LS</b><span>08</span></a>
-        <div class="nav-actions">
-          <button class="active" data-view="inicio" type="button"><i>⌂</i><span>Inicio</span></button>
-          <button data-view="explorar" type="button"><i>◇</i><span>Explorar</span></button>
-          <button data-view="directos" type="button"><i>◉</i><span>Directos</span></button>
-          <button data-view="usuarios" type="button"><i>◎</i><span>Usuarios</span></button>
-          <button data-view="perfil" type="button"><i>○</i><span>Mi mundo</span></button>
-        </div>
-        <button class="exit" id="exitBtn" type="button" title="Cerrar sesión">↗</button>
+      <div class="view-stack">
+        <section class="view active" id="view-inicio"><div class="video-feed" id="videoFeed"><div class="state">Buscando videos…</div></div></section>
+        <section class="view panel-view" id="view-explorar"><header><small>DESCUBRIR</small><h2>Explorar</h2></header><input class="search" id="searchInput" placeholder="Buscar usuarios o videos"><div class="panel-grid" id="exploreResults"></div></section>
+        <section class="view panel-view" id="view-crear"><header><small>PUBLICAR</small><h2>Crear</h2></header><div class="empty-card"><b>Tu próxima publicación empieza acá.</b><span>La subida completa se conectará en la siguiente etapa.</span></div></section>
+        <section class="view panel-view" id="view-alertas"><header><small>ACTIVIDAD</small><h2>Alertas</h2></header><div class="panel-grid" id="alertsList"><div class="state">Cargando alertas…</div></div></section>
+        <section class="view panel-view" id="view-perfil"><div id="profileView"><div class="state">Cargando tu perfil…</div></div></section>
+      </div>
+
+      <nav class="bottom-nav" aria-label="Navegación principal">
+        <button class="active" data-view="inicio" type="button"><i>⌂</i><span>Inicio</span></button>
+        <button data-view="explorar" type="button"><i>⌕</i><span>Explorar</span></button>
+        <button class="create-button" data-view="crear" type="button"><i>＋</i><span>Crear</span></button>
+        <button data-view="alertas" type="button"><i>♡</i><span>Alertas</span></button>
+        <button data-view="perfil" type="button"><i>○</i><span>Perfil</span></button>
       </nav>
-      <div class="world-view">
-        <header class="world-top">
-          <div><small>SEÑAL / ACTIVA</small><h2 id="worldGreeting">Buenas, creador.</h2></div>
-          <div class="world-avatar" id="worldAvatar">8</div>
-        </header>
-        <section class="world-hero">
-          <div><span id="worldHeroKicker">HOY EN TU MUNDO</span><h3 id="worldHeroTitle">No recorrés un feed.<br><em>Descubrís señales.</em></h3></div>
-          <div class="signal-meter"><b id="signalCount">00</b><small>SEÑALES<br>RECIENTES</small></div>
-        </section>
-        <div class="section-title"><span id="worldSectionTitle">TRANSMISIONES CERCANAS</span><button id="refreshBtn" type="button">ACTUALIZAR ↻</button></div>
-        <div class="signal-feed" id="signalFeed"><div class="feed-loading">Buscando señales activas…</div></div>
-      </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=8.0.0-audit-foundation-4"></script>
-  <script src="./modules.js?v=8.0.0-audit-foundation-4"></script>
+  <script src="./app.js?v=8.0.0-original-feed-1"></script>
 </body>
 </html>

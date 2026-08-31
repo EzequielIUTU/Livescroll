@@ -47,6 +47,8 @@
         <div class="nav-actions">
           <button class="active" data-view="inicio" type="button"><i>⌂</i><span>Inicio</span></button>
           <button data-view="explorar" type="button"><i>◇</i><span>Explorar</span></button>
+          <button data-view="directos" type="button"><i>◉</i><span>Directos</span></button>
+          <button data-view="usuarios" type="button"><i>◎</i><span>Usuarios</span></button>
           <button data-view="perfil" type="button"><i>○</i><span>Mi mundo</span></button>
         </div>
         <button class="exit" id="exitBtn" type="button" title="Cerrar sesión">↗</button>
@@ -57,16 +59,16 @@
           <div class="world-avatar" id="worldAvatar">8</div>
         </header>
         <section class="world-hero">
-          <div><span>HOY EN TU MUNDO</span><h3>No recorrés un feed.<br><em>Descubrís señales.</em></h3></div>
+          <div><span id="worldHeroKicker">HOY EN TU MUNDO</span><h3 id="worldHeroTitle">No recorrés un feed.<br><em>Descubrís señales.</em></h3></div>
           <div class="signal-meter"><b id="signalCount">00</b><small>SEÑALES<br>RECIENTES</small></div>
         </section>
-        <div class="section-title"><span>TRANSMISIONES CERCANAS</span><button id="refreshBtn" type="button">ACTUALIZAR ↻</button></div>
+        <div class="section-title"><span id="worldSectionTitle">TRANSMISIONES CERCANAS</span><button id="refreshBtn" type="button">ACTUALIZAR ↻</button></div>
         <div class="signal-feed" id="signalFeed"><div class="feed-loading">Buscando señales activas…</div></div>
       </div>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=8.0.0-worlds-foundation-2"></script>
+  <script src="./app.js?v=8.0.0-worlds-foundation-3"></script>
+  <script src="./modules.js?v=8.0.0-worlds-foundation-3"></script>
 </body>
 </html>
-

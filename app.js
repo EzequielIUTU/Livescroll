@@ -12204,14 +12204,14 @@ function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount =
   const visualStyle = ["electric","cosmic","minimal"].includes(profile?.profile_visual_style) ? profile.profile_visual_style : "electric";
   const featured = videos.find(video => video.id === profile?.profile_featured_video_id) || videos[0] || null;
   const latestLabel = featured?.created_at ? lsTimeAgo(featured.created_at) : "Sin publicaciones";
-  const statusLabel = profile?.is_live ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
+  const statusLabel = isProfileLive(profile) ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
   return `
     <section class="ls7-living-profile ls7-profile-style-${visualStyle}" aria-label="Perfil Vivo LiveScroll 7">
       <div class="ls7-living-head">
         <div><small>◈ PERFIL VIVO 7</small><h2>Ahora mismo</h2></div>
         <div class="ls7-living-head-actions">
           ${own ? `<button class="ls7-profile-customize-btn" onclick="openLiveScroll7ProfileCustomizer()">Personalizar</button>` : ""}
-          <span class="${profile?.is_live ? "is-live" : ""}"><i></i>${statusLabel}</span>
+          <span class="${isProfileLive(profile) ? "is-live" : ""}"><i></i>${statusLabel}</span>
         </div>
       </div>
       <div class="ls7-living-grid">
@@ -12234,7 +12234,7 @@ function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount =
           <div><small>ENERGÍA DEL PERFIL</small><strong>${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%</strong><i><b style="width:${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%"></b></i></div>
           <div class="ls7-data-pair"><span><b>${videos.length}</b><small>Señales</small></span><span><b>${followersCount}</b><small>Conexiones</small></span></div>
           <div class="ls7-data-pair"><span><b>${totalViews}</b><small>Impactos</small></span><span><b>${profile?.is_creator ? "CREATOR" : "USER"}</b><small>Nivel</small></span></div>
-          <p><i></i>${profile?.is_live ? "Transmitiendo ahora en LiveScroll." : featured ? `Último movimiento: ${escapeHtml(latestLabel)}.` : "Esperando la primera publicación."}</p>
+          <p><i></i>${isProfileLive(profile) ? "Transmitiendo ahora en LiveScroll." : featured ? `Último movimiento: ${escapeHtml(latestLabel)}.` : "Esperando la primera publicación."}</p>
         </div>
       </div>
     </section>`;
@@ -12531,7 +12531,7 @@ async function renderProfile() {
   const latestVideo = videos?.[0] || null;
   const hasFreshActivity = !!(
     (latestVideo && lsIsWithinHours(latestVideo.created_at, 24)) ||
-    currentProfile.is_live
+    isProfileLive(currentProfile)
   );
 
   const recentActivityHtml = recentActivity.length ? `
@@ -12629,6 +12629,8 @@ async function renderProfile() {
     own:true
   });
 
+  const manualLiveControlHtml = currentProfile.is_creator ? renderManualLiveControl() : "";
+
   main.innerHTML = `
     <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
       <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
@@ -12679,7 +12681,7 @@ async function renderProfile() {
 
       <div class="ls-profile-nova-inner" id="lsProfileNovaInner" style="position:relative; z-index:2;">
         <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${currentProfile.is_live ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
+          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${isProfileLive(currentProfile) ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
             <div class="handle profile-role-badge ${currentProfile.is_creator ? "creator" : "user"}">${currentProfile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
@@ -12700,6 +12702,7 @@ async function renderProfile() {
       </div>
     </div>
 
+    ${manualLiveControlHtml}
     ${renderGenerationIdentityCard(videos, true)}
     ${livingProfileHtml}
 
@@ -13080,6 +13083,10 @@ function livePlatformSet(profile) {
   return new Set(values.filter(value => ["kick","twitch","youtube","tiktok"].includes(value)));
 }
 
+function isProfileLive(profile) {
+  return profile?.is_live === true || profile?.youtube_is_live === true || profile?.tiktok_is_live === true;
+}
+
 function ensureLiveStartAlertStyles() {
   if (document.getElementById("lsLiveStartAlertStyles")) return;
   const style = document.createElement("style");
@@ -13226,7 +13233,7 @@ async function loadUsersDirectory(term) {
   list.innerHTML = "Buscando...";
 
   let query = sb.from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, youtube_is_live, tiktok_is_live")
     .is("ban_reason", null)
     .neq("id", currentUser.id)
     .order("is_live", { ascending: false })
@@ -13248,9 +13255,9 @@ async function loadUsersDirectory(term) {
 
   list.innerHTML = users.map(u => `
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
-      <div class="avatar-sm${u.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
+      <div class="avatar-sm${isProfileLive(u) ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname" style="font-size:14px;">${u.is_live ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname" style="font-size:14px;">${isProfileLive(u) ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
         <div class="ls-directory-role ${u.is_creator ? "creator" : "user"}">${u.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
@@ -13706,7 +13713,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, youtube_is_live, tiktok_is_live").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
   recordDailyChallengeEvent("profile_view", profile.id);
 
@@ -13778,7 +13785,7 @@ async function viewPublicProfile(username) {
 
       <div style="position:relative;z-index:2;">
         <div class="profile-hero-top">
-          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${profile.is_live ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${isProfileLive(profile) ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
           <div class="profile-name-block">
             <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
             <div class="handle profile-role-badge ${profile.is_creator ? "creator" : "user"}">${profile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
@@ -14421,8 +14428,7 @@ async function openEditProfile() {
               <details class="ls-social-secondary-link"><summary>Enlace alternativo de Twitch (opcional)</summary><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Solo si querés usar otro enlace"></details>
               <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
               <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
-              <button type="button" id="tiktokLiveToggle" class="${currentProfile.tiktok_is_live ? "btn" : "btn-outline"}" onclick="toggleTikTokLive()" style="width:100%;">${currentProfile.tiktok_is_live ? "■ Finalizar directo de TikTok" : "🔴 Estoy en vivo por TikTok"}</button>
-              <div style="font-size:10px;color:var(--text-dim);">TikTok se desactiva automáticamente después de 4 horas si olvidás finalizarlo.</div>
+              <div style="font-size:10px;color:var(--text-dim);">Los controles para iniciar o finalizar directos están visibles en tu perfil principal.</div>
             ` : `
               <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);">
                 <div style="font-size:14px;font-weight:800;margin-bottom:8px;">🔒 Kick, Twitch, YouTube y TikTok</div>
@@ -14829,27 +14835,60 @@ async function requestCreatorAccess() {
   openEditProfile();
 }
 
-async function toggleTikTokLive() {
+function renderManualLiveControl() {
+  const youtubeLive = currentProfile?.youtube_is_live === true;
+  const tiktokLive = currentProfile?.tiktok_is_live === true;
+  return `<section class="profile-section ls-manual-live-control">
+    <div class="profile-section-head"><div class="ico">📡</div><h3>Control de Directo</h3><div class="sub">Visible solo para vos</div></div>
+    <div class="form-card" style="padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(255,0,51,.055),rgba(53,241,229,.035));">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <div><strong style="font-size:13px;">Activación manual</strong><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Se apaga automáticamente después de 4 horas.</div></div>
+        <span style="font:900 8px 'JetBrains Mono',monospace;color:${youtubeLive || tiktokLive ? 'var(--green)' : 'var(--text-dim)'};">${youtubeLive || tiktokLive ? '● EN DIRECTO' : '○ SIN DIRECTO'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;">
+        <button id="manualLiveYoutube" class="${youtubeLive ? 'btn' : 'btn-outline'}" onclick="toggleManualSocialLive('youtube')" style="min-height:48px;${youtubeLive ? 'background:#ff0033;color:#fff;border-color:#ff315c;' : ''}">${youtubeLive ? '■ Finalizar YouTube' : '▶ Iniciar YouTube'}</button>
+        <button id="manualLiveTiktok" class="${tiktokLive ? 'btn' : 'btn-outline'}" onclick="toggleManualSocialLive('tiktok')" style="min-height:48px;${tiktokLive ? 'background:#101114;color:#fff;border-color:#35f1e5;' : ''}">${tiktokLive ? '■ Finalizar TikTok' : '♪ Iniciar TikTok'}</button>
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:10px;line-height:1.5;">Kick y Twitch continúan con detección automática. Para YouTube y TikTok se utiliza el enlace guardado en tu perfil.</div>
+    </div>
+  </section>`;
+}
+
+async function toggleManualSocialLive(platform) {
   if (!currentProfile?.is_creator) { showToast("Esta opción es solo para Creadores"); return; }
-  const url = document.getElementById("socialTiktok")?.value.trim() || currentProfile.social_tiktok || "";
-  if (!currentProfile.tiktok_is_live && !getTikTokProfileUrl(url)) {
-    showToast("Primero agregá el enlace de tu perfil de TikTok");
+  const isYoutube = platform === "youtube";
+  const url = isYoutube ? currentProfile.social_youtube || "" : currentProfile.social_tiktok || "";
+  const validUrl = isYoutube ? getYouTubeChannelUrl(url) : getTikTokProfileUrl(url);
+  const active = isYoutube ? currentProfile.youtube_is_live === true : currentProfile.tiktok_is_live === true;
+  if (!active && !validUrl) {
+    showToast(`Primero agregá el enlace de ${isYoutube ? "YouTube" : "TikTok"} desde Editar perfil`);
     return;
   }
-  const activate = !currentProfile.tiktok_is_live;
-  const button = document.getElementById("tiktokLiveToggle");
+  const button = document.getElementById(isYoutube ? "manualLiveYoutube" : "manualLiveTiktok");
   if (button) button.disabled = true;
-  const { data, error } = await sb.rpc("set_my_tiktok_live", { p_live:activate, p_profile_url:url || null });
+  const { data, error } = await sb.rpc("set_my_social_live", {
+    p_platform:platform,
+    p_live:!active,
+    p_profile_url:url || null
+  });
   if (error || data?.ok === false) {
     if (button) button.disabled = false;
-    showToast(data?.error === "invalid_tiktok_url" ? "El enlace de TikTok no es válido" : "No se pudo actualizar el directo de TikTok");
+    const messages = {
+      invalid_youtube_url:"El enlace de YouTube no es válido",
+      invalid_tiktok_url:"El enlace de TikTok no es válido",
+      creator_required:"Esta opción es solo para Creadores"
+    };
+    showToast(messages[data?.error] || "No se pudo actualizar el directo");
     return;
   }
-  currentProfile.tiktok_is_live = activate;
-  if (url) currentProfile.social_tiktok = url;
-  showToast(activate ? "🔴 Tu directo de TikTok ya aparece en Directos" : "Directo de TikTok finalizado");
-  openEditProfile();
+  if (isYoutube) currentProfile.youtube_is_live = !active;
+  else currentProfile.tiktok_is_live = !active;
+  lsPerfCache.directos = { data:null, at:0 };
+  showToast(!active ? `🔴 Tu directo de ${isYoutube ? "YouTube" : "TikTok"} ya aparece en Directos` : `Directo de ${isYoutube ? "YouTube" : "TikTok"} finalizado`);
+  renderProfile();
 }
+
+async function toggleTikTokLive() { return toggleManualSocialLive("tiktok"); }
 
 async function saveProfileEdits() {
   const newUsername = document.getElementById("editUsername").value.trim();

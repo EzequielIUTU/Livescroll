@@ -62,10 +62,10 @@ BEGIN
     social_tiktok=CASE WHEN v_platform='tiktok' THEN coalesce(v_url,social_tiktok) ELSE social_tiktok END,
     kick_is_live=v_kick,twitch_is_live=v_twitch,youtube_is_live=v_youtube,tiktok_is_live=v_tiktok,
     is_live=v_kick OR v_twitch,live_platform=v_live_platform,
-    kick_live_until=CASE WHEN v_platform='kick' AND p_live THEN now()+interval '4 hours' WHEN v_platform='kick' THEN NULL ELSE kick_live_until END,
-    twitch_live_until=CASE WHEN v_platform='twitch' AND p_live THEN now()+interval '4 hours' WHEN v_platform='twitch' THEN NULL ELSE twitch_live_until END,
-    youtube_live_until=CASE WHEN v_platform='youtube' AND p_live THEN now()+interval '4 hours' WHEN v_platform='youtube' THEN NULL ELSE youtube_live_until END,
-    tiktok_live_until=CASE WHEN v_platform='tiktok' AND p_live THEN now()+interval '4 hours' WHEN v_platform='tiktok' THEN NULL ELSE tiktok_live_until END,
+    kick_live_until=CASE WHEN v_platform='kick' AND p_live THEN now()+interval '15 hours' WHEN v_platform='kick' THEN NULL ELSE kick_live_until END,
+    twitch_live_until=CASE WHEN v_platform='twitch' AND p_live THEN now()+interval '15 hours' WHEN v_platform='twitch' THEN NULL ELSE twitch_live_until END,
+    youtube_live_until=CASE WHEN v_platform='youtube' AND p_live THEN now()+interval '15 hours' WHEN v_platform='youtube' THEN NULL ELSE youtube_live_until END,
+    tiktok_live_until=CASE WHEN v_platform='tiktok' AND p_live THEN now()+interval '15 hours' WHEN v_platform='tiktok' THEN NULL ELSE tiktok_live_until END,
     youtube_live_video_id=CASE WHEN v_platform='youtube' THEN NULL ELSE youtube_live_video_id END,
     live_started_at=CASE WHEN p_live THEN now() ELSE live_started_at END
   WHERE id=v_id;

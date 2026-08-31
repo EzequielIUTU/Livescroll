@@ -1561,13 +1561,14 @@ async function handleLogout() {
 }
 
 async function loadProfile() {
-  const [profileResult, statusResult, creatorResult, ls7CustomizationResult] = await Promise.all([
+  const [profileResult, statusResult, creatorResult, ls7CustomizationResult, creatorProgramResult] = await Promise.all([
     sb.rpc("get_my_profile_data"),
     sb.rpc("get_my_status"),
     sb.rpc("get_my_creator_access"),
     isLiveScroll7App()
       ? sb.rpc("get_my_ls7_profile_customization")
-      : Promise.resolve({ data:null, error:null })
+      : Promise.resolve({ data:null, error:null }),
+    sb.rpc("get_my_creator_program_status")
   ]);
 
   if (!profileResult.error && profileResult.data?.ok) {
@@ -1620,6 +1621,9 @@ async function loadProfile() {
   currentProfile.creator_application_status = creatorResult?.data?.application_status || null;
   currentProfile.creator_video_count = Number(creatorResult?.data?.video_count || 0);
   currentProfile.creator_account_days = Number(creatorResult?.data?.account_days || 0);
+  currentProfile.is_creator_verified = creatorProgramResult?.data?.is_creator_verified === true;
+  currentProfile.creator_terms_version = creatorProgramResult?.data?.terms_version || null;
+  currentProfile.creator_terms_accepted_at = creatorProgramResult?.data?.terms_accepted_at || null;
 
   // Una cuenta de streaming ya vinculada debe aparecer en el perfil sin que
   // el creador tenga que abrir Editar perfil ni copiar un enlace manual.
@@ -12630,6 +12634,7 @@ async function renderProfile() {
   });
 
   const manualLiveControlHtml = currentProfile.is_creator ? renderManualLiveControl() : "";
+  const creatorProgramCardHtml = renderCreatorProgramCard();
 
   main.innerHTML = `
     <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
@@ -12683,7 +12688,7 @@ async function renderProfile() {
         <div class="profile-hero-top">
           <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${isProfileLive(currentProfile) ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
           <div class="profile-name-block">
-            <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)}</h1>
+            <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} ${renderCreatorVerifiedBadge(currentProfile)}</h1>
             <div class="handle profile-role-badge ${currentProfile.is_creator ? "creator" : "user"}">${currentProfile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
             ${renderProfileTitleInline(equippedTitle, true)}
             ${renderEquippedMedalsInline(equippedBadges, true)}
@@ -12703,6 +12708,7 @@ async function renderProfile() {
     </div>
 
     ${manualLiveControlHtml}
+    ${creatorProgramCardHtml}
     ${renderGenerationIdentityCard(videos, true)}
     ${livingProfileHtml}
 
@@ -13089,6 +13095,11 @@ function isProfileLive(profile) {
   return profile?.is_live === true || profile?.kick_is_live === true || profile?.twitch_is_live === true || profile?.youtube_is_live === true || profile?.tiktok_is_live === true;
 }
 
+function renderCreatorVerifiedBadge(profile) {
+  if (profile?.is_creator_verified !== true) return "";
+  return `<span title="Creador verificado por LiveScroll" style="display:inline-flex;align-items:center;gap:4px;margin-left:5px;padding:3px 7px;border:1px solid rgba(57,231,255,.55);border-radius:999px;background:linear-gradient(135deg,rgba(57,231,255,.16),rgba(145,70,255,.16));color:#75efff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.06em;vertical-align:middle;box-shadow:0 0 15px rgba(57,231,255,.14);">◆ VERIFICADO</span>`;
+}
+
 function ensureLiveStartAlertStyles() {
   if (document.getElementById("lsLiveStartAlertStyles")) return;
   const style = document.createElement("style");
@@ -13235,7 +13246,7 @@ async function loadUsersDirectory(term) {
   list.innerHTML = "Buscando...";
 
   let query = sb.from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, is_creator_verified, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live")
     .is("ban_reason", null)
     .neq("id", currentUser.id)
     .order("is_live", { ascending: false })
@@ -13259,7 +13270,7 @@ async function loadUsersDirectory(term) {
     <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
       <div class="avatar-sm${isProfileLive(u) ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
       <div class="info">
-        <div class="uname" style="font-size:14px;">${isProfileLive(u) ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+        <div class="uname" style="font-size:14px;">${isProfileLive(u) ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)} ${renderCreatorVerifiedBadge(u)}</div>
         <div class="ls-directory-role ${u.is_creator ? "creator" : "user"}">${u.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
       </div>
       <div style="color:var(--text-dim); font-size:16px;">›</div>
@@ -13715,7 +13726,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, is_creator_verified, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
   recordDailyChallengeEvent("profile_view", profile.id);
 
@@ -13789,7 +13800,7 @@ async function viewPublicProfile(username) {
         <div class="profile-hero-top">
           <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${isProfileLive(profile) ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
           <div class="profile-name-block">
-            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)}</h1>
+            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)} ${renderCreatorVerifiedBadge(profile)}</h1>
             <div class="handle profile-role-badge ${profile.is_creator ? "creator" : "user"}">${profile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
             ${renderProfileTitleInline(theirTitle, false)}
             ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
@@ -14439,7 +14450,7 @@ async function openEditProfile() {
                 </div>
                 ${creatorStatus === "pending"
                   ? `<button type="button" class="btn-outline" disabled style="width:100%;">⏳ Solicitud en revisión</button>`
-                  : `<button type="button" class="btn-outline" onclick="requestCreatorAccess()" ${creatorRequirementsMet ? "" : "disabled"} style="width:100%;">🎬 Solicitar acceso como creador</button>`}
+                  : `<button type="button" class="btn-outline" onclick="openCreatorProgramTerms()" ${creatorRequirementsMet ? "" : "disabled"} style="width:100%;">🎬 Solicitar acceso como creador</button>`}
                 <div style="font-size:11px;color:${creatorRequirementsMet ? "var(--green)" : "var(--text-dim)"};margin-top:8px;">
                   Videos: ${currentProfile.creator_video_count}/5 · Antigüedad: ${currentProfile.creator_account_days}/7 días
                 </div>
@@ -14819,6 +14830,52 @@ function selectAvatarEmoji(emoji) {
   document.getElementById(`emoji-${emoji}`).style.background = "var(--panel-2)";
 }
 
+const CREATOR_PROGRAM_TERMS_VERSION = "1.0";
+
+function creatorProgramTermsHtml() {
+  return `<ol style="padding-left:20px;margin:0;color:var(--text-dim);font-size:12px;line-height:1.65;">
+    <li><strong style="color:var(--text);">Contenido propio y permitido.</strong> El creador declara tener autorización para publicar su contenido y no infringir derechos de terceros.</li>
+    <li><strong style="color:var(--text);">Conducta responsable.</strong> No se permite contenido ilegal, engañoso, discriminatorio, violento, sexual no permitido, spam ni manipulación de métricas.</li>
+    <li><strong style="color:var(--text);">Enlaces reales.</strong> Las cuentas de Kick, Twitch, YouTube, TikTok e Instagram deben pertenecer al creador o estar autorizadas.</li>
+    <li><strong style="color:var(--text);">Moderación.</strong> LiveScroll puede revisar contenido, retirar la verificación o suspender el acceso ante incumplimientos.</li>
+    <li><strong style="color:var(--text);">Sin ingresos garantizados.</strong> Participar del programa no garantiza pagos, alcance, seguidores ni resultados comerciales.</li>
+    <li><strong style="color:var(--text);">Datos y seguridad.</strong> El creador es responsable de proteger su cuenta y acepta el tratamiento necesario de datos para operar el programa.</li>
+    <li><strong style="color:var(--text);">Cambios futuros.</strong> Si estos términos cambian de forma importante, LiveScroll podrá solicitar una nueva aceptación.</li>
+  </ol>`;
+}
+
+function openCreatorProgramTerms() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:180;">
+    <div class="modal-box" style="max-width:520px;max-height:90dvh;display:flex;flex-direction:column;">
+      <div class="modal-box-header"><div><h2 style="font-size:18px;margin:0;">Programa de Creadores</h2><div style="font-size:9px;color:var(--gold);margin-top:4px;">TÉRMINOS Y CONDICIONES · VERSIÓN ${CREATOR_PROGRAM_TERMS_VERSION}</div></div></div>
+      <div class="modal-box-body" style="overflow-y:auto;">
+        <p style="font-size:12px;line-height:1.55;">Para solicitar el acceso o ingresar formalmente al programa, leé y aceptá estas condiciones:</p>
+        <div class="form-card" style="padding:14px;">${creatorProgramTermsHtml()}</div>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-top:14px;font-size:12px;line-height:1.45;cursor:pointer;"><input type="checkbox" id="creatorTermsAccept" style="margin-top:3px;"> <span>Leí y acepto los Términos y Condiciones del Programa de Creadores ${CREATOR_PROGRAM_TERMS_VERSION}.</span></label>
+        <div id="creatorTermsError" class="error-msg"></div>
+      </div>
+      <div class="modal-box-footer" style="display:flex;gap:9px;"><button class="btn-outline" style="flex:1;" onclick="closeManagedModal()">Cancelar</button><button class="btn" style="flex:1;" onclick="acceptCreatorProgramTerms()">Aceptar y continuar</button></div>
+    </div></div>`;
+}
+
+async function acceptCreatorProgramTerms() {
+  if (!document.getElementById("creatorTermsAccept")?.checked) {
+    document.getElementById("creatorTermsError").textContent = "Tenés que aceptar las condiciones para continuar.";
+    return;
+  }
+  const { data, error } = await sb.rpc("accept_creator_program_terms", { p_version:CREATOR_PROGRAM_TERMS_VERSION });
+  if (error || !data?.ok) { showToast("No se pudo registrar la aceptación"); return; }
+  currentProfile.creator_terms_version = CREATOR_PROGRAM_TERMS_VERSION;
+  currentProfile.creator_terms_accepted_at = data.accepted_at || new Date().toISOString();
+  if (!currentProfile.is_creator) await requestCreatorAccess();
+  else {
+    closeManagedModal();
+    showToast("✓ Términos aceptados. El administrador ya puede verificar tu ingreso.");
+    renderProfile();
+  }
+}
+
 async function requestCreatorAccess() {
   const { data, error } = await sb.rpc("request_creator_access");
   if (error || !data?.ok) {
@@ -14835,6 +14892,17 @@ async function requestCreatorAccess() {
   currentProfile.creator_application_status = "pending";
   showToast("🎬 Solicitud enviada al administrador");
   openEditProfile();
+}
+
+function renderCreatorProgramCard() {
+  if (!currentProfile?.is_creator || currentProfile?.is_creator_verified) return "";
+  const accepted = currentProfile.creator_terms_version === CREATOR_PROGRAM_TERMS_VERSION;
+  return `<section class="profile-section"><div class="profile-section-head"><div class="ico">◆</div><h3>Programa de Creadores</h3><div class="sub">Verificación oficial</div></div>
+    <div class="form-card" style="border-color:rgba(57,231,255,.28);background:linear-gradient(135deg,rgba(57,231,255,.07),rgba(145,70,255,.06));">
+      <strong style="font-size:13px;">${accepted ? "Solicitud lista para revisión" : "Obtené la insignia VERIFICADO"}</strong>
+      <p style="font-size:11px;color:var(--text-dim);line-height:1.5;">${accepted ? "Ya aceptaste los términos. El administrador puede aprobar tu ingreso formal al programa." : "Aceptá los términos del programa. Luego un administrador revisará y verificará tu perfil."}</p>
+      ${accepted ? `<button class="btn-outline" disabled style="width:100%;">⏳ Esperando verificación</button>` : `<button class="btn" onclick="openCreatorProgramTerms()" style="width:100%;">Leer términos y solicitar ingreso</button>`}
+    </div></section>`;
 }
 
 function renderManualLiveControl() {
@@ -15294,13 +15362,13 @@ async function renderAdmin() {
           <div>
             <div style="font-weight:800;">@${escapeHtml(a.username)}</div>
             <div style="font-size:13px;color:var(--text-dim);margin-top:5px;line-height:1.45;">
-              ${a.video_count} videos · ${a.account_days} días de antigüedad · solicitó ${new Date(a.requested_at).toLocaleDateString("es-AR")}
+              ${a.video_count} videos · ${a.account_days} días de antigüedad<br>Solicitó: ${formatAdminRegistrationDate(a.requested_at)}
             </div>
           </div>
           <div style="display:flex;gap:7px;flex-wrap:wrap;">
             <button class="btn-outline" onclick="viewPublicProfile('${escapeHtml(a.username)}')">Ver perfil</button>
-            <button class="btn" onclick="handleCreatorApplication('${a.application_id}','approve')">✓ Aprobar</button>
-            <button class="btn-outline" style="color:var(--red);" onclick="handleCreatorApplication('${a.application_id}','reject')">✕ Rechazar</button>
+            <button class="btn" onclick="handleCreatorApplication('${a.application_id}','approve','${a.user_id || ""}')">✓ Aprobar programa</button>
+            <button class="btn-outline" style="color:var(--red);" onclick="handleCreatorApplication('${a.application_id}','reject','${a.user_id || ""}')">✕ Rechazar</button>
           </div>
         </div>
       </div>
@@ -17042,7 +17110,7 @@ async function handleUserSearch() {
   renderUserCards(data, error, resultsEl);
 }
 
-async function handleCreatorApplication(applicationId, decision) {
+async function handleCreatorApplication(applicationId, decision, userId = "") {
   const approving = decision === "approve";
   if (!confirm(approving ? "¿Aprobar esta cuenta como Creador?" : "¿Rechazar esta solicitud?")) return;
 
@@ -17056,7 +17124,13 @@ async function handleCreatorApplication(applicationId, decision) {
     return;
   }
 
-  showToast(approving ? "🎬 Creador aprobado" : "Solicitud rechazada");
+  let programVerified = false;
+  const approvedUserId = userId || data?.user_id || "";
+  if (approving && approvedUserId) {
+    const programResult = await sb.rpc("admin_set_creator_program_verified", { p_user_id:approvedUserId,p_verified:true });
+    programVerified = programResult?.data?.ok === true;
+  }
+  showToast(approving ? (programVerified ? "◆ Creador aprobado y verificado" : "🎬 Acceso aprobado; verificación pendiente") : "Solicitud rechazada");
   await renderAdmin();
   setTimeout(() => switchAdminPanelGroup("usuarios", document.querySelector('[data-admin-tab="usuarios"]')), 0);
 }
@@ -17104,13 +17178,24 @@ async function renderUserCards(data, error, resultsEl, showAll) {
 
   const plans = await loadPlans();
 
+  const userIds = data.map(user => user.id).filter(Boolean);
+  const { data:creatorProgramRows } = userIds.length
+    ? await sb.from("profiles").select("id,is_creator,is_creator_verified,creator_terms_version,creator_terms_accepted_at").in("id",userIds)
+    : { data:[] };
+  const creatorProgramById = Object.fromEntries((creatorProgramRows || []).map(row => [row.id,row]));
+  data = data.map(user => ({ ...user, ...(creatorProgramById[user.id] || {}) }));
+
   resultsEl.innerHTML = (showAll ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">${data.length} usuario${data.length === 1 ? "" : "s"} en total</p>` : "") + data.map(u => `
     <div class="form-card" style="margin-bottom:10px;">
-      <div style="font-weight:600;">@${escapeHtml(u.username)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
-      <div style="color:var(--text-dim); font-size:12px;"><span id="email-card-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-card-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${u.points_balance} pts${u.plan_id ? ` · plan ${escapeHtml(plans.find(p => p.id === u.plan_id)?.name || u.plan_id)}` : ""} · desde ${new Date(u.created_at).toLocaleDateString("es-AR")}</div>
+      <div style="font-weight:600;">@${escapeHtml(u.username)} ${renderCreatorVerifiedBadge(u)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
+      <div style="color:var(--text-dim);font-size:12px;line-height:1.6;"><span id="email-card-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-card-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${u.points_balance} pts${u.plan_id ? ` · plan ${escapeHtml(plans.find(p => p.id === u.plan_id)?.name || u.plan_id)}` : ""}<br><span style="color:var(--text);">📅 Registro: ${formatAdminRegistrationDate(u.created_at)}</span><br>⏱ Antigüedad: ${formatAdminAccountAge(u.created_at)} · ${u.is_creator ? "🎬 Creador" : "👤 Usuario"} · ${u.creator_terms_version ? `Términos ${escapeHtml(u.creator_terms_version)} aceptados` : "Términos pendientes"}</div>
       <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
         <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleAdjustPoints('${u.id}', '${escapeHtml(u.username)}')">± Ajustar puntos</button>
         <button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleSetPlan('${u.id}', '${escapeHtml(u.username)}')">📦 Activar plan</button>
+        <button class="btn-outline" style="padding:4px 10px;font-size:12px;color:${u.is_creator ? 'var(--red)' : 'var(--green)'};" onclick="handleAdminCreatorAccess('${u.id}','${escapeHtml(u.username)}',${u.is_creator ? 'false' : 'true'})">${u.is_creator ? "Quitar Creador" : "🎬 Dar acceso Creador"}</button>
+        ${u.is_creator_verified
+          ? `<button class="btn-outline" style="padding:4px 10px;font-size:12px;" onclick="handleAdminCreatorProgram('${u.id}','${escapeHtml(u.username)}',false)">Quitar VERIFICADO</button>`
+          : `<button class="btn" style="padding:4px 10px;font-size:12px;" onclick="handleAdminCreatorProgram('${u.id}','${escapeHtml(u.username)}',true)" ${u.is_creator && u.creator_terms_version === CREATOR_PROGRAM_TERMS_VERSION ? "" : "disabled"}>◆ Aceptar al programa</button>`}
         ${u.ban_reason
           ? `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleUnbanUser('${u.id}')">Levantar ban</button>`
           : `<button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleBanUser('${u.id}', '${escapeHtml(u.username)}')">🚫 Banear</button>`}
@@ -17118,6 +17203,44 @@ async function renderUserCards(data, error, resultsEl, showAll) {
       </div>
     </div>
   `).join("");
+}
+
+function formatAdminRegistrationDate(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Sin fecha";
+  return date.toLocaleString("es-AR", { dateStyle:"short", timeStyle:"medium" });
+}
+
+function formatAdminAccountAge(value) {
+  const created = new Date(value).getTime();
+  if (!Number.isFinite(created)) return "Sin información";
+  let totalHours = Math.max(0,Math.floor((Date.now()-created)/3600000));
+  const years=Math.floor(totalHours/(24*365)); totalHours-=years*24*365;
+  const days=Math.floor(totalHours/24); const hours=totalHours%24;
+  const parts=[];
+  if (years) parts.push(`${years} año${years===1?'':'s'}`);
+  if (days) parts.push(`${days} día${days===1?'':'s'}`);
+  parts.push(`${hours} hora${hours===1?'':'s'}`);
+  return parts.join(", ");
+}
+
+async function handleAdminCreatorAccess(userId, username, enabled) {
+  if (!confirm(enabled ? `¿Dar acceso manual de Creador a @${username}?` : `¿Quitar el acceso de Creador a @${username}? También perderá la verificación.`)) return;
+  const { data,error } = await sb.rpc("admin_set_creator_access", { p_user_id:userId,p_enabled:enabled });
+  if (error || !data?.ok) { showToast("No se pudo cambiar el acceso de Creador"); return; }
+  showToast(enabled ? "🎬 Acceso de Creador habilitado" : "Acceso de Creador retirado");
+  handleUserSearch();
+}
+
+async function handleAdminCreatorProgram(userId, username, verified) {
+  if (!confirm(verified ? `¿Aceptar a @${username} en el Programa de Creadores y otorgar VERIFICADO?` : `¿Quitar la insignia VERIFICADO de @${username}?`)) return;
+  const { data,error } = await sb.rpc("admin_set_creator_program_verified", { p_user_id:userId,p_verified:verified });
+  if (error || !data?.ok) {
+    const messages={ creator_required:"Primero tenés que darle acceso de Creador",terms_required:"El usuario todavía no aceptó los términos" };
+    showToast(messages[data?.error] || "No se pudo actualizar el programa"); return;
+  }
+  showToast(verified ? "◆ Creador aceptado y verificado" : "Verificación retirada");
+  handleUserSearch();
 }
 
 async function handleSetPlan(userId, username) {

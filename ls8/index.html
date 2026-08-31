@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>LiveScroll 8</title>
   <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=safe-area-20260831-1">
+  <link rel="stylesheet" href="./style.css?v=8.0.0-functional-core-1">
 </head>
 <body>
   <main class="app-shell">
@@ -31,8 +31,8 @@
 
       <div class="view-stack">
         <section class="view active" id="view-inicio"><div class="video-feed" id="videoFeed"><div class="state">Buscando videos…</div></div></section>
-        <section class="view panel-view" id="view-explorar"><header><small>DESCUBRIR</small><h2>Explorar</h2></header><input class="search" id="searchInput" placeholder="Buscar usuarios o videos"><div class="panel-grid" id="exploreResults"></div></section>
-        <section class="view panel-view" id="view-crear"><header><small>PUBLICAR</small><h2>Crear</h2></header><div class="empty-card"><b>Tu próxima publicación empieza acá.</b><span>La subida completa se conectará en la siguiente etapa.</span></div></section>
+        <section class="view panel-view" id="view-explorar"><header><small>DESCUBRIR</small><h2>Explorar</h2></header><input class="search" id="searchInput" type="search" autocomplete="off" placeholder="Buscar usuarios o videos"><div class="panel-grid" id="exploreResults"><div class="empty-card"><b>Buscá por nombre o título.</b><span>Encontrá personas, creadores y publicaciones.</span></div></div></section>
+        <section class="view panel-view" id="view-crear"><header><small>PUBLICAR EN LS8</small><h2>Crear</h2></header><form class="publish-card" id="publishForm"><label>Plataforma<select name="platform" required><option value="youtube">YouTube</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option><option value="kick">Kick</option></select></label><label>Título<input name="title" maxlength="120" placeholder="¿Qué querés compartir?" required></label><label>Enlace<input name="url" type="url" inputmode="url" placeholder="https://…" required></label><button class="primary" type="submit">PUBLICAR SEÑAL</button><small>La publicación también aparecerá en LiveScroll 6 y 7.</small></form></section>
         <section class="view panel-view" id="view-alertas"><header><small>ACTIVIDAD</small><h2>Alertas</h2></header><div class="panel-grid" id="alertsList"><div class="state">Cargando alertas…</div></div></section>
         <section class="view panel-view" id="view-perfil"><div id="profileView"><div class="state">Cargando tu perfil…</div></div></section>
       </div>
@@ -46,7 +46,9 @@
       </nav>
     </section>
   </main>
+  <div id="modalWrap"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=8.0.0-original-feed-1"></script>
+  <script src="./app.js?v=8.0.0-functional-core-1"></script>
 </body>
 </html>

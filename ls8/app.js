@@ -1,22 +1,52 @@
 const SUPABASE_URL="https://lxpjqvlphvjyygifedeb.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4cGpxdmxwaHZqeXlnaWZlZGViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MTMyMTMsImV4cCI6MjA5ODk4OTIxM30.9ovZlNQ-XKdSszZuMYb6PzRnXtX5eejuzBeqpKgkVnk";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-const signal=document.querySelector(".signal-stage"),access=document.querySelector("#accessStage"),appStage=document.querySelector("#appStage"),statusEl=document.querySelector("#status"),form=document.querySelector("#authForm");
-let mode="login";
-function showAccess(open){signal.classList.toggle("hidden",open);access.classList.toggle("open",open);access.setAttribute("aria-hidden",String(!open));if(open)setTimeout(()=>document.querySelector("#email").focus(),400)}
-function escapeHtml(value){return String(value??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
-function showApp(open){signal.classList.add("hidden");access.classList.remove("open");access.setAttribute("aria-hidden","true");appStage.classList.toggle("open",open);appStage.setAttribute("aria-hidden",String(!open));if(open)(window.ls8Start||loadWorld)()}
-function mediaUrl(video){return video.thumbnail_url||((video.platform==="upload"||/\.(mp4|webm)(\?|$)/i.test(video.video_url||""))?video.video_url:"")}
-async function loadWorld(){
-  const [{data:{user}},{data:videos,error}]=await Promise.all([sb.auth.getUser(),sb.from("videos").select("id,title,video_url,thumbnail_url,platform,client_origin,created_at,profiles!videos_user_id_fkey(username,avatar_url,avatar_emoji)").order("created_at",{ascending:false}).limit(12)]);
-  if(user){const {data:profile}=await sb.from("profiles").select("username,avatar_url,avatar_emoji").eq("id",user.id).maybeSingle();const name=profile?.username||user.email?.split("@")[0]||"creador";document.querySelector("#worldGreeting").textContent=`Buenas, ${name}.`;const avatar=document.querySelector("#worldAvatar");if(profile?.avatar_url)avatar.innerHTML=`<img src="${escapeHtml(profile.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;else avatar.textContent=profile?.avatar_emoji||"8"}
-  const feed=document.querySelector("#signalFeed");if(error){feed.innerHTML=`<div class="feed-empty">No pudimos encontrar las señales. Volvé a intentar.</div>`;return}document.querySelector("#signalCount").textContent=String(videos?.length||0).padStart(2,"0");
-  feed.innerHTML=(videos||[]).map((v,i)=>{const media=mediaUrl(v),author=v.profiles?.username||"usuario";return `<article class="signal-card" data-url="${escapeHtml(v.video_url||"")}"><div class="signal-media">${media?`<img src="${escapeHtml(media)}" alt="" loading="lazy">`:`<div style="height:100%;display:grid;place-items:center;color:#43e8ff;font-size:42px">◇</div>`}<span class="signal-index">${String(i+1).padStart(2,"0")}</span></div><div class="signal-card-copy"><strong>${escapeHtml(v.title||"Señal sin título")}</strong><span>@${escapeHtml(author)}</span></div><i class="signal-origin">${escapeHtml((v.client_origin||v.platform||"LS").toUpperCase())}</i></article>`}).join("")||`<div class="feed-empty">Todavía no hay señales para mostrar.</div>`;
-  feed.querySelectorAll(".signal-card").forEach(card=>card.onclick=()=>{const url=card.dataset.url;if(url)window.open(url,"_blank","noopener")});
+const $=selector=>document.querySelector(selector);
+const esc=value=>String(value??"").replace(/[&<>'"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
+let authMode="login",activeFeed="para-ti",currentUser=null,currentProfile=null,videos=[];
+
+function showApp(open){$("#authScreen").classList.toggle("hidden",open);$("#mainApp").classList.toggle("open",open);$("#mainApp").setAttribute("aria-hidden",String(!open));if(open)bootApp()}
+function setAvatar(target,profile){if(profile?.avatar_url)target.innerHTML=`<img src="${esc(profile.avatar_url)}" alt="">`;else target.textContent=profile?.avatar_emoji||"8"}
+function playableUrl(video){return video.video_url||""}
+function posterUrl(video){return video.thumbnail_url||""}
+
+async function loadIdentity(){
+  const {data:{user}}=await sb.auth.getUser();currentUser=user;if(!user)return;
+  const {data}=await sb.from("profiles").select("id,username,avatar_url,avatar_emoji,bio,points,is_creator,is_creator_verified").eq("id",user.id).maybeSingle();
+  currentProfile=data||{};setAvatar($("#topAvatar"),currentProfile);
 }
-document.querySelector("#discoverBtn").onclick=()=>showAccess(true);document.querySelector("#backBtn").onclick=()=>showAccess(false);
-document.querySelectorAll("[data-mode]").forEach(btn=>btn.onclick=()=>{mode=btn.dataset.mode;document.querySelectorAll("[data-mode]").forEach(x=>x.classList.toggle("active",x===btn));document.querySelector("#accessTitle").textContent=mode==="login"?"Tu señal sigue activa.":"Creá tu primera señal.";document.querySelector("#accessText").textContent=mode==="login"?"Ingresá con la misma cuenta de LiveScroll.":"Una cuenta para todas las generaciones de LiveScroll.";document.querySelector("#submitText").textContent=mode==="login"?"ENTRAR A LS8":"CREAR MI CUENTA";statusEl.textContent=""});
-form.onsubmit=async e=>{e.preventDefault();const button=form.querySelector("button"),email=document.querySelector("#email").value.trim(),password=document.querySelector("#password").value;button.disabled=true;statusEl.className="status";statusEl.textContent="Conectando tu señal…";const result=mode==="login"?await sb.auth.signInWithPassword({email,password}):await sb.auth.signUp({email,password});button.disabled=false;if(result.error){statusEl.textContent=result.error.message;return}if(mode==="login")showApp(true);else{statusEl.classList.add("ok");statusEl.textContent="Cuenta creada. Revisá tu correo si se solicita confirmación."}};
-document.querySelector("#refreshBtn").onclick=loadWorld;document.querySelector("#exitBtn").onclick=async()=>{await sb.auth.signOut();appStage.classList.remove("open");showAccess(true);statusEl.textContent="Sesión cerrada."};
-document.querySelectorAll("[data-view]").forEach(btn=>btn.onclick=()=>{document.querySelectorAll("[data-view]").forEach(x=>x.classList.toggle("active",x===btn));if(btn.dataset.view!=="inicio")document.querySelector("#signalFeed").innerHTML=`<div class="feed-empty">${btn.dataset.view==="perfil"?"Tu mundo personal será la próxima pantalla.":"El nuevo explorador de mundos está en preparación."}</div>`;else loadWorld()});
-sb.auth.getSession().then(({data})=>{if(data.session)showApp(true)});
+
+function videoCard(video,index){
+  const profile=video.profiles||{},url=playableUrl(video),poster=posterUrl(video),isFile=/\.(mp4|webm|mov)(\?|$)/i.test(url)||video.platform==="upload";
+  const media=isFile?`<video src="${esc(url)}" ${poster?`poster="${esc(poster)}"`:""} playsinline loop preload="metadata"></video>`:poster?`<img src="${esc(poster)}" alt="" loading="lazy">`:`<div class="video-placeholder"><b>LS8</b><span>Abrir publicación</span></div>`;
+  return `<article class="video-card" data-index="${index}" data-url="${esc(url)}"><div class="video-media">${media}</div><div class="shade"></div><div class="video-copy"><strong>@${esc(profile.username||"usuario")}</strong><p>${esc(video.title||"Nueva publicación en LiveScroll")}</p><small>${esc((video.client_origin||video.platform||"LS8").toUpperCase())}</small></div><aside class="video-actions"><button data-action="profile" type="button"><span class="action-avatar">${profile.avatar_url?`<img src="${esc(profile.avatar_url)}" alt="">`:esc(profile.avatar_emoji||"○")}</span></button><button data-action="like" type="button"><i>♥</i><span>${Number(video.likes_count||0)}</span></button><button data-action="comments" type="button"><i>●</i><span>${Number(video.comments_count||0)}</span></button><button data-action="share" type="button"><i>↗</i><span>Compartir</span></button><button data-action="save" type="button"><i>▣</i><span>Guardar</span></button></aside></article>`;
+}
+
+async function loadFeed(){
+  const feed=$("#videoFeed");feed.innerHTML='<div class="state">Buscando videos…</div>';
+  let query=sb.from("videos").select("id,user_id,title,video_url,thumbnail_url,platform,client_origin,created_at,profiles!videos_user_id_fkey(username,avatar_url,avatar_emoji)").order("created_at",{ascending:false}).limit(30);
+  if(activeFeed==="siguiendo"&&currentUser){const {data:follows}=await sb.from("follows").select("following_id").eq("follower_id",currentUser.id);const ids=(follows||[]).map(row=>row.following_id);if(!ids.length){feed.innerHTML='<div class="state">Todavía no seguís a ningún creador.</div>';return}query=query.in("user_id",ids)}
+  const {data,error}=await query;if(error){feed.innerHTML='<div class="state error">No pudimos cargar el feed. Tocá para reintentar.</div>';feed.onclick=loadFeed;return}
+  videos=data||[];feed.innerHTML=videos.map(videoCard).join("")||'<div class="state">Todavía no hay videos para mostrar.</div>';bindVideoCards();observeVideos();
+}
+
+function bindVideoCards(){
+  document.querySelectorAll(".video-card").forEach(card=>card.addEventListener("click",event=>{const action=event.target.closest("[data-action]")?.dataset.action;if(action){event.stopPropagation();if(action==="share"&&navigator.share)navigator.share({title:"LiveScroll 8",url:card.dataset.url||location.href});else if(action==="like"||action==="save")event.target.closest("button").classList.toggle("selected");return}const video=card.querySelector("video");if(video)video.paused?video.play():video.pause();else if(card.dataset.url)window.open(card.dataset.url,"_blank","noopener")}));
+}
+function observeVideos(){const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{const video=entry.target.querySelector("video");if(!video)return;if(entry.isIntersecting&&entry.intersectionRatio>.7)video.play().catch(()=>{});else video.pause()}),{threshold:[.2,.7]});document.querySelectorAll(".video-card").forEach(card=>observer.observe(card))}
+
+async function loadProfile(){
+  await loadIdentity();const target=$("#profileView");if(!currentUser)return;
+  const [{count:posts},{count:followers},{count:following}]=await Promise.all([sb.from("videos").select("id",{count:"exact",head:true}).eq("user_id",currentUser.id),sb.from("follows").select("id",{count:"exact",head:true}).eq("following_id",currentUser.id),sb.from("follows").select("id",{count:"exact",head:true}).eq("follower_id",currentUser.id)]);
+  target.innerHTML=`<header class="profile-head"><div class="profile-avatar" id="profileAvatar"></div><div><small>${currentProfile?.is_creator?"CREADOR":"USUARIO"}${currentProfile?.is_creator_verified?" · VERIFICADO":""}</small><h2>@${esc(currentProfile?.username||currentUser.email?.split("@")[0]||"usuario")}</h2><p>${esc(currentProfile?.bio||"Este es tu espacio en LiveScroll 8.")}</p></div></header><div class="profile-stats"><div><b>${posts||0}</b><span>Videos</span></div><div><b>${followers||0}</b><span>Seguidores</span></div><div><b>${following||0}</b><span>Siguiendo</span></div><div><b>${Number(currentProfile?.points||0)}</b><span>Puntos</span></div></div><button class="logout" id="logoutBtn" type="button">Cerrar sesión</button>`;setAvatar($("#profileAvatar"),currentProfile);$("#logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
+}
+
+async function switchView(view){document.querySelectorAll("[data-view]").forEach(button=>button.classList.toggle("active",button.dataset.view===view));document.querySelectorAll(".view").forEach(section=>section.classList.toggle("active",section.id===`view-${view}`));$("#feedTabs").classList.toggle("hidden",view!=="inicio");if(view==="perfil")loadProfile();if(view==="alertas")$("#alertsList").innerHTML='<div class="empty-card"><b>Tus alertas aparecerán acá.</b><span>Likes, comentarios y nuevos seguidores en un solo lugar.</span></div>'}
+async function bootApp(){await loadIdentity();await loadFeed()}
+
+document.querySelectorAll("[data-auth-mode]").forEach(button=>button.onclick=()=>{authMode=button.dataset.authMode;document.querySelectorAll("[data-auth-mode]").forEach(item=>item.classList.toggle("active",item===button));$("#authSubmit").textContent=authMode==="login"?"ENTRAR A LS8":"CREAR MI CUENTA";$("#authStatus").textContent=""});
+$("#authForm").onsubmit=async event=>{event.preventDefault();const button=$("#authSubmit"),email=$("#email").value.trim(),password=$("#password").value;button.disabled=true;$("#authStatus").textContent="Conectando…";const result=authMode==="login"?await sb.auth.signInWithPassword({email,password}):await sb.auth.signUp({email,password});button.disabled=false;if(result.error){$("#authStatus").textContent=result.error.message;return}if(authMode==="login")showApp(true);else $("#authStatus").textContent="Cuenta creada. Revisá tu correo si se solicita confirmación."};
+document.querySelectorAll("[data-view]").forEach(button=>button.onclick=()=>switchView(button.dataset.view));
+document.querySelectorAll("[data-feed]").forEach(button=>button.onclick=()=>{activeFeed=button.dataset.feed;document.querySelectorAll("[data-feed]").forEach(item=>item.classList.toggle("active",item===button));loadFeed()});
+$("#topAvatar").onclick=()=>switchView("perfil");
+sb.auth.getSession().then(({data})=>showApp(Boolean(data.session)));

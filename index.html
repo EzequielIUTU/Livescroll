@@ -70,7 +70,7 @@
 <link rel="stylesheet" href="ls8-teaser.css?v=5">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=6.2.2-profile-performance-1">
+<link rel="stylesheet" href="style.css?v=login-stability-20260831-1">
 </head>
 <body>
 
@@ -94,13 +94,27 @@
     }
   }
   // Red de seguridad: un problema de conexión nunca debe dejar la APK
-  // atrapada detrás de la bienvenida.
+  // atrapada detrás de la bienvenida ni ocultar el acceso público.
   window.setTimeout(function () {
     var boot=document.getElementById('ls7BootScreen');
     if (!boot || boot.dataset.finished === '1') return;
     document.documentElement.classList.remove('ls7-boot-pending');
     boot.remove();
-  }, 12000);
+    try {
+      if (typeof window.ensurePublicAccessVisible === 'function') {
+        window.ensurePublicAccessVisible();
+      } else {
+        var landing=document.getElementById('landingView');
+        var app=document.getElementById('appView');
+        var navRight=document.getElementById('navRight');
+        if (landing) landing.classList.remove('hidden');
+        if (app) app.classList.add('hidden');
+        if (navRight && !navRight.querySelector('[data-ls-login-entry]')) {
+          navRight.innerHTML='<button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth(\'login\')">Iniciar sesión</button>';
+        }
+      }
+    } catch (_) {}
+  }, 5000);
 </script>
 
 <div id="introOverlay" class="ls6-cinematic" data-scene="0" role="dialog" aria-label="Presentación de LiveScroll 6">
@@ -730,7 +744,7 @@
 <nav>
   <div class="nav-brand" aria-label="LiveScroll 6"><span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>6</b></div>
   <div class="nav-links" id="navLinks"></div>
-  <div id="navRight"></div>
+  <div id="navRight"><button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button></div>
   <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileMenu()">☰</button>
 </nav>
 
@@ -773,7 +787,8 @@
     </div>
 
     <div class="cta-row">
-      <p style="color:var(--text-dim); font-size:14px;">Usá el botón de arriba para crear tu cuenta o iniciar sesión ↑</p>
+      <button class="btn" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button>
+      <button class="btn-outline" type="button" onclick="showAuth('signup')">Crear cuenta</button>
     </div>
 
     <div class="faq-section">
@@ -814,7 +829,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=7.0.8-low-egress-6"></script>
+<script src="app.js?v=login-stability-20260831-1"></script>
 <script src="ls8-teaser.js?v=6"></script>
 </body>
 </html>

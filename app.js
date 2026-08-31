@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 207904)
-Total output lines: 19600
-
 // ============================================================
 // LIVESCROLL · FIRMA OFICIAL DEL PROYECTO
 // Creador público: @EzequielIUTU · Argentina · 2026
@@ -10692,7 +10689,827 @@ async function saveReeditedVideo(file) {
   lsPerfCache.profileVideos.at = 0;
   lsPerfCache.feed.at = 0;
   loadedEmbeds.clear();
-  showToast(`✂️ “${ed…7904 tokens truncated…tlesFromProfile()"' : ""}
+  showToast(`✂️ “${editedTitle}” fue reeditado sin perder sus interacciones`);
+  await renderProfile();
+  } catch (error) {
+    await Promise.allSettled(newR2Urls.map(deleteMediaFromR2));
+    throw error;
+  }
+}
+
+function openVideoTrimmer() {
+  if (!rawSelectedFile) return;
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Tu navegador no permite recortar acá. Probá con Chrome o Firefox actualizados.");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  const objectUrl = URL.createObjectURL(rawSelectedFile);
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:140;">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-box-header"><h2>✂️ ${videoReeditContext ? "Reeditar video" : "Recortar video"}</h2></div>
+        <div class="modal-box-body">
+          <video id="trimPreviewVideo" src="${objectUrl}" controls muted style="width:100%; border-radius:10px; margin-bottom:14px; background:#000;"></video>
+          <div id="trimLoadingMsg" style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Cargando video...</div>
+          <div id="trimControls" class="hidden">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-bottom:4px;">
+              <span>Inicio: <span id="trimStartLabel" class="mono">0:00</span></span>
+              <span>Fin: <span id="trimEndLabel" class="mono">0:00</span></span>
+            </div>
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde empieza:</label>
+            <input type="range" id="trimStartRange" min="0" max="1" step="0.1" value="0" style="width:100%;">
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde termina:</label>
+            <input type="range" id="trimEndRange" min="0" max="1" step="0.1" value="1" style="width:100%;">
+            <div style="font-size:12px; color:var(--text-dim); margin-top:8px;">Duración elegida: <strong id="trimDurationLabel" class="mono" style="color:var(--gold);">0s</strong></div>
+          </div>
+          <div id="trimProgressWrap" class="hidden" style="margin-top:14px;">
+            <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden;">
+              <div id="trimProgressBar" style="width:0%; height:100%; background:var(--gold); transition:width 0.15s;"></div>
+            </div>
+            <div id="trimProgressText" style="font-size:12px; color:var(--text-dim); margin-top:6px; text-align:center;">Procesando, no cierres esta ventana...</div>
+          </div>
+        </div>
+        <div class="modal-box-footer">
+          <div style="display:flex; gap:10px;">
+            <button class="btn-outline" style="flex:1;" onclick="closeVideoTrimmer()">Cancelar</button>
+            <button class="btn" id="trimConfirmBtn" style="flex:1;" onclick="confirmVideoTrim()" disabled>${videoReeditContext ? "Guardar nueva edición" : "Recortar y usar"}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const video = document.getElementById("trimPreviewVideo");
+  video.addEventListener("loadedmetadata", () => {
+    const dur = video.duration;
+    document.getElementById("trimLoadingMsg").classList.add("hidden");
+    document.getElementById("trimControls").classList.remove("hidden");
+    document.getElementById("trimConfirmBtn").disabled = false;
+
+    const startRange = document.getElementById("trimStartRange");
+    const endRange = document.getElementById("trimEndRange");
+    startRange.max = dur; endRange.max = dur;
+    startRange.value = 0; endRange.value = dur;
+    updateTrimLabels();
+
+    startRange.addEventListener("input", () => {
+      if (parseFloat(startRange.value) >= parseFloat(endRange.value)) startRange.value = Math.max(0, parseFloat(endRange.value) - 1);
+      video.currentTime = parseFloat(startRange.value);
+      updateTrimLabels();
+    });
+    endRange.addEventListener("input", () => {
+      if (parseFloat(endRange.value) <= parseFloat(startRange.value)) endRange.value = Math.min(dur, parseFloat(startRange.value) + 1);
+      video.currentTime = parseFloat(endRange.value);
+      updateTrimLabels();
+    });
+  });
+}
+
+function updateTrimLabels() {
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  if (!startRange || !endRange) return;
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+  document.getElementById("trimStartLabel").textContent = formatTrimSeconds(start);
+  document.getElementById("trimEndLabel").textContent = formatTrimSeconds(end);
+  document.getElementById("trimDurationLabel").textContent = formatTrimSeconds(end - start);
+}
+
+function closeVideoTrimmer() {
+  const wasReediting = !!videoReeditContext;
+  document.getElementById("globalModalWrap").innerHTML = "";
+  videoReeditContext = null;
+  if (wasReediting) {
+    rawSelectedFile = null;
+    trimmedFile = null;
+  }
+}
+
+async function confirmVideoTrim() {
+  const video = document.getElementById("trimPreviewVideo");
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+
+  if (end - start < 1) { showToast("Elegí al menos 1 segundo de duración"); return; }
+
+  document.getElementById("trimControls").classList.add("hidden");
+  document.getElementById("trimProgressWrap").classList.remove("hidden");
+  document.getElementById("trimConfirmBtn").disabled = true;
+  document.getElementById("trimConfirmBtn").textContent = "Procesando...";
+
+  try {
+    const result = await trimVideoClientSide(video, start, end, (pct) => {
+      const bar = document.getElementById("trimProgressBar");
+      if (bar) bar.style.width = `${Math.round(pct * 100)}%`;
+    });
+
+    const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
+    const baseName = rawSelectedFile.name.replace(/\.[^.]+$/, "");
+    trimmedFile = new File([result.blob], `${baseName}-recorte.${ext}`, { type: result.mimeType });
+
+    if (videoReeditContext) {
+      await saveReeditedVideo(trimmedFile);
+    } else {
+      closeVideoTrimmer();
+      refreshFileSizeUI();
+      refreshUploadPreviewSafe();
+      showToast("¡Video recortado!");
+    }
+  } catch (e) {
+    console.error("Error recortando video:", e);
+    showToast("No se pudo recortar. El video original sigue intacto.");
+    closeVideoTrimmer();
+    videoReeditContext = null;
+  }
+}
+
+function trimVideoClientSide(video, startSec, endSec, onProgress) {
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+      const mimeCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+      const mimeType = mimeCandidates.find(m => window.MediaRecorder.isTypeSupported(m)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onerror = (e) => reject(e.error || new Error("Error al grabar"));
+      recorder.onstop = () => {
+        resolve({ blob: new Blob(chunks, { type: mimeType || "video/webm" }), mimeType: mimeType || "video/webm" });
+      };
+
+      video.currentTime = startSec;
+      video.onseeked = () => {
+        video.onseeked = null;
+        recorder.start();
+        video.play();
+
+        const step = () => {
+          if (video.currentTime >= endSec || video.ended) {
+            video.pause();
+            recorder.stop();
+            return;
+          }
+          if (onProgress) onProgress(Math.min(1, (video.currentTime - startSec) / (endSec - startSec)));
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+async function setUploadMode(mode) {
+  window.currentUploadMode = mode;
+  videoReeditContext = null;
+  rawSelectedFile = null;
+  trimmedFile = null;
+  clearUploadPreviewSafe();
+  document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
+  document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
+  document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
+  document.getElementById("modeFileBtn").className = mode === "file" ? "btn" : "btn-outline";
+}
+
+async function handleUpload() {
+  if (window.currentUploadMode === "file") {
+    await handleUploadFile();
+  } else {
+    await handleUploadLink();
+  }
+}
+
+async function getUploadRewardPoints() {
+  try {
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "points_per_upload")
+      .single();
+
+    return Number(data?.value) || 40;
+  } catch (_) {
+    return 40;
+  }
+}
+
+function showVideoPublishedSuccess(title, pointsEarned) {
+  const existing = document.getElementById("videoPublishedSuccessModal");
+  if (existing) existing.remove();
+
+  const safeTitle = escapeHtml(title || "Tu video");
+
+  const modal = document.createElement("div");
+  modal.id = "videoPublishedSuccessModal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    background:rgba(0,0,0,.76);
+    display:flex;align-items:center;justify-content:center;
+    padding:18px;box-sizing:border-box;
+    backdrop-filter:blur(7px);
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      width:min(100%,430px);
+      background:var(--panel);
+      border:1px solid rgba(34,197,94,.38);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 22px 70px rgba(0,0,0,.55);
+      text-align:center;
+    ">
+      <div style="
+        width:58px;height:58px;border-radius:50%;
+        margin:0 auto 12px;
+        display:flex;align-items:center;justify-content:center;
+        background:rgba(34,197,94,.12);
+        border:1px solid rgba(34,197,94,.35);
+        font-size:28px;
+      ">✓</div>
+
+      <div style="
+        font-family:'JetBrains Mono',monospace;
+        font-size:9px;font-weight:900;
+        color:var(--green);
+        letter-spacing:.12em;text-transform:uppercase;
+        margin-bottom:6px;
+      ">PUBLICADO</div>
+
+      <h2 style="margin:0 0 7px;font-size:20px;">¡Video publicado!</h2>
+      <p style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">
+        ${safeTitle}
+      </p>
+
+      ${pointsEarned > 0 ? `
+        <div style="
+          margin:16px 0;
+          padding:12px;
+          border-radius:12px;
+          border:1px solid rgba(34,197,94,.25);
+          background:rgba(34,197,94,.07);
+        ">
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">
+            Ganaste
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:900;color:var(--green);">
+            +${pointsEarned} pts
+          </div>
+        </div>
+      ` : `
+        <div style="margin:16px 0;color:var(--text-dim);font-size:11px;">
+          Video publicado sin recompensa de puntos.
+        </div>
+      `}
+
+      <button class="btn" onclick="closeVideoPublishedSuccess(true)" style="width:100%;padding:12px;">
+        ▶ Ver en LiveScroll
+      </button>
+
+      <button class="btn-outline" onclick="closeVideoPublishedSuccess(false)" style="width:100%;padding:10px;margin-top:8px;">
+        Cerrar
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function closeVideoPublishedSuccess(goToFeed) {
+  document.getElementById("videoPublishedSuccessModal")?.remove();
+  if (goToFeed) switchTab("feed");
+}
+
+async function handleUploadLink() {
+  const platform = document.getElementById("uploadPlatform").value;
+  const title = document.getElementById("uploadTitle").value.trim();
+  const url = document.getElementById("uploadUrl").value.trim();
+  const errEl = document.getElementById("uploadError");
+  errEl.textContent = "";
+
+  if (!title || !url) { errEl.textContent = "Completá título y link."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
+
+  const { data:createdVideo, error } = await sb.from("videos").insert({
+    user_id: currentUser.id,
+    platform,
+    title,
+    video_url: url,
+    client_origin: getLiveScrollClientOrigin()
+  }).select("id").single();
+
+  if (error) { errEl.textContent = error.message; return; }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    errEl.textContent = "El video se publicó, pero faltan los hashtags: " + tagError.message;
+  }
+  lsPerfCache.feed = { data:null, at:0 };
+
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
+  if (currentProfile.is_blocked) {
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
+  } else {
+    earned = reward;
+    currentProfile.points_balance += reward;
+    updateBalanceUI();
+    showFloatingPointsSafe(reward);
+  }
+
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
+  showVideoPublishedSuccess(title, earned);
+}
+
+
+async function createVideoThumbnailBlob(file) {
+  return new Promise((resolve) => {
+    let objectUrl = null;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    const cleanup = () => {
+      try { video.pause(); } catch (_) {}
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+
+    const fail = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    video.onerror = fail;
+
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      video.currentTime = Math.min(Math.max(0.2, duration * 0.12), Math.max(0.2, duration - 0.1));
+    };
+
+    video.onseeked = () => {
+      try {
+        const sourceW = video.videoWidth || 1280;
+        const sourceH = video.videoHeight || 720;
+        const maxW = 720;
+        const scale = Math.min(1, maxW / sourceW);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(sourceW * scale));
+        canvas.height = Math.max(1, Math.round(sourceH * scale));
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return fail();
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          cleanup();
+          resolve(blob || null);
+        }, "image/jpeg", 0.82);
+      } catch (_) {
+        fail();
+      }
+    };
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      video.src = objectUrl;
+    } catch (_) {
+      fail();
+    }
+  });
+}
+
+async function handleUploadFile() {
+  const title = document.getElementById("uploadTitle").value.trim();
+  const file = trimmedFile || rawSelectedFile;
+  const errEl = document.getElementById("uploadError");
+  const btn = document.getElementById("uploadSubmitBtn");
+  errEl.textContent = "";
+
+  if (!title || !file) { errEl.textContent = "Completá el título y elegí un archivo."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
+  if (file.size > MAX_FILE_MB * 1024 * 1024) { errEl.textContent = `El archivo supera los ${MAX_FILE_MB}MB permitidos. Probá recortarlo un poco más.`; return; }
+
+  btn.disabled = true;
+  btn.textContent = "Subiendo...";
+  document.getElementById("uploadProgress").classList.remove("hidden");
+
+  let videoUpload;
+  try {
+    videoUpload = await uploadMediaToR2(file);
+  } catch (uploadError) {
+    errEl.textContent = "Error al subir: " + uploadError.message;
+    btn.disabled = false;
+    btn.textContent = "Publicar video";
+    return;
+  }
+
+  let thumbnailUrl = null;
+  try {
+    const thumbnailBlob = await createVideoThumbnailBlob(file);
+
+    if (thumbnailBlob) {
+      const thumbUpload = await uploadMediaToR2(thumbnailBlob);
+      thumbnailUrl = thumbUpload?.url || null;
+    }
+  } catch (thumbErr) {
+    console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
+  }
+
+  const { data:createdVideo, error: insertError } = await sb.from("videos").insert({
+    user_id: currentUser.id,
+    platform: "upload",
+    title,
+    video_url: videoUpload.url,
+    thumbnail_url: thumbnailUrl,
+    client_origin: getLiveScrollClientOrigin()
+  }).select("id").single();
+
+  btn.disabled = false;
+  btn.textContent = "Publicar video";
+
+  if (insertError) {
+    await Promise.allSettled([
+      deleteMediaFromR2(videoUpload?.url),
+      deleteMediaFromR2(thumbnailUrl)
+    ]);
+    errEl.textContent = insertError.message;
+    return;
+  }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    showToast("Video publicado; no pudimos guardar sus hashtags");
+  }
+  lsPerfCache.feed = { data:null, at:0 };
+
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
+  if (currentProfile.is_blocked) {
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
+  } else {
+    earned = reward;
+    currentProfile.points_balance += reward;
+    updateBalanceUI();
+    showFloatingPointsSafe(reward);
+  }
+
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
+  showVideoPublishedSuccess(title, earned);
+}
+
+// ============================================================
+// BILLETERA / CANJE
+// ============================================================
+async function renderWallet() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando billetera...</p>`;
+
+  const plans = await loadPlans();
+  const plan = plans.find(p => p.id === currentProfile.plan_id) || plans[0];
+
+  const { data: ledger } = await sb
+    .from("points_ledger")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  const { data: boostStatus } = await sb.rpc("get_boost_status", { p_user_id: currentUser.id });
+  const { data: walletConfig } = await sb.from("app_text_config").select("*").eq("key", "wallet_visibility").single();
+  const walletClosed = walletConfig?.value === "closed" && !currentProfile.is_admin;
+
+  const MIN_REDEEM = 1500;
+  const progressPct = Math.min(100, (currentProfile.points_balance / MIN_REDEEM) * 100);
+  const missing = Math.max(0, MIN_REDEEM - currentProfile.points_balance);
+  const commissionPreview = Math.round(MIN_REDEEM * plan.commission_pct);
+
+  main.innerHTML = `
+    <h1 class="page-title">Billetera</h1>
+    ${walletConfig?.value === "closed" && currentProfile.is_admin ? `<div style="background:rgba(248,113,113,0.1); border:1px solid var(--red); color:var(--red); font-size:12px; padding:10px 14px; border-radius:8px; margin-bottom:16px;">🔒 Los retiros están CERRADOS para el resto de los usuarios ahora mismo. Vos seguís pudiendo retirar. Cambialo desde el panel de Admin.</div>` : ""}
+    <p class="page-sub">Plan actual: <strong style="color:var(--gold)">${plan.name}</strong> · Comisión por retiro: ${(plan.commission_pct * 100).toFixed(0)}% · Canje mínimo: 1.500 pts</p>
+
+    <div class="wallet-hero">
+      <div>
+        <div class="label">Balance actual</div>
+        <div class="big mono">${currentProfile.points_balance} pts</div>
+      </div>
+      <div>
+        <div class="label">Equivale aprox. a (antes de comisión)</div>
+        <div class="big mono" style="color:var(--green)">$${currentProfile.points_balance.toLocaleString("es-AR")} ARS</div>
+      </div>
+    </div>
+
+    ${renderBoostBox(plan, boostStatus)}
+
+    <div style="margin-bottom:28px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-dim);margin-bottom:8px;">
+        <span>Progreso hacia tu próximo canje</span>
+        <span class="mono">${currentProfile.points_balance} / ${MIN_REDEEM} pts</span>
+      </div>
+      <div style="background:var(--panel-2);border:1px solid var(--border);border-radius:20px;height:14px;overflow:hidden;">
+        <div style="width:${progressPct}%;height:100%;background:linear-gradient(90deg, var(--gold-dim), var(--gold));transition:width 0.4s ease;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">
+        ${missing > 0 ? `Te faltan <span style="color:var(--gold)">${missing} pts</span> para poder canjear` : `¡Ya podés solicitar tu canje! 🎉`}
+      </div>
+    </div>
+
+    ${walletClosed ? `
+    <div class="form-card" style="margin-bottom:28px; text-align:center; border-color:var(--red);">
+      <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+      <h3 style="margin-top:0;">Retiros pausados</h3>
+      <p style="color:var(--text-dim); font-size:13px;">Estamos ajustando el sistema de canjes. Tus puntos siguen a salvo, volvé a intentar más tarde.</p>
+    </div>` : `
+    <div class="form-card" style="margin-bottom:28px">
+      <h3 style="margin-top:0">Solicitar canje</h3>
+      <div class="field">
+        <label>Puntos a canjear (mínimo 1.500)</label>
+        <input type="number" id="redeemPoints" placeholder="1500" min="1500" max="${currentProfile.points_balance}" oninput="updateRedeemPreview(${plan.commission_pct})">
+      </div>
+      <div class="field">
+        <label>Alias de MercadoPago</label>
+        <input type="text" id="redeemAlias" placeholder="tu.alias.mp">
+      </div>
+      <div id="redeemPreview" style="font-size:13px; color:var(--text-dim); margin-bottom:14px;">
+        Con la comisión de tu plan (${(plan.commission_pct * 100).toFixed(0)}%), 1.500 pts te darían <strong style="color:var(--green)">$${(1500 - commissionPreview).toLocaleString("es-AR")}</strong>
+      </div>
+      <button class="btn" onclick="handleRedeem(${plan.commission_pct})">Solicitar canje</button>
+      <div id="redeemError" class="error-msg"></div>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:10px;">
+        Los canjes se revisan manualmente antes de acreditarse. El saldo se descuenta al solicitar.
+        Tope de canje semanal en tu plan: $${plan.weekly_redemption_cap.toLocaleString("es-AR")}.
+      </p>
+    </div>`}
+
+    <h3>Historial de movimientos</h3>
+    <div id="ledgerList">
+      ${(ledger || []).map(l => `
+        <div class="ledger-row">
+          <span>${reasonLabel(l.reason)} · ${new Date(l.created_at).toLocaleString("es-AR")}</span>
+          <span class="amt mono ${l.amount >= 0 ? "pos" : "neg"}">${l.amount >= 0 ? "+" : ""}${l.amount}</span>
+        </div>
+      `).join("") || "<p style='color:var(--text-dim)'>Sin movimientos todavía.</p>"}
+    </div>`;
+}
+
+function renderBoostBox(plan, status) {
+  if (!status || !status.has_boost_plan) {
+    return `
+      <div class="form-card" style="margin-bottom:24px; text-align:center; color:var(--text-dim); font-size:13px;">
+        Tu plan (${plan.name}) no incluye boost activable. <button onclick="switchTab('store')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Ver planes en Tienda →</button>
+      </div>`;
+  }
+  if (status.active) {
+    const expires = new Date(status.expires_at);
+    return `
+      <div class="form-card" style="margin-bottom:24px; border-color:var(--green);">
+        ⚡ Boost <strong>x${plan.boost_multiplier}</strong> activo hasta <strong>${expires.toLocaleString("es-AR")}</strong>
+      </div>`;
+  }
+  if (!status.can_activate) {
+    const next = new Date(status.next_available);
+    return `
+      <div class="form-card" style="margin-bottom:24px; color:var(--text-dim); font-size:13px;">
+        Tu próximo boost x${plan.boost_multiplier} estará disponible el <strong style="color:var(--text)">${next.toLocaleString("es-AR")}</strong>
+      </div>`;
+  }
+  return `
+    <div class="form-card" style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <span>Tenés disponible tu boost <strong style="color:var(--gold)">x${plan.boost_multiplier}</strong> por 24hs</span>
+      <button class="btn" onclick="handleActivateBoost()">Activar boost</button>
+    </div>`;
+}
+
+async function handleActivateBoost() {
+  const { data, error } = await sb.rpc("activate_boost", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo activar el boost"); return; }
+  showToast("¡Boost activado por 24hs!");
+  renderWallet();
+}
+
+function updateRedeemPreview(commissionPct) {
+  const input = document.getElementById("redeemPoints");
+  const preview = document.getElementById("redeemPreview");
+  const points = parseInt(input.value, 10) || 1500;
+  const commission = Math.round(points * commissionPct);
+  preview.innerHTML = `Con la comisión de tu plan (${(commissionPct * 100).toFixed(0)}%), ${points} pts te darían <strong style="color:var(--green)">$${(points - commission).toLocaleString("es-AR")}</strong>`;
+}
+
+function reasonLabel(reason) {
+  const labels = {
+    upload: "Subiste un video",
+    watch: "Miraste un video",
+    watched_by_other: "Miraron tu video",
+    redemption: "Canje solicitado",
+    adjustment: "Ajuste manual"
+  };
+  return labels[reason] || reason;
+}
+
+async function handleRedeem() {
+  const points = parseInt(document.getElementById("redeemPoints").value, 10);
+  const alias = document.getElementById("redeemAlias").value.trim();
+  const errEl = document.getElementById("redeemError");
+  errEl.textContent = "";
+
+  if (!points || !alias) { errEl.textContent = "Completá los puntos y el alias."; return; }
+
+  const { data, error } = await sb.rpc("request_redemption", {
+    p_user_id: currentUser.id,
+    p_points: points,
+    p_alias: alias
+  });
+
+  if (error) { errEl.textContent = error.message; return; }
+  if (!data.ok) {
+    const messages = {
+      below_minimum: "El mínimo para canjear es 1.500 puntos.",
+      insufficient_balance: "No tenés suficientes puntos.",
+      weekly_cap_exceeded: `Superaste el tope de canje semanal de tu plan. Te quedan $${Math.max(0, data.remaining || 0).toLocaleString("es-AR")} disponibles esta semana.`,
+      cuenta_bloqueada: "Tu cuenta está bloqueada para canjes (detectamos otra cuenta desde la misma red). Contactanos si creés que es un error."
+    };
+    errEl.textContent = messages[data.error] || data.error;
+    return;
+  }
+
+  currentProfile.points_balance -= points;
+  updateBalanceUI();
+  showToast(`Canje solicitado: recibís $${data.amount_ars.toLocaleString("es-AR")} (comisión: $${data.commission_ars})`);
+  renderWallet();
+}
+
+// ============================================================
+// MI PERFIL — videos propios y cuánto generaron
+// ============================================================
+
+function lsTimeAgo(dateString) {
+  if (!dateString) return "";
+  const diff = Math.max(0, Date.now() - new Date(dateString).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Ahora";
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days} d`;
+}
+
+function lsIsWithinHours(dateString, hours) {
+  if (!dateString) return false;
+  const t = new Date(dateString).getTime();
+  return Number.isFinite(t) && (Date.now() - t) >= 0 && (Date.now() - t) <= hours * 3600000;
+}
+
+function lsBuildRecentActivity(videos, badges) {
+  const items = [];
+
+  (videos || []).slice(0, 3).forEach(v => {
+    items.push({
+      icon:"🎬",
+      title:`Subiste “${v.title || "un video"}”`,
+      date:v.created_at
+    });
+  });
+
+  (badges || []).slice(-2).forEach(b => {
+    const d = b.earned_at || b.created_at || b.unlocked_at;
+    if (d) items.push({
+      icon:b.badge_icon || "🏅",
+      title:`Ganaste la medalla “${b.badge_name || "Nueva medalla"}”`,
+      date:d
+    });
+  });
+
+  return items
+    .filter(x => x.date)
+    .sort((a,b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 4);
+}
+
+function initProfileNovaTilt() {
+  const hero = document.getElementById("lsProfileNovaHero");
+  const inner = document.getElementById("lsProfileNovaInner");
+  if (!hero || !inner || window.matchMedia("(hover:none)").matches) return;
+
+  let frame = 0;
+  let pointerX = 0;
+  let pointerY = 0;
+  const paint = () => {
+    frame = 0;
+    const r = hero.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (pointerX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, (pointerY - r.top) / r.height));
+    const ry = (x - .5) * 3.2;
+    const rx = (.5 - y) * 2.4;
+    hero.style.setProperty("--ls-glow-x", `${x*100}%`);
+    hero.style.setProperty("--ls-glow-y", `${y*100}%`);
+    inner.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
+  };
+  const move = (e) => {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    if (!frame) frame = requestAnimationFrame(paint);
+  };
+  const reset = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    inner.style.transform = "";
+  };
+  hero.addEventListener("mousemove", move);
+  hero.addEventListener("mouseleave", reset);
+}
+
+
+async function getMyProfileTitle() {
+  const { data, error } = await sb.rpc("get_my_profile_title");
+  if (error) {
+    console.warn("No se pudo cargar el título propio:", error);
+    return null;
+  }
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
+}
+
+async function getPublicProfileTitle(userId) {
+  if (!userId) return null;
+  const { data, error } = await sb.rpc("get_profile_title", { p_user_id:userId });
+  if (error) {
+    console.warn("No se pudo cargar el título público:", error);
+    return null;
+  }
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
+}
+
+function normalizeProfileTitleRarity(value) {
+  const normalized = String(value || "comun")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+  const aliases = {
+    comun:"comun", common:"comun",
+    rara:"rara", raro:"rara", rare:"rara",
+    epica:"epica", epico:"epica", epic:"epica",
+    legendaria:"legendaria", legendario:"legendaria", legendary:"legendaria",
+    exclusiva:"exclusiva", exclusivo:"exclusiva", exclusive:"exclusiva",
+    mitica:"mitica", mitico:"mitica", mythic:"mitica"
+  };
+  return aliases[normalized] || "comun";
+}
+
+async function hydrateProfileTitleRarity(title) {
+  if (!title?.item_id) return title;
+  if (title.rarity) return { ...title, rarity:normalizeProfileTitleRarity(title.rarity) };
+  const { data } = await sb.from("store_items").select("rarity").eq("id", title.item_id).maybeSingle();
+  return { ...title, rarity:normalizeProfileTitleRarity(data?.rarity) };
+}
+
+function renderProfileTitleInline(title, isOwnProfile = false) {
+  if (!title?.item_id) {
+    if (!isOwnProfile) return "";
+
+    return `
+      <button
+        type="button"
+        onclick="openMyTitlesFromProfile()"
+        title="Equipar un título"
+        style="
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          width:30px;
+          height:30px;
+          margin-top:5px;
+          border-radius:999px;
+          border:1px solid rgba(34,197,94,.45);
+          background:rgba(34,197,94,.10);
+          color:var(--green);
+          font-size:20px;
+          font-weight:900;
+          cursor:pointer;
+          box-shadow:0 0 14px rgba(34,197,94,.16);
+        "
+      >+</button>`;
+  }
+
+  const rarity = normalizeProfileTitleRarity(title.rarity);
+  const rarityClass = getStoreBadgeRarityClass(rarity);
+  const rarityLabel = getStoreBadgeRarityLabel(rarity);
+  return `
+    <button
+      class="ls-profile-title-chip ${rarityClass}"
+      type="button"
+      ${isOwnProfile ? 'onclick="openMyTitlesFromProfile()"' : ""}
       title="${isOwnProfile ? "Cambiar título" : "Título de perfil"}"
       style="
         display:inline-flex;

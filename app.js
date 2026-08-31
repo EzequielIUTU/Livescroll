@@ -17106,8 +17106,9 @@ async function handleUserSearch() {
   if (!query) { resultsEl.innerHTML = ""; return; }
 
   resultsEl.innerHTML = "Buscando...";
-  const { data, error } = await sb.rpc("admin_search_users", { p_query: query });
-  renderUserCards(data, error, resultsEl);
+  window.__adminUsersMode = { type:"search",query };
+  const { data, error } = await sb.rpc("admin_get_users_v2", { p_query:query });
+  renderUserCards(data?.users || [], error || (data?.ok === false ? new Error(data?.error) : null), resultsEl);
 }
 
 async function handleCreatorApplication(applicationId, decision, userId = "") {
@@ -17138,8 +17139,17 @@ async function handleCreatorApplication(applicationId, decision, userId = "") {
 async function handleListAllUsers() {
   const resultsEl = document.getElementById("userSearchResults");
   resultsEl.innerHTML = "Cargando todos los usuarios...";
-  const { data, error } = await sb.rpc("admin_list_all_users");
-  renderUserCards(data, error, resultsEl, true);
+  window.__adminUsersMode = { type:"all",query:"" };
+  const { data, error } = await sb.rpc("admin_get_users_v2", { p_query:null });
+  renderUserCards(data?.users || [], error || (data?.ok === false ? new Error(data?.error) : null), resultsEl, true);
+}
+
+async function refreshAdminUsersResults() {
+  if (window.__adminUsersMode?.type === "search") {
+    const input=document.getElementById("userSearchInput");
+    if (input) input.value=window.__adminUsersMode.query || "";
+    await handleUserSearch();
+  } else await handleListAllUsers();
 }
 
 function maskPaymentInfo(value) {
@@ -17178,13 +17188,6 @@ async function renderUserCards(data, error, resultsEl, showAll) {
 
   const plans = await loadPlans();
 
-  const userIds = data.map(user => user.id).filter(Boolean);
-  const { data:creatorProgramRows } = userIds.length
-    ? await sb.from("profiles").select("id,is_creator,is_creator_verified,creator_terms_version,creator_terms_accepted_at").in("id",userIds)
-    : { data:[] };
-  const creatorProgramById = Object.fromEntries((creatorProgramRows || []).map(row => [row.id,row]));
-  data = data.map(user => ({ ...user, ...(creatorProgramById[user.id] || {}) }));
-
   resultsEl.innerHTML = (showAll ? `<p style="color:var(--text-dim); font-size:12px; margin-bottom:10px;">${data.length} usuario${data.length === 1 ? "" : "s"} en total</p>` : "") + data.map(u => `
     <div class="form-card" style="margin-bottom:10px;">
       <div style="font-weight:600;">@${escapeHtml(u.username)} ${renderCreatorVerifiedBadge(u)} ${u.ban_reason ? `<span style="color:var(--red); font-size:11px;">🚫 BANEADO</span>` : u.is_blocked ? `<span style="color:var(--gold); font-size:11px;">🕒 pendiente</span>` : ""}</div>
@@ -17195,7 +17198,7 @@ async function renderUserCards(data, error, resultsEl, showAll) {
         <button class="btn-outline" style="padding:4px 10px;font-size:12px;color:${u.is_creator ? 'var(--red)' : 'var(--green)'};" onclick="handleAdminCreatorAccess('${u.id}','${escapeHtml(u.username)}',${u.is_creator ? 'false' : 'true'})">${u.is_creator ? "Quitar Creador" : "🎬 Dar acceso Creador"}</button>
         ${u.is_creator_verified
           ? `<button class="btn-outline" style="padding:4px 10px;font-size:12px;" onclick="handleAdminCreatorProgram('${u.id}','${escapeHtml(u.username)}',false)">Quitar VERIFICADO</button>`
-          : `<button class="btn" style="padding:4px 10px;font-size:12px;" onclick="handleAdminCreatorProgram('${u.id}','${escapeHtml(u.username)}',true)" ${u.is_creator && u.creator_terms_version === CREATOR_PROGRAM_TERMS_VERSION ? "" : "disabled"}>◆ Aceptar al programa</button>`}
+          : `<button class="btn" style="padding:4px 10px;font-size:12px;" onclick="handleAdminCreatorProgram('${u.id}','${escapeHtml(u.username)}',true)">◆ Aceptar al programa</button>`}
         ${u.ban_reason
           ? `<button class="btn-outline" style="padding:4px 10px; font-size:12px;" onclick="handleUnbanUser('${u.id}')">Levantar ban</button>`
           : `<button class="btn-outline" style="padding:4px 10px; font-size:12px; color:var(--red);" onclick="handleBanUser('${u.id}', '${escapeHtml(u.username)}')">🚫 Banear</button>`}
@@ -17229,7 +17232,7 @@ async function handleAdminCreatorAccess(userId, username, enabled) {
   const { data,error } = await sb.rpc("admin_set_creator_access", { p_user_id:userId,p_enabled:enabled });
   if (error || !data?.ok) { showToast("No se pudo cambiar el acceso de Creador"); return; }
   showToast(enabled ? "🎬 Acceso de Creador habilitado" : "Acceso de Creador retirado");
-  handleUserSearch();
+  await refreshAdminUsersResults();
 }
 
 async function handleAdminCreatorProgram(userId, username, verified) {
@@ -17240,7 +17243,7 @@ async function handleAdminCreatorProgram(userId, username, verified) {
     showToast(messages[data?.error] || "No se pudo actualizar el programa"); return;
   }
   showToast(verified ? "◆ Creador aceptado y verificado" : "Verificación retirada");
-  handleUserSearch();
+  await refreshAdminUsersResults();
 }
 
 async function handleSetPlan(userId, username) {

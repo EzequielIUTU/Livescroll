@@ -82,6 +82,21 @@ BEGIN
 END;
 $$;
 
+-- Este control no consulta APIs externas: únicamente apaga estados vencidos.
+DO $$
+DECLARE v_job record;
+BEGIN
+  FOR v_job IN SELECT jobid FROM cron.job WHERE jobname='expire-manual-social-lives' LOOP
+    PERFORM cron.unschedule(v_job.jobid);
+  END LOOP;
+  PERFORM cron.schedule(
+    'expire-manual-social-lives',
+    '*/5 * * * *',
+    'select public.expire_manual_social_lives();'
+  );
+END;
+$$;
+
 COMMIT;
 
 SELECT public.expire_manual_social_lives() AS directos_manuales_vencidos;

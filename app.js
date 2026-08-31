@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 211075)
-Total output lines: 19903
-
 // ============================================================
 // LIVESCROLL · FIRMA OFICIAL DEL PROYECTO
 // Creador público: @EzequielIUTU · Argentina · 2026
@@ -222,7 +219,6 @@ function finishLiveScroll7Boot({ authenticated = false } = {}) {
   if (!isLiveScroll7App()) return;
   const screen = document.getElementById("ls7BootScreen");
   if (!screen || screen.dataset.finished === "1") return;
-  if (!authenticated) ensurePublicAccessVisible();
   screen.dataset.finished = "1";
   screen.classList.toggle("is-welcome", authenticated);
   const hold = authenticated ? 720 : 180;
@@ -276,33 +272,6 @@ let lsAuthActivationUserId = null;
 let lsAuthenticatedAppReadyUserId = null;
 let lsExplicitLoginInProgress = false;
 
-function withStartupDeadline(promise, timeoutMs, label = "operación") {
-  let timer = null;
-  return Promise.race([
-    Promise.resolve(promise).finally(() => clearTimeout(timer)),
-    new Promise((_, reject) => {
-      timer = window.setTimeout(() => reject(new Error(`${label} superó el tiempo de espera`)), timeoutMs);
-    })
-  ]);
-}
-
-function ensurePublicAccessVisible() {
-  if (currentUser && lsAuthenticatedAppReadyUserId === currentUser.id) return false;
-  const landing = document.getElementById("landingView");
-  const app = document.getElementById("appView");
-  const navLinks = document.getElementById("navLinks");
-  const navRight = document.getElementById("navRight");
-  landing?.classList.remove("hidden");
-  app?.classList.add("hidden");
-  if (navLinks) navLinks.innerHTML = "";
-  if (navRight && !navRight.querySelector("[data-ls-login-entry]")) {
-    navRight.innerHTML = `<button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button>`;
-  }
-  document.body.classList.remove("ls-navigation-ready");
-  return true;
-}
-window.ensurePublicAccessVisible = ensurePublicAccessVisible;
-
 async function activateAuthenticatedSession(session, { openShared = false, explicitLogin = false } = {}) {
   const user = session?.user;
   if (!user?.id) return false;
@@ -325,12 +294,12 @@ async function activateAuthenticatedSession(session, { openShared = false, expli
   currentUser = user;
   lsAuthActivationUserId = user.id;
   const activation = (async () => {
-    await withStartupDeadline(loadProfile(), 8000, "La carga del perfil");
+    await loadProfile();
     if (explicitLogin) {
       closeAuthModal();
       await showPostLoginIntro();
     }
-    await withStartupDeadline(renderApp(), 9000, "El inicio de LiveScroll");
+    await renderApp();
     lsAuthenticatedAppReadyUserId = user.id;
   })();
   lsAuthActivationPromise = activation;
@@ -939,10 +908,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // El acceso público existe desde el primer instante. La recuperación de
-  // sesión puede reemplazarlo después, pero nunca dejar la pantalla vacía.
-  ensurePublicAccessVisible();
-
   // Suscribimos primero para capturar PASSWORD_RECOVERY antes de tratar
   // la sesión temporal del enlace como un inicio de sesión normal.
   let lsRecoveryMode = false;
@@ -986,7 +951,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let session = null;
   try {
-    const sessionResult = await withStartupDeadline(sb.auth.getSession(), 5000, "La recuperación de sesión");
+    const sessionResult = await sb.auth.getSession();
     session = sessionResult?.data?.session || null;
     if (sessionResult?.error) console.warn("No se pudo recuperar la sesión:", sessionResult.error.message);
   } catch (error) {
@@ -1747,7 +1712,7 @@ function renderLanding() {
   document.getElementById("appView").classList.add("hidden");
   document.getElementById("navLinks").innerHTML = "";
   document.getElementById("navRight").innerHTML = `
-    <button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button>`;
+    <button class="btn-outline" onclick="showAuth('login')">Iniciar sesión</button>`;
 
   if (window.sharedVideoId) {
     const hero = document.querySelector(".hero");
@@ -3741,21 +3706,22 @@ async function renderApp() {
   setTimeout(applySeasonalTheme, 0);
   ensureModernMobileStyles();
 
+  document.getElementById("landingView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+
+  // 5.4.6: mostramos respuesta inmediata mientras resolvemos
+  // las pocas cosas necesarias para construir la navegación.
+  const appView = document.getElementById("appView");
+  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
+
   // Empezamos a preparar el Feed mientras resolvemos navegación y planes.
   // renderFeed reutiliza esta misma promesa, por lo que nunca duplica la consulta.
   loadFeedVideosCached().catch(() => {});
 
-  const [visibilityResult, plans] = await withStartupDeadline(Promise.all([
+  const [visibilityResult, plans] = await Promise.all([
     sb.rpc("get_app_visibility"),
     loadPlans()
-  ]), 7000, "La configuración inicial");
-
-  // Ocultamos el acceso recién cuando las dependencias mínimas respondieron.
-  // Si alguna falla o vence el tiempo, el landing y su botón siguen visibles.
-  document.getElementById("landingView").classList.add("hidden");
-  document.getElementById("appView").classList.remove("hidden");
-  const appView = document.getElementById("appView");
-  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
+  ]);
 
   const visibilityData = visibilityResult?.data || {};
   const walletLocked =
@@ -5293,7 +5259,10569 @@ async function handleAcceptTutorial() {
   }
 
   const wrap = document.getElementById("globalModalWrap");
-  if (wra…111075 tokens truncated… type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
+  if (wrap) wrap.innerHTML = "";
+
+  if (currentUser?.id) {
+    await sb.rpc("acknowledge_content", {
+      p_user_id: currentUser.id,
+      p_content_key: "tutorial"
+    });
+  }
+
+  if (typeof switchTab === "function") {
+    switchTab("feed");
+  }
+
+  checkPendingContent();
+}
+
+function showTermsUpdateModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:130;">
+      <div class="modal-box">
+        <div class="modal-box-header"><h2>📋 Actualizamos los Términos</h2></div>
+        <div class="modal-box-body">
+        <p style="color:var(--text-dim); font-size:13px;">Cambiamos nuestros Términos y Condiciones. Por favor, revisalos antes de seguir usando LiveScroll.</p>
+        <a href="terminos.html" target="_blank" rel="noopener noreferrer" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
+        <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
+          <input type="checkbox" id="acceptNewTerms" style="margin-top:3px;">
+          <label for="acceptNewTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">Leí y acepto los Términos y Condiciones actualizados.</label>
+        </div>
+        <div id="acceptTermsError" class="error-msg"></div>
+        </div>
+        <div class="modal-box-footer">
+          <button class="btn" style="width:100%;" onclick="handleAcceptNewTerms()">Continuar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function handleAcceptNewTerms() {
+  const errEl = document.getElementById("acceptTermsError");
+  if (!document.getElementById("acceptNewTerms").checked) {
+    errEl.textContent = "Tenés que tildar el casillero para continuar.";
+    return;
+  }
+  await sb.rpc("acknowledge_content", { p_user_id: currentUser.id, p_content_key: "terms" });
+  document.getElementById("globalModalWrap").innerHTML = "";
+  checkPendingContent(); // por si también hay tutorial o changelog pendiente, se muestra después
+}
+
+
+const LS_SECONDARY_REVISION_PREFIX = "[REVISION_SECUNDARIA]";
+
+function isSecondaryRevisionEntry(entry) {
+  return String(entry?.content || "").trim().startsWith(LS_SECONDARY_REVISION_PREFIX);
+}
+
+function cleanChangelogContent(content) {
+  let value = String(content || "").trim();
+
+  if (value.startsWith(LS_SECONDARY_REVISION_PREFIX)) {
+    value = value.slice(LS_SECONDARY_REVISION_PREFIX.length).trim();
+  }
+
+  // Evitamos repetir el nombre de la app dentro de cada punto.
+  value = value
+    .replace(/^Revisión secundaria de LiveScroll\s+[0-9.]+\s+/i, "")
+    .replace(/\bLiveScroll\b(?=\s+continúa|\s+mantiene|\s+fue)/gi, "La app");
+
+  return value;
+}
+
+function showLiveScroll7PulseUpdate(entries) {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const categoryMeta = {
+    nuevo:{ label:"NUEVO", icon:"✦", color:"#ff435c" },
+    actualizado:{ label:"EVOLUCIÓN", icon:"↗", color:"#f4c95d" },
+    emergencia:{ label:"ALERTA RESUELTA", icon:"!", color:"#fb923c" },
+    reparado:{ label:"ESTABILIZADO", icon:"✓", color:"#7dd3fc" },
+    proximamente:{ label:"PRÓXIMA EVOLUCIÓN", icon:"◌", color:"#c4b5fd" }
+  };
+  const byVersion = {};
+
+  (Array.isArray(entries) ? entries : []).forEach(entry => {
+    const internal = Number(entry.version || 0);
+    if (!byVersion[internal]) {
+      byVersion[internal] = {
+        display:String(entry.display_version || `${internal}.0.0`),
+        releaseDate:entry.release_date || null,
+        lines:[]
+      };
+    }
+    const content = cleanChangelogContent(entry.content);
+    const duplicate = byVersion[internal].lines.some(line =>
+      line.category === entry.category && line.content === content
+    );
+    if (content && !duplicate) {
+      byVersion[internal].lines.push({ category:String(entry.category || "actualizado"), content });
+    }
+  });
+
+  const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
+  const newest = versions.at(-1) || 0;
+  const newestLabel = byVersion[newest]?.display || "7";
+  const multipleVersions = versions.length > 1;
+  const totalSignals = versions.reduce((sum, version) => sum + byVersion[version].lines.length, 0);
+  window.__lsChangelogShownVersion = Math.max(Number(window.__lsChangelogShownVersion || 0), newest);
+
+  const formatDate = value => {
+    if (!value) return "";
+    const date = new Date(`${value}T12:00:00`);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("es-AR", { day:"2-digit", month:"short", year:"numeric" });
+  };
+
+  wrap.innerHTML = `
+    <div id="changelogOverlay" class="ls7-pulse-update-overlay ls-modal-locked" data-modal-locked="1">
+      <div class="ls7-pulse-update-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div id="changelogBox" class="ls7-pulse-update-box">
+        <div class="ls7-pulse-update-scan" aria-hidden="true"></div>
+        <header class="ls7-pulse-update-head">
+          <div class="ls7-pulse-update-core" aria-hidden="true">
+            <span>7</span><i></i><b></b>
+          </div>
+          <div class="ls7-pulse-update-copy">
+            <div class="ls7-pulse-update-kicker"><i></i> EVOLUCIÓN DE LIVESCROLL 7</div>
+            <h2>${multipleVersions ? "LiveScroll 7 evolucionó" : "Nueva evolución disponible"}</h2>
+            <p>${multipleVersions
+              ? `Hay nuevas mejoras esperando por vos. Reunimos ${versions.length} etapas y ${totalSignals} cambios desde tu última visita.`
+              : `Hay nuevas mejoras esperando por vos. La experiencia avanzó a ${escapeHtml(newestLabel)}.`}</p>
+          </div>
+        </header>
+
+        <div class="ls7-pulse-update-progress" aria-hidden="true"><span></span><i></i><b></b></div>
+
+        <div class="ls7-pulse-update-body">
+          ${versions.map((version, versionIndex) => {
+            const info = byVersion[version];
+            return `
+              <section class="ls7-pulse-update-version" style="--pulse-delay:${versionIndex * 85}ms">
+                <div class="ls7-pulse-update-version-head">
+                  <div>
+                    <small>ETAPA ${String(versionIndex + 1).padStart(2,"0")}</small>
+                    <strong>LiveScroll ${escapeHtml(info.display)}</strong>
+                  </div>
+                  <div>
+                    ${info.releaseDate ? `<time>${escapeHtml(formatDate(info.releaseDate))}</time>` : ""}
+                    ${version === newest ? `<span>ACTUAL</span>` : ""}
+                  </div>
+                </div>
+                <div class="ls7-pulse-update-lines">
+                  ${info.lines.map((line, lineIndex) => {
+                    const meta = categoryMeta[line.category] || { label:String(line.category || "CAMBIO").toUpperCase(), icon:"•", color:"#a3a3a3" };
+                    return `
+                      <div class="ls7-pulse-update-line" style="--line-color:${meta.color};--line-delay:${(versionIndex * 85) + (lineIndex * 45)}ms">
+                        <span>${meta.icon}</span>
+                        <div><small>${escapeHtml(meta.label)}</small><p>${escapeHtml(line.content)}</p></div>
+                      </div>`;
+                  }).join("")}
+                </div>
+              </section>`;
+          }).join("")}
+        </div>
+
+        <footer class="ls7-pulse-update-foot">
+          <button onclick="handleAcceptChangelog()"><span>Descubrir los cambios</span><b>→</b></button>
+          <small>LIVE<span>SCROLL</span> 7 · TU EXPERIENCIA SIGUE EVOLUCIONANDO</small>
+        </footer>
+      </div>
+    </div>`;
+}
+
+function showChangelogModal(entries) {
+  applyLiveScrollSettings();
+  const allEntries = Array.isArray(entries) ? entries : [];
+
+  // LiveScroll 7 utiliza una experiencia propia. LiveScroll 6 conserva su
+  // cartel clásico y todo el comportamiento de confirmación existente.
+  if (isLiveScroll7App()) {
+    const version7Entries = allEntries.filter(entry =>
+      /^7(?:\.|$)/.test(String(entry?.display_version || ""))
+    );
+    if (version7Entries.length) showLiveScroll7PulseUpdate(version7Entries);
+    return;
+  }
+  const secondaryEntries = allEntries.filter(isSecondaryRevisionEntry);
+
+  // Si este aviso corresponde SOLO a una revisión secundaria,
+  // lo mostramos separado de la publicación principal de la versión.
+  if (secondaryEntries.length && secondaryEntries.length === allEntries.length) {
+    const wrap = document.getElementById("globalModalWrap");
+    if (!wrap) return;
+
+    const newest = secondaryEntries.reduce(
+      (max, e) => Math.max(max, Number(e.version || 0)),
+      0
+    );
+
+    const displayVersion =
+      secondaryEntries.find(e => e.display_version)?.display_version ||
+      secondaryEntries[0]?.display_version ||
+      "";
+
+    const cleaned = secondaryEntries
+      .map(e => cleanChangelogContent(e.content))
+      .filter(Boolean)
+      // El encabezado ya comunica que la revisión fue aprobada.
+      .filter(c => !/^completada y aprobada\.?$/i.test(c))
+      .filter((c, i, arr) => arr.indexOf(c) === i);
+
+    window.__lsChangelogShownVersion = Math.max(
+      Number(window.__lsChangelogShownVersion || 0),
+      newest
+    );
+
+    wrap.innerHTML = `
+      <div id="changelogOverlay" class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:140;">
+        <div id="changelogBox" class="modal-box" style="
+          max-width:480px;
+          max-height:88vh;
+          overflow:hidden;
+          display:flex;
+          flex-direction:column;
+          border:1px solid rgba(96,165,250,.24);
+          box-shadow:0 24px 80px rgba(0,0,0,.52),0 0 36px rgba(59,130,246,.08);
+        ">
+          <div class="modal-box-header" style="align-items:flex-start;">
+            <div>
+              <div style="
+                display:inline-flex;
+                align-items:center;
+                gap:6px;
+                font-size:9px;
+                font-weight:900;
+                letter-spacing:.1em;
+                color:#7dd3fc;
+                border:1px solid rgba(125,211,252,.22);
+                background:rgba(125,211,252,.06);
+                padding:4px 8px;
+                border-radius:999px;
+                margin-bottom:9px;
+              ">🛡️ REVISIÓN SECUNDARIA</div>
+
+              <h2 style="margin:0;font-size:22px;">Seguridad revisada y aprobada</h2>
+
+              <div style="font-size:11px;color:var(--text-dim);margin-top:5px;">
+                ${escapeHtml(displayVersion)} · revisión adicional
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+            <p style="
+              margin:0 0 14px;
+              font-size:12px;
+              line-height:1.55;
+              color:var(--text-dim);
+            ">
+              Completamos una nueva revisión interna enfocada en protección,
+              permisos y funcionamiento seguro.
+            </p>
+
+            <div style="
+              border:1px solid rgba(96,165,250,.18);
+              background:rgba(59,130,246,.045);
+              border-radius:14px;
+              padding:12px 13px;
+            ">
+              ${cleaned.map(c => `
+                <div style="
+                  display:flex;
+                  align-items:flex-start;
+                  gap:8px;
+                  font-size:12px;
+                  line-height:1.5;
+                  color:var(--text-dim);
+                  margin:${cleaned.indexOf(c) === cleaned.length - 1 ? "0" : "0 0 9px"};
+                ">
+                  <span style="color:#60a5fa;font-weight:900;">✓</span>
+                  <span>${escapeHtml(c)}</span>
+                </div>
+              `).join("")}
+            </div>
+
+            <div style="
+              margin-top:12px;
+              font-size:10px;
+              color:var(--text-dim);
+              opacity:.85;
+              text-align:center;
+            ">
+              Sin cambios necesarios de tu parte.
+            </div>
+          </div>
+
+          <div class="modal-box-footer">
+            <button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">
+              Entendido ✓
+            </button>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const labels = {
+    nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
+    actualizado: { title: "🔄 Mejora", color: "var(--gold)" },
+    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
+    reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
+    proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
+  };
+
+  const byVersion = {};
+
+  (entries || []).forEach(e => {
+    const version = Number(e.version || 0);
+    if (!byVersion[version]) {
+      byVersion[version] = {
+        display:e.display_version || null,
+        releaseDate:e.release_date || null,
+        cats:{}
+      };
+    }
+    if (e.display_version && !byVersion[version].display) {
+      byVersion[version].display = e.display_version;
+    }
+    if (e.release_date && !byVersion[version].releaseDate) {
+      byVersion[version].releaseDate = e.release_date;
+    }
+    const normalizedCategory = e.category === "emergencia" ? "reparado" : e.category;
+    byVersion[version].cats[normalizedCategory] = byVersion[version].cats[normalizedCategory] || [];
+    const cleanedContent = cleanChangelogContent(e.content);
+    if (cleanedContent && !byVersion[version].cats[normalizedCategory].includes(cleanedContent)) {
+      byVersion[version].cats[normalizedCategory].push(cleanedContent);
+    }
+  });
+
+  const versions = Object.keys(byVersion).map(Number).sort((a,b) => a-b);
+  const multipleVersions = versions.length > 1;
+  const newest = versions[versions.length - 1];
+  const newestLabel = byVersion[newest]?.display || "";
+  const isNextEra = versions.some(v => {
+    const label = byVersion[v]?.display || "";
+    const majorMinor = label.split(".").map(Number);
+    return (majorMinor[0] === 5 && majorMinor[1] >= 4) || majorMinor[0] >= 6;
+  });
+
+  // Versiones anteriores al camino a 6 conservan el modal clásico.
+  if (!isNextEra) {
+    const wrap = document.getElementById("globalModalWrap");
+    wrap.innerHTML = `
+      <div id="changelogOverlay" class="modal-overlay" style="transition:opacity .35s ease;">
+        <div id="changelogBox" class="modal-box" style="max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;transition:transform .35s ease,opacity .35s ease;">
+          <div class="modal-box-header">
+            <div>
+              <h2 style="margin:0;">${multipleVersions ? "👋 Mientras no estabas..." : "✨ Novedades"}</h2>
+              ${multipleVersions ? `<div style="font-size:11px;color:var(--text-dim);margin-top:4px;">Mirá todo lo que fuimos sumando desde tu última visita.</div>` : ""}
+            </div>
+          </div>
+          <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+            ${versions.map(v => {
+              const info=byVersion[v];
+              const label=info.display || `${v}.0.0`;
+              return `<div style="margin-bottom:20px;padding-bottom:17px;border-bottom:1px solid var(--border);">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text);font-weight:700;margin-bottom:10px;">LiveScroll ${escapeHtml(label)}</div>
+                ${["nuevo","actualizado","reparado","proximamente"].map(cat => (info.cats[cat]?.length || cat === "reparado") ? `
+                  <div style="margin-bottom:11px;">
+                    <div style="font-weight:600;font-size:12px;color:${labels[cat]?.color || "var(--text-dim)"};margin-bottom:5px;">${labels[cat]?.title || escapeHtml(cat)}</div>
+                    ${(info.cats[cat]?.length ? info.cats[cat] : ["No hubo ninguna reparación en esta actualización."]).map(c => `<div style="font-size:13px;color:var(--text-dim);margin-bottom:5px;line-height:1.45;">• ${escapeHtml(c)}</div>`).join("")}
+                  </div>`:"").join("")}
+              </div>`;
+            }).join("")}
+          </div>
+          <div class="modal-box-footer"><button class="btn" style="width:100%;" onclick="handleAcceptChangelog()">${multipleVersions ? "Ya estoy al día ✓" : "Aceptar"}</button></div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const stageNames = {
+    "5.4.6":"PERFORMANCE",
+    "5.5.7":"IDENTITY",
+    "5.6.8":"COLLECTION",
+    "5.7.9":"CONNECTED",
+    "5.8.0":"LIVE",
+    "5.8.1":"SECURITY",
+    "5.8.2":"FINANCIAL",
+    "5.8.6":"CREATOR ACCESS",
+    "5.8.7":"DIRECTOS CLEANUP",
+    "5.8.8":"MOBILE STABILITY",
+    "5.8.9":"ROAD TO 5.9",
+    "5.9.0":"ROAD TO 6",
+    "5.9.1":"VISUAL EVOLUTION",
+    "5.9.2":"FEED EXPERIENCE",
+    "5.9.3":"IDENTITY EXPERIENCE",
+    "5.9.4":"MOTION UPGRADE",
+    "5.9.5":"SIGNATURE MOTION",
+    "5.9.6":"ACCESS EVOLUTION",
+    "5.9.7":"NAVIGATION EVOLUTION",
+    "5.9.8":"SOCIAL PULSE",
+    "5.9.9":"VIDEO REVISION",
+    "6.0.0":"NEW ERA",
+    "6.0.1v":"CORE REVIEW",
+    "6.0.2v":"ANDROID READY",
+    "6.1.2":"NUBE LIVESCROLL",
+    "6.1.3":"ACTUALIZACIÓN EN VIVO",
+    "6.1.4":"CONEXIÓN CONTINUA",
+    "6.2.2":"PROFILE PERFORMANCE"
+  };
+  const stage = stageNames[newestLabel] || "ACTUALIZACIÓN";
+
+  const formatLaunchDate = (value) => {
+    if (!value) return "";
+    const d = new Date(`${value}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("es-AR", {
+      day:"2-digit",
+      month:"short",
+      year:"numeric"
+    });
+  };
+
+  const wrap = document.getElementById("globalModalWrap");
+
+  wrap.innerHTML = `
+    <div id="changelogOverlay" class="ls-next-era-changelog">
+      <div id="changelogBox" class="ls-next-era-box">
+        <div class="ls-next-era-scan"></div>
+
+        <div class="ls-next-era-head">
+          <div class="ls-next-era-kicker">LIVE SCROLL · ACTUALIZACIÓN</div>
+          <h2 class="ls-next-era-title">${multipleVersions ? "Mientras no estabas..." : `${escapeHtml(newestLabel)} · ${stage}`}</h2>
+          <div class="ls-next-era-sub">
+            ${multipleVersions
+              ? "Te perdiste algunas etapas del camino. Acá tenés todo lo que cambió desde la última vez que estuviste."
+              : newestLabel === "6.0.0"
+                ? "Llegamos. Bienvenido a la nueva era de LiveScroll."
+                : newestLabel === "6.0.1v"
+                  ? "LiveScroll 6 refuerza su núcleo para responder más rápido, cargar mejor y proteger cada cuenta."
+                  : newestLabel === "6.0.2v"
+                    ? "LiveScroll comienza su preparación para llegar a Android con permisos claros y mayor compatibilidad."
+                : newestLabel === "5.8.1"
+                  ? "Una actualización enfocada en seguridad, privacidad y protección de tu cuenta."
+                  : newestLabel === "5.8.2"
+                    ? "Los puntos evolucionan: más recompensas, Boost más accesible y una economía más clara."
+                    : newestLabel === "5.8.6"
+                      ? "Usuarios y Creadores ahora tienen accesos, perfiles y herramientas claramente diferenciados."
+                    : newestLabel === "5.8.7"
+                      ? "Directos se simplifica y queda enfocado en las integraciones de Kick y Twitch."
+                    : newestLabel === "5.8.8"
+                      ? "Una actualización enfocada en estabilidad móvil, pantallas verticales y navegación más segura."
+                    : "Una nueva etapa del camino hacia LiveScroll 6 acaba de comenzar."}
+          </div>
+        </div>
+
+        <div class="ls-next-era-body">
+          ${versions.map(v => {
+            const info=byVersion[v];
+            const label=info.display || `${v}.0.0`;
+            return `
+              <div class="ls-next-era-version">
+                <div class="ls-next-era-version-head">
+                  <div>
+                    <div class="ls-next-era-version-name">LiveScroll ${escapeHtml(label)}</div>
+                    ${info.releaseDate ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:3px;">${escapeHtml(formatLaunchDate(info.releaseDate))}</div>` : ""}
+                  </div>
+                  ${v === newest ? `<span class="ls-next-era-latest">MÁS RECIENTE</span>` : ""}
+                </div>
+                ${["nuevo","actualizado","reparado","proximamente"].map(cat => (info.cats[cat]?.length || cat === "reparado") ? `
+                  <div class="ls-next-era-category">
+                    <div class="ls-next-era-category-title" style="color:${labels[cat]?.color || "var(--text-dim)"}">${labels[cat]?.title || escapeHtml(cat)}</div>
+                    ${(info.cats[cat]?.length ? info.cats[cat] : ["No hubo ninguna reparación en esta actualización."]).map(c => `<div class="ls-next-era-line">• ${escapeHtml(c)}</div>`).join("")}
+                  </div>`:"").join("")}
+              </div>`;
+          }).join("")}
+        </div>
+
+        <div class="ls-next-era-foot">
+          <button class="ls-next-era-btn" onclick="handleAcceptChangelog()">
+            ${multipleVersions ? "Ya estoy al día ✓" : newestLabel === "6.0.0" ? "Entrar a la nueva era →" : newestLabel.startsWith("6.") ? "Continuar en LiveScroll 6 →" : "Continuar el camino →"}
+          </button>
+          <div class="ls-next-era-road">6.1.2 NUBE LIVESCROLL → 6.1.3 ACTUALIZACIÓN EN VIVO → 6.1.4 CONEXIÓN CONTINUA → 6.2.2 PROFILE PERFORMANCE</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+
+// ============================================================
+// NOVEDADES — SISTEMA DINÁMICO DESDE 5.8.1
+// El cartel toma la versión visible más reciente del historial cuando existe
+// una actualización pendiente, evitando quedar clavado en una versión anterior.
+// ============================================================
+
+let lsChangelogHistoryObserver = null;
+
+async function openChangelogHistory() {
+  if (lsChangelogHistoryObserver) {
+    lsChangelogHistoryObserver.disconnect();
+    lsChangelogHistoryObserver = null;
+  }
+  applyLiveScrollSettings();
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked${isLiveScroll7App() ? " ls7-pulse-archive-overlay" : ""}" style="z-index:100;backdrop-filter:none;-webkit-backdrop-filter:none;" data-modal-locked="1">
+      <div class="modal-box${isLiveScroll7App() ? " ls7-pulse-archive-box" : ""}" style="max-width:470px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header">
+          <div>
+            ${isLiveScroll7App() ? `<div class="ls7-pulse-archive-kicker"><i></i> LIVESCROLL 7</div>` : ""}
+            <h2 style="margin:0;">${isLiveScroll7App() ? "Historial de Evolución" : "📢 Novedades"}</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:3px;">
+              ${isLiveScroll7App() ? "Hay nuevas mejoras esperando por vos." : "Versiones y revisiones publicadas"}
+            </div>
+          </div>
+          <button onclick="closeChangelogHistory()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;overscroll-behavior:contain;contain:layout paint style;">
+          <div id="changelogHistoryList">Cargando...</div>
+        </div>
+      </div>
+    </div>`;
+
+  const labels = {
+    nuevo: { title: "🆕 Nuevo", color: "var(--green)" },
+    actualizado: { title: "🔄 Mejora", color: "var(--gold)" },
+    emergencia: { title: "⚠️ Reparación de emergencia", color: "#facc15" },
+    reparado: { title: "🛠️ Reparado", color: "#7dd3fc" },
+    proximamente: { title: "🔜 Próximamente", color: "var(--text-dim)" }
+  };
+
+  // Reutiliza el historial que ya pudo cargar el inicio y evita otra consulta igual.
+  const { data: allHistoryEntries, error } = await loadStartupChangelogHistory();
+  const list = document.getElementById("changelogHistoryList");
+  if (!list) return;
+
+  const entries = (Array.isArray(allHistoryEntries) ? allHistoryEntries : []).filter(entry => {
+    const display = String(entry?.display_version || "");
+    const isVersion7 = /^7(?:\.|$)/.test(display);
+    return isLiveScroll7App() ? isVersion7 : !isVersion7;
+  });
+
+  if (error || !entries || !entries.length) {
+    list.innerHTML = `<p style="color:var(--text-dim);font-size:13px;">${isLiveScroll7App() ? "La primera evolución de LiveScroll 7 todavía no fue publicada." : "Todavía no hay novedades publicadas."}</p>`;
+    return;
+  }
+
+  const semverParts = (value) => String(value || "0.0.0")
+    .split(".")
+    .map(n => Number.parseInt(n, 10) || 0);
+
+  const compareSemverDesc = (a, b) => {
+    const pa = semverParts(a);
+    const pb = semverParts(b);
+    const max = Math.max(pa.length, pb.length, 3);
+
+    for (let i = 0; i < max; i++) {
+      const av = pa[i] || 0;
+      const bv = pb[i] || 0;
+      if (av !== bv) return bv - av;
+    }
+
+    return 0;
+  };
+
+  // Agrupamos primero por versión visible y luego por revisión interna.
+  // Así 5.8.3 principal y 5.8.3 revisión secundaria NO quedan mezcladas.
+  const byDisplayVersion = {};
+
+  entries.forEach(e => {
+    const display = String(e.display_version || `${e.version}.0.0`);
+    const internal = Number(e.version || 0);
+
+    if (!byDisplayVersion[display]) {
+      byDisplayVersion[display] = {
+        display,
+        releaseDate:e.release_date || null,
+        revisions:{}
+      };
+    }
+
+    if (!byDisplayVersion[display].releaseDate && e.release_date) {
+      byDisplayVersion[display].releaseDate = e.release_date;
+    }
+
+    if (!byDisplayVersion[display].revisions[internal]) {
+      byDisplayVersion[display].revisions[internal] = {
+        internal,
+        secondary:false,
+        cats:{}
+      };
+    }
+
+    const revision = byDisplayVersion[display].revisions[internal];
+    if (isSecondaryRevisionEntry(e)) revision.secondary = true;
+
+    const cleaned = cleanChangelogContent(e.content);
+
+    revision.cats[e.category] = revision.cats[e.category] || [];
+
+    if (cleaned && !revision.cats[e.category].includes(cleaned)) {
+      revision.cats[e.category].push(cleaned);
+    }
+  });
+
+  const versions = Object.keys(byDisplayVersion).sort(compareSemverDesc);
+  const currentDisplayVersion = versions[0];
+
+  const formatReleaseDate = (value) => {
+    if (!value) return "";
+    const d = new Date(`${value}T12:00:00`);
+    return Number.isNaN(d.getTime())
+      ? ""
+      : d.toLocaleDateString("es-AR", {
+          day:"2-digit",
+          month:"short",
+          year:"numeric"
+        });
+  };
+
+  const renderSecondaryRevision = (revision) => {
+    const allLines = Object.values(revision.cats)
+      .flat()
+      .filter(Boolean)
+      // No repetimos una línea genérica que ya expresa el encabezado.
+      .filter(c => !/^completada y aprobada\.?$/i.test(c))
+      .filter((c, i, arr) => arr.indexOf(c) === i);
+
+    return `
+      <div style="
+        margin:12px 0 14px;
+        border:1px solid rgba(96,165,250,.20);
+        background:linear-gradient(135deg,rgba(59,130,246,.055),rgba(255,255,255,.012));
+        border-radius:14px;
+        padding:12px 13px;
+      ">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;">
+          <div style="
+            display:flex;
+            align-items:center;
+            gap:7px;
+            font-size:12px;
+            font-weight:900;
+            color:#7dd3fc;
+          ">
+            <span>🛡️</span>
+            <span>Revisión secundaria</span>
+          </div>
+
+          <span style="
+            font-size:8px;
+            font-weight:900;
+            letter-spacing:.06em;
+            color:#93c5fd;
+            border:1px solid rgba(147,197,253,.18);
+            padding:3px 6px;
+            border-radius:999px;
+          ">APROBADA</span>
+        </div>
+
+        <div style="font-size:10px;color:var(--text-dim);margin-bottom:9px;">
+          Seguridad y protección
+        </div>
+
+        ${allLines.map(c => `
+          <div style="
+            display:flex;
+            align-items:flex-start;
+            gap:7px;
+            font-size:12px;
+            line-height:1.5;
+            color:var(--text-dim);
+            margin-bottom:7px;
+          ">
+            <span style="color:#60a5fa;font-weight:900;">✓</span>
+            <span>${escapeHtml(c)}</span>
+          </div>
+        `).join("")}
+      </div>`;
+  };
+
+  const renderMainRevision = (revision) => {
+    return ["nuevo","actualizado","reparado","proximamente"].map(cat => {
+      const lines = revision.cats[cat] || [];
+      if (!lines.length && cat !== "reparado") return "";
+      const visibleLines = lines.length
+        ? lines
+        : ["No hubo ninguna reparación en esta actualización."];
+
+      return `
+        <div style="margin-bottom:12px;">
+          <div style="
+            font-weight:700;
+            font-size:12px;
+            color:${labels[cat]?.color || "var(--text-dim)"};
+            margin-bottom:6px;
+          ">
+            ${labels[cat]?.title || escapeHtml(cat)}
+          </div>
+
+          ${visibleLines.map(c => `
+            <div style="
+              font-size:12px;
+              color:var(--text-dim);
+              margin-bottom:5px;
+              line-height:1.48;
+            ">• ${escapeHtml(c)}</div>
+          `).join("")}
+        </div>`;
+    }).join("");
+  };
+
+  const renderVersionSection = (display) => {
+    const info = byDisplayVersion[display];
+    const revisions = Object.values(info.revisions)
+      .sort((a, b) => b.internal - a.internal);
+
+    const secondary = revisions.filter(r => r.secondary);
+    const main = revisions.filter(r => !r.secondary);
+    const groupedMain = { cats:{} };
+
+    main.forEach(revision => {
+      Object.entries(revision.cats || {}).forEach(([category, lines]) => {
+        const normalizedCategory = category === "emergencia" ? "reparado" : category;
+        groupedMain.cats[normalizedCategory] = groupedMain.cats[normalizedCategory] || [];
+        (lines || []).forEach(line => {
+          if (line && !groupedMain.cats[normalizedCategory].includes(line)) {
+            groupedMain.cats[normalizedCategory].push(line);
+          }
+        });
+      });
+    });
+
+    const dateText = formatReleaseDate(info.releaseDate);
+
+    return `
+      <section class="ls-changelog-history-version${isLiveScroll7App() ? " ls7-pulse-archive-version" : ""}" style="
+        margin-bottom:18px;
+        padding-bottom:18px;
+        border-bottom:1px solid var(--border);
+        content-visibility:auto;
+        contain-intrinsic-size:1px 260px;
+        contain:layout paint style;
+      ">
+        <div style="
+          display:flex;
+          align-items:flex-start;
+          justify-content:space-between;
+          gap:10px;
+          margin-bottom:10px;
+        ">
+          <div>
+            <div style="
+              font-family:'JetBrains Mono',monospace;
+              font-size:14px;
+              color:var(--text);
+              font-weight:900;
+            ">${escapeHtml(display)}</div>
+
+            ${dateText ? `
+              <div style="
+                font-family:'JetBrains Mono',monospace;
+                font-size:9px;
+                color:var(--text-dim);
+                margin-top:3px;
+              ">${escapeHtml(dateText)}</div>
+            ` : ""}
+          </div>
+
+          ${display === currentDisplayVersion
+            ? `<span style="
+                font-size:9px;
+                font-weight:900;
+                color:${isLiveScroll7App() ? "#fff" : "#12130f"};
+                background:${isLiveScroll7App() ? "linear-gradient(135deg,#ff2345,#a70020)" : "var(--green)"};
+                padding:3px 8px;
+                border-radius:20px;
+                letter-spacing:.04em;
+              ">ACTUAL</span>`
+            : ""}
+        </div>
+
+        ${secondary.map(renderSecondaryRevision).join("")}
+
+        ${main.length ? `
+          <div style="
+            padding:${secondary.length ? "4px 2px 0" : "0 2px"};
+          ">
+            ${renderMainRevision(groupedMain)}
+          </div>
+        ` : ""}
+      </section>`;
+  };
+
+  // No insertamos todo el historial en el DOM de una sola vez. Agregamos
+  // pocas versiones por tanda cuando el usuario se acerca al final.
+  const batchSize = window.__liveScrollLegacyMode ? 4 : 6;
+  let renderedCount = 0;
+
+  list.innerHTML = `<div id="changelogHistoryItems"></div><div id="changelogHistorySentinel" style="height:1px;"></div>`;
+  const itemsWrap = document.getElementById("changelogHistoryItems");
+  const sentinel = document.getElementById("changelogHistorySentinel");
+
+  const appendNextChangelogBatch = () => {
+    if (!itemsWrap || renderedCount >= versions.length) {
+      lsChangelogHistoryObserver?.disconnect();
+      lsChangelogHistoryObserver = null;
+      sentinel?.remove();
+      return;
+    }
+
+    const nextVersions = versions.slice(renderedCount, renderedCount + batchSize);
+    itemsWrap.insertAdjacentHTML("beforeend", nextVersions.map(renderVersionSection).join(""));
+    renderedCount += nextVersions.length;
+
+    if (renderedCount >= versions.length) {
+      lsChangelogHistoryObserver?.disconnect();
+      lsChangelogHistoryObserver = null;
+      sentinel?.remove();
+    }
+  };
+
+  appendNextChangelogBatch();
+
+  if (sentinel?.isConnected && "IntersectionObserver" in window) {
+    const scrollRoot = sentinel.closest(".modal-box-body");
+    lsChangelogHistoryObserver = new IntersectionObserver(entriesList => {
+      if (entriesList.some(entry => entry.isIntersecting)) appendNextChangelogBatch();
+    }, { root:scrollRoot, rootMargin:"500px 0px", threshold:0 });
+    lsChangelogHistoryObserver.observe(sentinel);
+  } else {
+    while (renderedCount < versions.length) appendNextChangelogBatch();
+  }
+}
+
+
+function closeChangelogHistory() {
+  if (lsChangelogHistoryObserver) {
+    lsChangelogHistoryObserver.disconnect();
+    lsChangelogHistoryObserver = null;
+  }
+  document.getElementById("globalModalWrap").innerHTML = "";
+}
+
+async function handleAcceptChangelog() {
+  const shownVersion = Number(window.__lsChangelogShownVersion || 0);
+  const seenKey = currentUser?.id
+    ? `livescroll_changelog_seen_${currentUser.id}`
+    : null;
+
+  const { error } = await sb.rpc("acknowledge_content", {
+    p_user_id: currentUser.id,
+    p_content_key: "changelog"
+  });
+
+  // El backend sigue siendo la fuente principal, pero el dispositivo
+  // guarda también qué versión vio. Esto evita que una falla puntual
+  // del RPC vuelva a ocultar/romper el flujo automático.
+  if (seenKey && shownVersion > 0) {
+    localStorage.setItem(seenKey, String(shownVersion));
+    await sb.rpc("set_my_changelog_seen_version", { p_version:shownVersion });
+  }
+
+  if (error) {
+    console.warn("No se pudo sincronizar Novedades con el servidor:", error);
+  }
+
+  const box = document.getElementById("changelogBox");
+  const overlay = document.getElementById("changelogOverlay");
+
+  const continuePendingFlow = () => {
+    const wrap = document.getElementById("globalModalWrap");
+    if (wrap) wrap.innerHTML = "";
+
+    // No encadenamos otro popup automático en la misma sesión.
+    // Lo pendiente queda guardado para el próximo ingreso o accesible desde Novedades.
+  };
+
+  if (box && overlay) {
+    box.style.transform = "translate(140%, 140%) scale(0.15)";
+    box.style.opacity = "0";
+    overlay.style.opacity = "0";
+    setTimeout(continuePendingFlow, 350);
+  } else {
+    continuePendingFlow();
+  }
+}
+
+async function recordDailyChallengeEvent(type, targetId) {
+  if (!currentUser?.id || !targetId) return;
+  try {
+    const { data, error } = await sb.rpc("record_daily_challenge_event", {
+      p_event_type:type,
+      p_target_id:targetId
+    });
+    if (!error && data?.ok && document.getElementById("lsDailyChallengeWrap")) {
+      loadDailyChallenges();
+    }
+  } catch (_) {}
+}
+
+let lsDailyChallengeRefreshTimer = null;
+
+function getArgentinaDateKey() {
+  try {
+    const parts = new Intl.DateTimeFormat("en", {
+      timeZone:"America/Argentina/Buenos_Aires",
+      year:"numeric",
+      month:"2-digit",
+      day:"2-digit"
+    }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map(part => [part.type,part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  } catch (_) {
+    return new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0,10);
+  }
+}
+
+function scheduleDailyChallengeRefresh(challengeDate) {
+  if (lsDailyChallengeRefreshTimer) clearTimeout(lsDailyChallengeRefreshTimer);
+  lsDailyChallengeRefreshTimer = setTimeout(() => {
+    if (!document.getElementById("lsDailyChallengeWrap")) {
+      lsDailyChallengeRefreshTimer = null;
+      return;
+    }
+    if (getArgentinaDateKey() !== String(challengeDate || "")) {
+      loadDailyChallenges();
+      return;
+    }
+    scheduleDailyChallengeRefresh(challengeDate);
+  }, 60000);
+}
+
+function getDailyChallengeSummary(data) {
+  const isSeven = isLiveScroll7App();
+  const challenges = (data?.challenges || []).slice(0, isSeven ? 3 : 1);
+  const completed = challenges.filter(item => Number(item.progress) >= Number(item.target)).length;
+  const totalProgress = challenges.reduce((sum,item) => sum + Math.min(Number(item.progress),Number(item.target)),0);
+  const totalTarget = challenges.reduce((sum,item) => sum + Number(item.target),0);
+  return {
+    isSeven,
+    challenges,
+    completed,
+    percent:totalTarget ? Math.round(totalProgress / totalTarget * 100) : 0
+  };
+}
+
+function renderDailyChallengeRows(challenges) {
+  return challenges.map(item => {
+    const done = Number(item.progress) >= Number(item.target);
+    return `<div style="display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:9px;padding:10px;border:1px solid ${done ? "rgba(34,197,94,.35)" : "var(--border)"};border-radius:12px;background:rgba(255,255,255,.025);">
+      <span style="font-size:21px;text-align:center;">${done ? "✅" : item.emoji}</span>
+      <strong style="font-size:11px;">${escapeHtml(item.title)}</strong>
+      <span style="font:800 9px 'JetBrains Mono',monospace;color:${done ? "var(--green)" : "var(--text-dim)"};">${item.progress}/${item.target}</span>
+    </div>`;
+  }).join("");
+}
+
+async function loadDailyChallenges() {
+  const wrap = document.getElementById("lsDailyChallengeWrap");
+  if (!wrap || !currentUser?.id) return;
+
+  try {
+    const { data, error } = await sb.rpc("get_daily_challenges");
+    if (error || !data?.ok || !Array.isArray(data.challenges)) {
+      wrap.innerHTML = "";
+      return;
+    }
+
+    window.__lsDailyChallengeData = data;
+    scheduleDailyChallengeRefresh(data.date);
+    const summary = getDailyChallengeSummary(data);
+    const accent = summary.isSeven ? "#58efff" : "var(--gold)";
+    const title = summary.isSeven ? "Pulso Diario" : "Reto de hoy";
+
+    wrap.innerHTML = `
+      <button type="button" onclick="openDailyChallengesModal()" aria-label="Abrir ${title}" style="width:100%;min-height:58px;margin-bottom:10px;padding:9px 12px;display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:center;gap:10px;border:1px solid ${summary.isSeven ? "rgba(57,231,255,.30)" : "var(--gold-dim)"};border-radius:14px;background:${summary.isSeven ? "linear-gradient(135deg,rgba(14,38,64,.82),rgba(33,13,59,.76))" : "var(--panel)"};color:var(--text);text-align:left;cursor:pointer;">
+        <span style="width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:${summary.isSeven ? "rgba(57,231,255,.12)" : "color-mix(in srgb,var(--gold) 10%,transparent)"};font-size:18px;">${summary.isSeven ? "◉" : "🎯"}</span>
+        <span style="min-width:0;">
+          <span style="display:flex;align-items:center;justify-content:space-between;gap:8px;"><strong style="font-size:11px;">${title}</strong><small style="color:${accent};font:900 8px 'JetBrains Mono',monospace;">${summary.completed}/${summary.challenges.length}</small></span>
+          <span style="display:block;height:4px;margin-top:6px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;"><i style="display:block;width:${summary.percent}%;height:100%;background:${summary.isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};"></i></span>
+        </span>
+        <span style="color:var(--text-dim);font-size:16px;">›</span>
+      </button>`;
+  } catch (_) {
+    wrap.innerHTML = "";
+  }
+}
+
+function openDailyChallengesModal() {
+  const data = window.__lsDailyChallengeData;
+  if (!data?.challenges) return;
+  const summary = getDailyChallengeSummary(data);
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:275;">
+      <div class="modal-box" style="max-width:430px;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div><small style="color:${summary.isSeven ? "#58efff" : "var(--gold)"};font-weight:900;letter-spacing:.1em;">${summary.isSeven ? "LIVESCROLL PULSE" : "RETO DIARIO"}</small><h2 style="margin:3px 0 0;">${summary.isSeven ? "Tu Pulso de hoy" : "Tu misión de hoy"}</h2></div>
+          <button type="button" onclick="closeDailyChallengesModal()" aria-label="Cerrar" style="width:40px;height:40px;border:1px solid var(--border);border-radius:50%;background:var(--panel-2);color:var(--text);font-size:18px;">✕</button>
+        </div>
+        <div class="modal-box-body">
+          <div style="display:grid;gap:8px;">${renderDailyChallengeRows(summary.challenges)}</div>
+          <div style="height:7px;margin-top:14px;border-radius:99px;background:rgba(255,255,255,.09);overflow:hidden;"><span style="display:block;width:${summary.percent}%;height:100%;background:${summary.isSeven ? "linear-gradient(90deg,#39e7ff,#a970ff)" : "var(--gold)"};"></span></div>
+          <p style="margin:10px 0 0;color:var(--text-dim);font-size:9px;line-height:1.5;">Se renueva automáticamente cada día. Esta etapa prueba el progreso antes de habilitar premios adicionales.</p>
+        </div>
+      </div>
+    </div>`;
+}
+
+function closeDailyChallengesModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+async function checkAndShowLoginStreak() {
+  const { data } = await sb.rpc("get_login_streak_status", { p_user_id: currentUser.id });
+  const banner = document.getElementById("loginStreakBannerWrap");
+  if (!data || !data.ok || !data.rewards || !data.rewards.length) { if (banner) banner.innerHTML = ""; return; }
+
+  window.__loginStreakData = data;
+  if (data.new_week && data.week_start) {
+    const weekNoticeKey = `ls-week-started-${data.week_start}`;
+    if (!localStorage.getItem(weekNoticeKey)) {
+      localStorage.setItem(weekNoticeKey, "1");
+      showToast("🔥 Comenzó una nueva semana en LiveScroll");
+    }
+  }
+  const claimableDay = data.current_day >= 7 ? 1 : data.current_day + 1;
+
+  if (banner) {
+    banner.innerHTML = data.claimed_today ? "" : `
+      <div class="form-card" style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; border-color:var(--gold-dim);" onclick="showLoginStreakModal()">
+        <div><strong>🔥 Inicio de Sesión</strong><div style="font-size:12px; color:var(--text-dim);">Día ${claimableDay} de 7 · tocá para reclamar</div></div>
+        <div class="btn" style="pointer-events:none; padding:6px 14px; font-size:13px;">Ver</div>
+      </div>`;
+  }
+
+  if (!data.claimed_today && !window.__loginStreakShownThisSession) {
+    window.__loginStreakShownThisSession = true;
+    showLoginStreakModal();
+  }
+}
+
+function closeLoginStreakModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+function showLoginStreakModal() {
+  const data = window.__loginStreakData;
+  if (!data) return;
+  const claimedToday = data.claimed_today;
+  const currentDay = data.current_day || 0;
+  const claimableDay = claimedToday ? null : (currentDay >= 7 ? 1 : currentDay + 1);
+  const rewards = data.rewards || [];
+  const days1to6 = rewards.filter(r => r.day_number !== 7);
+  const day7 = rewards.find(r => r.day_number === 7);
+
+  const isDayDone = (dayNum) => claimedToday ? dayNum <= currentDay : dayNum < claimableDay;
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:125;">
+      <div class="modal-box" style="max-width:380px;">
+        <div class="modal-box-header">
+          <h2>📅 Inicio de Sesión</h2>
+          <button onclick="closeLoginStreakModal()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-box-body">
+          <p style="color:var(--text-dim); font-size:12px; margin-top:0;">Entrá todos los días que puedas — si faltás uno, no se rompe nada, seguís de donde quedaste.</p>
+          <div class="login-streak-grid">
+            ${days1to6.map(r => `
+              <div class="login-streak-day ${isDayDone(r.day_number) ? "done" : ""} ${r.day_number === claimableDay ? "claimable" : ""}">
+                <div class="d">Día ${r.day_number}</div>
+                <div class="ic">${r.emoji_reward || r.badge_icon || "⭐"}</div>
+                <div class="p">+${r.points}</div>
+              </div>`).join("")}
+          </div>
+          ${day7 ? `
+            <div class="login-streak-bigday ${isDayDone(7) ? "done" : ""}">
+              <div class="tag">GRAN PREMIO · DÍA 7</div>
+              <div class="ic">${day7.emoji_reward || day7.badge_icon || "🎁"}</div>
+              <div class="p">+${day7.points} pts${day7.badge_name ? ` · 🏅 ${escapeHtml(day7.badge_name)}` : ""}</div>
+            </div>` : ""}
+        </div>
+        <div class="modal-box-footer">
+          ${claimedToday
+            ? `<button class="btn-outline" style="width:100%;" disabled>Ya reclamaste hoy ✓</button>`
+            : `<button class="btn" id="claimLoginStreakBtn" style="width:100%;min-height:48px;" onclick="handleClaimLoginStreak()">Reclamar Día ${claimableDay}</button>`}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function handleClaimLoginStreak() {
+  const btn = document.getElementById("claimLoginStreakBtn");
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Reclamando...";
+  }
+
+  const { data, error } = await sb.rpc("claim_daily_streak", {
+    p_user_id: currentUser.id
+  });
+
+  if (error || !data?.ok) {
+    const reason = data?.error || error?.message || "error_desconocido";
+
+    const messages = {
+      ya_reclamado: "Ya reclamaste la recompensa de hoy.",
+      not_authenticated: "Tu sesión venció. Volvé a iniciar sesión.",
+      invalid_user: "No pudimos validar tu cuenta. Recargá LiveScroll.",
+      cuenta_bloqueada: "Tu cuenta todavía no puede reclamar recompensas."
+    };
+
+    showToast(messages[reason] || "No se pudo reclamar. Probá nuevamente.");
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Reclamar";
+    }
+
+    console.warn("Error reclamando Inicio de Sesión:", reason, error || data);
+    return;
+  }
+
+  currentProfile.points_balance += Number(data.points || 0);
+  currentProfile.streak_current_day = data.day;
+  currentProfile.streak_last_login_date = new Date().toISOString().slice(0, 10);
+
+  updateBalanceUI();
+  showFloatingPointsSafe(Number(data.points || 0));
+
+  // Cerramos el selector, pero mantenemos oculta la navegación
+  // porque enseguida mostramos el premio.
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+
+  showStreakModal(data);
+
+  const banner = document.getElementById("loginStreakBannerWrap");
+  if (banner) banner.innerHTML = "";
+}
+
+async function handleClaimStreak() {
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo reclamar, probá de nuevo"); return; }
+
+  currentProfile.points_balance += data.points;
+  currentProfile.streak_current_day = data.day;
+  currentProfile.streak_last_login_date = new Date().toISOString().slice(0, 10);
+  updateBalanceUI();
+  showStreakModal(data);
+  renderProfile();
+}
+
+async function claimDailyStreak() {
+  if (currentProfile.is_blocked) return; // cuentas pendientes de verificar no acumulan racha todavía
+  if (window.streakClaimAttempted) return; // seguro: nunca reclamar más de una vez por sesión
+  window.streakClaimAttempted = true;
+
+  const { data, error } = await sb.rpc("claim_daily_streak", { p_user_id: currentUser.id });
+  if (error || !data.ok) return; // ya reclamado hoy, o sin configurar: no molestamos
+
+  currentProfile.points_balance += data.points;
+  currentProfile.streak_current_day = data.day;
+  updateBalanceUI();
+  showFloatingPointsSafe(data.points);
+  showStreakModal(data);
+}
+
+function closeStreakRewardModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+function showStreakModal(data) {
+  const wrap = document.getElementById("globalModalWrap");
+  const wasCompleted = data.completed_week;
+
+  wrap.innerHTML = `
+    <div style="position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:120; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div class="auth-box" style="margin:0; text-align:center;">
+        ${wasCompleted ? `
+          <div style="font-size:44px; margin-bottom:8px;">🎉</div>
+          <h2>¡Racha completa!</h2>
+          <p style="color:var(--text-dim); font-size:14px;">Completaste los 7 días. ¡Hasta la próxima semana!</p>
+        ` : `
+          <div style="font-size:44px; margin-bottom:8px;">🔥</div>
+          <h2>Día ${data.day} de 7</h2>
+        `}
+        <div class="mono" style="font-size:28px; color:var(--gold); margin:14px 0;">+${data.points} pts</div>
+        ${data.badge_name ? `
+          <div style="background:var(--panel-2); border:1px solid var(--gold-dim); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:32px;">${data.badge_icon || "🏅"}</div>
+            <div style="font-size:13px; color:var(--gold); margin-top:6px;">¡Ganaste la medalla "${escapeHtml(data.badge_name)}"!</div>
+          </div>` : ""}
+        ${data.emoji_reward ? `
+          <div style="background:var(--panel-2); border:1px solid var(--green); border-radius:12px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:32px;">${data.emoji_reward}</div>
+            <div style="font-size:13px; color:var(--green); margin-top:6px;">¡Nuevo emoji de avatar desbloqueado!</div>
+          </div>` : ""}
+        <button class="btn" style="width:100%;min-height:48px;" onclick="closeStreakRewardModal()">Genial</button>
+      </div>
+    </div>`;
+}
+
+
+async function handlePinVideo(videoId) {
+  const { data, error } = await sb.rpc("pin_video", { p_video_id: videoId, p_user_id: currentUser.id });
+  if (error || !data.ok) {
+    const messages = { limite_alcanzado: "Ya usaste todos tus cupos de anclado por ahora.", plan_sin_anclado: "Tu plan no incluye anclar videos." };
+    showToast(messages[data?.error] || "No se pudo anclar");
+    return;
+  }
+  showToast("¡Video anclado en Para Ti por 24hs!");
+  lsPerfCache.profileVideos.at = 0;
+  renderProfile();
+}
+
+async function handleDeleteOwnVideo(videoId) {
+  if (!confirm("¿Eliminar este video para siempre? Se borran también sus likes, comentarios y vistas. No se puede deshacer.")) return;
+  const mediaToDelete = await getVideoMediaForCleanup(videoId);
+  const { data, error } = await sb.rpc("delete_own_video", { p_video_id: videoId });
+  if (error || !data?.ok) {
+    console.error("delete_own_video:", error, data);
+    const messages = {
+      no_autenticado:"Tu sesión venció. Volvé a ingresar.",
+      no_autorizado:"Solamente el dueño puede eliminar este video.",
+      video_no_encontrado:"El video ya no existe.",
+      delete_failed:"No pudimos completar la eliminación. Probá nuevamente."
+    };
+    showToast(messages[data?.error] || "No se pudo eliminar el video");
+    return;
+  }
+  await cleanupR2VideoMedia(mediaToDelete);
+  document.getElementById(`tile-${videoId}`)?.remove();
+  showToast("Video eliminado definitivamente ✓");
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
+  renderProfile();
+}
+
+async function handleAdminDeleteProfileVideo(videoId, username) {
+  if (!currentProfile?.is_admin) return;
+  if (!confirm("¿Eliminar este video como administrador? Esta acción no se puede deshacer.")) return;
+  const mediaToDelete = await getVideoMediaForCleanup(videoId);
+  const { data, error } = await sb.rpc("admin_delete_video", { p_video_id:videoId });
+  if (error || !data?.ok) {
+    console.error("admin_delete_video perfil:", error, data);
+    showToast(`No se pudo eliminar: ${data?.detail || data?.error || error?.message || "error desconocido"}`);
+    return;
+  }
+  await cleanupR2VideoMedia(mediaToDelete);
+  document.getElementById(`public-tile-${videoId}`)?.remove();
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
+  showToast("Video eliminado por administración ✓");
+  await viewPublicProfile(username);
+}
+window.handleAdminDeleteProfileVideo = handleAdminDeleteProfileVideo;
+
+
+function checkBlockedStatus() {
+  const wrap = document.getElementById("blockedBannerWrap");
+  if (currentProfile.is_blocked) {
+    const verificationMessages = {
+      correo_sin_confirmar:"Confirmá el enlace que enviamos a tu correo y volvé a ingresar.",
+      nombre_invalido:"Tu nombre de usuario necesita una revisión rápida.",
+      registro_masivo_misma_red:"Detectamos varios registros recientes desde la misma conexión. La cuenta quedó protegida para revisión.",
+      sancion_activa:"Esta cuenta tiene una restricción activa y requiere revisión del equipo.",
+      perfil_incompleto:"Estamos terminando de preparar tu perfil.",
+      revision_manual:"La cuenta necesita una revisión rápida del equipo."
+    };
+    const verificationDetail = verificationMessages[currentProfile.auto_verification_reason] || verificationMessages.revision_manual;
+    wrap.innerHTML = `
+      <div style="max-width:920px;margin:14px auto 0;padding:10px 18px;background:rgba(34,197,94,0.08);border:1px solid var(--gold-dim);border-radius:10px;color:var(--text);font-size:13px;text-align:center;">
+        🕒 ${escapeHtml(verificationDetail)} Podés navegar, pero todavía no vas a sumar puntos.
+      </div>`;
+  } else {
+    wrap.innerHTML = "";
+  }
+}
+
+let boostActive = false;
+
+async function checkBoostStatus() {
+  const { data, error } = await sb.rpc("get_boost_status", { p_user_id: currentUser.id });
+  if (error || !data) return;
+  boostActive = data.active;
+  if (boostActive) {
+    const expires = new Date(data.expires_at);
+    showBoostBanner(expires);
+  }
+}
+
+function showBoostBanner(expiresAt) {
+  const wrap = document.getElementById("boostBannerWrap");
+  wrap.innerHTML = `
+    <div style="max-width:920px;margin:14px auto 0;padding:10px 18px;background:var(--panel-2);border:1px solid var(--gold-dim);border-radius:10px;color:var(--gold);font-size:13px;text-align:center;">
+      ⚡ Boost de bienvenida activo: ganás <strong>x2 puntos</strong> hasta ${expiresAt.toLocaleString("es-AR")}
+    </div>`;
+}
+
+
+function ensureSafeMobileUpgradeStyles() {
+  if (document.getElementById("lsSafeMobileUpgradeStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "lsSafeMobileUpgradeStyles";
+  style.textContent = `
+    body,
+    button,
+    a,
+    label,
+    p,
+    span,
+    div,
+    h1, h2, h3, h4, h5, h6,
+    .form-card,
+    .profile-hero,
+    .profile-section,
+    .feed-item {
+      -webkit-user-select:none;
+      user-select:none;
+      -webkit-touch-callout:none;
+    }
+
+    input,
+    textarea,
+    select,
+    [contenteditable="true"],
+    .allow-text-select {
+      -webkit-user-select:text !important;
+      user-select:text !important;
+      -webkit-touch-callout:default;
+    }
+
+
+    /* ===== LiveScroll Modern Pass: visual only ===== */
+    .feed-item {
+      border-radius:18px !important;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.07) !important;
+      box-shadow:0 10px 28px rgba(0,0,0,.16);
+    }
+
+    .feed-item button {
+      transition:transform .16s ease, opacity .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    .feed-item button:active {
+      transform:scale(.94);
+    }
+
+    .profile-hero,
+    .profile-section,
+    .form-card {
+      border-radius:18px !important;
+    }
+
+    .profile-stats-row {
+      gap:8px !important;
+    }
+
+    .stat-pill {
+      border-radius:14px !important;
+      transition:transform .18s ease, border-color .18s ease;
+    }
+
+    .stat-pill:active {
+      transform:scale(.97);
+    }
+
+    .btn,
+    .btn-outline {
+      min-height:42px;
+      border-radius:12px !important;
+      transition:transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+      touch-action:manipulation;
+    }
+
+    .btn:active,
+    .btn-outline:active {
+      transform:scale(.97);
+    }
+
+    .modal-box {
+      border-radius:20px;
+      box-shadow:0 22px 70px rgba(0,0,0,.42);
+    }
+
+    .modal-box-header {
+      padding-bottom:12px;
+    }
+
+    .modal-box-footer {
+      gap:10px;
+    }
+
+    .ls-nova .feed-item {
+      box-shadow:0 14px 36px rgba(0,0,0,.22);
+      backdrop-filter:blur(5px);
+      -webkit-backdrop-filter:blur(5px);
+    }
+
+    .ls-nova .profile-hero,
+    .ls-nova .profile-section,
+    .ls-nova .form-card {
+      box-shadow:0 10px 30px rgba(0,0,0,.12);
+    }
+
+    .ls-nova .btn:hover,
+    .ls-nova .btn-outline:hover {
+      transform:translateY(-1px);
+    }
+
+    .ls-legacy .feed-item,
+    .ls-legacy .profile-hero,
+    .ls-legacy .profile-section,
+    .ls-legacy .form-card,
+    .ls-legacy .modal-box {
+      box-shadow:none !important;
+      backdrop-filter:none !important;
+      -webkit-backdrop-filter:none !important;
+    }
+
+    @media (max-width:700px) {
+      .feed-item {
+        border-radius:15px !important;
+      }
+
+      .profile-hero,
+      .profile-section,
+      .form-card {
+        border-radius:15px !important;
+      }
+
+      .btn,
+      .btn-outline {
+        min-height:44px;
+      }
+
+      .modal-box {
+        max-width:calc(100vw - 18px);
+      }
+    }
+
+    @media (max-width:360px) {
+      .feed-item {
+        border-radius:12px !important;
+      }
+
+      .profile-stats-row {
+        gap:5px !important;
+      }
+
+      .stat-pill {
+        padding-left:7px !important;
+        padding-right:7px !important;
+      }
+    }
+
+
+    /* v5.3.5 — Perfil Nova: actividad + profundidad */
+    .ls-profile-nova {
+      transform-style:preserve-3d;
+      perspective:900px;
+    }
+    .ls-profile-nova-inner {
+      position:relative;
+      z-index:2;
+      transform-style:preserve-3d;
+      transition:transform .18s ease;
+      will-change:transform;
+    }
+    .ls-profile-nova::after {
+      content:"";
+      position:absolute;
+      inset:-35%;
+      z-index:1;
+      pointer-events:none;
+      opacity:0;
+      background:radial-gradient(circle at var(--ls-glow-x,50%) var(--ls-glow-y,35%), rgba(255,255,255,.11), transparent 34%);
+      transition:opacity .22s ease;
+    }
+    .ls-profile-nova:hover::after { opacity:1; }
+
+    .ls-activity-aura {
+      position:relative;
+      isolation:isolate;
+    }
+    .ls-activity-aura::before {
+      content:"";
+      position:absolute;
+      inset:-5px;
+      border-radius:50%;
+      z-index:-1;
+      background:conic-gradient(from 0deg, #facc15, #7dd3fc, #a78bfa, #22c55e, #facc15);
+      animation:lsActivityAuraSpin 4s linear infinite;
+    }
+    .ls-activity-aura::after {
+      content:"";
+      position:absolute;
+      inset:-9px;
+      border-radius:50%;
+      z-index:-2;
+      background:rgba(125,211,252,.16);
+      filter:blur(7px);
+      animation:lsActivityAuraPulse 2.2s ease-in-out infinite;
+    }
+    @keyframes lsActivityAuraSpin { to { transform:rotate(360deg); } }
+    @keyframes lsActivityAuraPulse {
+      0%,100% { opacity:.42; transform:scale(.96); }
+      50% { opacity:.9; transform:scale(1.06); }
+    }
+
+    .ls-recent-activity {
+      display:grid;
+      gap:8px;
+    }
+    .ls-activity-item {
+      display:flex;
+      align-items:center;
+      gap:11px;
+      padding:11px 12px;
+      border:1px solid var(--border);
+      border-radius:12px;
+      background:rgba(255,255,255,.025);
+    }
+    .ls-activity-icon {
+      width:36px;
+      height:36px;
+      flex:0 0 36px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:11px;
+      background:var(--panel-2);
+      font-size:18px;
+    }
+    .ls-activity-copy { min-width:0; flex:1; }
+    .ls-activity-title { font-size:12px; color:var(--text); }
+    .ls-activity-time { margin-top:2px; font-size:9px; color:var(--text-dim); }
+
+    .ls-new-video-badge {
+      position:absolute;
+      top:7px;
+      left:7px;
+      z-index:5;
+      padding:4px 7px;
+      border-radius:999px;
+      background:rgba(8,10,13,.82);
+      border:1px solid var(--gold-dim);
+      color:var(--gold);
+      font-size:9px;
+      font-weight:800;
+      letter-spacing:.03em;
+      pointer-events:none;
+    }
+
+    /* Legacy queda liviano */
+    .ls-legacy .ls-profile-nova-inner { transform:none !important; }
+    .ls-legacy .ls-profile-nova::after,
+    .ls-legacy .ls-activity-aura::before,
+    .ls-legacy .ls-activity-aura::after { animation:none !important; filter:none !important; }
+
+    @media (hover:none), (max-width:700px) {
+      .ls-profile-nova-inner { transform:none !important; }
+      .ls-profile-nova::after { display:none; }
+    }
+
+    .ls-like-pop-safe { animation:lsLikePopSafe .32s ease; }
+    @keyframes lsLikePopSafe {
+      0%,100% { transform:scale(1); }
+      50% { transform:scale(1.28); }
+    }
+
+    .ls-balance-pop-safe { animation:lsBalancePopSafe .4s ease; }
+    @keyframes lsBalancePopSafe {
+      0%,100% { transform:scale(1); }
+      50% { transform:scale(1.08); }
+    }
+
+    .ls-legacy .ls-like-pop-safe,
+    .ls-legacy .ls-balance-pop-safe {
+      animation:none !important;
+    }
+
+    @media (max-width:700px) {
+
+    }
+
+    .ls-view-enter-safe {
+      animation:lsViewEnterSafe .20s ease both;
+    }
+
+    @keyframes lsViewEnterSafe {
+      from { opacity:.45; transform:translateY(5px); }
+      to { opacity:1; transform:translateY(0); }
+    }
+
+    .ls-points-float-safe {
+      position:fixed;
+      z-index:600;
+      pointer-events:none;
+      color:var(--gold);
+      font-family:'JetBrains Mono', monospace;
+      font-weight:800;
+      font-size:15px;
+      text-shadow:0 2px 8px rgba(0,0,0,.7);
+      animation:lsPointsFloatSafe .95s ease-out forwards;
+    }
+
+    @keyframes lsPointsFloatSafe {
+      0% { opacity:0; transform:translate(-50%, 6px) scale(.9); }
+      15% { opacity:1; }
+      100% { opacity:0; transform:translate(-50%, -44px) scale(1.06); }
+    }
+
+    .ls-upload-preview-safe {
+      display:none;
+      position:relative;
+      margin:12px 0 0;
+      width:100%;
+      max-width:100%;
+      min-width:0;
+      height:clamp(190px, 34vw, 340px);
+      overflow:hidden;
+      box-sizing:border-box;
+      border-radius:12px;
+      border:1px solid var(--border);
+      background:#050607;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .ls-upload-preview-safe.active {
+      display:flex;
+    }
+
+    /* Preview estable:
+       la CAJA aprovecha todo el ancho disponible y nunca se sale del formulario.
+       El video se adapta dentro sin recortarse. */
+    .ls-upload-preview-safe video {
+      display:block;
+      width:100%;
+      height:100%;
+      min-width:0;
+      max-width:100%;
+      max-height:100%;
+      object-fit:contain;
+      object-position:center center;
+      background:#000;
+      margin:0;
+      box-sizing:border-box;
+    }
+
+    @media (max-width:700px) {
+      .ls-upload-preview-safe {
+        width:100%;
+        height:190px;
+        max-height:190px;
+        margin-left:0;
+        margin-right:0;
+      }
+
+      .ls-upload-preview-safe video {
+        width:100%;
+        height:100%;
+      }
+    }
+
+    .ls-upload-preview-safe .tag {
+      position:absolute;
+      top:8px;
+      left:8px;
+      z-index:2;
+      padding:4px 8px;
+      border-radius:999px;
+      background:rgba(0,0,0,.72);
+      color:#fff;
+      font-size:10px;
+      font-weight:700;
+    }
+
+    .ls-upload-preview-msg-safe {
+      display:none;
+      padding:14px;
+      color:var(--text-dim);
+      font-size:12px;
+      line-height:1.45;
+      text-align:center;
+    }
+
+    .ls-upload-preview-msg-safe.active {
+      display:block;
+    }
+
+    .ls-legacy .ls-view-enter-safe,
+    .ls-legacy .ls-points-float-safe {
+      animation:none !important;
+    }
+
+
+    @media (max-width:700px) {
+      .ls-profile-edit-modal {
+        width:100% !important;
+        max-width:100% !important;
+        height:100vh !important;
+        max-height:100vh !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        display:flex !important;
+        flex-direction:column !important;
+        overflow:hidden !important;
+      }
+
+      .ls-profile-edit-header {
+        flex:0 0 auto !important;
+        position:sticky !important;
+        top:0 !important;
+        z-index:20 !important;
+        background:var(--panel) !important;
+        border-bottom:1px solid var(--border) !important;
+      }
+
+      .ls-profile-edit-body {
+        flex:1 1 auto !important;
+        min-height:0 !important;
+        overflow-y:auto !important;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      .ls-profile-edit-footer {
+        flex:0 0 auto !important;
+        position:sticky !important;
+        bottom:0 !important;
+        z-index:20 !important;
+        background:var(--panel) !important;
+        border-top:1px solid var(--border) !important;
+        padding-bottom:max(10px, env(safe-area-inset-bottom)) !important;
+      }
+
+      .ls-comments-overlay-safe {
+        align-items:flex-end !important;
+        padding:0 !important;
+        box-sizing:border-box !important;
+      }
+
+      .ls-comments-panel-safe {
+        width:100% !important;
+        max-width:560px !important;
+        height:min(66vh, 560px) !important;
+        max-height:calc(100vh - 96px) !important;
+        border-radius:18px 18px 0 0 !important;
+        margin:0 !important;
+        box-sizing:border-box !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+function closeManagedModal() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+function safePulseElement(el, className) {
+  if (!el || window.__liveScrollLegacyMode) return;
+
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+
+  setTimeout(() => el.classList.remove(className), 450);
+}
+
+function animateCurrentViewSafe() {
+  if (window.__liveScrollLegacyMode) return;
+
+  const main = document.getElementById("appView");
+  if (!main) return;
+
+  main.classList.remove("ls-view-enter-safe");
+  void main.offsetWidth;
+  main.classList.add("ls-view-enter-safe");
+
+  setTimeout(() => main.classList.remove("ls-view-enter-safe"), 260);
+}
+
+function showFloatingPointsSafe(amount, anchorEl = null) {
+  const points = Number(amount);
+  if (!Number.isFinite(points) || points <= 0 || window.__liveScrollLegacyMode) return;
+
+  const anchor = anchorEl || document.getElementById("navBalance");
+  const rect = anchor?.getBoundingClientRect();
+
+  const el = document.createElement("div");
+  el.className = "ls-points-float-safe";
+  el.textContent = `+${points} pts`;
+
+  if (rect) {
+    el.style.left = `${rect.left + rect.width / 2}px`;
+    el.style.top = `${Math.max(56, rect.top + rect.height / 2)}px`;
+  } else {
+    el.style.left = "50%";
+    el.style.top = "90px";
+  }
+
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1050);
+}
+
+
+const lsPerfCache = {
+  feed: { data:null, at:0 },
+  directos: { data:null, at:0 },
+  profileVideos: { data:null, at:0 },
+  profileViewsLedger: { data:null, at:0 }
+};
+let lsFeedLoadPromise = null;
+let lsTabRenderToken = 0;
+
+async function loadFeedVideosCached() {
+  if (lsCacheFresh(lsPerfCache.feed, 45000)) {
+    return { data:lsPerfCache.feed.data, error:null };
+  }
+
+  if (lsFeedLoadPromise) return lsFeedLoadPromise;
+
+  lsFeedLoadPromise = sb
+    .from("videos")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id), video_hashtags(hashtags(slug, display_name))")
+    .order("created_at", { ascending:false })
+    .limit(12)
+    .then(result => {
+      if (!result.error && result.data) {
+        lsPerfCache.feed = { data:result.data, at:Date.now() };
+      }
+      return result;
+    })
+    .finally(() => {
+      lsFeedLoadPromise = null;
+    });
+
+  return lsFeedLoadPromise;
+}
+
+function renderFastSkeleton(lines = 5, type = "generic") {
+  if (type === "feed") {
+    return `<div style="display:grid;place-items:center;min-height:58vh;">
+      <div style="width:min(390px,100%);height:58vh;border-radius:18px;background:var(--panel-2);overflow:hidden;position:relative;">
+        <div class="ls-fast-shimmer" style="position:absolute;inset:0;"></div>
+      </div>
+    </div>`;
+  }
+  if (type === "profile") {
+    return `<div class="ls-fast-profile-skeleton">
+      <div class="ls-fast-profile-hero">
+        <span class="ls-fast-avatar"></span>
+        <div style="flex:1;display:grid;gap:9px;"><i style="width:44%;"></i><i style="width:64%;"></i></div>
+      </div>
+      <div class="ls-fast-stats">${"<i></i>".repeat(3)}</div>
+      <div class="ls-fast-skeleton">${"<i></i>".repeat(3)}</div>
+    </div>`;
+  }
+  if (type === "directos") return `<div class="ls-fast-skeleton">${'<i style="height:78px;"></i>'.repeat(3)}</div>`;
+  return `<div class="ls-fast-skeleton">${Array.from({length:lines}, () => "<i></i>").join("")}</div>`;
+}
+
+function renderRuntimeShareButton(video) {
+  const videoId = escapeHtml(String(video?.id || ""));
+  const encodedUrl = encodeURIComponent(video?.video_url || "");
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${videoId}', '${encodedUrl}')">🔗</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-share" data-label="Compartir" aria-label="Compartir video" title="Compartir" onclick="handleShare('${videoId}', '${encodedUrl}')"><span>↗</span><i>ENVIAR</i></button>`;
+}
+
+function renderRuntimeHideButton(videoId) {
+  const safeId = escapeHtml(String(videoId || ""));
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${safeId}')">🙈</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-hide" data-label="No me interesa" aria-label="No me interesa" title="No me interesa" onclick="hideVideoFromDiscovery('${safeId}')"><span>−</span><i>OCULTAR</i></button>`;
+}
+
+function renderRuntimeReportButton(videoId) {
+  const safeId = escapeHtml(String(videoId || ""));
+  if (!isLiveScroll7App()) {
+    return `<button class="feed-action-btn" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${safeId}')">🚩</button>`;
+  }
+  return `<button class="feed-action-btn ls7-action-report" data-label="Reportar" aria-label="Reportar video" title="Reportar" onclick="openReportModal('${safeId}')"><span>!</span><i>REPORTE</i></button>`;
+}
+
+function lsCacheFresh(entry, maxAgeMs) {
+  return !!entry?.data && (Date.now() - entry.at) < maxAgeMs;
+}
+
+function switchTab(tab) {
+  // Los planes siguen disponibles dentro de Tienda, pero ya no existen como
+  // apartado independiente. Los accesos viejos también terminan allí.
+  if (tab === "plans") tab = "store";
+  stopConnectedLiveRefresh();
+
+  clearAllWatchIntervals();
+  if (!suppressAndroidTabHistory && currentTab && tab !== currentTab) {
+    previousTabForAndroidBack = currentTab;
+  }
+  currentTab = tab;
+  syncLiveScroll7SwipeRail(tab);
+  const renderToken = ++lsTabRenderToken;
+
+  document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
+  const activeBtn = document.getElementById("tab-" + tab);
+  if (activeBtn) activeBtn.classList.add("active");
+  updateNavigationEvolution597(tab);
+
+  const main = document.getElementById("appView");
+  if (main) {
+    main.classList.remove("ls-nav-view-enter");
+    void main.offsetWidth;
+    main.classList.add("ls-nav-view-enter");
+    setTimeout(() => main.classList.remove("ls-nav-view-enter"), 240);
+  }
+
+  // Feedback visual en el mismo frame del toque.
+  if (main && ["feed","foryou","profile","users","directos","wallet","plans","store","ranking","admin"].includes(tab)) {
+    const skeletonType = (tab === "feed" || tab === "foryou") ? "feed" : tab === "profile" ? "profile" : tab === "directos" ? "directos" : "generic";
+    main.innerHTML = renderFastSkeleton(5, skeletonType);
+  }
+
+  if (tab === "feed") renderFeed(renderToken);
+  if (tab === "foryou") renderForYou(renderToken);
+  if (tab === "upload") renderUpload();
+  if (tab === "profile") renderProfile();
+  if (tab === "users") renderUsersDirectory();
+  if (tab === "directos") renderDirectos(renderToken);
+  if (tab === "wallet") renderWallet();
+  if (tab === "store") renderStore();
+  if (tab === "ranking") renderRanking();
+  if (tab === "admin") renderAdmin();
+
+  // En desktop conservamos la entrada Nova; en móvil aparece instantáneo.
+  if (window.innerWidth > 700) {
+    requestAnimationFrame(() => animateCurrentViewSafe());
+  }
+
+  // Seasonal: solo sincroniza controles si estamos en Admin.
+  // No reconstruye el tema ni observa todo el DOM.
+  if (tab === "admin") {
+    setTimeout(syncSeasonalAdminControls, 250);
+  }
+
+}
+
+// LiveScroll 7 · navegación horizontal con intención.
+// Solo actúa cuando el gesto es claramente lateral y nunca dentro de videos,
+// formularios, menús o ventanas modales.
+function ensureLiveScroll7HorizontalNavigation() {
+  if (window.__ls7HorizontalNavigationReady) return;
+  const surface = document.getElementById("appView");
+  if (!surface) return;
+  window.__ls7HorizontalNavigationReady = true;
+
+  if (!document.getElementById("lsSharedSwipeRailStyles")) {
+    const style = document.createElement("style");
+    style.id = "lsSharedSwipeRailStyles";
+    style.textContent = `
+      html:not(.ls7-app-runtime) #ls7SwipeRail {
+        position:fixed;left:50%;top:calc(max(64px,env(safe-area-inset-top) + 56px));z-index:74;
+        width:154px;height:29px;transform:translateX(-50%);display:flex;align-items:center;justify-content:space-between;
+        padding:0 11px;border:1px solid rgba(56,221,242,.22);border-radius:999px;
+        background:rgba(5,17,22,.80);box-shadow:0 8px 25px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.04);
+        color:#2ef27c;backdrop-filter:blur(12px);touch-action:pan-x;transition:opacity .16s ease,transform .16s ease;
+      }
+      html:not(.ls7-app-runtime) #ls7SwipeRail b { color:#d6edf1;font:850 7px 'JetBrains Mono',monospace;letter-spacing:.09em; }
+      html:not(.ls7-app-runtime) #ls7SwipeRail span { font-size:16px;line-height:1; }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-left { transform:translateX(calc(-50% - 8px)); }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-right { transform:translateX(calc(-50% + 8px)); }
+      html:not(.ls7-app-runtime) #ls7SwipeRail.is-hidden { opacity:0;pointer-events:none; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const tabs = ["feed", "foryou", "profile"];
+  let startX = 0;
+  let startY = 0;
+  let startedAt = 0;
+  let blocked = false;
+
+  surface.addEventListener("touchstart", event => {
+    const touch = event.touches?.[0];
+    if (!touch || event.touches.length !== 1) return;
+    const target = event.target;
+    blocked = !!target?.closest?.("button,a,input,textarea,select,video,iframe,.modal-overlay,.ls-comments-overlay-611,.mobile-menu-panel");
+    startX = touch.clientX;
+    startY = touch.clientY;
+    startedAt = performance.now();
+  }, { passive:true });
+
+  surface.addEventListener("touchend", event => {
+    if (blocked) return;
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const elapsed = performance.now() - startedAt;
+    if (elapsed > 760 || Math.abs(dx) < 72 || Math.abs(dx) < Math.abs(dy) * 1.35) return;
+
+    const index = tabs.indexOf(currentTab);
+    if (index < 0) return;
+    const nextIndex = dx < 0 ? index + 1 : index - 1;
+    if (nextIndex < 0 || nextIndex >= tabs.length) return;
+
+    surface.classList.remove("ls7-swipe-left", "ls7-swipe-right");
+    surface.classList.add(dx < 0 ? "ls7-swipe-left" : "ls7-swipe-right");
+    window.setTimeout(() => {
+      switchTab(tabs[nextIndex]);
+      surface.classList.remove("ls7-swipe-left", "ls7-swipe-right");
+    }, 115);
+  }, { passive:true });
+
+  // Los reproductores embebidos consumen los gestos antes de que lleguen a
+  // la página. Esta pequeña franja queda por encima del video y ofrece un
+  // lugar seguro para cambiar de apartado sin pelear con el scroll vertical.
+  const rail = document.createElement("div");
+  rail.id = "ls7SwipeRail";
+  rail.setAttribute("role", "navigation");
+  rail.setAttribute("aria-label", "Deslizar entre Mirar, Para Ti y Perfil");
+  rail.innerHTML = '<span>‹</span><b id="ls7SwipeRailLabel">MIRAR · DESLIZÁ</b><span>›</span>';
+  document.body.appendChild(rail);
+
+  let railX = 0;
+  let railY = 0;
+  rail.addEventListener("touchstart", event => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    railX = touch.clientX;
+    railY = touch.clientY;
+  }, { passive:true });
+  rail.addEventListener("touchend", event => {
+    const touch = event.changedTouches?.[0];
+    if (!touch) return;
+    const dx = touch.clientX - railX;
+    const dy = touch.clientY - railY;
+    if (Math.abs(dx) < 42 || Math.abs(dx) < Math.abs(dy) * 1.1) return;
+    const index = tabs.indexOf(currentTab);
+    const nextIndex = dx < 0 ? index + 1 : index - 1;
+    if (index < 0 || nextIndex < 0 || nextIndex >= tabs.length) return;
+    rail.classList.add(dx < 0 ? "is-left" : "is-right");
+    window.setTimeout(() => {
+      rail.classList.remove("is-left", "is-right");
+      switchTab(tabs[nextIndex]);
+    }, 105);
+  }, { passive:true });
+  syncLiveScroll7SwipeRail(currentTab);
+}
+
+function syncLiveScroll7SwipeRail(tab = currentTab) {
+  const rail = document.getElementById("ls7SwipeRail");
+  if (!rail) return;
+  const names = { feed:"MIRAR", foryou:"PARA TI", profile:"PERFIL" };
+  rail.classList.toggle("is-hidden", !names[tab]);
+  const label = document.getElementById("ls7SwipeRailLabel");
+  if (label && names[tab]) label.textContent = `${names[tab]} · DESLIZÁ`;
+}
+
+function updateBalanceUI() {
+  const el = document.getElementById("navBalance");
+  if (el) {
+    el.textContent = currentProfile.points_balance + " pts";
+    safePulseElement(el, "ls-balance-pop-safe");
+  }
+}
+
+function ensureModernToastStyles() {
+  if (document.getElementById("lsModernToastStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsModernToastStyles";
+  style.textContent = `
+    #toastWrap{
+      position:fixed!important;
+      z-index:2147482500!important;
+      left:50%!important;
+      right:auto!important;
+      bottom:calc(154px + env(safe-area-inset-bottom, 0px))!important;
+      width:min(92vw,430px)!important;
+      display:flex!important;
+      flex-direction:column!important;
+      gap:9px!important;
+      pointer-events:none!important;
+      transform:translateX(-50%)!important;
+    }
+    #toastWrap .ls-modern-toast{
+      --toast-accent:#f2c94c;
+      position:relative;
+      display:grid;
+      grid-template-columns:42px minmax(0,1fr);
+      align-items:center;
+      gap:11px;
+      width:100%;
+      min-height:66px;
+      padding:10px 14px 10px 11px;
+      overflow:hidden;
+      border:1px solid color-mix(in srgb,var(--toast-accent) 43%,transparent);
+      border-radius:19px;
+      background:linear-gradient(125deg,rgba(12,18,22,.97),rgba(8,11,14,.96));
+      color:#f7f8fa;
+      box-shadow:0 16px 42px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06);
+      backdrop-filter:blur(18px) saturate(1.3);
+      -webkit-backdrop-filter:blur(18px) saturate(1.3);
+      animation:lsToastArrive .38s cubic-bezier(.16,1,.3,1) both;
+      pointer-events:auto;
+    }
+    #toastWrap .ls-modern-toast:before{
+      content:"";position:absolute;inset:0 auto 0 0;width:3px;
+      background:var(--toast-accent);box-shadow:0 0 18px var(--toast-accent);
+    }
+    #toastWrap .ls-toast-icon{
+      width:42px;height:42px;display:grid;place-items:center;border-radius:14px;
+      color:var(--toast-accent);font:900 19px/1 Inter,system-ui,sans-serif;
+      background:color-mix(in srgb,var(--toast-accent) 13%,rgba(255,255,255,.025));
+      border:1px solid color-mix(in srgb,var(--toast-accent) 30%,transparent);
+    }
+    #toastWrap .ls-toast-copy{min-width:0;text-align:left}
+    #toastWrap .ls-toast-title{display:block;margin-bottom:3px;color:var(--toast-accent);font:800 10px/1.2 'JetBrains Mono',monospace;letter-spacing:.12em;text-transform:uppercase}
+    #toastWrap .ls-toast-message{display:block;color:#f3f5f7;font:700 13px/1.35 Inter,system-ui,sans-serif;overflow-wrap:anywhere}
+    #toastWrap .ls-modern-toast.is-success{--toast-accent:#45e6a8}
+    #toastWrap .ls-modern-toast.is-error{--toast-accent:#ff5875}
+    #toastWrap .ls-modern-toast.is-info{--toast-accent:#59d8ff}
+    #toastWrap .ls-modern-toast.is-leaving{animation:lsToastLeave .22s ease forwards}
+    html.ls7-app-runtime #toastWrap .ls-modern-toast{
+      background:linear-gradient(125deg,rgba(10,12,20,.98),rgba(18,10,25,.97));
+      border-radius:21px;
+      box-shadow:0 18px 50px rgba(0,0,0,.54),0 0 26px color-mix(in srgb,var(--toast-accent) 13%,transparent),inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    html:not(.ls7-app-runtime) #toastWrap .ls-modern-toast{
+      border-color:rgba(244,201,93,.38);background:linear-gradient(125deg,rgba(24,21,10,.98),rgba(10,12,13,.98));
+      box-shadow:0 18px 48px rgba(0,0,0,.52),0 0 24px rgba(244,201,93,.10),inset 0 1px 0 rgba(255,244,190,.07);
+    }
+    @keyframes lsToastArrive{from{opacity:0;transform:translate3d(0,24px,0) scale(.94)}to{opacity:1;transform:none}}
+    @keyframes lsToastLeave{to{opacity:0;transform:translate3d(0,12px,0) scale(.97)}}
+    @media(min-width:760px){#toastWrap{bottom:28px!important;left:auto!important;right:28px!important;transform:none!important;width:min(390px,calc(100vw - 56px))!important}}
+    @media(prefers-reduced-motion:reduce){#toastWrap .ls-modern-toast{animation:none!important}}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureFeedPolishStyles() {
+  if (document.getElementById("lsFeedPolishStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsFeedPolishStyles";
+  style.textContent = `
+    .mobile-menu-panel{padding-top:calc(22px + env(safe-area-inset-top,0px))!important}
+    .ls-mobile-menu-head{flex:0 0 auto}
+    html:not(.ls7-app-runtime) .mobile-menu-panel{
+      top:0!important;bottom:0!important;height:100dvh!important;max-height:100dvh!important;
+      box-sizing:border-box!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;
+    }
+    html:not(.ls7-app-runtime) .mobile-menu-panel .ls-mobile-menu-scroll{
+      flex:1 1 auto!important;min-height:0!important;overflow-x:hidden!important;overflow-y:auto!important;
+      padding-bottom:calc(34px + env(safe-area-inset-bottom,0px))!important;
+      overscroll-behavior-y:contain!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch!important;
+    }
+    #feedVertical,#profileFeedVertical,#foryouList .feed-vertical{
+      overscroll-behavior-y:contain;scroll-snap-type:y mandatory!important;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;
+    }
+    #feedVertical>.feed-item,#profileFeedVertical>.feed-item,#foryouList .feed-vertical>.feed-item{
+      scroll-snap-align:start!important;scroll-snap-stop:always!important;transform:translateZ(0);
+    }
+    .feed-item.ls-upload-feed-item video{transform:translateZ(0);backface-visibility:hidden;image-rendering:auto}
+    .feed-item.ls-upload-feed-item.ls-feed-active video{will-change:transform}
+    .ls-mp4-sound{
+      position:absolute;left:14px;top:58px;z-index:16;display:flex;align-items:center;gap:7px;
+      min-height:40px;padding:0 12px;border:1px solid rgba(255,255,255,.33);border-radius:999px;
+      background:rgba(3,6,9,.82);color:#fff;font:850 10px 'JetBrains Mono',monospace;letter-spacing:.06em;
+      box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 18px rgba(89,216,255,.20);backdrop-filter:blur(9px);
+      animation:lsSoundGlow 1.8s ease-in-out infinite;cursor:pointer;
+    }
+    .ls-mp4-sound span{font-size:19px;filter:drop-shadow(0 0 7px #59d8ff)}
+    .ls-mp4-sound.is-on{border-color:rgba(69,230,168,.72);color:#bfffe6;animation:none;box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 20px rgba(69,230,168,.24)}
+    @keyframes lsSoundGlow{50%{border-color:rgba(89,216,255,.78);box-shadow:0 8px 25px rgba(0,0,0,.42),0 0 26px rgba(89,216,255,.36)}}
+    html.ls7-app-runtime #appView,.ls7-mobile-menu-panel{transform:translateZ(0);backface-visibility:hidden}
+    html.ls7-app-runtime .feed-action-btn,html.ls7-app-runtime .nav-btn,html.ls7-app-runtime button{transition-timing-function:cubic-bezier(.22,.8,.25,1)!important}
+    html.ls7-app-runtime .feed-phone{box-shadow:0 12px 34px rgba(0,0,0,.32)!important}
+    html.ls7-app-runtime .feed-item.ls-upload-feed-item .feed-phone:after{
+      content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
+      box-shadow:inset 0 0 55px rgba(86,105,255,.055),inset 0 -90px 90px rgba(0,0,0,.18);
+    }
+    @media(max-width:700px){
+      html.ls7-app-runtime .feed-action-btn{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+      html.ls7-app-runtime .feed-phone{contain:layout paint style}
+    }
+    @media(prefers-reduced-motion:reduce){.ls-mp4-sound{animation:none}}
+  `;
+  document.head.appendChild(style);
+}
+
+document.addEventListener("DOMContentLoaded", ensureFeedPolishStyles);
+
+function toggleFeedVideoSound(button) {
+  const video = button?.closest(".dbltap-like-zone")?.querySelector("video");
+  if (!video) return;
+  const wantsSound = video.dataset.lsSoundWanted !== "1";
+  video.dataset.lsSoundWanted = wantsSound ? "1" : "0";
+  video.volume = 1;
+  const frameReady = video.closest(".feed-embed-frame")?.classList.contains("ls-video-frame-ready");
+  video.muted = !(wantsSound && frameReady);
+  button.classList.toggle("is-on", wantsSound);
+  button.querySelector("span").textContent = wantsSound ? "🔊" : "🔇";
+  button.querySelector("b").textContent = wantsSound ? "SONIDO ACTIVO" : "ACTIVAR SONIDO";
+  if (wantsSound) video.play().catch(() => {});
+}
+
+function setupOneVideoScroll(container) {
+  if (!container || container.dataset.oneVideoScroll === "1") return;
+  container.dataset.oneVideoScroll = "1";
+  let startIndex = 0, startY = 0, settling = false;
+  const items = () => Array.from(container.children).filter(el => el.classList.contains("feed-item"));
+  const nearestIndex = () => {
+    const rows = items();
+    let best = 0, distance = Infinity;
+    rows.forEach((row,index) => {
+      const d = Math.abs(row.offsetTop - container.scrollTop);
+      if (d < distance) { distance = d; best = index; }
+    });
+    return best;
+  };
+  const go = index => {
+    const rows = items();
+    const target = rows[Math.max(0,Math.min(rows.length - 1,index))];
+    if (!target) return;
+    settling = true;
+    container.scrollTo({ top:target.offsetTop, behavior:"smooth" });
+    setTimeout(() => { settling = false; }, 420);
+  };
+  container.addEventListener("touchstart", event => {
+    startIndex = nearestIndex();
+    startY = event.touches[0]?.clientY || 0;
+  }, { passive:true });
+  container.addEventListener("touchend", event => {
+    const endY = event.changedTouches[0]?.clientY || startY;
+    const delta = startY - endY;
+    if (Math.abs(delta) < 34) return go(startIndex);
+    requestAnimationFrame(() => go(startIndex + (delta > 0 ? 1 : -1)));
+  }, { passive:true });
+  container.addEventListener("wheel", event => {
+    if (settling || Math.abs(event.deltaY) < 8) return;
+    event.preventDefault();
+    go(nearestIndex() + (event.deltaY > 0 ? 1 : -1));
+  }, { passive:false });
+}
+
+function showToast(msg, type = "") {
+  ensureModernToastStyles();
+  const wrap = document.getElementById("toastWrap");
+  if (!wrap) return;
+  const message = String(msg || "Aviso");
+  const normalized = String(type || "").toLowerCase();
+  const isError = normalized === "error" || /no se pudo|error|cancelad|bloquead/i.test(message);
+  const isSuccess = normalized === "success" || /✓|listo|publicad|actualizad|guardad|activad|enviad|copiad|restaurad/i.test(message);
+  const kind = isError ? "error" : (isSuccess ? "success" : "info");
+  const meta = {
+    error:{ icon:"!", title:"Revisá esto" },
+    success:{ icon:"✓", title:"Todo listo" },
+    info:{ icon:"i", title:"LiveScroll" }
+  }[kind];
+  const t = document.createElement("div");
+  t.className = `ls-modern-toast is-${kind}`;
+  t.setAttribute("role", kind === "error" ? "alert" : "status");
+  t.innerHTML = `<span class="ls-toast-icon" aria-hidden="true">${meta.icon}</span><span class="ls-toast-copy"><strong class="ls-toast-title">${meta.title}</strong><span class="ls-toast-message"></span></span>`;
+  t.querySelector(".ls-toast-message").textContent = message;
+  wrap.appendChild(t);
+  while (wrap.children.length > 3) wrap.firstElementChild?.remove();
+  const removeToast = () => {
+    if (!t.isConnected) return;
+    t.classList.add("is-leaving");
+    setTimeout(() => t.remove(), 240);
+  };
+  t.addEventListener("click", removeToast, { once:true });
+  setTimeout(removeToast, kind === "error" ? 4200 : 3000);
+}
+
+// ============================================================
+// FEED — ver videos de otros y ganar puntos por minuto
+// ============================================================
+function ensureFeedExperience592Styles() {
+  if (document.getElementById("lsFeedExperience592Styles")) return;
+  const style = document.createElement("style");
+  style.id = "lsFeedExperience592Styles";
+  style.textContent = `
+    html:not(.ls-legacy) .feed-item {
+      background:
+        radial-gradient(circle at 50% 34%,rgba(56,221,242,.055),transparent 46%),
+        transparent;
+    }
+
+    html:not(.ls-legacy) .feed-phone {
+      border:1px solid rgba(56,221,242,.19) !important;
+      background:#020608;
+      box-shadow:
+        0 26px 76px rgba(0,0,0,.48),
+        0 0 0 1px rgba(46,242,124,.035),
+        0 0 46px rgba(56,221,242,.055) !important;
+    }
+
+    html:not(.ls-legacy) .feed-phone::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      z-index:3;
+      pointer-events:none;
+      border-radius:inherit;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+    }
+
+    html:not(.ls-legacy) .feed-overlay {
+      min-height:154px;
+      padding:50px 76px 22px 18px;
+      background:linear-gradient(180deg,transparent 0%,rgba(1,5,7,.18) 18%,rgba(2,7,10,.92) 74%,rgba(2,7,10,.985) 100%);
+      gap:10px;
+      pointer-events:none;
+    }
+
+    html:not(.ls-legacy) .feed-overlay > div:first-child {
+      min-width:0;
+      max-width:100%;
+      pointer-events:auto;
+    }
+
+    html:not(.ls-legacy) .feed-overlay .title {
+      max-width:100%;
+      margin:0 0 8px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      font-family:'Space Grotesk',sans-serif;
+      font-size:17px;
+      font-weight:700;
+      line-height:1.22;
+      letter-spacing:-.025em;
+      color:#fff;
+      text-shadow:0 2px 14px rgba(0,0,0,.7);
+    }
+
+    html:not(.ls-legacy) .feed-overlay .author {
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex-wrap:wrap;
+      width:max-content;
+      max-width:100%;
+      color:rgba(244,251,252,.78);
+      font-size:11px;
+      font-weight:650;
+    }
+
+    html:not(.ls-legacy) .feed-platform-chip {
+      display:inline-flex;
+      align-items:center;
+      min-height:20px;
+      padding:3px 7px;
+      border:1px solid rgba(56,221,242,.19);
+      border-radius:999px;
+      background:rgba(56,221,242,.075);
+      color:#8beaf5;
+      font:700 8px 'JetBrains Mono',monospace;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    html:not(.ls-legacy) .feed-overlay .live-pts {
+      position:absolute;
+      right:14px;
+      bottom:24px;
+      min-width:48px;
+      padding:6px 8px;
+      border:1px solid rgba(46,242,124,.22);
+      border-radius:999px;
+      background:rgba(6,24,17,.72);
+      color:var(--gold);
+      text-align:center;
+      box-shadow:0 8px 22px rgba(0,0,0,.20);
+      backdrop-filter:blur(8px);
+    }
+
+    html:not(.ls-legacy) .feed-actions {
+      right:12px !important;
+      bottom:112px !important;
+      gap:10px;
+      z-index:14;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn {
+      position:relative;
+      width:46px;
+      height:46px;
+      border:1px solid rgba(255,255,255,.15);
+      background:linear-gradient(145deg,rgba(13,32,40,.82),rgba(4,12,16,.72));
+      color:#fff;
+      box-shadow:0 10px 26px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07);
+      backdrop-filter:blur(12px) saturate(130%);
+      -webkit-backdrop-filter:blur(12px) saturate(130%);
+      transition:transform .16s ease,border-color .16s ease,background .16s ease,box-shadow .16s ease;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:hover {
+      transform:translateY(-2px) scale(1.03);
+      border-color:rgba(56,221,242,.38);
+      background:linear-gradient(145deg,rgba(18,48,58,.92),rgba(6,21,27,.86));
+      box-shadow:0 13px 30px rgba(0,0,0,.34),0 0 18px rgba(56,221,242,.08);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:active {
+      transform:scale(.92);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn.liked {
+      border-color:rgba(248,113,113,.45);
+      background:linear-gradient(145deg,rgba(248,113,113,.30),rgba(80,16,28,.72));
+      box-shadow:0 10px 28px rgba(248,113,113,.12),inset 0 1px 0 rgba(255,255,255,.08);
+    }
+
+    html:not(.ls-legacy) .feed-action-btn::after {
+      content:attr(data-label);
+      position:absolute;
+      right:54px;
+      top:50%;
+      transform:translateY(-50%) translateX(5px);
+      padding:5px 8px;
+      border:1px solid rgba(56,221,242,.16);
+      border-radius:8px;
+      background:rgba(4,13,17,.9);
+      color:rgba(255,255,255,.78);
+      font:700 8px 'JetBrains Mono',monospace;
+      letter-spacing:.04em;
+      white-space:nowrap;
+      opacity:0;
+      pointer-events:none;
+      transition:opacity .15s ease,transform .15s ease;
+    }
+
+    html:not(.ls-legacy) .feed-action-btn:hover::after {
+      opacity:1;
+      transform:translateY(-50%) translateX(0);
+    }
+
+    html:not(.ls-legacy) .feed-nudge {
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(4,13,17,.58);
+      color:rgba(255,255,255,.66);
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+      backdrop-filter:blur(8px);
+    }
+
+    html.ls-legacy .feed-action-btn {
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.58);
+      box-shadow:none;
+      backdrop-filter:none;
+    }
+
+    html.ls-legacy .feed-action-btn::after {
+      display:none;
+    }
+
+    @media(max-width:700px) {
+      html:not(.ls-legacy) #feedVertical .feed-overlay,
+      html:not(.ls-legacy) #profileFeedVertical .feed-overlay,
+      html:not(.ls-legacy) #foryouList .feed-overlay {
+        left:0 !important;
+        right:0 !important;
+        bottom:0 !important;
+        padding:52px 76px max(22px,env(safe-area-inset-bottom)) 16px !important;
+      }
+
+      html:not(.ls-legacy) .feed-item.ls-upload-feed-item .feed-overlay {
+        bottom:52px !important;
+      }
+
+      html:not(.ls-legacy) #feedVertical .feed-actions,
+      html:not(.ls-legacy) #profileFeedVertical .feed-actions,
+      html:not(.ls-legacy) #foryouList .feed-actions {
+        right:10px !important;
+        bottom:112px !important;
+      }
+
+      html:not(.ls-legacy) .feed-item.ls-upload-feed-item .feed-actions {
+        bottom:164px !important;
+      }
+
+      html:not(.ls-legacy) .feed-action-btn {
+        width:44px;
+        height:44px;
+      }
+
+      html:not(.ls-legacy) .feed-action-btn::after {
+        display:none;
+      }
+
+      html:not(.ls-legacy) .feed-overlay .title {
+        font-size:16px;
+      }
+
+      html:not(.ls-legacy) .feed-overlay .live-pts {
+        right:13px;
+        bottom:max(22px,env(safe-area-inset-bottom));
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function renderFeed(renderToken = lsTabRenderToken) {
+  ensureFeedExperience592Styles();
+  const main = document.getElementById("appView");
+  if (!main) return;
+
+  main.innerHTML = `
+    <div id="loginStreakBannerWrap" class="login-streak-banner-float"></div>
+    <div id="lsDailyChallengeWrap"></div>
+    <div id="lsGenerationFeedFilterWrap">${renderGenerationFeedFilter()}</div>
+    <div id="feedList">${renderFastSkeleton(7, "feed")}</div>`;
+  loadGenerationWeeklyPulse();
+  checkAndShowLoginStreak();
+  loadDailyChallenges();
+
+  const feedResult = await loadFeedVideosCached();
+  let videos = feedResult?.data || [];
+  const error = feedResult?.error;
+
+  // La preferencia "No me interesa" es privada y nunca borra el video.
+  if (currentUser?.id && videos.length) {
+    const { data:hiddenRows } = await sb
+      .from("user_hidden_videos")
+      .select("video_id")
+      .eq("user_id", currentUser.id)
+      .in("video_id", videos.map(v => v.id));
+    const hiddenIds = new Set((hiddenRows || []).map(row => row.video_id));
+    videos = videos.filter(video => !hiddenIds.has(video.id));
+  }
+
+  if (lsGenerationFeedFilter !== "all") {
+    videos = videos.filter(video => video.client_origin === lsGenerationFeedFilter);
+  }
+
+  // Si el usuario ya tocó otra pestaña, esta respuesta vieja no pisa la nueva vista.
+  if (renderToken !== lsTabRenderToken || currentTab !== "feed") return;
+
+  const list = document.getElementById("feedList");
+  if (!list) return;
+  if (error) { list.textContent = "Error cargando videos: " + error.message; return; }
+  if (!videos.length) {
+    list.innerHTML = `<div style="padding:40px 0; text-align:center;">
+      <h1 class="page-title">${lsGenerationFeedFilter === "all" ? "Mirá y ganá" : `Generación ${lsGenerationFeedFilter.toUpperCase()}`}</h1>
+      <p style="color:var(--text-dim)">${lsGenerationFeedFilter === "all" ? "Todavía no hay videos de otros usuarios. ¡Subí el primero!" : "Todavía no hay publicaciones nuevas de esta generación."}</p>
+    </div>`;
+    return;
+  }
+
+  const { data: myLikes } = await sb
+    .from("video_likes")
+    .select("video_id")
+    .eq("user_id", currentUser.id)
+    .in("video_id", videos.map(v => v.id));
+  const likedSet = new Set((myLikes || []).map(l => l.video_id));
+
+  list.innerHTML = `
+    <div class="feed-vertical" id="feedVertical">
+      ${videos.map((v, i) => {
+        const isMine = v.user_id === currentUser.id;
+        return `
+        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}" style="content-visibility:auto;contain-intrinsic-size:1px var(--ls-mobile-feed-height,720px);">
+          <div class="feed-phone">
+            <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
+            ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
+            <div class="feed-actions">
+              <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+              <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
+              ${renderRuntimeShareButton(v)}
+              ${!isMine ? renderRuntimeHideButton(v.id) : ""}
+              ${!isMine ? renderRuntimeReportButton(v.id) : ""}
+            </div>
+            <div class="feed-overlay">
+              <div>
+                <div class="title">${escapeHtml(v.title)}</div>
+                ${renderVideoHashtags(v)}
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles?.username || "")}')"><span>@${escapeHtml(v.profiles?.username || "usuario")}</span> ${getPlanBadgeHtml(v.profiles?.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+              </div>
+              <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
+            </div>
+            ${i === 0 ? `<div class="feed-nudge">Deslizá hacia arriba para el siguiente ↑</div>` : ""}
+          </div>
+        </div>`;
+      }).join("")}
+    </div>`;
+
+  setupFeedObserver(videos);
+  setupDoubleTapLike();
+  fitMobileFeedViewport("feedVertical");
+  setupPullToRefresh(renderFeed);
+  setupSwipeNavigation("feed", { left: "foryou" });
+}
+
+
+let lsFeedViewportResizeBound = false;
+
+function fitMobileFeedViewport(containerId = "feedVertical") {
+  if (window.innerWidth > 700) return;
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  setupOneVideoScroll(container);
+
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const top = Math.max(0, container.getBoundingClientRect().top);
+
+  // Si el dock movil esta visible, el feed termina justo encima para que
+  // los controles nativos del MP4 (sonido, progreso y pantalla completa)
+  // nunca queden tapados. En un modal el dock ya queda por detras.
+  const dock = document.getElementById("lsMobileDock");
+  const feedIsInsideModal = !!container.closest("#globalModalWrap, .modal-overlay");
+  const dockIsVisible = !!(
+    dock &&
+    !feedIsInsideModal &&
+    window.getComputedStyle(dock).display !== "none"
+  );
+  const safeBottom = dockIsVisible
+    ? Math.ceil(dock.getBoundingClientRect().height + 20)
+    : 8;
+  const usable = Math.max(430, Math.floor(viewportHeight - top - safeBottom));
+
+  container.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
+  document.documentElement.style.setProperty("--ls-mobile-feed-height", `${usable}px`);
+
+  if (!lsFeedViewportResizeBound) {
+    lsFeedViewportResizeBound = true;
+
+    const refresh = () => {
+      const active =
+        document.getElementById("profileFeedVertical") ||
+        document.getElementById("feedVertical") ||
+        document.querySelector("#foryouList .feed-vertical");
+
+      if (active) fitMobileFeedViewport(active.id || "feedVertical");
+    };
+
+    window.addEventListener("resize", refresh, { passive:true });
+    window.visualViewport?.addEventListener("resize", refresh, { passive:true });
+  }
+}
+
+function setupPullToRefresh(refreshFn) {
+  const container = document.getElementById("feedVertical");
+  if (!container) return;
+
+  let startY = 0, pulling = false, indicator = null;
+
+  container.addEventListener("touchstart", (e) => {
+    pulling = container.scrollTop <= 0;
+    startY = e.touches[0].clientY;
+  }, { passive: true });
+
+  container.addEventListener("touchmove", (e) => {
+    if (!pulling || container.scrollTop > 0) return;
+    const deltaY = e.touches[0].clientY - startY;
+    if (deltaY <= 0) return;
+
+    if (!indicator) {
+      indicator = document.createElement("div");
+      indicator.id = "pullRefreshIndicator";
+      indicator.style.cssText = "position:absolute; top:0; left:0; right:0; text-align:center; padding:14px; color:var(--gold); font-size:13px; z-index:15;";
+      container.style.position = "relative";
+      container.prepend(indicator);
+    }
+    const pull = Math.min(deltaY, 100);
+    indicator.style.transform = `translateY(${pull}px)`;
+    indicator.textContent = pull > 70 ? "🔄 Soltá para actualizar" : "⬇️ Deslizá para actualizar";
+    indicator.dataset.pull = pull;
+  }, { passive: true });
+
+  container.addEventListener("touchend", () => {
+    if (!pulling) return;
+    pulling = false;
+    if (!indicator) return;
+    const pullAmount = parseInt(indicator.dataset.pull || 0, 10);
+    indicator.remove();
+    indicator = null;
+    if (pullAmount > 70) {
+      showToast("Actualizando...");
+      refreshFn();
+    }
+  }, { passive: true });
+}
+
+function setupDoubleTapLike() {
+  document.querySelectorAll(".dbltap-like-zone").forEach(zone => {
+    let lastTap = 0;
+    zone.addEventListener("touchend", () => {
+      const now = Date.now();
+      if (now - lastTap < 350) {
+        const videoId = zone.dataset.videoId;
+        handleLike(videoId);
+        showHeartPop(zone);
+      }
+      lastTap = now;
+    });
+  });
+}
+
+function showHeartPop(container) {
+  const heart = document.createElement("div");
+  heart.textContent = "❤️";
+  heart.style.cssText = "position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:70px; z-index:20; pointer-events:none; animation:heartPop 0.6s ease forwards;";
+  container.style.position = "relative";
+  container.appendChild(heart);
+  setTimeout(() => heart.remove(), 600);
+}
+
+function setupSwipeNavigation(fromTab, targets) {
+  const container = document.getElementById("feedVertical");
+  if (!container) return;
+
+  let startX = 0, startY = 0, tracking = false;
+
+  container.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+
+  container.addEventListener("touchend", (e) => {
+    if (!tracking) return;
+    tracking = false;
+    const deltaX = e.changedTouches[0].clientX - startX;
+    const deltaY = e.changedTouches[0].clientY - startY;
+
+    if (Math.abs(deltaX) < 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return; // no fue un swipe lateral claro
+
+    if (deltaX < 0 && targets.left) { switchTab(targets.left); }
+    else if (deltaX > 0 && targets.right) { switchTab(targets.right); }
+  }, { passive: true });
+}
+
+function preloadFeedVideo(video) {
+  if (!video || loadedEmbeds.has(video.id)) return;
+  const el = document.getElementById(`embed-${video.id}`);
+  if (!el || video.platform !== "upload" || !isSafeUrl(video.video_url)) return;
+
+  const saveData = navigator.connection?.saveData === true;
+  const slowNetwork = ["slow-2g", "2g"].includes(navigator.connection?.effectiveType);
+  const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
+
+  if (saveData || slowNetwork || isLegacyMode) return;
+
+  el.innerHTML = `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%;height:100%;position:relative;">
+    <video src="${escapeHtml(video.video_url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;"></video>
+    <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
+  </div>`;
+  loadedEmbeds.add(video.id);
+}
+
+function activateLoadedEmbed(video) {
+  if (!video) return;
+  const player = document.querySelector(`#embed-${video.id} video`);
+  if (!player) return;
+
+  // Cada activación recibe un identificador. Así una respuesta de carga antigua
+  // nunca puede volver a reproducir audio cuando la tarjeta ya salió de pantalla.
+  const requestId = String((Number(player.dataset.lsPlaybackRequest || 0) + 1));
+  player.dataset.lsPlaybackRequest = requestId;
+  player.dataset.lsPlaybackWanted = "1";
+  player.autoplay = true;
+
+  const isStillActive = () =>
+    player.isConnected &&
+    player.dataset.lsPlaybackWanted === "1" &&
+    player.dataset.lsPlaybackRequest === requestId &&
+    player.closest(".feed-item")?.classList.contains("ls-feed-active");
+
+  const markDecodedFrame = () => {
+    if (!isStillActive()) return;
+    const frame = player.closest(".feed-embed-frame");
+    frame?.classList.add("ls-video-frame-ready");
+    frame?.classList.remove("ls-video-frame-buffering");
+    if (player.dataset.lsSoundWanted === "1") player.muted = false;
+  };
+
+  const startPlayback = () => {
+    if (!isStillActive()) return;
+    const frame = player.closest(".feed-embed-frame");
+    frame?.classList.add("ls-video-frame-buffering");
+    frame?.classList.remove("ls-video-frame-ready");
+    // El audio espera al primer cuadro decodificado para no sonar sobre una
+    // pantalla negra. La preferencia del usuario se conserva en el dataset.
+    player.muted = true;
+
+    player.play()
+      .then(() => {
+        if (!isStillActive()) {
+          try { player.pause(); } catch (_) {}
+          return;
+        }
+        if (typeof player.requestVideoFrameCallback === "function") {
+          player.requestVideoFrameCallback(markDecodedFrame);
+        } else {
+          // WebViews antiguos no confirman el cuadro decodificado. Dejamos
+          // pasar dos repintados y un margen corto antes de devolver el sonido.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => setTimeout(markDecodedFrame, 90));
+          });
+        }
+      })
+      .catch(() => frame?.classList.remove("ls-video-frame-buffering"));
+  };
+
+  if (player.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) startPlayback();
+  else player.addEventListener("loadeddata", startPlayback, { once:true });
+}
+
+function pauseFeedMedia(videoId = null) {
+  const selector = videoId
+    ? `#embed-${videoId} video, #embed-${videoId} audio`
+    : ".feed-item video, .feed-item audio";
+
+  document.querySelectorAll(selector).forEach(media => {
+    media.dataset.lsPlaybackWanted = "0";
+    media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+    media.autoplay = false;
+    media.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
+    try { media.pause(); } catch (_) {}
+  });
+}
+
+function pauseAllFeedMediaExcept(videoId) {
+  document.querySelectorAll(".feed-item video, .feed-item audio").forEach(media => {
+    const host = media.closest("[id^='embed-']");
+    const hostId = host?.id?.replace("embed-", "");
+    if (String(hostId) !== String(videoId)) {
+      media.dataset.lsPlaybackWanted = "0";
+      media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+      media.autoplay = false;
+      media.closest(".feed-embed-frame")?.classList.remove("ls-video-frame-buffering");
+      try { media.pause(); } catch (_) {}
+    }
+  });
+}
+
+function releaseFeedMediaElement(el) {
+  if (!el) return;
+
+  el.querySelectorAll("video, audio").forEach(media => {
+    media.dataset.lsPlaybackWanted = "0";
+    media.dataset.lsPlaybackRequest = String(Number(media.dataset.lsPlaybackRequest || 0) + 1);
+    media.autoplay = false;
+    try { media.pause(); } catch (_) {}
+    try {
+      media.removeAttribute("src");
+      media.load();
+    } catch (_) {}
+  });
+
+  el.querySelectorAll("iframe").forEach(frame => {
+    try { frame.src = "about:blank"; } catch (_) {}
+  });
+}
+
+function setupFeedObserver(videos) {
+  const videoMap = Object.fromEntries(videos.map(v => [String(v.id), v]));
+  const orderedIds = videos.map(v => String(v.id));
+  loadedEmbeds.clear();
+
+  const keepWarmAround = (videoId) => {
+    const idx = orderedIds.indexOf(String(videoId));
+    if (idx < 0) return;
+    const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
+    const keep = new Set((isLegacyMode
+      ? [orderedIds[idx]]
+      : [orderedIds[idx], orderedIds[idx + 1]]).filter(Boolean));
+    const nextId = orderedIds[idx + 1];
+    if (!isLegacyMode && nextId && videoMap[nextId]) preloadFeedVideo(videoMap[nextId]);
+
+    Array.from(loadedEmbeds).forEach(id => {
+      if (!keep.has(String(id))) unloadEmbed(id, videoMap[String(id)]);
+    });
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const videoId = String(entry.target.dataset.videoId);
+      if (entry.isIntersecting && entry.intersectionRatio > 0.58) {
+        entry.target.classList.add("ls-feed-active");
+        pauseAllFeedMediaExcept(videoId);
+        loadEmbed(videoMap[videoId]);
+        activateLoadedEmbed(videoMap[videoId]);
+        keepWarmAround(videoId);
+        startWatching(videoMap[videoId]);
+      } else if (entry.intersectionRatio < 0.25) {
+        entry.target.classList.remove("ls-feed-active");
+        pauseFeedMedia(videoId);
+        stopWatching(videoId);
+      }
+    });
+  }, {
+    threshold:[0,.25,.58,1],
+    rootMargin:document.documentElement.classList.contains("ls-legacy") ? "4% 0px" : "12% 0px"
+  });
+
+  document.querySelectorAll(".feed-item").forEach(el => observer.observe(el));
+  feedObserverInstance = observer;
+
+  if (videos[0]) {
+    loadEmbed(videos[0]);
+    activateLoadedEmbed(videos[0]);
+    if (!document.documentElement.classList.contains("ls-legacy") && videos[1]) preloadFeedVideo(videos[1]);
+  }
+}
+
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (e) {
+    return false;
+  }
+}
+
+function getEmbedPlaceholderHtml(video) {
+  const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣", youtube: "🔴", upload: "🎬" };
+  const thumb = (video.platform === "youtube" || video.platform === "upload") ? getThumbnailHtml(video) : "";
+
+  if (video.platform === "upload" && thumb.startsWith("<video")) {
+    return `<div class="feed-fallback" style="position:relative;overflow:hidden;">
+      ${thumb
+        .replace('preload="metadata"', 'preload="none"')
+        .replace("<video ", `<video style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.7;pointer-events:none;" `)}
+      <div class="platform-icon" style="position:relative;z-index:2;">▶️</div>
+    </div>`;
+  }
+
+  return `<div class="feed-fallback">
+    ${thumb && thumb.startsWith("<img") ? thumb.replace(/alt="[^"]*"/, 'alt="miniatura"').replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;opacity:0.55;" `) : ""}
+    <div class="platform-icon" style="position:relative;">${icons[video.platform] || "▶️"}</div>
+  </div>`;
+}
+
+function loadEmbed(video) {
+  if (!video || loadedEmbeds.has(video.id)) return;
+  const el = document.getElementById(`embed-${video.id}`);
+  if (!el) return;
+  el.innerHTML = getEmbedHtml(video);
+  loadedEmbeds.add(video.id);
+}
+
+function unloadEmbed(videoId, video) {
+  if (!loadedEmbeds.has(videoId)) return;
+  const el = document.getElementById(`embed-${videoId}`);
+  if (!el) return;
+
+  releaseFeedMediaElement(el);
+  el.innerHTML = video ? getEmbedPlaceholderHtml(video) : "";
+  loadedEmbeds.delete(videoId);
+}
+
+function getEmbedHtml(video) {
+  const url = video.video_url;
+  if (!isSafeUrl(url)) {
+    return `<div class="feed-fallback"><p>Link de video inválido.</p></div>`;
+  }
+  if (video.platform === "upload") {
+    const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
+    return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%; position:relative;">
+      <video src="${escapeHtml(url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;"></video>
+      <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
+    </div>`;
+  }
+  if (video.platform === "youtube") {
+    const id = extractYoutubeId(url);
+    if (id) return `<iframe src="https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&mute=1&playsinline=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+  }
+  if (video.platform === "twitch") {
+    const twitch = extractTwitchVideo(url);
+    if (twitch?.type === "clip") return `<iframe src="https://clips.twitch.tv/embed?clip=${encodeURIComponent(twitch.id)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true&muted=true" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+    if (twitch?.type === "video") return `<iframe src="https://player.twitch.tv/?video=v${encodeURIComponent(twitch.id)}&parent=${encodeURIComponent(location.hostname)}&autoplay=true&muted=true" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  }
+  if (video.platform === "kick") {
+    return getExternalVideoCard("kick", url, "Kick protege algunos videos contra la reproducción externa.");
+  }
+  if (video.platform === "tiktok") {
+    const id = extractTikTokVideoId(url);
+    if (id) return `<iframe src="https://www.tiktok.com/player/v1/${encodeURIComponent(id)}?autoplay=1&loop=1" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  }
+  if (["kick", "twitch", "tiktok"].includes(video.platform)) {
+    return getExternalVideoCard(video.platform, url, `Este enlace se reproduce directamente en ${video.platform === "tiktok" ? "TikTok" : video.platform === "twitch" ? "Twitch" : "Kick"}.`);
+  }
+  const icons = { tiktok: "🎵", kick: "🟢", twitch: "🟣" };
+  return `<div class="feed-fallback">
+    <div class="platform-icon">${icons[video.platform] || "▶️"}</div>
+    <p>Este video se ve mejor en ${escapeHtml(video.platform)}</p>
+    <a class="btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir y mirar ahí</a>
+  </div>`;
+}
+
+function extractTwitchVideo(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "clips.twitch.tv") {
+      const id = parsed.pathname.split("/").filter(Boolean)[0] || "";
+      return /^[A-Za-z0-9_-]+$/.test(id) ? { type:"clip", id } : null;
+    }
+    if (host !== "twitch.tv" && host !== "m.twitch.tv") return null;
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if (parts[0] === "videos" && /^\d+$/.test(parts[1] || "")) return { type:"video", id:parts[1] };
+    const clipIndex = parts.indexOf("clip");
+    if (clipIndex >= 0 && /^[A-Za-z0-9_-]+$/.test(parts[clipIndex + 1] || "")) return { type:"clip", id:parts[clipIndex + 1] };
+  } catch (_) {}
+  return null;
+}
+
+function extractTikTokVideoId(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)tiktok\.com$/i.test(parsed.hostname)) return null;
+    const match = parsed.pathname.match(/\/video\/(\d{8,30})/);
+    return match ? match[1] : null;
+  } catch (_) { return null; }
+}
+
+function ensureExternalVideoCardStyles() {
+  if (document.getElementById("lsExternalVideoCardStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsExternalVideoCardStyles";
+  style.textContent = `
+    .ls-external-video-card{--platform:#53fc18;position:relative!important;isolation:isolate;overflow:hidden!important;display:flex!important;align-items:flex-start!important;justify-content:flex-end!important;gap:0!important;padding:24px 22px 28px!important;text-align:left!important;background:radial-gradient(circle at 18% 14%,color-mix(in srgb,var(--platform) 22%,transparent),transparent 38%),linear-gradient(155deg,#111720 0%,#070a0e 58%,#020304 100%)!important}
+    .ls-external-video-card[data-platform="twitch"]{--platform:#9146ff}.ls-external-video-card[data-platform="tiktok"]{--platform:#25f4ee}.ls-external-video-card::before{content:"";position:absolute;z-index:-1;width:68%;aspect-ratio:1;left:-22%;top:-24%;border:1px solid color-mix(in srgb,var(--platform) 38%,transparent);border-radius:50%;box-shadow:0 0 80px color-mix(in srgb,var(--platform) 12%,transparent);animation:lsExternalOrbit 9s linear infinite}.ls-external-video-card::after{content:"";position:absolute;z-index:-1;inset:-45% -70%;background:linear-gradient(110deg,transparent 43%,color-mix(in srgb,var(--platform) 13%,transparent) 50%,transparent 57%);animation:lsExternalScan 3.8s ease-in-out infinite}
+    .ls-external-brand{display:grid;grid-template-columns:52px minmax(0,1fr);align-items:center;gap:13px;width:100%;margin:auto 0 18px}.ls-external-brand-logo{width:52px;height:52px;padding:12px;border:1px solid color-mix(in srgb,var(--platform) 50%,transparent);border-radius:16px;background:rgba(0,0,0,.42);box-shadow:0 12px 30px rgba(0,0,0,.34),0 0 22px color-mix(in srgb,var(--platform) 15%,transparent)}.ls-external-brand-logo img{display:block;width:100%;height:100%;object-fit:contain}.ls-external-brand-copy{min-width:0}.ls-external-brand-copy small{display:block;margin-bottom:5px;color:var(--platform);font:900 8px 'JetBrains Mono',monospace;letter-spacing:.16em}.ls-external-brand-copy strong{display:block;color:#fff;font-size:21px;line-height:1.05}.ls-external-brand-copy span{display:block;margin-top:6px;color:#aab4c2;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ls-external-video-card .ls-external-reason{max-width:330px;margin:0 0 16px!important;color:#c1c8d1!important;font-size:11px!important;line-height:1.5}.ls-external-open{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:44px;padding:11px 14px;border:1px solid color-mix(in srgb,var(--platform) 58%,transparent);border-radius:13px;background:color-mix(in srgb,var(--platform) 16%,rgba(0,0,0,.7));color:#fff!important;text-decoration:none;font-size:12px;font-weight:900;box-shadow:0 10px 26px rgba(0,0,0,.28);transition:transform .18s ease,background .18s ease}.ls-external-open:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--platform) 25%,rgba(0,0,0,.7))}.ls-external-open b{color:var(--platform);font-size:17px}
+    @keyframes lsExternalOrbit{to{transform:rotate(360deg)}}@keyframes lsExternalScan{0%,20%{transform:translateX(-30%)}80%,100%{transform:translateX(30%)}}
+    .ls-legacy .ls-external-video-card::before,.ls-legacy .ls-external-video-card::after{animation:none!important;display:none}.ls-legacy .ls-external-video-card{background:#10151c!important}
+    @media (prefers-reduced-motion:reduce){.ls-external-video-card::before,.ls-external-video-card::after{animation:none!important}}
+  `;
+  document.head.appendChild(style);
+}
+
+function getExternalVideoIdentity(platform, url) {
+  const config = {
+    kick:{ label:"Kick", brand:"kick", color:"53FC18" },
+    twitch:{ label:"Twitch", brand:"twitch", color:"9146FF" },
+    tiktok:{ label:"TikTok", brand:"tiktok", color:"FFFFFF" }
+  }[platform] || { label:"Plataforma", brand:"playstation", color:"FFFFFF" };
+  let handle = "Contenido externo";
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    const candidate = platform === "tiktok" && parts[0]?.startsWith("@") ? parts[0] : parts[0];
+    if (candidate && candidate.length <= 50) handle = candidate.startsWith("@") ? candidate : `@${candidate}`;
+  } catch (_) {}
+  return { ...config, handle };
+}
+
+function getExternalVideoCard(platform, url, reason = "") {
+  ensureExternalVideoCardStyles();
+  const identity = getExternalVideoIdentity(platform, url);
+  return `<div class="feed-fallback ls-external-video-card" data-platform="${escapeHtml(platform)}">
+    <div class="ls-external-brand">
+      <div class="ls-external-brand-logo"><img src="${getSocialBrandIconUrl(identity.brand,identity.color)}" alt="" loading="lazy" decoding="async"></div>
+      <div class="ls-external-brand-copy"><small>CONTENIDO EN ${identity.label.toUpperCase()}</small><strong>${identity.label}</strong><span>${escapeHtml(identity.handle)}</span></div>
+    </div>
+    ${reason ? `<p class="ls-external-reason">${escapeHtml(reason)}</p>` : ""}
+    <a class="ls-external-open" href="${escapeHtml(url)}" target="_blank" rel="noopener"><span>Abrir y reproducir</span><b>↗</b></a>
+  </div>`;
+}
+
+async function openSharedVideo(videoId) {
+  const { data: video } = await sb
+    .from("videos")
+    .select("*, profiles!videos_user_id_fkey(username, plan_id)")
+    .eq("id", videoId)
+    .single();
+  if (!video) return;
+
+  openProfileVideoFeed([video], video.id, { username: video.profiles?.username || "usuario", plan_id: video.profiles?.plan_id });
+}
+
+async function openProfileVideoFeed(videos, startVideoId, authorInfo) {
+  const { data: myLikes } = await sb
+    .from("video_likes")
+    .select("video_id")
+    .eq("user_id", currentUser.id)
+    .in("video_id", videos.map(v => v.id));
+  const likedSet = new Set((myLikes || []).map(l => l.video_id));
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div id="profileFeedOverlay" style="position:fixed; inset:0; background:var(--ink); z-index:150;">
+      <button onclick="closeProfileVideoFeed()" style="position:absolute; top:max(14px, env(safe-area-inset-top)); right:14px; z-index:20; background:rgba(0,0,0,0.55); border:none; color:#fff; width:36px; height:36px; border-radius:50%; font-size:18px; cursor:pointer;">✕</button>
+      <div class="feed-vertical" id="profileFeedVertical" style="height:100dvh; margin:0;">
+        ${videos.map((v) => {
+          const isMine = v.user_id === currentUser.id;
+          return `
+          <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}" style="content-visibility:auto;contain-intrinsic-size:1px var(--ls-mobile-feed-height,720px);">
+            <div class="feed-phone">
+              <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
+              ${isMine ? `<div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">Tu video · sin puntos</div>` : ""}
+              <div class="feed-actions">
+                <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+                <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
+                ${renderRuntimeShareButton(v)}
+                ${!isMine ? renderRuntimeReportButton(v.id) : ""}
+              </div>
+              <div class="feed-overlay">
+                <div>
+                  <div class="title">${escapeHtml(v.title)}</div>
+                  <div class="author"><span>@${escapeHtml(authorInfo.username)}</span> ${getPlanBadgeHtml(authorInfo.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+                </div>
+                <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>`;
+
+  setupFeedObserver(videos);
+  setupDoubleTapLike();
+  fitMobileFeedViewport("profileFeedVertical");
+
+  const container = document.getElementById("profileFeedVertical");
+  const startEl = document.querySelector(`#profileFeedVertical [data-video-id="${startVideoId}"]`);
+  if (container && startEl) container.scrollTop = startEl.offsetTop;
+}
+
+function closeProfileVideoFeed() {
+  clearAllWatchIntervals();
+  closeManagedModal();
+}
+
+function getGridCoverHtml(video) {
+  const thumb = getThumbnailHtml(video);
+
+  if (thumb.startsWith("<img")) {
+    return thumb.replace("<img ", `<img style="width:100%;height:100%;object-fit:cover;" `);
+  }
+
+  if (thumb.startsWith("<video")) {
+    return thumb;
+  }
+
+  return `<div class="grid-fallback">${thumb}</div>`;
+}
+
+let lsProfilePreviewObserver = null;
+let lsProfilePreviewQueue = [];
+let lsProfilePreviewBusy = false;
+
+function lsLoadNextProfilePreview() {
+  if (lsProfilePreviewBusy) return;
+  const cover = lsProfilePreviewQueue.shift();
+  if (!cover) return;
+  if (!cover.isConnected || cover.dataset.lsPreviewLoaded === "1") {
+    requestAnimationFrame(lsLoadNextProfilePreview);
+    return;
+  }
+
+  const video = cover.querySelector("video");
+  const src = cover.dataset.lsPreviewSrc;
+  if (!video || !src) {
+    requestAnimationFrame(lsLoadNextProfilePreview);
+    return;
+  }
+
+  lsProfilePreviewBusy = true;
+  cover.dataset.lsPreviewLoaded = "1";
+  video.preload = "metadata";
+  video.src = src;
+
+  let completed = false;
+  const finish = () => {
+    if (completed) return;
+    completed = true;
+    cover.classList.add("ls-preview-ready");
+    lsProfilePreviewBusy = false;
+    setTimeout(lsLoadNextProfilePreview, 90);
+  };
+  video.addEventListener("loadeddata", finish, { once:true });
+  video.addEventListener("error", finish, { once:true });
+  setTimeout(finish, 2200);
+  video.load();
+}
+
+function initLazyProfilePreviews() {
+  if (lsProfilePreviewObserver) lsProfilePreviewObserver.disconnect();
+  lsProfilePreviewQueue = [];
+  lsProfilePreviewBusy = false;
+  const covers = document.querySelectorAll(".ls-lazy-video-cover[data-ls-preview-src]");
+  document.querySelectorAll(".video-grid-tile > img").forEach((image, index) => {
+    image.decoding = "async";
+    if (index < 4) image.loading = "eager";
+    image.fetchPriority = index < 3 ? "high" : "low";
+  });
+  if (!covers.length) return;
+
+  if (!("IntersectionObserver" in window)) {
+    lsProfilePreviewQueue = Array.from(covers).slice(0, 6);
+    lsLoadNextProfilePreview();
+    return;
+  }
+
+  lsProfilePreviewObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      lsProfilePreviewObserver.unobserve(entry.target);
+      if (!lsProfilePreviewQueue.includes(entry.target)) lsProfilePreviewQueue.push(entry.target);
+    });
+    lsLoadNextProfilePreview();
+  }, { root:null, rootMargin:"220px 0px", threshold:0.01 });
+
+  covers.forEach(cover => lsProfilePreviewObserver.observe(cover));
+}
+
+function ensureModernMobileStyles() {
+  if (document.getElementById("livescrollModernMobileStyles")) return;
+
+  const style = document.createElement("style");
+  style.id = "livescrollModernMobileStyles";
+  style.textContent = `
+
+    /* Road to LiveScroll 6 — teaser único por cuenta */
+    .ls-road6-overlay {
+      position:fixed;
+      inset:0;
+      z-index:920;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:18px;
+      box-sizing:border-box;
+      background:
+        radial-gradient(circle at 50% 110%, rgba(250,204,21,.16), transparent 42%),
+        radial-gradient(circle at 18% 10%, rgba(125,211,252,.10), transparent 32%),
+        rgba(2,4,8,.94);
+      backdrop-filter:blur(14px);
+      animation:lsRoad6OverlayIn .55s ease both;
+    }
+
+    .ls-road6-card {
+      position:relative;
+      width:min(440px,100%);
+      overflow:hidden;
+      border-radius:24px;
+      border:1px solid rgba(250,204,21,.28);
+      background:linear-gradient(160deg, rgba(22,24,31,.98), rgba(7,9,13,.99) 64%);
+      box-shadow:0 30px 100px rgba(0,0,0,.72), 0 0 45px rgba(250,204,21,.08);
+      transform-origin:center;
+      animation:lsRoad6CardIn .85s cubic-bezier(.16,1,.3,1) both;
+    }
+
+    .ls-road6-card::before {
+      content:"";
+      position:absolute;
+      width:180px;
+      height:180px;
+      top:-95px;
+      right:-70px;
+      border-radius:50%;
+      background:rgba(250,204,21,.13);
+      filter:blur(12px);
+      animation:lsRoad6Glow 3s ease-in-out infinite;
+    }
+
+    .ls-road6-scan {
+      position:absolute;
+      inset:0;
+      pointer-events:none;
+      opacity:.24;
+      background:linear-gradient(110deg, transparent 20%, rgba(255,255,255,.12) 45%, transparent 70%);
+      transform:translateX(-120%);
+      animation:lsRoad6Scan 2.8s 1s ease-in-out infinite;
+    }
+
+    .ls-road6-content {
+      position:relative;
+      z-index:2;
+      padding:30px 24px 22px;
+      text-align:center;
+    }
+
+    .ls-road6-kicker {
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px;
+      letter-spacing:.20em;
+      color:var(--gold);
+      text-transform:uppercase;
+      opacity:0;
+      animation:lsRoad6Rise .55s .42s ease forwards;
+    }
+
+    .ls-road6-mark {
+      width:72px;
+      height:72px;
+      margin:18px auto 16px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:22px;
+      border:1px solid rgba(250,204,21,.30);
+      background:rgba(250,204,21,.07);
+      font-size:34px;
+      box-shadow:inset 0 0 25px rgba(250,204,21,.05);
+      opacity:0;
+      animation:lsRoad6Mark .7s .55s cubic-bezier(.16,1,.3,1) forwards;
+    }
+
+    .ls-road6-title {
+      margin:0;
+      font-size:clamp(25px,7vw,34px);
+      line-height:1.05;
+      letter-spacing:-.04em;
+      color:var(--text);
+      opacity:0;
+      animation:lsRoad6Rise .6s .68s ease forwards;
+    }
+
+    .ls-road6-copy {
+      max-width:350px;
+      margin:13px auto 0;
+      color:var(--text-dim);
+      font-size:13px;
+      line-height:1.55;
+      opacity:0;
+      animation:lsRoad6Rise .6s .82s ease forwards;
+    }
+
+    .ls-road6-signals {
+      display:grid;
+      grid-template-columns:repeat(4,1fr);
+      gap:7px;
+      margin:22px 0 18px;
+      opacity:0;
+      animation:lsRoad6Rise .6s .96s ease forwards;
+    }
+
+    .ls-road6-signal {
+      padding:10px 4px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.025);
+      font-size:9px;
+      color:var(--text-dim);
+    }
+
+    .ls-road6-signal b {
+      display:block;
+      margin-bottom:5px;
+      font-size:19px;
+      font-weight:400;
+    }
+
+    .ls-road6-road {
+      padding:12px 13px;
+      border-radius:13px;
+      border:1px solid rgba(250,204,21,.16);
+      background:rgba(250,204,21,.035);
+      font-family:'JetBrains Mono',monospace;
+      font-size:10px;
+      color:var(--gold);
+      line-height:1.5;
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.08s ease forwards;
+    }
+
+    .ls-road6-btn {
+      width:100%;
+      min-height:48px;
+      margin-top:18px;
+      border:0;
+      border-radius:13px;
+      cursor:pointer;
+      font-family:inherit;
+      font-weight:800;
+      color:#12130f;
+      background:linear-gradient(135deg, #fde047, #f59e0b);
+      box-shadow:0 10px 28px rgba(245,158,11,.15);
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.2s ease forwards;
+    }
+
+    .ls-road6-foot {
+      margin-top:11px;
+      font-size:9px;
+      color:var(--text-dim);
+      opacity:0;
+      animation:lsRoad6Rise .6s 1.32s ease forwards;
+    }
+
+    @keyframes lsRoad6OverlayIn {
+      from { opacity:0; }
+      to { opacity:1; }
+    }
+    @keyframes lsRoad6CardIn {
+      0% { opacity:0; transform:translateY(38px) scale(.92); filter:blur(8px); }
+      70% { opacity:1; transform:translateY(-3px) scale(1.01); filter:blur(0); }
+      100% { opacity:1; transform:none; filter:blur(0); }
+    }
+    @keyframes lsRoad6Rise {
+      from { opacity:0; transform:translateY(12px); }
+      to { opacity:1; transform:none; }
+    }
+    @keyframes lsRoad6Mark {
+      from { opacity:0; transform:scale(.55) rotate(-12deg); }
+      to { opacity:1; transform:none; }
+    }
+    @keyframes lsRoad6Glow {
+      0%,100% { opacity:.45; transform:scale(.9); }
+      50% { opacity:1; transform:scale(1.15); }
+    }
+    @keyframes lsRoad6Scan {
+      0%,55% { transform:translateX(-120%); }
+      85%,100% { transform:translateX(120%); }
+    }
+
+    @media (max-width:420px) {
+      .ls-road6-overlay { padding:10px; }
+      .ls-road6-content { padding:25px 17px 18px; }
+      .ls-road6-signals { gap:5px; }
+      .ls-road6-signal { font-size:8px; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-road6-overlay,
+      .ls-road6-card,
+      .ls-road6-card *,
+      .ls-road6-card::before {
+        animation:none !important;
+        opacity:1 !important;
+        transform:none !important;
+        filter:none !important;
+      }
+    }
+
+
+
+    /* NEXT ERA — carteles de versión 5.4.6 → 6.0.0 */
+    .ls-next-era-changelog {
+      position:fixed;
+      inset:0;
+      z-index:910;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      box-sizing:border-box;
+      background:
+        radial-gradient(circle at 50% 105%, rgba(250,204,21,.15), transparent 42%),
+        radial-gradient(circle at 12% 8%, rgba(125,211,252,.08), transparent 28%),
+        rgba(2,4,8,.95);
+      backdrop-filter:blur(13px);
+      animation:lsRoad6OverlayIn .45s ease both;
+    }
+    .ls-next-era-box {
+      position:relative;
+      width:min(455px,100%);
+      max-height:90vh;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      border-radius:24px;
+      border:1px solid rgba(250,204,21,.27);
+      background:linear-gradient(160deg, rgba(22,24,31,.99), rgba(7,9,13,.99) 66%);
+      box-shadow:0 30px 100px rgba(0,0,0,.74), 0 0 45px rgba(250,204,21,.07);
+      animation:lsRoad6CardIn .78s cubic-bezier(.16,1,.3,1) both;
+      transition:transform .35s ease, opacity .35s ease;
+    }
+    .ls-next-era-box::before {
+      content:"";
+      position:absolute;
+      width:180px;
+      height:180px;
+      top:-110px;
+      right:-65px;
+      border-radius:50%;
+      background:rgba(250,204,21,.14);
+      filter:blur(13px);
+      animation:lsRoad6Glow 3.2s ease-in-out infinite;
+      pointer-events:none;
+    }
+    .ls-next-era-scan {
+      position:absolute;
+      inset:0;
+      z-index:1;
+      pointer-events:none;
+      opacity:.20;
+      background:linear-gradient(110deg,transparent 20%,rgba(255,255,255,.12) 45%,transparent 70%);
+      transform:translateX(-120%);
+      animation:lsRoad6Scan 3s 1s ease-in-out infinite;
+    }
+    .ls-next-era-head {
+      position:relative;
+      z-index:2;
+      padding:25px 22px 15px;
+      border-bottom:1px solid rgba(255,255,255,.07);
+    }
+    .ls-next-era-kicker {
+      font-family:'JetBrains Mono',monospace;
+      font-size:9px;
+      letter-spacing:.20em;
+      color:var(--gold);
+      text-transform:uppercase;
+    }
+    .ls-next-era-title {
+      margin:8px 0 0;
+      font-size:25px;
+      line-height:1.08;
+      letter-spacing:-.035em;
+      color:var(--text);
+    }
+    .ls-next-era-sub {
+      margin-top:7px;
+      color:var(--text-dim);
+      font-size:11px;
+      line-height:1.45;
+    }
+    .ls-next-era-body {
+      position:relative;
+      z-index:2;
+      overflow-y:auto;
+      min-height:0;
+      padding:17px 22px 4px;
+    }
+    .ls-next-era-version {
+      position:relative;
+      margin-bottom:16px;
+      padding:13px;
+      border:1px solid rgba(250,204,21,.11);
+      border-radius:14px;
+      background:rgba(255,255,255,.018);
+    }
+    .ls-next-era-version-head {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-bottom:10px;
+    }
+    .ls-next-era-version-name {
+      font-family:'JetBrains Mono',monospace;
+      font-size:11px;
+      font-weight:800;
+      color:var(--gold);
+    }
+    .ls-next-era-latest {
+      padding:2px 7px;
+      border-radius:999px;
+      background:var(--gold);
+      color:#12130f;
+      font-size:8px;
+      font-weight:900;
+    }
+    .ls-next-era-category { margin-bottom:10px; }
+    .ls-next-era-category:last-child { margin-bottom:0; }
+    .ls-next-era-category-title {
+      margin-bottom:4px;
+      font-size:11px;
+      font-weight:700;
+    }
+    .ls-next-era-line {
+      color:var(--text-dim);
+      font-size:12px;
+      line-height:1.45;
+      margin:4px 0;
+    }
+    .ls-next-era-foot {
+      position:relative;
+      z-index:3;
+      padding:14px 22px 20px;
+      background:linear-gradient(to top,rgba(7,9,13,1),rgba(7,9,13,.94));
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .ls-next-era-btn {
+      width:100%;
+      min-height:46px;
+      border:0;
+      border-radius:13px;
+      cursor:pointer;
+      font-family:inherit;
+      font-weight:850;
+      color:#12130f;
+      background:linear-gradient(135deg,#fde047,#f59e0b);
+      box-shadow:0 10px 28px rgba(245,158,11,.14);
+    }
+    .ls-next-era-road {
+      margin-top:9px;
+      text-align:center;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      letter-spacing:.05em;
+      color:rgba(250,204,21,.66);
+    }
+    @media (max-width:420px) {
+      .ls-next-era-changelog { padding:8px; }
+      .ls-next-era-box { max-height:96vh; }
+      .ls-next-era-head { padding:21px 17px 13px; }
+      .ls-next-era-body { padding:14px 17px 2px; }
+      .ls-next-era-foot { padding:12px 17px 16px; }
+    }
+
+
+
+    /* 5.5.7 — Medallas exclusivas de Tienda */
+    .ls-store-badge-card {
+      position:relative;
+      overflow:hidden;
+      text-align:center;
+      min-height:185px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+    }
+
+    .ls-store-badge-card::before {
+      content:"";
+      position:absolute;
+      inset:-40%;
+      pointer-events:none;
+      opacity:.14;
+      background:radial-gradient(circle, currentColor 0%, transparent 42%);
+      filter:blur(18px);
+    }
+
+    .ls-store-badge-icon {
+      position:relative;
+      z-index:1;
+      width:66px;
+      height:66px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin-bottom:4px;
+      border-radius:50%;
+      font-size:35px;
+      background:rgba(5,7,10,.72);
+      border:1px solid currentColor;
+      box-shadow:0 12px 30px rgba(0,0,0,.30);
+    }
+
+    .ls-rarity-comun { color:#cbd5e1; }
+    .ls-rarity-rara { color:#7dd3fc; }
+    .ls-rarity-epica { color:#c084fc; }
+    .ls-rarity-legendaria { color:#fbbf24; }
+    .ls-rarity-exclusiva { color:#fb7185; }
+    .ls-rarity-mitica { color:#ff365d;text-shadow:0 0 11px rgba(255,54,93,.62),0 0 19px rgba(244,211,94,.30); }
+
+    .ls-profile-title-chip {
+      --title-color:#cbd5e1;
+      --title-rgb:203,213,225;
+      position:relative;
+      overflow:hidden;
+      border-color:rgba(var(--title-rgb),.42) !important;
+      background:linear-gradient(135deg,rgba(var(--title-rgb),.15),rgba(var(--title-rgb),.04)) !important;
+      color:var(--title-color) !important;
+      box-shadow:0 0 16px rgba(var(--title-rgb),.13);
+    }
+    .ls-profile-title-chip.ls-rarity-rara { --title-color:#7dd3fc; --title-rgb:125,211,252; }
+    .ls-profile-title-chip.ls-rarity-epica { --title-color:#c084fc; --title-rgb:192,132,252; box-shadow:0 0 20px rgba(192,132,252,.24); }
+    .ls-profile-title-chip.ls-rarity-legendaria { --title-color:#fbbf24; --title-rgb:251,191,36; box-shadow:0 0 24px rgba(251,191,36,.28); }
+    .ls-profile-title-chip.ls-rarity-exclusiva { --title-color:#fb7185; --title-rgb:251,113,133; box-shadow:0 0 26px rgba(251,113,133,.30); }
+    .ls-profile-title-chip.ls-rarity-epica::before,
+    .ls-profile-title-chip.ls-rarity-legendaria::before,
+    .ls-profile-title-chip.ls-rarity-exclusiva::before {
+      content:"";
+      position:absolute;
+      inset:-80% -35%;
+      pointer-events:none;
+      background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.30) 50%,transparent 58%);
+      animation:lsTitleShine 3.4s ease-in-out infinite;
+    }
+    @keyframes lsTitleShine {
+      0%,62% { transform:translateX(-55%) rotate(8deg); opacity:0; }
+      72% { opacity:1; }
+      100% { transform:translateX(55%) rotate(8deg); opacity:0; }
+    }
+
+    .ls-rarity-tag {
+      position:relative;
+      z-index:1;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+
+
+    .ls-limited-urgency {
+      position:relative;
+      z-index:1;
+      margin-top:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-family:'JetBrains Mono',monospace;
+      font-size:8px;
+      font-weight:900;
+      letter-spacing:.06em;
+      border:1px solid rgba(251,146,60,.28);
+      background:rgba(251,146,60,.06);
+      color:#fdba74;
+      animation:lsLimitedUrgency 1.8s ease-in-out infinite;
+    }
+
+    .ls-limited-last {
+      border-color:rgba(248,113,113,.34);
+      background:rgba(248,113,113,.07);
+      color:#fca5a5;
+      animation:lsLimitedUrgency .95s ease-in-out infinite;
+    }
+
+    @keyframes lsLimitedUrgency {
+      0%,100% { transform:scale(1); opacity:.86; }
+      50% { transform:scale(1.035); opacity:1; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-limited-urgency,
+      .ls-limited-last {
+        animation:none !important;
+      }
+    }
+
+    .ls-store-badge-desc {
+      position:relative;
+      z-index:1;
+      max-width:180px;
+      min-height:30px;
+      font-size:10px;
+      line-height:1.4;
+      color:var(--text-dim);
+    }
+
+    /* LiveScroll 5.5.7 — IDENTITY */
+    .ls-equipped-medals {
+      display:flex;
+      align-items:center;
+      gap:7px;
+      margin-top:8px;
+      min-height:30px;
+      flex-wrap:wrap;
+    }
+
+
+    .ls-equipped-medal.ls-medal-rarity-comun {
+      border-color:#cbd5e1;
+      box-shadow:0 0 0 2px rgba(203,213,225,.12), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-rara {
+      border-color:#7dd3fc;
+      box-shadow:0 0 0 2px rgba(125,211,252,.16), 0 0 16px rgba(125,211,252,.20), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-epica {
+      border-color:#c084fc;
+      box-shadow:0 0 0 2px rgba(192,132,252,.16), 0 0 18px rgba(192,132,252,.24), 0 5px 16px rgba(0,0,0,.24);
+    }
+    .ls-equipped-medal.ls-medal-rarity-legendaria {
+      border-color:#fbbf24;
+      box-shadow:0 0 0 2px rgba(251,191,36,.18), 0 0 20px rgba(251,191,36,.28), 0 5px 16px rgba(0,0,0,.24);
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-legendaria::before,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva::before {
+      content:"";
+      position:absolute;
+      inset:-7px;
+      border-radius:50%;
+      pointer-events:none;
+      opacity:.30;
+      filter:blur(6px);
+      background:currentColor;
+      animation:lsMedalHalo 2.8s ease-in-out infinite;
+      z-index:-1;
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      background:
+        radial-gradient(circle at 30% 22%, rgba(255,255,255,.16), transparent 28%),
+        linear-gradient(145deg, rgba(251,113,133,.10), rgba(192,132,252,.06)),
+        rgba(8,10,13,.78);
+    }
+
+    @keyframes lsMedalHalo {
+      0%,100% { opacity:.18; transform:scale(.92); }
+      50% { opacity:.42; transform:scale(1.08); }
+    }
+
+    .ls-public-medals-wrap {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin-top:7px;
+      padding:4px 7px;
+      border-radius:999px;
+      background:rgba(255,255,255,.025);
+      border:1px solid rgba(255,255,255,.06);
+      backdrop-filter:blur(5px);
+    }
+
+    .ls-public-medals-wrap .ls-equipped-medals {
+      margin:0 !important;
+      min-height:0 !important;
+      gap:6px !important;
+    }
+
+
+    .ls-public-medals-wrap .ls-equipped-medal.ls-medal-favorite {
+      width:32px;
+      height:32px;
+      flex-basis:32px;
+      font-size:18px;
+    }
+
+    .ls-public-medals-wrap .ls-equipped-medal {
+      width:28px;
+      height:28px;
+      font-size:15px;
+      margin:0;
+      flex:0 0 28px;
+    }
+
+    .ls-medal-detail-meta {
+      display:flex;
+      justify-content:center;
+      gap:7px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+
+
+
+    @media (max-width:520px) {
+      .ls-collection-filter {
+        flex:1 1 auto;
+        min-height:34px;
+      }
+
+      #collection568Grid > div {
+        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      }
+
+      #collection568Sort {
+        flex:1 1 150px;
+        min-height:36px;
+      }
+    }
+
+    .ls-collection-filter.active {
+      border-color:var(--gold) !important;
+      color:var(--gold) !important;
+      background:rgba(250,204,21,.045) !important;
+    }
+
+    .ls-medal-detail-chip {
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      font-size:9px;
+      color:var(--text-dim);
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      border-color:#fb7185;
+      box-shadow:0 0 0 2px rgba(251,113,133,.18), 0 0 22px rgba(251,113,133,.30), 0 5px 16px rgba(0,0,0,.24);
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-mitica {
+      color:#f4d35e;
+      border-color:#ff365d;
+      background:radial-gradient(circle at 32% 23%,#ff879b 0 7%,transparent 24%),linear-gradient(145deg,#6f061d 4%,#ee214b 43%,#7e071e 67%,#d69b1f 100%);
+      box-shadow:0 0 0 2px rgba(244,211,94,.28),0 0 18px rgba(255,32,77,.65),0 0 34px rgba(244,211,94,.28),0 7px 20px rgba(0,0,0,.38);
+      animation:ls6MythicPulse 1.85s ease-in-out infinite;
+    }
+    .ls-equipped-medal.ls-medal-rarity-mitica::after {
+      content:"";position:absolute;inset:-5px;border:1px solid #f4d35e;border-radius:50%;opacity:.52;pointer-events:none;
+    }
+    @keyframes ls6MythicPulse { 0%,100%{transform:translateZ(0) scale(1);filter:saturate(1)}50%{transform:translateZ(0) scale(1.07);filter:saturate(1.22)} }
+
+    .ls-equipped-medal.ls-medal-rarity-rara::after,
+    .ls-equipped-medal.ls-medal-rarity-epica::after,
+    .ls-equipped-medal.ls-medal-rarity-legendaria::after,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva::after {
+      content:"";
+      position:absolute;
+      inset:-4px;
+      border-radius:50%;
+      border:1px solid currentColor;
+      opacity:.18;
+      pointer-events:none;
+    }
+
+    .ls-equipped-medal.ls-medal-rarity-epica,
+    .ls-equipped-medal.ls-medal-rarity-legendaria,
+    .ls-equipped-medal.ls-medal-rarity-exclusiva {
+      animation:lsMedalRarePulse 2.6s ease-in-out infinite;
+    }
+
+    @keyframes lsMedalRarePulse {
+      0%,100% { transform:translateZ(0) scale(1); }
+      50% { transform:translateZ(0) scale(1.055); }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-equipped-medal {
+        animation:none !important;
+      }
+    }
+
+
+    .ls-equipped-medal.ls-medal-favorite {
+      width:36px;
+      height:36px;
+      font-size:20px;
+      box-shadow:
+        0 0 0 2px rgba(250,204,21,.16),
+        0 0 22px rgba(250,204,21,.18),
+        0 8px 20px rgba(0,0,0,.28);
+    }
+
+    .ls-equipped-medal.ls-medal-favorite::before {
+      content:"★";
+      position:absolute;
+      top:-7px;
+      right:-5px;
+      z-index:3;
+      font-size:10px;
+      line-height:1;
+      color:var(--gold);
+      text-shadow:0 0 8px rgba(250,204,21,.55);
+      pointer-events:none;
+    }
+
+    .ls-favorite-note {
+      margin:8px 0 13px;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid rgba(250,204,21,.16);
+      background:rgba(250,204,21,.035);
+      color:var(--text-dim);
+      font-size:10px;
+      line-height:1.45;
+    }
+
+    .ls-medal-order-row {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .ls-medal-order-btn {
+      min-width:31px;
+      height:28px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:var(--panel);
+      color:var(--text);
+      cursor:pointer;
+      font-size:12px;
+    }
+
+    .ls-equipped-medal {
+      position:relative;
+      width:31px;
+      height:31px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      border:1px solid rgba(250,204,21,.28);
+      background:
+        radial-gradient(circle at 32% 24%, rgba(255,255,255,.12), transparent 32%),
+        rgba(8,10,13,.72);
+      box-shadow:0 5px 16px rgba(0,0,0,.24), inset 0 0 12px rgba(250,204,21,.035);
+      font-size:17px;
+      cursor:pointer;
+      transform:translateZ(0);
+      transition:transform .14s ease, border-color .14s ease;
+    }
+
+    .ls-equipped-medal:hover {
+      transform:translateY(-2px) scale(1.05);
+      border-color:rgba(250,204,21,.58);
+    }
+
+    .ls-equipped-medal-slot {
+      width:31px;
+      height:31px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      border:1px dashed rgba(255,255,255,.16);
+      color:var(--text-dim);
+      background:rgba(255,255,255,.018);
+      font-size:12px;
+    }
+
+    .ls-medal-picker-grid {
+      display:grid;
+      grid-template-columns:repeat(auto-fill,minmax(118px,1fr));
+      gap:9px;
+    }
+
+    .ls-medal-picker-item {
+      min-height:88px;
+      padding:11px 9px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      text-align:center;
+      border-radius:13px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--text);
+      cursor:pointer;
+      font-family:inherit;
+      transition:transform .14s ease,border-color .14s ease,background .14s ease;
+    }
+
+    .ls-medal-picker-item:hover {
+      transform:translateY(-2px);
+      border-color:var(--gold-dim);
+    }
+
+    .ls-medal-picker-item.selected {
+      border-color:var(--gold);
+      background:rgba(250,204,21,.065);
+      box-shadow:inset 0 0 0 1px rgba(250,204,21,.08);
+    }
+
+    .ls-medal-picker-icon {
+      font-size:27px;
+      line-height:1;
+    }
+
+    .ls-medal-picker-name {
+      font-size:10px;
+      line-height:1.25;
+      color:var(--text-dim);
+    }
+
+    .ls-medal-detail-icon {
+      width:72px;
+      height:72px;
+      margin:0 auto 14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:50%;
+      font-size:40px;
+      border:1px solid rgba(250,204,21,.32);
+      background:radial-gradient(circle at 35% 25%,rgba(255,255,255,.12),transparent 32%),rgba(250,204,21,.045);
+      box-shadow:0 15px 42px rgba(0,0,0,.35);
+    }
+
+    @media (max-width:700px) {
+      .ls-equipped-medal,
+      .ls-equipped-medal-slot {
+        width:30px;
+        height:30px;
+      }
+      .ls-equipped-medal {
+        transition:none;
+      }
+    }
+
+    /* LiveScroll 5.4.6 — PERFORMANCE / Mobile Fast */
+    .ls-fast-shimmer,
+    .ls-fast-profile-skeleton i,
+    .ls-fast-avatar {
+      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
+      background-size:220% 100%;
+      animation:lsSkeleton 1.05s linear infinite;
+    }
+    .ls-fast-profile-skeleton { display:grid; gap:12px; }
+    .ls-fast-profile-hero {
+      min-height:128px; display:flex; align-items:center; gap:14px; padding:18px;
+      border-radius:16px; background:var(--panel); border:1px solid var(--border);
+    }
+    .ls-fast-profile-hero i { display:block; height:13px; border-radius:999px; }
+    .ls-fast-avatar { width:66px; height:66px; flex:0 0 66px; border-radius:50%; }
+    .ls-fast-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .ls-fast-stats i { display:block; height:54px; border-radius:13px; }
+
+    .ls-fast-skeleton {
+      display:grid;
+      gap:10px;
+      padding:4px 0;
+    }
+    .ls-fast-skeleton > i {
+      display:block;
+      height:62px;
+      border-radius:13px;
+      background:linear-gradient(100deg, var(--panel-2), rgba(255,255,255,.055), var(--panel-2));
+      background-size:220% 100%;
+      animation:lsSkeleton 1.05s linear infinite;
+    }
+    @keyframes lsSkeleton { to { background-position:-220% 0; } }
+
+    @media (max-width:700px) {
+      /* En móvil priorizamos respuesta inmediata sobre animación decorativa. */
+      #appView {
+        transition:none !important;
+      }
+      #appView .page-title,
+      #appView .page-sub,
+      #appView .form-card,
+      #appView .video-card,
+      #appView .directo-card,
+      #appView .profile-section,
+      #appView .store-item,
+      #appView .ranking-row {
+        animation-duration:.14s !important;
+        animation-delay:0s !important;
+        transition-duration:.12s !important;
+      }
+      .toast { animation-duration:.16s !important; }
+      .modal-overlay { animation-duration:.16s !important; }
+      .modal-box { transition-duration:.16s !important; }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .ls-fast-skeleton > i { animation:none !important; }
+    }
+
+    /* v5.3.5 — Mobile Feed Full View */
+    :root {
+      --ls-mobile-feed-height: 640px;
+    }
+
+    @media (max-width:700px) {
+      #feedVertical,
+      #profileFeedVertical,
+      #foryouList .feed-vertical {
+        scroll-snap-type:y mandatory !important;
+      }
+
+      #feedVertical > .feed-item,
+      #profileFeedVertical > .feed-item,
+      #foryouList .feed-vertical > .feed-item {
+        height:var(--ls-mobile-feed-height) !important;
+        min-height:var(--ls-mobile-feed-height) !important;
+        max-height:var(--ls-mobile-feed-height) !important;
+        margin:0 !important;
+        scroll-snap-align:start !important;
+        scroll-snap-stop:always !important;
+        overflow:hidden !important;
+      }
+
+      #feedVertical .feed-phone,
+      #profileFeedVertical .feed-phone,
+      #foryouList .feed-phone {
+        width:100% !important;
+        height:100% !important;
+        min-height:100% !important;
+        max-height:100% !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        overflow:hidden !important;
+      }
+
+      #feedVertical .feed-embed-frame,
+      #profileFeedVertical .feed-embed-frame,
+      #foryouList .feed-embed-frame {
+        position:absolute !important;
+        inset:0 !important;
+        width:100% !important;
+        height:100% !important;
+        display:flex !important;
+        align-items:center !important;
+        justify-content:center !important;
+        background:#000 !important;
+      }
+
+      #feedVertical .feed-embed-frame iframe,
+      #profileFeedVertical .feed-embed-frame iframe,
+      #foryouList .feed-embed-frame iframe {
+        width:100% !important;
+        height:100% !important;
+        border:0 !important;
+      }
+
+      #feedVertical .feed-actions,
+      #profileFeedVertical .feed-actions,
+      #foryouList .feed-actions {
+        right:10px !important;
+        bottom:118px !important;
+        z-index:12 !important;
+      }
+
+      #feedVertical .feed-overlay,
+      #profileFeedVertical .feed-overlay,
+      #foryouList .feed-overlay {
+        left:12px !important;
+        right:68px !important;
+        bottom:18px !important;
+        z-index:10 !important;
+      }
+
+      /* MP4: reservamos abajo la barra nativa del reproductor. */
+      .feed-item.ls-upload-feed-item .feed-overlay {
+        bottom:72px !important;
+        pointer-events:none !important;
+      }
+
+      .feed-item.ls-upload-feed-item .feed-overlay .author {
+        pointer-events:auto !important;
+      }
+
+      .feed-item.ls-upload-feed-item .feed-actions {
+        bottom:148px !important;
+      }
+
+      .feed-item.ls-upload-feed-item .dbltap-like-zone {
+        width:100% !important;
+        height:100% !important;
+      }
+
+      .feed-item.ls-upload-feed-item video {
+        width:100% !important;
+        height:100% !important;
+        object-fit:contain !important;
+        background:#000 !important;
+      }
+
+      .feed-nudge {
+        top:14px !important;
+        bottom:auto !important;
+        left:50% !important;
+        transform:translateX(-50%) !important;
+        white-space:nowrap !important;
+        z-index:11 !important;
+        opacity:.72 !important;
+      }
+    }
+
+    /* LiveScroll Mobile/UI Upgrade */
+    html, body {
+      max-width:100%;
+      overflow-x:hidden;
+    }
+
+    #appView,
+    .profile-section,
+    .profile-hero,
+    .form-card,
+    .modal-box {
+      box-sizing:border-box;
+      max-width:100%;
+    }
+
+    .grid-menu-btn {
+      width:42px !important;
+      height:42px !important;
+      min-width:42px !important;
+      min-height:42px !important;
+      border-radius:50% !important;
+      display:flex !important;
+      align-items:center !important;
+      justify-content:center !important;
+      font-size:25px !important;
+      line-height:1 !important;
+      background:rgba(8,10,14,.78) !important;
+      backdrop-filter:blur(10px);
+      -webkit-backdrop-filter:blur(10px);
+      border:1px solid rgba(255,255,255,.16) !important;
+      color:#fff !important;
+      padding:0 0 7px !important;
+      z-index:12 !important;
+      box-shadow:0 6px 18px rgba(0,0,0,.28);
+      touch-action:manipulation;
+    }
+
+    .grid-menu-btn:active {
+      transform:scale(.94);
+    }
+
+    .ls-action-sheet-overlay {
+      position:fixed;
+      inset:0;
+      z-index:400;
+      background:rgba(0,0,0,.66);
+      backdrop-filter:blur(3px);
+      -webkit-backdrop-filter:blur(3px);
+      display:flex;
+      align-items:flex-end;
+      justify-content:center;
+      padding:12px;
+      padding-bottom:max(12px, env(safe-area-inset-bottom));
+      animation:lsFadeIn .16s ease;
+    }
+
+    .ls-action-sheet {
+      width:min(520px, 100%);
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:10px;
+      box-shadow:0 -18px 55px rgba(0,0,0,.55);
+      animation:lsSheetUp .22s cubic-bezier(.2,.8,.2,1);
+      overflow:hidden;
+    }
+
+    .ls-action-sheet-handle {
+      width:42px;
+      height:4px;
+      border-radius:10px;
+      background:rgba(255,255,255,.22);
+      margin:3px auto 10px;
+    }
+
+    .ls-action-sheet-title {
+      padding:6px 10px 13px;
+      border-bottom:1px solid var(--border);
+      margin-bottom:6px;
+    }
+
+    .ls-action-sheet-title strong {
+      display:block;
+      font-size:14px;
+      color:var(--text);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .ls-action-sheet-title span {
+      display:block;
+      margin-top:3px;
+      color:var(--text-dim);
+      font-size:11px;
+    }
+
+    .ls-sheet-action {
+      width:100%;
+      min-height:52px;
+      border:0;
+      border-radius:13px;
+      background:transparent;
+      color:var(--text);
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 13px;
+      font-family:inherit;
+      font-size:14px;
+      text-align:left;
+      cursor:pointer;
+      touch-action:manipulation;
+    }
+
+    .ls-sheet-action:hover,
+    .ls-sheet-action:active {
+      background:var(--panel-2);
+    }
+
+    .ls-sheet-action .ico {
+      width:34px;
+      height:34px;
+      flex:0 0 34px;
+      border-radius:10px;
+      background:rgba(255,255,255,.06);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:18px;
+    }
+
+    .ls-sheet-action .txt {
+      min-width:0;
+      flex:1;
+    }
+
+    .ls-sheet-action .txt strong {
+      display:block;
+      font-size:14px;
+    }
+
+    .ls-sheet-action .txt small {
+      display:block;
+      color:var(--text-dim);
+      font-size:11px;
+      margin-top:2px;
+    }
+
+    .ls-sheet-action.danger {
+      color:var(--red);
+    }
+
+    .ls-sheet-action[disabled] {
+      opacity:.46;
+      cursor:not-allowed;
+    }
+
+    @keyframes lsSheetUp {
+      from { transform:translateY(28px); opacity:0; }
+      to { transform:translateY(0); opacity:1; }
+    }
+
+    @keyframes lsFadeIn {
+      from { opacity:0; }
+      to { opacity:1; }
+    }
+
+    @media (max-width:700px) {
+      #appView {
+        width:100% !important;
+        padding-left:10px !important;
+        padding-right:10px !important;
+      }
+
+      .profile-hero,
+      .profile-section,
+      .form-card {
+        border-radius:16px !important;
+      }
+
+      .profile-hero {
+        overflow:hidden !important;
+      }
+
+      .profile-stats-row {
+        display:grid !important;
+        grid-template-columns:repeat(3, minmax(0,1fr)) !important;
+        gap:7px !important;
+        width:100% !important;
+      }
+
+      .stat-pill {
+        min-width:0 !important;
+        padding:10px 5px !important;
+      }
+
+      .stat-pill .num {
+        font-size:clamp(18px, 6vw, 24px) !important;
+      }
+
+      .stat-pill .lbl {
+        font-size:10px !important;
+        white-space:normal !important;
+        line-height:1.15 !important;
+      }
+
+      .profile-name-block h1 {
+        font-size:clamp(20px, 6vw, 28px) !important;
+        overflow-wrap:anywhere;
+      }
+
+      .profile-section-head {
+        gap:8px !important;
+        align-items:center !important;
+      }
+
+      .profile-section-head h3 {
+        min-width:0;
+        font-size:15px !important;
+      }
+
+      .profile-section-head .sub {
+        font-size:10px !important;
+        text-align:right;
+      }
+
+      .video-grid {
+        gap:7px !important;
+      }
+
+      .video-grid-tile {
+        min-width:0 !important;
+        overflow:hidden !important;
+      }
+
+      .grid-menu-btn {
+        width:46px !important;
+        height:46px !important;
+        min-width:46px !important;
+        min-height:46px !important;
+        font-size:28px !important;
+        top:8px !important;
+        right:8px !important;
+      }
+
+      .video-grid-menu {
+        display:none !important;
+      }
+
+      .modal-overlay {
+        padding:10px !important;
+        align-items:flex-end !important;
+      }
+
+      .modal-box,
+      .auth-box {
+        width:100% !important;
+        max-width:100% !important;
+        max-height:92dvh !important;
+        overflow-y:auto !important;
+        border-radius:20px !important;
+      }
+
+      button,
+      .btn,
+      .btn-outline {
+        touch-action:manipulation;
+      }
+
+      input,
+      textarea,
+      select {
+        max-width:100% !important;
+        box-sizing:border-box !important;
+      }
+    }
+  `;
+
+  document.head.appendChild(style);
+}
+
+function closeVideoActionSheet() {
+  document.getElementById("videoActionSheetOverlay")?.remove();
+}
+
+function openVideoActionSheet(videoId) {
+  const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
+  if (!video) return;
+
+  const pin = window.__profilePinContext || {};
+  const isPinned = Array.isArray(pin.pinnedIds) && pin.pinnedIds.includes(videoId);
+  const canPin = !!pin.canPin;
+  const limitReached = canPin && !isPinned && (pin.pinsUsed >= pin.maxPinned);
+
+  closeVideoActionSheet();
+
+  const overlay = document.createElement("div");
+  overlay.id = "videoActionSheetOverlay";
+  overlay.className = "ls-action-sheet-overlay";
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeVideoActionSheet();
+  };
+
+  let pinAction = "";
+  if (isPinned) {
+    pinAction = `
+      <button class="ls-sheet-action" disabled>
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Video anclado</strong>
+          <small>Ya está destacado en Para Ti</small>
+        </span>
+      </button>`;
+  } else if (canPin) {
+    pinAction = `
+      <button class="ls-sheet-action" ${limitReached ? "disabled" : ""}
+        onclick="closeVideoActionSheet(); handlePinVideo('${videoId}')">
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Anclar 24 h</strong>
+          <small>${limitReached
+            ? `Ya usaste ${pin.pinsUsed}/${pin.maxPinned} espacios disponibles`
+            : `Destacalo en Para Ti · ${pin.pinsUsed}/${pin.maxPinned} usados`}</small>
+        </span>
+      </button>`;
+  } else {
+    pinAction = `
+      <button class="ls-sheet-action" disabled>
+        <span class="ico">📌</span>
+        <span class="txt">
+          <strong>Anclar 24 h</strong>
+          <small>Tu plan actual no incluye videos anclados</small>
+        </span>
+      </button>`;
+  }
+
+  overlay.innerHTML = `
+    <div class="ls-action-sheet">
+      <div class="ls-action-sheet-handle"></div>
+
+      <div class="ls-action-sheet-title">
+        <strong>${escapeHtml(video.title || "Video")}</strong>
+        <span>Opciones del video</span>
+      </div>
+
+      ${pinAction}
+
+      <button class="ls-sheet-action"
+        onclick="closeVideoActionSheet(); openProfileVideoFeed(window.__profileFeedVideos, '${videoId}', window.__profileFeedAuthor)">
+        <span class="ico">▶️</span>
+        <span class="txt">
+          <strong>Ver video</strong>
+          <small>Abrir dentro de LiveScroll</small>
+        </span>
+      </button>
+
+      ${video.platform === "upload" ? `
+        <button class="ls-sheet-action" onclick="openVideoReeditor('${videoId}')">
+          <span class="ico">✂️</span>
+          <span class="txt">
+            <strong>Reeditar video</strong>
+            <small>Cambiar el inicio o el final sin perder interacciones</small>
+          </span>
+        </button>` : `
+        <button class="ls-sheet-action" disabled>
+          <span class="ico">✂️</span>
+          <span class="txt"><strong>Reeditar video</strong><small>Disponible para MP4 subidos a LiveScroll</small></span>
+        </button>`}
+
+      <button class="ls-sheet-action"
+        onclick="closeVideoActionSheet(); window.open('${escapeHtml(video.video_url)}', '_blank', 'noopener')">
+        <span class="ico">🔗</span>
+        <span class="txt">
+          <strong>Abrir enlace</strong>
+          <small>Ver el archivo o plataforma original</small>
+        </span>
+      </button>
+
+      <button class="ls-sheet-action danger"
+        onclick="closeVideoActionSheet(); handleDeleteOwnVideo('${videoId}')">
+        <span class="ico">🗑️</span>
+        <span class="txt">
+          <strong>Eliminar video</strong>
+          <small>Esta acción no se puede deshacer</small>
+        </span>
+      </button>
+
+      <button class="ls-sheet-action" onclick="closeVideoActionSheet()">
+        <span class="ico">✕</span>
+        <span class="txt"><strong>Cancelar</strong></span>
+      </button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+}
+
+function toggleVideoTileMenu(videoId) {
+  ensureModernMobileStyles();
+
+  if (window.matchMedia("(max-width: 700px)").matches) {
+    openVideoActionSheet(videoId);
+    return;
+  }
+
+  document.querySelectorAll(".video-grid-menu").forEach(el => {
+    if (el.id !== `menu-${videoId}`) el.classList.add("hidden");
+  });
+  document.getElementById(`menu-${videoId}`)?.classList.toggle("hidden");
+}
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".grid-menu-btn") && !e.target.closest(".video-grid-menu")) {
+    document.querySelectorAll(".video-grid-menu").forEach(el => el.classList.add("hidden"));
+  }
+});
+
+function getThumbnailHtml(video) {
+  if (video.platform === "youtube") {
+    const id = extractYoutubeId(video.video_url);
+    if (id) return `<img src="https://img.youtube.com/vi/${id}/hqdefault.jpg" alt="miniatura" loading="lazy" decoding="async">`;
+  }
+
+  if (video.platform === "upload") {
+    if (video.thumbnail_url && isSafeUrl(video.thumbnail_url)) {
+      return `<img src="${escapeHtml(video.thumbnail_url)}" alt="carátula del video" loading="lazy" decoding="async">`;
+    }
+
+    // En Legacy no abrimos varios MP4 solamente para fabricar miniaturas: eso
+    // compite con el reproductor principal y en equipos antiguos deja audio sin imagen.
+    if (document.documentElement.classList.contains("ls-legacy")) {
+      return `<div class="ls-legacy-cover-placeholder"><span aria-hidden="true">▶</span><small>VIDEO</small></div>`;
+    }
+
+    // Videos viejos sin carátula persistida: el MP4 se activa recién cerca de la pantalla.
+    if (isSafeUrl(video.video_url)) {
+      return `<div class="ls-lazy-video-cover" data-ls-preview-src="${escapeHtml(video.video_url)}#t=0.3">
+        <span aria-hidden="true">▶</span>
+        <video preload="none" muted playsinline disablepictureinpicture
+          style="width:100%;height:100%;object-fit:cover;pointer-events:none;background:#071116;"></video>
+      </div>`;
+    }
+
+    return "🎬";
+  }
+
+  const icons = { kick: "🟢", twitch: "🟣", tiktok: "🎵" };
+  return icons[video.platform] || "▶️";
+}
+
+function extractYoutubeId(url) {
+  if (typeof url !== "string" || !url.trim()) return null;
+
+  try {
+    const parsed = new URL(url.trim());
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    let candidate = null;
+
+    if (host === "youtu.be") {
+      candidate = parsed.pathname.split("/").filter(Boolean)[0];
+    } else if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (parsed.pathname === "/watch") candidate = parsed.searchParams.get("v");
+      else if (["shorts", "embed", "live"].includes(pathParts[0])) candidate = pathParts[1];
+    }
+
+    return /^[A-Za-z0-9_-]{11}$/.test(candidate || "") ? candidate : null;
+  } catch (error) {
+    // Respaldo para enlaces pegados sin protocolo.
+    const match = url.match(/(?:v=|youtu\.be\/|shorts\/|embed\/|live\/)([A-Za-z0-9_-]{11})(?:[?&#/]|$)/i);
+    return match ? match[1] : null;
+  }
+}
+
+const lsDiscoveryStartedVideos = new Set();
+
+function recordDiscoverySignal(videoId, eventType, watchSecondsValue = 0) {
+  if (!currentUser?.id || !videoId) return;
+  sb.rpc("record_discovery_event", {
+    p_video_id: videoId,
+    p_event_type: eventType,
+    p_watch_seconds: Math.max(0, Math.round(Number(watchSecondsValue) || 0))
+  }).then(({ error }) => {
+    if (error) console.warn("Señal de descubrimiento no registrada:", error.message);
+  });
+}
+
+function renderVideoHashtags(video) {
+  const tags = (video?.video_hashtags || [])
+    .map(row => row?.hashtags)
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!tags.length) return "";
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:7px 0 2px;">${tags.map(tag =>
+    `<button type="button" onclick="event.stopPropagation();openHashtagFeed('${escapeHtml(tag.slug)}')" style="border:0;background:transparent;color:#67e8f9;padding:0;font:800 11px 'JetBrains Mono',monospace;cursor:pointer;">#${escapeHtml(tag.display_name || tag.slug)}</button>`
+  ).join("")}</div>`;
+}
+
+async function hideVideoFromDiscovery(videoId) {
+  const { data, error } = await sb.rpc("hide_video_for_user", { p_video_id: videoId });
+  if (error || data?.ok === false) return showToast("No se pudo ocultar el video");
+  document.querySelector(`.feed-item[data-video-id="${videoId}"]`)?.remove();
+  lsPerfCache.feed = { data:null, at:0 };
+  showHiddenVideoUndo(videoId);
+}
+window.hideVideoFromDiscovery = hideVideoFromDiscovery;
+
+function showHiddenVideoUndo(videoId) {
+  document.getElementById("lsHiddenUndo")?.remove();
+  const bar = document.createElement("div");
+  bar.id = "lsHiddenUndo";
+  bar.className = "ls-hidden-undo-611";
+  bar.innerHTML = `<span><strong>Video ocultado</strong><small>Ya no aparecerá en tu inicio.</small></span><button type="button">Deshacer</button>`;
+  bar.querySelector("button").onclick = async () => {
+    const { data, error } = await sb.rpc("restore_hidden_video", { p_video_id:videoId });
+    if (error || !data?.ok) return showToast("No se pudo restablecer el video");
+    bar.remove();
+    lsPerfCache.feed = { data:null, at:0 };
+    showToast("Video restablecido ✓");
+    if (currentTab === "feed") renderFeed();
+  };
+  document.body.appendChild(bar);
+  setTimeout(() => bar.remove(), 6500);
+}
+
+async function openHashtagFeed(rawSlug) {
+  const slug = normalizeHashtag(rawSlug);
+  if (!slug) return;
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `<div class="modal-overlay" onclick="if(event.target===this)this.innerHTML=''">
+    <div class="modal-box"><div class="modal-box-body"><h2 style="margin:0 0 14px;color:var(--gold)">#${escapeHtml(slug)}</h2><div id="hashtagVideoList" style="color:var(--text-dim)">Buscando videos...</div></div></div>
+  </div>`;
+  const { data:ids, error } = await sb.rpc("get_video_ids_by_hashtag", { p_slug:slug, p_limit:30 });
+  const list = document.getElementById("hashtagVideoList");
+  if (!list) return;
+  if (error) { list.textContent = "No pudimos cargar esta etiqueta."; return; }
+  const videoIds = (ids || []).map(row => row.video_id);
+  if (!videoIds.length) { list.textContent = "Todavía no hay videos con esta etiqueta."; return; }
+  const { data:videos } = await sb.from("videos").select("id,title,thumbnail_url,profiles!videos_user_id_fkey(username)").in("id", videoIds);
+  const byId = new Map((videos || []).map(video => [video.id, video]));
+  list.innerHTML = videoIds.map(id => byId.get(id)).filter(Boolean).map(video => `<button class="btn-outline" style="width:100%;display:flex;justify-content:space-between;gap:10px;margin:8px 0;text-align:left" onclick="openSharedVideo('${video.id}')"><span>${escapeHtml(video.title)}</span><span style="color:var(--text-dim)">@${escapeHtml(video.profiles?.username || "usuario")}</span></button>`).join("");
+}
+window.openHashtagFeed = openHashtagFeed;
+
+function startWatching(video) {
+  if (video.user_id === currentUser.id) return;
+  if (watchIntervals[video.id]) return; // ya está corriendo, no duplicar
+
+  if (!lsDiscoveryStartedVideos.has(video.id)) {
+    lsDiscoveryStartedVideos.add(video.id);
+    recordDiscoverySignal(video.id, "view_start", 0);
+  }
+
+  watchSeconds[video.id] = watchSeconds[video.id] || 0;
+
+  const interval = setInterval(async () => {
+    if (document.hidden) return;
+
+    watchSeconds[video.id] += 5;
+    const secsEl = document.getElementById(`secs-${video.id}`);
+    if (secsEl) secsEl.textContent = watchSeconds[video.id] + "s";
+
+    if (watchSeconds[video.id] % 15 === 0) {
+      recordDiscoverySignal(video.id, "watch_progress", watchSeconds[video.id]);
+      const { data, error } = await sb.rpc("award_watch_points", {
+        p_video_id: video.id,
+        p_viewer_id: currentUser.id,
+        p_new_seconds: 15
+      });
+
+      if (error) return;
+
+      if (data.ok) {
+        currentProfile.points_balance += data.points_viewer;
+        updateBalanceUI();
+        showFloatingPointsSafe(data.points_viewer, document.getElementById(`pts-${video.id}`));
+        const ptsEl = document.getElementById(`pts-${video.id}`);
+        if (ptsEl) ptsEl.innerHTML = `+${data.points_viewer} pts <span class="mono">${watchSeconds[video.id]}s</span>`;
+      } else if (data.error === "daily_cap_reached") {
+        stopWatching(video.id);
+        showToast("Alcanzaste tu tope diario de puntos por mirar hoy");
+      } else if (data.error === "cuenta_bloqueada") {
+        stopWatching(video.id);
+      } else if (data.error === "video_repetido") {
+        stopWatching(video.id);
+        showToast("Ya sumaste el máximo por este video hoy — mirá otro para seguir ganando");
+      } else if (data.error === "saldo_maximo") {
+        stopWatching(video.id);
+        showToast("Llegaste al tope de saldo de tu plan — canjeá para seguir ganando 💰");
+      }
+    }
+  }, 5000);
+
+  watchIntervals[video.id] = interval;
+}
+
+function stopWatching(videoId) {
+  if (watchIntervals[videoId]) {
+    clearInterval(watchIntervals[videoId]);
+    delete watchIntervals[videoId];
+  }
+}
+
+function clearAllWatchIntervals() {
+  Object.values(watchIntervals).forEach(clearInterval);
+  watchIntervals = {};
+  watchSeconds = {};
+
+  // 5.4.6 FINAL: nada del Feed queda reproduciéndose detrás de otra pantalla.
+  document.querySelectorAll(".feed-item [id^='embed-'], [id^='embed-'].feed-embed-frame").forEach(releaseFeedMediaElement);
+  pauseFeedMedia();
+
+  loadedEmbeds.clear();
+
+  if (feedObserverInstance) {
+    feedObserverInstance.disconnect();
+    feedObserverInstance = null;
+  }
+}
+
+// ============================================================
+// SUBIR VIDEO
+// ============================================================
+function normalizeHashtag(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/^#+/, "")
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 28);
+}
+
+function getUploadHashtags() {
+  const raw = document.getElementById("uploadHashtags")?.value || "";
+  const parts = raw.split(/[\s,]+/).map(normalizeHashtag).filter(tag => tag.length >= 2);
+  const unique = [...new Set(parts)];
+  return { tags:unique.slice(0, 5), tooMany:unique.length > 5 };
+}
+
+function refreshUploadHashtagPreview() {
+  const { tags, tooMany } = getUploadHashtags();
+  const preview = document.getElementById("uploadHashtagPreview");
+  if (!preview) return;
+  preview.innerHTML = `${tags.map(tag => `<span style="border:1px solid rgba(103,232,249,.28);background:rgba(103,232,249,.08);color:#67e8f9;border-radius:20px;padding:5px 9px;">#${escapeHtml(tag)}</span>`).join("")}${tooMany ? `<span style="color:var(--red)">Máximo 5 etiquetas</span>` : ""}`;
+}
+window.refreshUploadHashtagPreview = refreshUploadHashtagPreview;
+
+async function loadTrendingHashtagSuggestions() {
+  const { data } = await sb.rpc("get_trending_hashtags", { p_limit:12 });
+  const datalist = document.getElementById("uploadHashtagSuggestions");
+  if (datalist) datalist.innerHTML = (data || []).map(tag => `<option value="#${escapeHtml(tag.slug)}"></option>`).join("");
+}
+
+async function saveVideoHashtags(videoId) {
+  const { tags, tooMany } = getUploadHashtags();
+  if (tooMany) throw new Error("Podés usar como máximo 5 hashtags.");
+  const { error } = await sb.rpc("set_video_hashtags", { p_video_id:videoId, p_tags:tags });
+  if (error) throw error;
+}
+
+async function renderUpload() {
+  rawSelectedFile = null;
+  trimmedFile = null;
+
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p style="color:var(--text-dim);">Preparando Subir video...</p>`;
+
+  let uploadReward = 40;
+  try {
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "points_per_upload")
+      .single();
+
+    if (data?.value != null) {
+      uploadReward = Number(data.value) || 40;
+    }
+  } catch (_) {}
+
+  main.innerHTML = `
+    <div class="ls-upload-studio-shell" style="max-width:860px;margin:0 auto;">
+      <div class="ls-upload-studio-hero" style="
+        position:relative;
+        overflow:hidden;
+        padding:22px;
+        margin-bottom:18px;
+        border:1px solid rgba(250,204,21,.22);
+        border-radius:18px;
+        background:
+          radial-gradient(circle at 85% 15%, rgba(250,204,21,.11), transparent 32%),
+          linear-gradient(145deg, rgba(255,255,255,.025), rgba(255,255,255,.006));
+      ">
+        <div style="
+          font-family:'JetBrains Mono',monospace;
+          font-size:9px;
+          font-weight:900;
+          letter-spacing:.13em;
+          color:var(--gold);
+          text-transform:uppercase;
+          margin-bottom:7px;
+        ">CREATOR STUDIO</div>
+
+        <div style="display:flex;justify-content:space-between;gap:18px;align-items:flex-end;flex-wrap:wrap;">
+          <div>
+            <h1 class="page-title" style="margin-bottom:5px;">Subir video</h1>
+            <p class="page-sub" style="margin:0;max-width:560px;">
+              Compartí un enlace o publicá tu archivo. LiveScroll prepara todo antes de enviarlo.
+            </p>
+          </div>
+
+          <div style="
+            border:1px solid rgba(34,197,94,.28);
+            background:rgba(34,197,94,.07);
+            border-radius:12px;
+            padding:10px 13px;
+            min-width:150px;
+          ">
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">Recompensa</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:900;color:var(--green);margin-top:2px;">
+              +${uploadReward} pts
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ls-upload-studio-steps" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">01</strong><br>
+          <span style="color:var(--text-dim);">Elegí origen</span>
+        </div>
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">02</strong><br>
+          <span style="color:var(--text-dim);">Revisá el contenido</span>
+        </div>
+        <div style="padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--panel);font-size:11px;">
+          <strong style="color:var(--gold);">03</strong><br>
+          <span style="color:var(--text-dim);">Publicá</span>
+        </div>
+      </div>
+
+      <div class="ls-upload-mode-grid" style="
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:10px;
+        margin-bottom:16px;
+      ">
+        <button
+          class="btn"
+          id="modeLinkBtn"
+          onclick="setUploadMode('link')"
+          style="padding:14px;border-radius:12px;"
+        >
+          🔗 Usar enlace
+          <span style="display:block;font-size:9px;opacity:.72;margin-top:3px;">Kick · Twitch · YouTube · TikTok</span>
+        </button>
+
+        <button
+          class="btn-outline"
+          id="modeFileBtn"
+          onclick="setUploadMode('file')"
+          style="padding:14px;border-radius:12px;"
+        >
+          🎬 Subir archivo
+          <span style="display:block;font-size:9px;opacity:.72;margin-top:3px;">MP4 · MKV · WEBM</span>
+        </button>
+      </div>
+
+      <div class="form-card ls-upload-studio-form" style="
+        border-radius:16px;
+        border:1px solid var(--border);
+        padding:18px;
+        min-width:0;
+        overflow:hidden;
+        box-sizing:border-box;
+      ">
+        <div id="linkFields">
+          <div style="font-size:11px;font-weight:800;margin-bottom:12px;">🔗 Video desde plataforma</div>
+
+          <div class="field">
+            <label>Plataforma</label>
+            <select
+              id="uploadPlatform"
+              style="width:100%;padding:12px;background:var(--ink);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:inherit"
+            >
+              <option value="kick">Kick</option>
+              <option value="twitch">Twitch</option>
+              <option value="youtube">YouTube</option>
+              <option value="tiktok">TikTok</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Link del video</label>
+            <input type="text" id="uploadUrl" placeholder="Pegá acá el enlace del video">
+          </div>
+        </div>
+
+        <div id="fileFields" class="hidden">
+          <div style="font-size:11px;font-weight:800;margin-bottom:12px;">🎬 Archivo desde tu dispositivo</div>
+
+          <div class="field">
+            <label>Archivo de video</label>
+
+            <button class="ls-upload-file-drop"
+              type="button"
+              onclick="openLiveScrollAndroidMedia('files','uploadFile','elegir el video que querés publicar','files')"
+              style="
+                width:100%;
+                display:block;
+                border:1px dashed rgba(250,204,21,.35);
+                background:rgba(250,204,21,.035);
+                color:var(--text);
+                font-family:inherit;
+                border-radius:14px;
+                padding:22px 14px;
+                text-align:center;
+                cursor:pointer;
+              "
+            >
+              <div style="font-size:28px;margin-bottom:6px;">＋</div>
+              <div style="font-weight:800;font-size:12px;">Elegir video</div>
+              <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">
+                MP4, MKV o WEBM · máximo 50 MB
+              </div>
+            </button>
+
+            <input
+              type="file"
+              id="uploadFile"
+              accept=".mp4,.mkv,video/mp4,video/x-matroska,video/webm"
+              onchange="previewFileSize()"
+              style="display:none;"
+            >
+
+            <div id="fileSizeInfo" style="font-size:12px;margin-top:8px;"></div>
+
+            <p style="font-size:10px;color:var(--text-dim);margin:8px 0 0;line-height:1.5;">
+              Si el video es demasiado largo o pesado, podés seleccionarlo igual:
+              LiveScroll te ofrecerá recortarlo antes de subirlo.
+            </p>
+
+            <div
+              id="uploadPreviewSafe"
+              class="ls-upload-preview-safe"
+              style="
+                display:none;
+                position:relative !important;
+                width:100% !important;
+                max-width:100% !important;
+                min-width:0 !important;
+                aspect-ratio:16 / 9 !important;
+                height:auto !important;
+                margin:12px 0 0 !important;
+                overflow:hidden !important;
+                box-sizing:border-box !important;
+                border-radius:12px;
+                border:1px solid var(--border);
+                background:#000;
+              "
+            >
+              <div class="tag">Vista previa</div>
+              <video
+                id="uploadPreviewVideoSafe"
+                controls
+                muted
+                playsinline
+                preload="metadata"
+                style="
+                  position:absolute !important;
+                  inset:0 !important;
+                  display:block !important;
+                  width:100% !important;
+                  height:100% !important;
+                  max-width:none !important;
+                  max-height:none !important;
+                  min-width:0 !important;
+                  object-fit:contain !important;
+                  object-position:center center !important;
+                  margin:0 !important;
+                  padding:0 !important;
+                  background:#000 !important;
+                  box-sizing:border-box !important;
+                "
+              ></video>
+              <div id="uploadPreviewMsgSafe" class="ls-upload-preview-msg-safe"></div>
+            </div>
+          </div>
+
+          <div id="uploadProgress" class="hidden" style="margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-bottom:5px;">
+              <span>SUBIENDO</span>
+              <span>LiveScroll</span>
+            </div>
+            <div style="background:var(--panel-2);border-radius:20px;height:10px;overflow:hidden;">
+              <div id="uploadProgressBar" style="width:0%;height:100%;background:var(--gold);transition:width .2s;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin:16px 0;"></div>
+
+        <div class="field">
+          <label>Título</label>
+          <input
+            type="text"
+            id="uploadTitle"
+            maxlength="100"
+            placeholder="Ej: Jugada increíble en vivo"
+          >
+          <div style="font-size:9px;color:var(--text-dim);margin-top:5px;">
+            Corto, claro y fácil de reconocer.
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Hashtags <span style="color:var(--text-dim);font-weight:500">(hasta 5)</span></label>
+          <input type="text" id="uploadHashtags" list="uploadHashtagSuggestions" maxlength="150" placeholder="#gaming #futbol #humor" oninput="refreshUploadHashtagPreview()">
+          <datalist id="uploadHashtagSuggestions"></datalist>
+          <div id="uploadHashtagPreview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:10px;"></div>
+          <div style="font-size:9px;color:var(--text-dim);margin-top:6px;">Ayudan a encontrar tu video. Separalos con espacios.</div>
+        </div>
+
+        <button
+          class="btn"
+          id="uploadSubmitBtn"
+          onclick="handleUpload()"
+          style="width:100%;padding:13px;border-radius:11px;font-weight:900;"
+        >
+          Publicar video · +${uploadReward} pts
+        </button>
+
+        <div id="uploadError" class="error-msg" style="margin-top:8px;"></div>
+      </div>
+    </div>`;
+
+  setUploadMode("link");
+  loadTrendingHashtagSuggestions();
+}
+
+const MAX_FILE_MB = 50;
+let rawSelectedFile = null;
+let trimmedFile = null;
+let uploadPreviewUrlSafe = null;
+let videoReeditContext = null;
+let videoReeditAbortController = null;
+
+function cancelVideoReeditorPreparation() {
+  window.__lsVideoReeditCancelledByUser = true;
+  if (videoReeditAbortController) {
+    try { videoReeditAbortController.abort(); } catch (_) {}
+  }
+  videoReeditAbortController = null;
+  videoReeditContext = null;
+  rawSelectedFile = null;
+  trimmedFile = null;
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+  showToast("Preparación cancelada. El video original sigue intacto.");
+}
+
+window.cancelVideoReeditorPreparation = cancelVideoReeditorPreparation;
+
+function previewFileSize() {
+  rawSelectedFile = document.getElementById("uploadFile").files[0] || null;
+  trimmedFile = null;
+  refreshFileSizeUI();
+  refreshUploadPreviewSafe();
+}
+
+function clearUploadPreviewSafe() {
+  const preview = document.getElementById("uploadPreviewSafe");
+  const video = document.getElementById("uploadPreviewVideoSafe");
+  const msg = document.getElementById("uploadPreviewMsgSafe");
+
+  if (uploadPreviewUrlSafe) {
+    URL.revokeObjectURL(uploadPreviewUrlSafe);
+    uploadPreviewUrlSafe = null;
+  }
+
+  if (video) {
+    video.pause();
+    video.removeAttribute("src");
+    video.load();
+    video.style.display = "";
+  }
+
+  if (msg) {
+    msg.textContent = "";
+    msg.classList.remove("active");
+  }
+
+  if (preview) {
+    preview.classList.remove("active", "landscape", "portrait", "square");
+    preview.style.setProperty("display", "none", "important");
+    preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+    preview.style.setProperty("height", "auto", "important");
+    delete preview.dataset.detectedRatio;
+  }
+}
+
+function refreshUploadPreviewSafe() {
+  const preview = document.getElementById("uploadPreviewSafe");
+  const video = document.getElementById("uploadPreviewVideoSafe");
+  const msg = document.getElementById("uploadPreviewMsgSafe");
+  const file = trimmedFile || rawSelectedFile;
+
+  if (!preview || !video || !msg) return;
+
+  clearUploadPreviewSafe();
+  if (!file) return;
+
+  uploadPreviewUrlSafe = URL.createObjectURL(file);
+  preview.classList.add("active");
+  preview.style.setProperty("display", "block", "important");
+  preview.style.setProperty("width", "100%", "important");
+  preview.style.setProperty("max-width", "100%", "important");
+  preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+  preview.style.setProperty("height", "auto", "important");
+  preview.style.setProperty("overflow", "hidden", "important");
+  video.src = uploadPreviewUrlSafe;
+
+  video.onerror = () => {
+    video.style.display = "none";
+    msg.textContent = "Este formato no puede previsualizarse en este navegador, pero podés subirlo normalmente.";
+    msg.classList.add("active");
+  };
+
+  video.onloadedmetadata = () => {
+    video.style.setProperty("display", "block", "important");
+    msg.classList.remove("active");
+
+    // Caja fija responsive 16:9:
+    // horizontales llenan el ancho;
+    // verticales quedan centrados con barras laterales;
+    // nunca se modifica el tamaño del contenedor según metadata del MP4.
+    preview.style.setProperty("display", "block", "important");
+    preview.style.setProperty("width", "100%", "important");
+    preview.style.setProperty("max-width", "100%", "important");
+    preview.style.setProperty("aspect-ratio", "16 / 9", "important");
+    preview.style.setProperty("height", "auto", "important");
+  };
+}
+
+function refreshFileSizeUI() {
+  const info = document.getElementById("fileSizeInfo");
+  document.getElementById("trimActionsWrap")?.remove();
+  if (!info) return;
+
+  const effectiveFile = trimmedFile || rawSelectedFile;
+  if (!effectiveFile) { info.textContent = ""; return; }
+
+  const mb = (effectiveFile.size / (1024 * 1024)).toFixed(1);
+  const overLimit = effectiveFile.size > MAX_FILE_MB * 1024 * 1024;
+
+  info.innerHTML = trimmedFile
+    ? `<span style="color:${overLimit ? "var(--red)" : "var(--green)"}">✂️ Recortado: ${mb}MB${overLimit ? ` — todavía supera los ${MAX_FILE_MB}MB, recortá un poco más` : " — perfecto"}</span>`
+    : (overLimit
+        ? `<span style="color:var(--red)">${mb}MB — supera el máximo de ${MAX_FILE_MB}MB</span>`
+        : `<span style="color:var(--green)">${mb}MB — perfecto, entra sin problema</span>`);
+
+  const actionsWrap = document.createElement("div");
+  actionsWrap.id = "trimActionsWrap";
+  actionsWrap.style.cssText = "margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;";
+  actionsWrap.innerHTML = `
+    <button type="button" class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="openVideoTrimmer()">✂️ ${trimmedFile ? "Recortar de nuevo" : "Recortar este video"}</button>
+    ${trimmedFile ? `<button type="button" class="btn-outline" style="font-size:12px; padding:6px 12px;" onclick="discardTrim()">Usar el original</button>` : ""}`;
+  info.insertAdjacentElement("afterend", actionsWrap);
+}
+
+function discardTrim() {
+  trimmedFile = null;
+  refreshFileSizeUI();
+  refreshUploadPreviewSafe();
+}
+
+function formatTrimSeconds(s) {
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+async function openVideoReeditor(videoId) {
+  const video = (window.__profileFeedVideos || []).find(v => v.id === videoId);
+  if (!video || video.user_id !== currentUser.id) {
+    showToast("No encontramos ese video en tu perfil");
+    return;
+  }
+  if (video.platform !== "upload" || !isSafeUrl(video.video_url)) {
+    showToast("Solo se pueden reeditar videos subidos directamente a LiveScroll");
+    return;
+  }
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Este navegador no permite reeditar videos. Probá con Chrome o Firefox actualizados.");
+    return;
+  }
+
+  closeVideoActionSheet();
+  document.querySelectorAll(".video-grid-menu").forEach(el => el.classList.add("hidden"));
+  if (videoReeditAbortController) {
+    try { videoReeditAbortController.abort(); } catch (_) {}
+  }
+  window.__lsVideoReeditCancelledByUser = false;
+  videoReeditAbortController = new AbortController();
+  const localAbortController = videoReeditAbortController;
+  let preparationTimedOut = false;
+  const preparationTimeout = setTimeout(() => {
+    preparationTimedOut = true;
+    try { localAbortController.abort(); } catch (_) {}
+  }, 90000);
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:140;">
+      <div class="modal-box" style="max-width:420px;text-align:center;">
+        <div class="modal-box-body" style="padding:30px 22px;">
+          <div style="font-size:38px;margin-bottom:12px;">✂️</div>
+          <h2 style="margin:0 0 7px;">Preparando tu video</h2>
+          <p id="videoReeditPrepareStatus" style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">Descargando una copia segura para editar. El original todavía no se modifica.</p>
+          <div class="ls-reedit-loading"><i></i></div>
+          <button class="btn-outline" style="width:100%;margin-top:16px;" onclick="cancelVideoReeditorPreparation()">Cancelar</button>
+        </div>
+      </div>
+    </div>`;
+
+  try {
+    const response = await fetch(video.video_url, {
+      cache:"no-store",
+      signal:localAbortController.signal
+    });
+    if (!response.ok) throw new Error(`No se pudo descargar (${response.status})`);
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    const prepareStatus = document.getElementById("videoReeditPrepareStatus");
+    if (prepareStatus && contentLength > 0) {
+      prepareStatus.textContent = `Descargando ${(contentLength / (1024 * 1024)).toFixed(1)} MB para editar sin tocar el original...`;
+    }
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("El archivo recibido está vacío");
+    if (blob.size > MAX_FILE_MB * 1024 * 1024) {
+      throw new Error(`El archivo supera los ${MAX_FILE_MB} MB permitidos para reedición`);
+    }
+    const extension = blob.type.includes("webm") ? "webm" : "mp4";
+    rawSelectedFile = new File([blob], `video-${video.id}.${extension}`, { type:blob.type || "video/mp4" });
+    trimmedFile = null;
+    videoReeditContext = {
+      videoId:video.id,
+      title:video.title || "Video",
+      oldVideoUrl:video.video_url,
+      oldThumbnailUrl:video.thumbnail_url || null
+    };
+    openVideoTrimmer();
+  } catch (error) {
+    if (window.__lsVideoReeditCancelledByUser) return;
+    console.error("No se pudo preparar la reedición:", error);
+    wrap.innerHTML = "";
+    videoReeditContext = null;
+    rawSelectedFile = null;
+    showToast(preparationTimedOut
+      ? "La descarga tardó demasiado. Probá nuevamente con una conexión más estable."
+      : "No pudimos preparar el video. El original sigue intacto.");
+  } finally {
+    clearTimeout(preparationTimeout);
+    if (videoReeditAbortController === localAbortController) {
+      videoReeditAbortController = null;
+    }
+  }
+}
+
+function getClipStoragePathFromPublicUrl(publicUrl) {
+  try {
+    const parsed = new URL(publicUrl);
+    const marker = "/storage/v1/object/public/clip-videos/";
+    const markerIndex = parsed.pathname.indexOf(marker);
+    if (markerIndex < 0) return null;
+    return decodeURIComponent(parsed.pathname.slice(markerIndex + marker.length));
+  } catch (_) {
+    return null;
+  }
+}
+
+async function saveReeditedVideo(file) {
+  const context = videoReeditContext;
+  if (!context || !file) throw new Error("Falta el contexto de reedición");
+  if (file.size > MAX_FILE_MB * 1024 * 1024) {
+    throw new Error(`La nueva edición supera los ${MAX_FILE_MB} MB`);
+  }
+
+  const progressText = document.getElementById("trimProgressText");
+  const progressBar = document.getElementById("trimProgressBar");
+  if (progressText) progressText.textContent = "Subiendo la nueva edición de forma segura...";
+  if (progressBar) progressBar.style.width = "35%";
+
+  const newR2Urls = [];
+  try {
+  const videoUpload = await uploadMediaToR2(file);
+  const newVideoUrl = videoUpload.url;
+  newR2Urls.push(newVideoUrl);
+  if (!newVideoUrl) throw new Error("No se obtuvo la URL de la nueva edición");
+  if (progressBar) progressBar.style.width = "65%";
+
+  let newThumbnailUrl = null;
+  try {
+    const thumbnailBlob = await createVideoThumbnailBlob(file);
+    if (thumbnailBlob) {
+      const thumbUpload = await uploadMediaToR2(thumbnailBlob);
+      newThumbnailUrl = thumbUpload?.url || null;
+      if (newThumbnailUrl) newR2Urls.push(newThumbnailUrl);
+    }
+  } catch (thumbnailError) {
+    console.warn("No se pudo crear la nueva carátula:", thumbnailError);
+  }
+  if (progressBar) progressBar.style.width = "82%";
+
+  const { data:updateResult, error:updateError } = await sb.rpc("replace_own_video_media", {
+    p_video_id:context.videoId,
+    p_video_url:newVideoUrl,
+    p_thumbnail_url:newThumbnailUrl
+  });
+  if (updateError || !updateResult?.ok) {
+    throw updateError || new Error(updateResult?.error || "No se pudo guardar la edición");
+  }
+  if (progressBar) progressBar.style.width = "100%";
+
+  const oldPaths = [
+    getClipStoragePathFromPublicUrl(context.oldVideoUrl),
+    getClipStoragePathFromPublicUrl(context.oldThumbnailUrl)
+  ].filter(Boolean);
+  if (oldPaths.length) {
+    sb.storage.from("clip-videos").remove(oldPaths).catch(error => {
+      console.warn("La edición se guardó, pero no se pudo limpiar un archivo anterior:", error);
+    });
+  }
+
+  const editedTitle = context.title;
+  closeVideoTrimmer();
+  lsPerfCache.profileVideos.at = 0;
+  lsPerfCache.feed.at = 0;
+  loadedEmbeds.clear();
+  showToast(`✂️ “${editedTitle}” fue reeditado sin perder sus interacciones`);
+  await renderProfile();
+  } catch (error) {
+    await Promise.allSettled(newR2Urls.map(deleteMediaFromR2));
+    throw error;
+  }
+}
+
+function openVideoTrimmer() {
+  if (!rawSelectedFile) return;
+  if (!window.MediaRecorder || !HTMLVideoElement.prototype.captureStream) {
+    showToast("Tu navegador no permite recortar acá. Probá con Chrome o Firefox actualizados.");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  const objectUrl = URL.createObjectURL(rawSelectedFile);
+  wrap.innerHTML = `
+    <div class="modal-overlay" style="z-index:140;">
+      <div class="modal-box" style="max-width:420px;">
+        <div class="modal-box-header"><h2>✂️ ${videoReeditContext ? "Reeditar video" : "Recortar video"}</h2></div>
+        <div class="modal-box-body">
+          <video id="trimPreviewVideo" src="${objectUrl}" controls muted style="width:100%; border-radius:10px; margin-bottom:14px; background:#000;"></video>
+          <div id="trimLoadingMsg" style="font-size:12px; color:var(--text-dim); margin-bottom:10px;">Cargando video...</div>
+          <div id="trimControls" class="hidden">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-bottom:4px;">
+              <span>Inicio: <span id="trimStartLabel" class="mono">0:00</span></span>
+              <span>Fin: <span id="trimEndLabel" class="mono">0:00</span></span>
+            </div>
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde empieza:</label>
+            <input type="range" id="trimStartRange" min="0" max="1" step="0.1" value="0" style="width:100%;">
+            <label style="font-size:11px; color:var(--text-dim);">Arrastrá para elegir dónde termina:</label>
+            <input type="range" id="trimEndRange" min="0" max="1" step="0.1" value="1" style="width:100%;">
+            <div style="font-size:12px; color:var(--text-dim); margin-top:8px;">Duración elegida: <strong id="trimDurationLabel" class="mono" style="color:var(--gold);">0s</strong></div>
+          </div>
+          <div id="trimProgressWrap" class="hidden" style="margin-top:14px;">
+            <div style="background:var(--panel-2); border-radius:20px; height:10px; overflow:hidden;">
+              <div id="trimProgressBar" style="width:0%; height:100%; background:var(--gold); transition:width 0.15s;"></div>
+            </div>
+            <div id="trimProgressText" style="font-size:12px; color:var(--text-dim); margin-top:6px; text-align:center;">Procesando, no cierres esta ventana...</div>
+          </div>
+        </div>
+        <div class="modal-box-footer">
+          <div style="display:flex; gap:10px;">
+            <button class="btn-outline" style="flex:1;" onclick="closeVideoTrimmer()">Cancelar</button>
+            <button class="btn" id="trimConfirmBtn" style="flex:1;" onclick="confirmVideoTrim()" disabled>${videoReeditContext ? "Guardar nueva edición" : "Recortar y usar"}</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  const video = document.getElementById("trimPreviewVideo");
+  video.addEventListener("loadedmetadata", () => {
+    const dur = video.duration;
+    document.getElementById("trimLoadingMsg").classList.add("hidden");
+    document.getElementById("trimControls").classList.remove("hidden");
+    document.getElementById("trimConfirmBtn").disabled = false;
+
+    const startRange = document.getElementById("trimStartRange");
+    const endRange = document.getElementById("trimEndRange");
+    startRange.max = dur; endRange.max = dur;
+    startRange.value = 0; endRange.value = dur;
+    updateTrimLabels();
+
+    startRange.addEventListener("input", () => {
+      if (parseFloat(startRange.value) >= parseFloat(endRange.value)) startRange.value = Math.max(0, parseFloat(endRange.value) - 1);
+      video.currentTime = parseFloat(startRange.value);
+      updateTrimLabels();
+    });
+    endRange.addEventListener("input", () => {
+      if (parseFloat(endRange.value) <= parseFloat(startRange.value)) endRange.value = Math.min(dur, parseFloat(startRange.value) + 1);
+      video.currentTime = parseFloat(endRange.value);
+      updateTrimLabels();
+    });
+  });
+}
+
+function updateTrimLabels() {
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  if (!startRange || !endRange) return;
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+  document.getElementById("trimStartLabel").textContent = formatTrimSeconds(start);
+  document.getElementById("trimEndLabel").textContent = formatTrimSeconds(end);
+  document.getElementById("trimDurationLabel").textContent = formatTrimSeconds(end - start);
+}
+
+function closeVideoTrimmer() {
+  const wasReediting = !!videoReeditContext;
+  document.getElementById("globalModalWrap").innerHTML = "";
+  videoReeditContext = null;
+  if (wasReediting) {
+    rawSelectedFile = null;
+    trimmedFile = null;
+  }
+}
+
+async function confirmVideoTrim() {
+  const video = document.getElementById("trimPreviewVideo");
+  const startRange = document.getElementById("trimStartRange");
+  const endRange = document.getElementById("trimEndRange");
+  const start = parseFloat(startRange.value);
+  const end = parseFloat(endRange.value);
+
+  if (end - start < 1) { showToast("Elegí al menos 1 segundo de duración"); return; }
+
+  document.getElementById("trimControls").classList.add("hidden");
+  document.getElementById("trimProgressWrap").classList.remove("hidden");
+  document.getElementById("trimConfirmBtn").disabled = true;
+  document.getElementById("trimConfirmBtn").textContent = "Procesando...";
+
+  try {
+    const result = await trimVideoClientSide(video, start, end, (pct) => {
+      const bar = document.getElementById("trimProgressBar");
+      if (bar) bar.style.width = `${Math.round(pct * 100)}%`;
+    });
+
+    const ext = result.mimeType.includes("mp4") ? "mp4" : "webm";
+    const baseName = rawSelectedFile.name.replace(/\.[^.]+$/, "");
+    trimmedFile = new File([result.blob], `${baseName}-recorte.${ext}`, { type: result.mimeType });
+
+    if (videoReeditContext) {
+      await saveReeditedVideo(trimmedFile);
+    } else {
+      closeVideoTrimmer();
+      refreshFileSizeUI();
+      refreshUploadPreviewSafe();
+      showToast("¡Video recortado!");
+    }
+  } catch (e) {
+    console.error("Error recortando video:", e);
+    showToast("No se pudo recortar. El video original sigue intacto.");
+    closeVideoTrimmer();
+    videoReeditContext = null;
+  }
+}
+
+function trimVideoClientSide(video, startSec, endSec, onProgress) {
+  return new Promise((resolve, reject) => {
+    try {
+      const stream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+      const mimeCandidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+      const mimeType = mimeCandidates.find(m => window.MediaRecorder.isTypeSupported(m)) || "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const chunks = [];
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onerror = (e) => reject(e.error || new Error("Error al grabar"));
+      recorder.onstop = () => {
+        resolve({ blob: new Blob(chunks, { type: mimeType || "video/webm" }), mimeType: mimeType || "video/webm" });
+      };
+
+      video.currentTime = startSec;
+      video.onseeked = () => {
+        video.onseeked = null;
+        recorder.start();
+        video.play();
+
+        const step = () => {
+          if (video.currentTime >= endSec || video.ended) {
+            video.pause();
+            recorder.stop();
+            return;
+          }
+          if (onProgress) onProgress(Math.min(1, (video.currentTime - startSec) / (endSec - startSec)));
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+async function setUploadMode(mode) {
+  window.currentUploadMode = mode;
+  videoReeditContext = null;
+  rawSelectedFile = null;
+  trimmedFile = null;
+  clearUploadPreviewSafe();
+  document.getElementById("linkFields").classList.toggle("hidden", mode !== "link");
+  document.getElementById("fileFields").classList.toggle("hidden", mode !== "file");
+  document.getElementById("modeLinkBtn").className = mode === "link" ? "btn" : "btn-outline";
+  document.getElementById("modeFileBtn").className = mode === "file" ? "btn" : "btn-outline";
+}
+
+async function handleUpload() {
+  if (window.currentUploadMode === "file") {
+    await handleUploadFile();
+  } else {
+    await handleUploadLink();
+  }
+}
+
+async function getUploadRewardPoints() {
+  try {
+    const { data } = await sb
+      .from("app_config")
+      .select("value")
+      .eq("key", "points_per_upload")
+      .single();
+
+    return Number(data?.value) || 40;
+  } catch (_) {
+    return 40;
+  }
+}
+
+function showVideoPublishedSuccess(title, pointsEarned) {
+  const existing = document.getElementById("videoPublishedSuccessModal");
+  if (existing) existing.remove();
+
+  const safeTitle = escapeHtml(title || "Tu video");
+
+  const modal = document.createElement("div");
+  modal.id = "videoPublishedSuccessModal";
+  modal.style.cssText = `
+    position:fixed;inset:0;z-index:99999;
+    background:rgba(0,0,0,.76);
+    display:flex;align-items:center;justify-content:center;
+    padding:18px;box-sizing:border-box;
+    backdrop-filter:blur(7px);
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      width:min(100%,430px);
+      background:var(--panel);
+      border:1px solid rgba(34,197,94,.38);
+      border-radius:18px;
+      padding:22px;
+      box-shadow:0 22px 70px rgba(0,0,0,.55);
+      text-align:center;
+    ">
+      <div style="
+        width:58px;height:58px;border-radius:50%;
+        margin:0 auto 12px;
+        display:flex;align-items:center;justify-content:center;
+        background:rgba(34,197,94,.12);
+        border:1px solid rgba(34,197,94,.35);
+        font-size:28px;
+      ">✓</div>
+
+      <div style="
+        font-family:'JetBrains Mono',monospace;
+        font-size:9px;font-weight:900;
+        color:var(--green);
+        letter-spacing:.12em;text-transform:uppercase;
+        margin-bottom:6px;
+      ">PUBLICADO</div>
+
+      <h2 style="margin:0 0 7px;font-size:20px;">¡Video publicado!</h2>
+      <p style="margin:0;color:var(--text-dim);font-size:12px;line-height:1.5;">
+        ${safeTitle}
+      </p>
+
+      ${pointsEarned > 0 ? `
+        <div style="
+          margin:16px 0;
+          padding:12px;
+          border-radius:12px;
+          border:1px solid rgba(34,197,94,.25);
+          background:rgba(34,197,94,.07);
+        ">
+          <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">
+            Ganaste
+          </div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:23px;font-weight:900;color:var(--green);">
+            +${pointsEarned} pts
+          </div>
+        </div>
+      ` : `
+        <div style="margin:16px 0;color:var(--text-dim);font-size:11px;">
+          Video publicado sin recompensa de puntos.
+        </div>
+      `}
+
+      <button class="btn" onclick="closeVideoPublishedSuccess(true)" style="width:100%;padding:12px;">
+        ▶ Ver en LiveScroll
+      </button>
+
+      <button class="btn-outline" onclick="closeVideoPublishedSuccess(false)" style="width:100%;padding:10px;margin-top:8px;">
+        Cerrar
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+
+function closeVideoPublishedSuccess(goToFeed) {
+  document.getElementById("videoPublishedSuccessModal")?.remove();
+  if (goToFeed) switchTab("feed");
+}
+
+async function handleUploadLink() {
+  const platform = document.getElementById("uploadPlatform").value;
+  const title = document.getElementById("uploadTitle").value.trim();
+  const url = document.getElementById("uploadUrl").value.trim();
+  const errEl = document.getElementById("uploadError");
+  errEl.textContent = "";
+
+  if (!title || !url) { errEl.textContent = "Completá título y link."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
+
+  const { data:createdVideo, error } = await sb.from("videos").insert({
+    user_id: currentUser.id,
+    platform,
+    title,
+    video_url: url,
+    client_origin: getLiveScrollClientOrigin()
+  }).select("id").single();
+
+  if (error) { errEl.textContent = error.message; return; }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    errEl.textContent = "El video se publicó, pero faltan los hashtags: " + tagError.message;
+  }
+  lsPerfCache.feed = { data:null, at:0 };
+
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
+  if (currentProfile.is_blocked) {
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
+  } else {
+    earned = reward;
+    currentProfile.points_balance += reward;
+    updateBalanceUI();
+    showFloatingPointsSafe(reward);
+  }
+
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
+  showVideoPublishedSuccess(title, earned);
+}
+
+
+async function createVideoThumbnailBlob(file) {
+  return new Promise((resolve) => {
+    let objectUrl = null;
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "metadata";
+
+    const cleanup = () => {
+      try { video.pause(); } catch (_) {}
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+
+    const fail = () => {
+      cleanup();
+      resolve(null);
+    };
+
+    video.onerror = fail;
+
+    video.onloadedmetadata = () => {
+      const duration = Number.isFinite(video.duration) ? video.duration : 0;
+      video.currentTime = Math.min(Math.max(0.2, duration * 0.12), Math.max(0.2, duration - 0.1));
+    };
+
+    video.onseeked = () => {
+      try {
+        const sourceW = video.videoWidth || 1280;
+        const sourceH = video.videoHeight || 720;
+        const maxW = 720;
+        const scale = Math.min(1, maxW / sourceW);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(sourceW * scale));
+        canvas.height = Math.max(1, Math.round(sourceH * scale));
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return fail();
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob((blob) => {
+          cleanup();
+          resolve(blob || null);
+        }, "image/jpeg", 0.82);
+      } catch (_) {
+        fail();
+      }
+    };
+
+    try {
+      objectUrl = URL.createObjectURL(file);
+      video.src = objectUrl;
+    } catch (_) {
+      fail();
+    }
+  });
+}
+
+async function handleUploadFile() {
+  const title = document.getElementById("uploadTitle").value.trim();
+  const file = trimmedFile || rawSelectedFile;
+  const errEl = document.getElementById("uploadError");
+  const btn = document.getElementById("uploadSubmitBtn");
+  errEl.textContent = "";
+
+  if (!title || !file) { errEl.textContent = "Completá el título y elegí un archivo."; return; }
+  if (getUploadHashtags().tooMany) { errEl.textContent = "Podés usar como máximo 5 hashtags."; return; }
+  if (file.size > MAX_FILE_MB * 1024 * 1024) { errEl.textContent = `El archivo supera los ${MAX_FILE_MB}MB permitidos. Probá recortarlo un poco más.`; return; }
+
+  btn.disabled = true;
+  btn.textContent = "Subiendo...";
+  document.getElementById("uploadProgress").classList.remove("hidden");
+
+  let videoUpload;
+  try {
+    videoUpload = await uploadMediaToR2(file);
+  } catch (uploadError) {
+    errEl.textContent = "Error al subir: " + uploadError.message;
+    btn.disabled = false;
+    btn.textContent = "Publicar video";
+    return;
+  }
+
+  let thumbnailUrl = null;
+  try {
+    const thumbnailBlob = await createVideoThumbnailBlob(file);
+
+    if (thumbnailBlob) {
+      const thumbUpload = await uploadMediaToR2(thumbnailBlob);
+      thumbnailUrl = thumbUpload?.url || null;
+    }
+  } catch (thumbErr) {
+    console.warn("No se pudo generar la carátula, el video se sube igual:", thumbErr);
+  }
+
+  const { data:createdVideo, error: insertError } = await sb.from("videos").insert({
+    user_id: currentUser.id,
+    platform: "upload",
+    title,
+    video_url: videoUpload.url,
+    thumbnail_url: thumbnailUrl,
+    client_origin: getLiveScrollClientOrigin()
+  }).select("id").single();
+
+  btn.disabled = false;
+  btn.textContent = "Publicar video";
+
+  if (insertError) {
+    await Promise.allSettled([
+      deleteMediaFromR2(videoUpload?.url),
+      deleteMediaFromR2(thumbnailUrl)
+    ]);
+    errEl.textContent = insertError.message;
+    return;
+  }
+  try {
+    await saveVideoHashtags(createdVideo.id);
+  } catch (tagError) {
+    showToast("Video publicado; no pudimos guardar sus hashtags");
+  }
+  lsPerfCache.feed = { data:null, at:0 };
+
+  const reward = await getUploadRewardPoints();
+  let earned = 0;
+
+  if (currentProfile.is_blocked) {
+    showToast("Video publicado (sin puntos: cuenta bloqueada)");
+  } else {
+    earned = reward;
+    currentProfile.points_balance += reward;
+    updateBalanceUI();
+    showFloatingPointsSafe(reward);
+  }
+
+  recordDailyChallengeEvent("upload_video", createdVideo.id);
+  showVideoPublishedSuccess(title, earned);
+}
+
+// ============================================================
+// BILLETERA / CANJE
+// ============================================================
+async function renderWallet() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando billetera...</p>`;
+
+  const plans = await loadPlans();
+  const plan = plans.find(p => p.id === currentProfile.plan_id) || plans[0];
+
+  const { data: ledger } = await sb
+    .from("points_ledger")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(60);
+
+  const { data: boostStatus } = await sb.rpc("get_boost_status", { p_user_id: currentUser.id });
+  const { data: walletConfig } = await sb.from("app_text_config").select("*").eq("key", "wallet_visibility").single();
+  const walletClosed = walletConfig?.value === "closed" && !currentProfile.is_admin;
+
+  const MIN_REDEEM = 1500;
+  const progressPct = Math.min(100, (currentProfile.points_balance / MIN_REDEEM) * 100);
+  const missing = Math.max(0, MIN_REDEEM - currentProfile.points_balance);
+  const commissionPreview = Math.round(MIN_REDEEM * plan.commission_pct);
+
+  main.innerHTML = `
+    <h1 class="page-title">Billetera</h1>
+    ${walletConfig?.value === "closed" && currentProfile.is_admin ? `<div style="background:rgba(248,113,113,0.1); border:1px solid var(--red); color:var(--red); font-size:12px; padding:10px 14px; border-radius:8px; margin-bottom:16px;">🔒 Los retiros están CERRADOS para el resto de los usuarios ahora mismo. Vos seguís pudiendo retirar. Cambialo desde el panel de Admin.</div>` : ""}
+    <p class="page-sub">Plan actual: <strong style="color:var(--gold)">${plan.name}</strong> · Comisión por retiro: ${(plan.commission_pct * 100).toFixed(0)}% · Canje mínimo: 1.500 pts</p>
+
+    <div class="wallet-hero">
+      <div>
+        <div class="label">Balance actual</div>
+        <div class="big mono">${currentProfile.points_balance} pts</div>
+      </div>
+      <div>
+        <div class="label">Equivale aprox. a (antes de comisión)</div>
+        <div class="big mono" style="color:var(--green)">$${currentProfile.points_balance.toLocaleString("es-AR")} ARS</div>
+      </div>
+    </div>
+
+    ${renderBoostBox(plan, boostStatus)}
+
+    <div style="margin-bottom:28px">
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-dim);margin-bottom:8px;">
+        <span>Progreso hacia tu próximo canje</span>
+        <span class="mono">${currentProfile.points_balance} / ${MIN_REDEEM} pts</span>
+      </div>
+      <div style="background:var(--panel-2);border:1px solid var(--border);border-radius:20px;height:14px;overflow:hidden;">
+        <div style="width:${progressPct}%;height:100%;background:linear-gradient(90deg, var(--gold-dim), var(--gold));transition:width 0.4s ease;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:6px;">
+        ${missing > 0 ? `Te faltan <span style="color:var(--gold)">${missing} pts</span> para poder canjear` : `¡Ya podés solicitar tu canje! 🎉`}
+      </div>
+    </div>
+
+    ${walletClosed ? `
+    <div class="form-card" style="margin-bottom:28px; text-align:center; border-color:var(--red);">
+      <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+      <h3 style="margin-top:0;">Retiros pausados</h3>
+      <p style="color:var(--text-dim); font-size:13px;">Estamos ajustando el sistema de canjes. Tus puntos siguen a salvo, volvé a intentar más tarde.</p>
+    </div>` : `
+    <div class="form-card" style="margin-bottom:28px">
+      <h3 style="margin-top:0">Solicitar canje</h3>
+      <div class="field">
+        <label>Puntos a canjear (mínimo 1.500)</label>
+        <input type="number" id="redeemPoints" placeholder="1500" min="1500" max="${currentProfile.points_balance}" oninput="updateRedeemPreview(${plan.commission_pct})">
+      </div>
+      <div class="field">
+        <label>Alias de MercadoPago</label>
+        <input type="text" id="redeemAlias" placeholder="tu.alias.mp">
+      </div>
+      <div id="redeemPreview" style="font-size:13px; color:var(--text-dim); margin-bottom:14px;">
+        Con la comisión de tu plan (${(plan.commission_pct * 100).toFixed(0)}%), 1.500 pts te darían <strong style="color:var(--green)">$${(1500 - commissionPreview).toLocaleString("es-AR")}</strong>
+      </div>
+      <button class="btn" onclick="handleRedeem(${plan.commission_pct})">Solicitar canje</button>
+      <div id="redeemError" class="error-msg"></div>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:10px;">
+        Los canjes se revisan manualmente antes de acreditarse. El saldo se descuenta al solicitar.
+        Tope de canje semanal en tu plan: $${plan.weekly_redemption_cap.toLocaleString("es-AR")}.
+      </p>
+    </div>`}
+
+    <h3>Historial de movimientos</h3>
+    <div id="ledgerList">
+      ${(ledger || []).map(l => `
+        <div class="ledger-row">
+          <span>${reasonLabel(l.reason)} · ${new Date(l.created_at).toLocaleString("es-AR")}</span>
+          <span class="amt mono ${l.amount >= 0 ? "pos" : "neg"}">${l.amount >= 0 ? "+" : ""}${l.amount}</span>
+        </div>
+      `).join("") || "<p style='color:var(--text-dim)'>Sin movimientos todavía.</p>"}
+    </div>`;
+}
+
+function renderBoostBox(plan, status) {
+  if (!status || !status.has_boost_plan) {
+    return `
+      <div class="form-card" style="margin-bottom:24px; text-align:center; color:var(--text-dim); font-size:13px;">
+        Tu plan (${plan.name}) no incluye boost activable. <button onclick="switchTab('store')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Ver planes en Tienda →</button>
+      </div>`;
+  }
+  if (status.active) {
+    const expires = new Date(status.expires_at);
+    return `
+      <div class="form-card" style="margin-bottom:24px; border-color:var(--green);">
+        ⚡ Boost <strong>x${plan.boost_multiplier}</strong> activo hasta <strong>${expires.toLocaleString("es-AR")}</strong>
+      </div>`;
+  }
+  if (!status.can_activate) {
+    const next = new Date(status.next_available);
+    return `
+      <div class="form-card" style="margin-bottom:24px; color:var(--text-dim); font-size:13px;">
+        Tu próximo boost x${plan.boost_multiplier} estará disponible el <strong style="color:var(--text)">${next.toLocaleString("es-AR")}</strong>
+      </div>`;
+  }
+  return `
+    <div class="form-card" style="margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+      <span>Tenés disponible tu boost <strong style="color:var(--gold)">x${plan.boost_multiplier}</strong> por 24hs</span>
+      <button class="btn" onclick="handleActivateBoost()">Activar boost</button>
+    </div>`;
+}
+
+async function handleActivateBoost() {
+  const { data, error } = await sb.rpc("activate_boost", { p_user_id: currentUser.id });
+  if (error || !data.ok) { showToast("No se pudo activar el boost"); return; }
+  showToast("¡Boost activado por 24hs!");
+  renderWallet();
+}
+
+function updateRedeemPreview(commissionPct) {
+  const input = document.getElementById("redeemPoints");
+  const preview = document.getElementById("redeemPreview");
+  const points = parseInt(input.value, 10) || 1500;
+  const commission = Math.round(points * commissionPct);
+  preview.innerHTML = `Con la comisión de tu plan (${(commissionPct * 100).toFixed(0)}%), ${points} pts te darían <strong style="color:var(--green)">$${(points - commission).toLocaleString("es-AR")}</strong>`;
+}
+
+function reasonLabel(reason) {
+  const labels = {
+    upload: "Subiste un video",
+    watch: "Miraste un video",
+    watched_by_other: "Miraron tu video",
+    redemption: "Canje solicitado",
+    adjustment: "Ajuste manual"
+  };
+  return labels[reason] || reason;
+}
+
+async function handleRedeem() {
+  const points = parseInt(document.getElementById("redeemPoints").value, 10);
+  const alias = document.getElementById("redeemAlias").value.trim();
+  const errEl = document.getElementById("redeemError");
+  errEl.textContent = "";
+
+  if (!points || !alias) { errEl.textContent = "Completá los puntos y el alias."; return; }
+
+  const { data, error } = await sb.rpc("request_redemption", {
+    p_user_id: currentUser.id,
+    p_points: points,
+    p_alias: alias
+  });
+
+  if (error) { errEl.textContent = error.message; return; }
+  if (!data.ok) {
+    const messages = {
+      below_minimum: "El mínimo para canjear es 1.500 puntos.",
+      insufficient_balance: "No tenés suficientes puntos.",
+      weekly_cap_exceeded: `Superaste el tope de canje semanal de tu plan. Te quedan $${Math.max(0, data.remaining || 0).toLocaleString("es-AR")} disponibles esta semana.`,
+      cuenta_bloqueada: "Tu cuenta está bloqueada para canjes (detectamos otra cuenta desde la misma red). Contactanos si creés que es un error."
+    };
+    errEl.textContent = messages[data.error] || data.error;
+    return;
+  }
+
+  currentProfile.points_balance -= points;
+  updateBalanceUI();
+  showToast(`Canje solicitado: recibís $${data.amount_ars.toLocaleString("es-AR")} (comisión: $${data.commission_ars})`);
+  renderWallet();
+}
+
+// ============================================================
+// MI PERFIL — videos propios y cuánto generaron
+// ============================================================
+
+function lsTimeAgo(dateString) {
+  if (!dateString) return "";
+  const diff = Math.max(0, Date.now() - new Date(dateString).getTime());
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Ahora";
+  if (mins < 60) return `Hace ${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `Hace ${hrs} h`;
+  const days = Math.floor(hrs / 24);
+  return `Hace ${days} d`;
+}
+
+function lsIsWithinHours(dateString, hours) {
+  if (!dateString) return false;
+  const t = new Date(dateString).getTime();
+  return Number.isFinite(t) && (Date.now() - t) >= 0 && (Date.now() - t) <= hours * 3600000;
+}
+
+function lsBuildRecentActivity(videos, badges) {
+  const items = [];
+
+  (videos || []).slice(0, 3).forEach(v => {
+    items.push({
+      icon:"🎬",
+      title:`Subiste “${v.title || "un video"}”`,
+      date:v.created_at
+    });
+  });
+
+  (badges || []).slice(-2).forEach(b => {
+    const d = b.earned_at || b.created_at || b.unlocked_at;
+    if (d) items.push({
+      icon:b.badge_icon || "🏅",
+      title:`Ganaste la medalla “${b.badge_name || "Nueva medalla"}”`,
+      date:d
+    });
+  });
+
+  return items
+    .filter(x => x.date)
+    .sort((a,b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 4);
+}
+
+function initProfileNovaTilt() {
+  const hero = document.getElementById("lsProfileNovaHero");
+  const inner = document.getElementById("lsProfileNovaInner");
+  if (!hero || !inner || window.matchMedia("(hover:none)").matches) return;
+
+  let frame = 0;
+  let pointerX = 0;
+  let pointerY = 0;
+  const paint = () => {
+    frame = 0;
+    const r = hero.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (pointerX - r.left) / r.width));
+    const y = Math.max(0, Math.min(1, (pointerY - r.top) / r.height));
+    const ry = (x - .5) * 3.2;
+    const rx = (.5 - y) * 2.4;
+    hero.style.setProperty("--ls-glow-x", `${x*100}%`);
+    hero.style.setProperty("--ls-glow-y", `${y*100}%`);
+    inner.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg) translateZ(0)`;
+  };
+  const move = (e) => {
+    pointerX = e.clientX;
+    pointerY = e.clientY;
+    if (!frame) frame = requestAnimationFrame(paint);
+  };
+  const reset = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    inner.style.transform = "";
+  };
+  hero.addEventListener("mousemove", move);
+  hero.addEventListener("mouseleave", reset);
+}
+
+
+async function getMyProfileTitle() {
+  const { data, error } = await sb.rpc("get_my_profile_title");
+  if (error) {
+    console.warn("No se pudo cargar el título propio:", error);
+    return null;
+  }
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
+}
+
+async function getPublicProfileTitle(userId) {
+  if (!userId) return null;
+  const { data, error } = await sb.rpc("get_profile_title", { p_user_id:userId });
+  if (error) {
+    console.warn("No se pudo cargar el título público:", error);
+    return null;
+  }
+  return data?.item_id ? await hydrateProfileTitleRarity(data) : null;
+}
+
+function normalizeProfileTitleRarity(value) {
+  const normalized = String(value || "comun")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]/g, "");
+  const aliases = {
+    comun:"comun", common:"comun",
+    rara:"rara", raro:"rara", rare:"rara",
+    epica:"epica", epico:"epica", epic:"epica",
+    legendaria:"legendaria", legendario:"legendaria", legendary:"legendaria",
+    exclusiva:"exclusiva", exclusivo:"exclusiva", exclusive:"exclusiva",
+    mitica:"mitica", mitico:"mitica", mythic:"mitica"
+  };
+  return aliases[normalized] || "comun";
+}
+
+async function hydrateProfileTitleRarity(title) {
+  if (!title?.item_id) return title;
+  if (title.rarity) return { ...title, rarity:normalizeProfileTitleRarity(title.rarity) };
+  const { data } = await sb.from("store_items").select("rarity").eq("id", title.item_id).maybeSingle();
+  return { ...title, rarity:normalizeProfileTitleRarity(data?.rarity) };
+}
+
+function renderProfileTitleInline(title, isOwnProfile = false) {
+  if (!title?.item_id) {
+    if (!isOwnProfile) return "";
+
+    return `
+      <button
+        type="button"
+        onclick="openMyTitlesFromProfile()"
+        title="Equipar un título"
+        style="
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          width:30px;
+          height:30px;
+          margin-top:5px;
+          border-radius:999px;
+          border:1px solid rgba(34,197,94,.45);
+          background:rgba(34,197,94,.10);
+          color:var(--green);
+          font-size:20px;
+          font-weight:900;
+          cursor:pointer;
+          box-shadow:0 0 14px rgba(34,197,94,.16);
+        "
+      >+</button>`;
+  }
+
+  const rarity = normalizeProfileTitleRarity(title.rarity);
+  const rarityClass = getStoreBadgeRarityClass(rarity);
+  const rarityLabel = getStoreBadgeRarityLabel(rarity);
+  return `
+    <button
+      class="ls-profile-title-chip ${rarityClass}"
+      type="button"
+      ${isOwnProfile ? 'onclick="openMyTitlesFromProfile()"' : ""}
+      title="${isOwnProfile ? "Cambiar título" : "Título de perfil"}"
+      style="
+        display:inline-flex;
+        align-items:center;
+        gap:6px;
+        margin-top:5px;
+        padding:4px 9px;
+        border-radius:999px;
+        border:1px solid rgba(203,213,225,.22);
+        font-family:'JetBrains Mono',monospace;
+        font-size:9px;
+        font-weight:900;
+        letter-spacing:.04em;
+        text-transform:uppercase;
+        ${isOwnProfile ? "cursor:pointer;" : "cursor:default;"}
+      "
+    >
+      <span style="font-size:13px;">${title.icon || "🏷️"}</span>
+      <span style="position:relative;z-index:1;">${escapeHtml(title.name || "Título")} · ${escapeHtml(rarityLabel)}</span>
+    </button>`;
+}
+
+function openMyBadgesFromProfile() {
+  openMyMedalsPanel("badge");
+}
+
+function openMyTitlesFromProfile() {
+  openMyMedalsPanel("title");
+}
+
+async function handleEquipProfileTitle(itemId) {
+  const { data, error } = await sb.rpc("equip_profile_title", { p_item_id:itemId });
+
+  if (error || !data?.ok) {
+    const msgs = {
+      titulo_no_disponible:"Este título ya no está disponible.",
+      titulo_no_desbloqueado:"Primero tenés que conseguir este título.",
+      not_authenticated:"Volvé a iniciar sesión."
+    };
+    showToast(msgs[data?.error] || "No se pudo equipar el título");
+    return;
+  }
+
+  showToast(`🏷️ Título equipado: ${data.title || "listo"}`);
+  window.__myProfileTitle = data;
+  closeManagedModal();
+  await renderProfile();
+}
+
+async function handleUnequipProfileTitle() {
+  const { data, error } = await sb.rpc("unequip_profile_title");
+
+  if (error || !data?.ok) {
+    showToast("No se pudo quitar el título");
+    return;
+  }
+
+  window.__myProfileTitle = null;
+  showToast("Título quitado");
+  closeManagedModal();
+  await renderProfile();
+}
+
+function openTitleDetail(itemId, name, icon, equipped = false, obtainedAt = "", rarity = "comun") {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const safeRarity = normalizeProfileTitleRarity(rarity);
+  const rarityClass = getStoreBadgeRarityClass(safeRarity);
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
+      <div class="modal-box" style="max-width:350px;">
+        <div class="modal-box-body" style="padding:26px;text-align:center;">
+          <div class="ls-profile-title-chip ${rarityClass}" style="width:76px;height:76px;border:1px solid;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:44px;margin:0 auto 10px;">${icon || "🏷️"}</div>
+          <h2 style="margin:0 0 6px;">${escapeHtml(name || "Título")}</h2>
+          <div style="font-size:10px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-weight:900;">
+            TÍTULO ${escapeHtml(getStoreBadgeRarityLabel(safeRarity).toUpperCase())}
+          </div>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
+            Este título se muestra debajo de tu nombre tanto en tu perfil como cuando otras personas visitan tu perfil.
+          </p>
+          ${obtainedAt ? `<div style="font-size:9px;color:var(--text-dim);margin-top:10px;">Obtenido ${new Date(obtainedAt).toLocaleDateString("es-AR")}</div>` : ""}
+          <div style="display:flex;gap:8px;margin-top:18px;">
+            <button class="btn-outline" style="flex:1;" onclick="openMyMedalsPanel()">Volver</button>
+            ${equipped
+              ? `<button class="btn" style="flex:1;" onclick="handleUnequipProfileTitle()">Quitar</button>`
+              : `<button class="btn" style="flex:1;" onclick="handleEquipProfileTitle('${itemId}')">Equipar</button>`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+
+async function getEquippedProfileMedals(userId) {
+  if (!userId) return [];
+
+  const [{ data, error }, { data: owned }, { data: storeMeta }, { data: claims }] = await Promise.all([
+    sb.rpc("get_equipped_profile_badges", { p_user_id:userId }),
+    sb.from("user_badges").select("badge_name,badge_icon,earned_at").eq("user_id", userId),
+    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
+    sb.from("user_store_badge_claims").select("badge_id,serial_number").eq("user_id", userId)
+  ]);
+
+  if (error) {
+    console.warn("No se pudieron cargar medallas equipadas:", error);
+    return [];
+  }
+
+  const ownedByName = {};
+  (owned || []).forEach(b => {
+    ownedByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  const storeByName = {};
+  (storeMeta || []).forEach(b => {
+    storeByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  const claimByBadgeId = {};
+  (claims || []).forEach(c => {
+    claimByBadgeId[c.badge_id] = c;
+  });
+
+  return (data || [])
+    .map(m => {
+      const key = String(m.badge_name || "").toLowerCase();
+      const ownedBadge = ownedByName[key] || {};
+      const storeBadge = storeByName[key] || {};
+      const launchBadge = getLiveScroll6LaunchBadgeMeta(m.badge_name) || {};
+      const claim = claimByBadgeId[storeBadge.id] || {};
+
+      return {
+        ...m,
+        badge_icon: m.badge_icon || ownedBadge.badge_icon || "🏅",
+        earned_at: ownedBadge.earned_at || "",
+        rarity: m.rarity || storeBadge.rarity || launchBadge.rarity || "",
+        description: storeBadge.description || launchBadge.description || "",
+        is_limited: !!storeBadge.is_limited || !!launchBadge.is_limited,
+        stock_total: storeBadge.stock_total || null,
+        serial_number: claim.serial_number || null
+      };
+    })
+    .sort((a,b) => Number(a.slot_number) - Number(b.slot_number));
+}
+
+
+function getProfileMedalRarityClass(rarity) {
+  const safe = ["comun","rara","epica","legendaria","exclusiva","mitica"].includes(rarity)
+    ? rarity
+    : "";
+  return safe ? `ls-medal-rarity-${safe}` : "";
+}
+
+function getProfileMedalRarityLabel(rarity) {
+  return ({
+    comun:"Común",
+    rara:"Rara",
+    epica:"Épica",
+    legendaria:"Legendaria",
+    exclusiva:"Exclusiva",
+    mitica:"Mítica"
+  })[rarity] || "";
+}
+
+function getLiveScroll6LaunchBadgeMeta(name) {
+  return String(name || "").trim().toLowerCase() === "fundador de la nueva era"
+    ? {
+        rarity:"mitica",
+        description:"Recompensa única para quienes estuvieron presentes durante los primeros 7 días de LiveScroll 6.",
+        is_limited:true
+      }
+    : null;
+}
+
+function renderEquippedMedalsInline(medals, ownProfile = false) {
+  const safe = Array.isArray(medals) ? medals.slice(0,3) : [];
+  const slots = [];
+
+  for (let i = 1; i <= 3; i++) {
+    const medal = safe.find(m => Number(m.slot_number) === i);
+
+    if (medal) {
+      slots.push(`
+        <button type="button"
+          class="ls-equipped-medal ${getProfileMedalRarityClass(medal.rarity)}${Number(medal.slot_number) === 1 ? " ls-medal-favorite" : ""}"
+          title="${escapeHtml(medal.badge_name || "Medalla")}${getProfileMedalRarityLabel(medal.rarity) ? ` · ${getProfileMedalRarityLabel(medal.rarity)}` : ""}"
+          onclick="event.stopPropagation(); openMedalDetail('${escapeHtml(medal.badge_name || "")}', '${escapeHtml(medal.badge_icon || "🏅")}', '${escapeHtml(medal.rarity || "")}', '${escapeHtml(medal.description || "")}', '${escapeHtml(medal.earned_at || "")}', '${escapeHtml(medal.serial_number || "")}', '${escapeHtml(medal.stock_total || "")}')">
+          ${medal.badge_icon || "🏅"}
+        </button>`);
+    } else if (ownProfile) {
+      slots.push(`<button type="button" class="ls-equipped-medal-slot" title="Espacio libre" onclick="openEquipMedalsPanel()">＋</button>`);
+    }
+  }
+
+  return `
+    <div class="ls-equipped-medals">
+      ${slots.join("")}
+      ${ownProfile ? `<button type="button" onclick="openEquipMedalsPanel()" style="background:none;border:0;color:var(--gold);font-family:inherit;font-size:10px;cursor:pointer;padding:5px 2px;">Editar</button>` : ""}
+    </div>`;
+}
+
+function openMedalDetail(name, icon, rarity = "", description = "", earnedAt = "", serialNumber = "", stockTotal = "") {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
+      <div class="modal-box" style="max-width:350px;">
+        <div class="modal-box-body" style="padding:26px;text-align:center;">
+          <div class="ls-medal-detail-icon">${icon || "🏅"}</div>
+          <h2 style="margin:0 0 6px;">${escapeHtml(name || "Medalla")}</h2>
+          <div style="font-size:11px;color:var(--gold);font-family:'JetBrains Mono',monospace;">
+            ${getProfileMedalRarityLabel(rarity) ? `MEDALLA ${getProfileMedalRarityLabel(rarity).toUpperCase()}` : "MEDALLA DE PERFIL"}
+          </div>
+          <p style="font-size:12px;color:var(--text-dim);line-height:1.5;margin:13px 0 0;">
+            ${escapeHtml(description || "Esta medalla forma parte de la identidad pública de este perfil.")}
+          </p>
+          <div class="ls-medal-detail-meta">
+            ${getProfileMedalRarityLabel(rarity) ? `<span class="ls-medal-detail-chip">${getProfileMedalRarityLabel(rarity)}</span>` : ""}
+            ${earnedAt ? `<span class="ls-medal-detail-chip">Obtenida ${new Date(earnedAt).toLocaleDateString("es-AR")}</span>` : ""}
+            ${serialNumber && stockTotal ? `<span class="ls-medal-detail-chip" style="color:var(--gold);border-color:rgba(250,204,21,.25);">LIMITED #${serialNumber}/${stockTotal}</span>` : ""}
+          </div>
+          <button class="btn" style="width:100%;margin-top:18px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Cerrar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function openEquipMedalsPanel() {
+  const badges = window.__myProfileBadges || [];
+  const current = await getEquippedProfileMedals(currentUser.id);
+  const selected = current.map(m => m.badge_name).filter(Boolean);
+
+  window.__selectedProfileMedals = selected.slice(0,3);
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" style="z-index:230;" data-modal-locked="1">
+      <div class="modal-box" style="max-width:450px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header">
+          <div>
+            <h2 style="margin:0;">🏅 Tu identidad</h2>
+            <div style="font-size:10px;color:var(--text-dim);margin-top:4px;">Elegí hasta 3 medallas. La primera queda como tu favorita ★.</div>
+          </div>
+          <button onclick="document.getElementById('globalModalWrap').innerHTML=''" style="background:none;border:0;color:var(--text-dim);font-size:19px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;min-height:0;">
+          <div id="medalSelectionCount" style="font-size:11px;color:var(--gold);margin-bottom:8px;">${window.__selectedProfileMedals.length}/3 seleccionadas</div>
+          <div class="ls-favorite-note">★ La medalla que quede primera será tu favorita y tendrá un destaque especial en tu perfil.</div>
+
+          ${badges.length ? `
+            <div class="ls-medal-picker-grid">
+              ${badges.map(b => `
+                <div
+                  class="ls-medal-picker-item ${window.__selectedProfileMedals.includes(b.badge_name) ? "selected" : ""}"
+                  data-medal-name="${escapeHtml(b.badge_name)}"
+                  onclick="toggleProfileMedalSelection(this, '${escapeHtml(b.badge_name)}')">
+                  <div class="ls-medal-picker-icon">${b.badge_icon || "🏅"}</div>
+                  <div class="ls-medal-picker-name">${escapeHtml(b.badge_name)}</div>
+                  <div class="ls-medal-order-row" onclick="event.stopPropagation();">
+                    <button type="button" class="ls-medal-order-btn" title="Mover antes"
+                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', -1)">←</button>
+                    <span class="mono" style="font-size:9px;color:var(--text-dim);" id="medalOrder-${escapeHtml(b.badge_name)}"></span>
+                    <button type="button" class="ls-medal-order-btn" title="Mover después"
+                      onclick="moveSelectedProfileMedal('${escapeHtml(b.badge_name)}', 1)">→</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>` :
+            `<div style="padding:24px 8px;text-align:center;color:var(--text-dim);font-size:12px;">Todavía no tenés medallas para equipar.</div>`
+          }
+        </div>
+
+        <div class="modal-box-footer" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <button class="btn-outline" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn-outline" onclick="clearProfileMedalSelection()">Quitar todas</button>
+          <button class="btn" onclick="saveEquippedProfileMedals()">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+
+  setTimeout(() => refreshProfileMedalOrderUI(), 0);
+}
+
+
+function refreshProfileMedalOrderUI() {
+  const list = window.__selectedProfileMedals || [];
+
+  document.querySelectorAll(".ls-medal-picker-item").forEach(el => {
+    const name = el.dataset.medalName;
+    const idx = list.indexOf(name);
+    el.classList.toggle("selected", idx >= 0);
+
+    const orderEl = el.querySelector("[id^='medalOrder-']");
+    if (orderEl) {
+      orderEl.textContent = idx >= 0 ? (idx === 0 ? "★ 1" : `${idx + 1}`) : "";
+    }
+  });
+
+  const count = document.getElementById("medalSelectionCount");
+  if (count) count.textContent = `${list.length}/3 seleccionadas`;
+}
+
+function moveSelectedProfileMedal(badgeName, direction) {
+  const list = window.__selectedProfileMedals || [];
+  const idx = list.indexOf(badgeName);
+
+  if (idx < 0) {
+    showToast("Primero seleccioná esa medalla");
+    return;
+  }
+
+  const next = idx + Number(direction);
+  if (next < 0 || next >= list.length) return;
+
+  [list[idx], list[next]] = [list[next], list[idx]];
+  window.__selectedProfileMedals = list;
+  refreshProfileMedalOrderUI();
+}
+
+function toggleProfileMedalSelection(button, badgeName) {
+  const list = window.__selectedProfileMedals || [];
+  const idx = list.indexOf(badgeName);
+
+  if (idx >= 0) {
+    list.splice(idx,1);
+    button?.classList.remove("selected");
+  } else {
+    if (list.length >= 3) {
+      showToast("Podés mostrar hasta 3 medallas");
+      return;
+    }
+    list.push(badgeName);
+    button?.classList.add("selected");
+  }
+
+  window.__selectedProfileMedals = list;
+  refreshProfileMedalOrderUI();
+}
+
+function clearProfileMedalSelection() {
+  window.__selectedProfileMedals = [];
+  refreshProfileMedalOrderUI();
+}
+
+async function saveEquippedProfileMedals() {
+  const selected = (window.__selectedProfileMedals || []).slice(0,3);
+
+  const { data, error } = await sb.rpc("set_equipped_profile_badges", {
+    p_badge_names: selected
+  });
+
+  if (error || !data?.ok) {
+    console.error(error || data);
+    showToast("No se pudieron guardar las medallas");
+    return;
+  }
+
+  document.getElementById("globalModalWrap").innerHTML = "";
+  showToast("🏅 Identidad actualizada");
+  renderProfile();
+}
+
+async function getMyCollectionSummary() {
+  const [
+    { data: unlockedEmojis },
+    { data: unlockedItems },
+    { data: titleItems }
+  ] = await Promise.all([
+    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_items").select("item_id").eq("user_id", currentUser.id),
+    sb.from("store_items").select("id,category").eq("category", "title")
+  ]);
+
+  const titleIds = new Set((titleItems || []).map(t => t.id));
+  const titleCount = (unlockedItems || []).filter(i => titleIds.has(i.item_id)).length;
+
+  return {
+    emojis: (unlockedEmojis || []).length,
+    titles: titleCount
+  };
+}
+
+function ensureIdentityExperience593Styles() {
+  if (document.getElementById("lsIdentityExperience593Styles")) return;
+  const style = document.createElement("style");
+  style.id = "lsIdentityExperience593Styles";
+  style.textContent = `
+    html:not(.ls-legacy) .profile-hero {
+      border:1px solid rgba(56,221,242,.18) !important;
+      border-radius:24px !important;
+      background:
+        radial-gradient(circle at 88% 18%,rgba(56,221,242,.11),transparent 30%),
+        radial-gradient(circle at 10% 82%,rgba(46,242,124,.09),transparent 34%),
+        linear-gradient(150deg,rgba(13,32,40,.98),rgba(7,17,22,.97)) !important;
+      box-shadow:0 24px 70px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    html:not(.ls-legacy) .profile-cover {
+      height:142px;
+      border-bottom:1px solid rgba(56,221,242,.13);
+      background-color:#0b2730;
+      background-image:
+        radial-gradient(circle at 22% 30%,rgba(46,242,124,.18),transparent 28%),
+        linear-gradient(120deg,#0d2932,#09202a 55%,#10333c);
+    }
+
+    html:not(.ls-legacy) .profile-cover::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+      background-size:28px 28px;
+      pointer-events:none;
+    }
+
+    html:not(.ls-legacy) .profile-cover-edit-btn {
+      top:12px;
+      right:12px;
+      min-height:34px;
+      padding:6px 11px;
+      border-color:rgba(255,255,255,.16);
+      background:rgba(4,13,17,.68);
+      box-shadow:0 8px 20px rgba(0,0,0,.20);
+      backdrop-filter:blur(8px);
+    }
+
+    html:not(.ls-legacy) .profile-avatar-ring {
+      width:82px;
+      height:82px;
+      border:2px solid var(--gold-dim);
+      background:linear-gradient(145deg,#102d36,#071116);
+      box-shadow:0 0 0 5px rgba(7,17,22,.78),0 14px 34px rgba(0,0,0,.27),0 0 28px rgba(46,242,124,.08);
+    }
+
+    html:not(.ls-legacy) .profile-avatar-ring img {
+      width:70px;
+      height:70px;
+    }
+
+    html:not(.ls-legacy) .profile-name-block h1 {
+      font-size:24px;
+      font-weight:700;
+      letter-spacing:-.045em;
+      text-wrap:balance;
+    }
+
+    .profile-role-badge {
+      display:inline-flex;
+      align-items:center;
+      width:max-content;
+      margin-top:5px;
+      padding:5px 9px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      font:800 9px 'JetBrains Mono',monospace !important;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+    }
+
+    html:not(.ls-legacy) .profile-role-badge.user {
+      color:#a9c1c7;
+      border-color:rgba(154,179,186,.20);
+      background:rgba(154,179,186,.06);
+    }
+
+    html:not(.ls-legacy) .profile-role-badge.creator {
+      color:var(--gold);
+      border-color:rgba(46,242,124,.25);
+      background:linear-gradient(135deg,rgba(46,242,124,.10),rgba(56,221,242,.055));
+      box-shadow:0 0 20px rgba(46,242,124,.06);
+    }
+
+    html:not(.ls-legacy) .profile-bio {
+      max-width:680px;
+      padding:11px 13px;
+      border-left:2px solid rgba(56,221,242,.35);
+      border-radius:0 11px 11px 0;
+      background:rgba(4,14,18,.30);
+      color:#b9cdd2;
+    }
+
+    .ls-profile-socials {
+      display:flex;
+      gap:8px;
+      margin:0 0 16px;
+      flex-wrap:wrap;
+      position:relative;
+      z-index:3;
+    }
+
+    .ls-profile-social-link {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      min-height:34px;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:var(--panel-2);
+      color:var(--text);
+      text-decoration:none;
+      font-size:10px;
+      font-weight:750;
+      transition:transform .16s ease,border-color .16s ease,background .16s ease;
+    }
+
+    .ls-profile-social-logo {
+      width:17px;
+      height:17px;
+      display:block;
+      flex:0 0 17px;
+      object-fit:contain;
+    }
+
+    html:not(.ls-legacy) .ls-profile-social-link {
+      border-color:rgba(56,221,242,.15);
+      background:rgba(7,24,30,.66);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .ls-profile-social-link:hover {
+      transform:translateY(-2px);
+      border-color:rgba(46,242,124,.30);
+      background:rgba(18,48,58,.78);
+    }
+
+    html:not(.ls-legacy) .profile-stats-row {
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:9px !important;
+    }
+
+    html:not(.ls-legacy) .stat-pill {
+      min-width:0;
+      padding:12px 10px;
+      border:1px solid rgba(56,221,242,.14);
+      border-radius:14px !important;
+      background:linear-gradient(145deg,rgba(18,48,58,.58),rgba(7,21,27,.50));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .stat-pill .num {
+      font-size:20px;
+      color:var(--gold);
+      text-shadow:0 0 18px rgba(46,242,124,.12);
+    }
+
+    html:not(.ls-legacy) .profile-section-head .ico {
+      border-color:rgba(56,221,242,.17);
+      border-radius:11px;
+      background:linear-gradient(145deg,rgba(46,242,124,.08),rgba(56,221,242,.07));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    html:not(.ls-legacy) .profile-section-head h3 {
+      font-size:16px;
+      letter-spacing:-.025em;
+    }
+
+    html:not(.ls-legacy) .video-grid-tile {
+      border:1px solid rgba(56,221,242,.10);
+      border-radius:10px;
+      box-shadow:0 10px 24px rgba(0,0,0,.18);
+      transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+    }
+
+    html:not(.ls-legacy) .video-grid-tile:hover {
+      transform:translateY(-2px);
+      border-color:rgba(46,242,124,.24);
+      box-shadow:0 14px 30px rgba(0,0,0,.25);
+    }
+
+    .users-directory-tabs {
+      display:grid !important;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:8px !important;
+      margin-bottom:12px;
+      padding:5px;
+      border:1px solid var(--border);
+      border-radius:15px;
+      background:var(--panel);
+    }
+
+    html:not(.ls-legacy) .users-directory-tabs {
+      border-color:rgba(56,221,242,.14);
+      background:linear-gradient(145deg,rgba(13,32,40,.82),rgba(7,17,22,.76));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+    }
+
+    .users-directory-tabs button {
+      width:100%;
+      min-width:0;
+    }
+
+    html:not(.ls-legacy) .user-directory-search {
+      min-height:48px;
+      margin-bottom:14px;
+      padding-left:15px;
+      border-color:rgba(56,221,242,.17);
+      border-radius:14px;
+      background:rgba(4,14,18,.68);
+    }
+
+    html:not(.ls-legacy) .user-directory-row {
+      min-height:68px;
+      margin-bottom:9px;
+      padding:12px 14px;
+      border-color:rgba(56,221,242,.12) !important;
+      background:linear-gradient(145deg,rgba(13,32,40,.88),rgba(8,22,28,.84)) !important;
+      transition:transform .17s ease,border-color .17s ease,background .17s ease;
+    }
+
+    html:not(.ls-legacy) .user-directory-row:hover {
+      transform:translateX(3px);
+      border-color:rgba(46,242,124,.24) !important;
+      background:linear-gradient(145deg,rgba(15,39,47,.94),rgba(8,25,31,.90)) !important;
+    }
+
+    html:not(.ls-legacy) .user-directory-row .avatar-sm {
+      width:44px;
+      height:44px;
+      border-color:rgba(56,221,242,.20);
+      box-shadow:0 7px 18px rgba(0,0,0,.20);
+    }
+
+    .ls-directory-role {
+      display:inline-flex;
+      margin-top:4px;
+      color:var(--text-dim);
+      font:750 9px 'JetBrains Mono',monospace;
+      letter-spacing:.05em;
+      text-transform:uppercase;
+    }
+
+    .ls-directory-role.creator {
+      color:var(--gold);
+    }
+
+    html.ls-legacy .profile-hero,
+    html.ls-legacy .user-directory-row,
+    html.ls-legacy .video-grid-tile {
+      box-shadow:none !important;
+      backdrop-filter:none !important;
+    }
+
+    @media(max-width:600px) {
+      html:not(.ls-legacy) .profile-hero {
+        border-radius:18px !important;
+        padding-left:16px;
+        padding-right:16px;
+      }
+
+      html:not(.ls-legacy) .profile-cover {
+        height:122px;
+        margin-left:-16px;
+        margin-right:-16px;
+      }
+
+      html:not(.ls-legacy) .profile-avatar-ring {
+        width:68px;
+        height:68px;
+      }
+
+      html:not(.ls-legacy) .profile-avatar-ring img {
+        width:58px;
+        height:58px;
+      }
+
+      html:not(.ls-legacy) .profile-name-block h1 {
+        font-size:20px;
+        overflow-wrap:anywhere;
+      }
+
+      html:not(.ls-legacy) .profile-stats-row {
+        gap:6px !important;
+      }
+
+      html:not(.ls-legacy) .stat-pill {
+        padding:10px 5px;
+      }
+
+      html:not(.ls-legacy) .stat-pill .num {
+        font-size:17px;
+      }
+
+      html:not(.ls-legacy) .stat-pill .lbl {
+        font-size:8px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount = 0, totalViews = 0, own = false }) {
+  if (!isLiveScroll7App()) return "";
+  const visualStyle = ["electric","cosmic","minimal"].includes(profile?.profile_visual_style) ? profile.profile_visual_style : "electric";
+  const featured = videos.find(video => video.id === profile?.profile_featured_video_id) || videos[0] || null;
+  const latestLabel = featured?.created_at ? lsTimeAgo(featured.created_at) : "Sin publicaciones";
+  const statusLabel = isProfileLive(profile) ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
+  return `
+    <section class="ls7-living-profile ls7-profile-style-${visualStyle}" aria-label="Perfil Vivo LiveScroll ${getLiveScrollRuntimeGeneration()}">
+      <div class="ls7-living-head">
+        <div><small>◈ PERFIL VIVO 7</small><h2>Ahora mismo</h2></div>
+        <div class="ls7-living-head-actions">
+          ${own ? `<button class="ls7-profile-customize-btn" onclick="openLiveScroll7ProfileCustomizer()">Personalizar</button>` : ""}
+          <span class="${isProfileLive(profile) ? "is-live" : ""}"><i></i>${statusLabel}</span>
+        </div>
+      </div>
+      <div class="ls7-living-grid">
+        ${featured ? `
+          <button class="ls7-featured-video" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${featured.id}', window.__profileFeedAuthor)" aria-label="Reproducir video destacado">
+            <div class="ls7-featured-cover">${getGridCoverHtml(featured)}</div>
+            <div class="ls7-featured-shade"></div>
+            <div class="ls7-featured-copy">
+              <small>VIDEO PROTAGONISTA</small>
+              <strong>${escapeHtml(featured.title || "Última publicación")}</strong>
+              <span>▶ Reproducir · ${escapeHtml(latestLabel)}</span>
+            </div>
+          </button>` : `
+          <div class="ls7-featured-empty">
+            <b>Tu señal empieza acá</b>
+            <span>${own ? "Publicá tu primer video y convertí tu perfil en una experiencia." : "Este Usuario todavía no publicó su primera señal."}</span>
+            ${own ? `<button class="btn" onclick="switchTab('upload')">Crear señal</button>` : ""}
+          </div>`}
+        <div class="ls7-live-data">
+          <div><small>ENERGÍA DEL PERFIL</small><strong>${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%</strong><i><b style="width:${Math.min(100, 18 + videos.length * 9 + Math.min(28, followersCount * 2))}%"></b></i></div>
+          <div class="ls7-data-pair"><span><b>${videos.length}</b><small>Señales</small></span><span><b>${followersCount}</b><small>Conexiones</small></span></div>
+          <div class="ls7-data-pair"><span><b>${totalViews}</b><small>Impactos</small></span><span><b>${profile?.is_creator ? "CREATOR" : "USER"}</b><small>Nivel</small></span></div>
+          <p><i></i>${isProfileLive(profile) ? "Transmitiendo ahora en LiveScroll." : featured ? `Último movimiento: ${escapeHtml(latestLabel)}.` : "Esperando la primera publicación."}</p>
+        </div>
+      </div>
+    </section>`;
+}
+
+function openLiveScroll7ProfileCustomizer() {
+  if (!isLiveScroll7App()) return;
+  const videos = Array.isArray(window.__profileFeedVideos) ? window.__profileFeedVideos : [];
+  const selectedVideo = currentProfile?.profile_featured_video_id || videos[0]?.id || "";
+  const selectedStyle = ["electric","cosmic","minimal"].includes(currentProfile?.profile_visual_style) ? currentProfile.profile_visual_style : "electric";
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked ls7-profile-customizer-overlay" data-modal-locked="1">
+      <div class="modal-box ls7-profile-customizer-box">
+        <div class="modal-box-head"><div><small>PERFIL VIVO 7</small><h2>Tu perfil, tus reglas</h2></div><button onclick="closeLiveScroll7ProfileCustomizer()">✕</button></div>
+        <div class="modal-box-body">
+          <label class="ls7-customizer-label">Video protagonista</label>
+          <select id="ls7FeaturedVideoSelect">
+            ${videos.length ? videos.map(video => `<option value="${video.id}" ${video.id === selectedVideo ? "selected" : ""}>${escapeHtml(video.title || "Video sin título")}</option>`).join("") : `<option value="">Todavía no hay videos</option>`}
+          </select>
+          <label class="ls7-customizer-label">Estilo visual</label>
+          <div class="ls7-style-picker" id="ls7StylePicker">
+            ${[
+              ["electric","⚡","Eléctrico","Cian, azul y energía viva"],
+              ["cosmic","◉","Cósmico","Violeta profundo y estrellas"],
+              ["minimal","◇","Minimal","Oscuro, limpio y elegante"]
+            ].map(([value,icon,name,copy]) => `<button class="${value === selectedStyle ? "active" : ""}" data-style="${value}" onclick="selectLiveScroll7ProfileStyle('${value}')"><b>${icon}</b><span><strong>${name}</strong><small>${copy}</small></span></button>`).join("")}
+          </div>
+          <div class="ls7-style-preview ls7-profile-style-${selectedStyle}" id="ls7StylePreview"><i></i><div><small>VISTA PREVIA</small><strong>@${escapeHtml(currentProfile?.username || "usuario")}</strong><span>Así se sentirá tu Perfil Vivo.</span></div></div>
+        </div>
+        <div class="modal-box-actions"><button class="btn-outline" onclick="closeLiveScroll7ProfileCustomizer()">Cancelar</button><button class="btn" id="ls7SaveProfileStyle" onclick="saveLiveScroll7ProfileCustomization()">Guardar cambios</button></div>
+      </div>
+    </div>`;
+}
+
+function selectLiveScroll7ProfileStyle(style) {
+  if (!["electric","cosmic","minimal"].includes(style)) return;
+  document.querySelectorAll("#ls7StylePicker button").forEach(button => button.classList.toggle("active", button.dataset.style === style));
+  const preview = document.getElementById("ls7StylePreview");
+  if (preview) preview.className = `ls7-style-preview ls7-profile-style-${style}`;
+}
+
+function closeLiveScroll7ProfileCustomizer() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = "";
+}
+
+async function saveLiveScroll7ProfileCustomization() {
+  const button = document.getElementById("ls7SaveProfileStyle");
+  const featuredVideoId = document.getElementById("ls7FeaturedVideoSelect")?.value || null;
+  const visualStyle = document.querySelector("#ls7StylePicker button.active")?.dataset.style || "electric";
+  if (button) { button.disabled = true;button.textContent = "Guardando…"; }
+  const { data, error } = await sb.rpc("set_my_ls7_profile_customization", {
+    p_featured_video_id:featuredVideoId,
+    p_visual_style:visualStyle
+  });
+  if (error) {
+    if (button) { button.disabled = false;button.textContent = "Guardar cambios"; }
+    showToast("No se pudo guardar. Ejecutá primero el SQL 7.0.3v.");
+    return;
+  }
+  if (data?.ok === false) {
+    if (button) { button.disabled = false;button.textContent = "Guardar cambios"; }
+    showToast(data.error === "video_invalido" ? "Ese video no pertenece a tu perfil." : "No se pudo guardar el perfil.");
+    return;
+  }
+  currentProfile.profile_featured_video_id = data?.profile_featured_video_id || featuredVideoId;
+  currentProfile.profile_visual_style = ["electric","cosmic","minimal"].includes(data?.profile_visual_style)
+    ? data.profile_visual_style
+    : visualStyle;
+  closeLiveScroll7ProfileCustomizer();
+  showToast("Perfil Vivo actualizado");
+  renderProfile();
+}
+
+const LS6_PROFILE_VIDEO_COLUMNS = "id,user_id,platform,title,video_url,thumbnail_url,created_at,client_origin";
+
+async function renderProfile() {
+  ensureIdentityExperience593Styles();
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando tu perfil...</p>`;
+
+  const videosPromise = lsCacheFresh(lsPerfCache.profileVideos, 30000)
+    ? Promise.resolve({ data:lsPerfCache.profileVideos.data, error:null })
+    : sb.from("videos").select(isLiveScroll7App() ? "*" : LS6_PROFILE_VIDEO_COLUMNS).eq("user_id", currentUser.id).order("created_at", { ascending:false });
+
+  const viewsLedgerPromise = lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)
+    ? Promise.resolve({ data:lsPerfCache.profileViewsLedger.data, error:null })
+    : sb.from("points_ledger").select("amount").eq("user_id", currentUser.id).eq("reason", "watched_by_other");
+
+  const [videosResult, viewsLedgerResult] = await Promise.all([videosPromise, viewsLedgerPromise]);
+  const videos = videosResult?.data || [];
+  const error = videosResult?.error;
+
+  if (!error && !lsCacheFresh(lsPerfCache.profileVideos, 30000)) {
+    lsPerfCache.profileVideos = { data:videos, at:Date.now() };
+  }
+
+  if (error) { main.innerHTML = `<p class="error-msg">Error cargando tus videos: ${escapeHtml(error.message || "Error desconocido")}</p>`; return; }
+
+  const watchedByOther = viewsLedgerResult?.data || [];
+  if (!viewsLedgerResult?.error && !lsCacheFresh(lsPerfCache.profileViewsLedger, 30000)) {
+    lsPerfCache.profileViewsLedger = { data:watchedByOther, at:Date.now() };
+  }
+
+  const totalFromViews = (watchedByOther || []).reduce((sum, r) => sum + r.amount, 0);
+
+  const videoIds = videos.map(v => v.id);
+  const [
+    pinsResult,
+    plans,
+    followersResult,
+    badgesResult,
+    equippedBadges,
+    equippedTitle,
+    collectionSummary,
+    sessionsResult,
+    likesResult,
+    referralResult
+  ] = await Promise.all([
+    sb.rpc("get_my_pinned_videos", { p_user_id:currentUser.id }),
+    loadPlans(),
+    sb.from("follows").select("follower_id", { count:"exact", head:true }).eq("followed_id", currentUser.id),
+    sb.from("user_badges").select("*").eq("user_id", currentUser.id).order("earned_at", { ascending:false }),
+    getEquippedProfileMedals(currentUser.id),
+    getMyProfileTitle(),
+    getMyCollectionSummary(),
+    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    sb.from("app_config").select("key, value").in("key", ["referral_referrer_pts", "referral_referred_pts"])
+  ]);
+
+  const myPins = pinsResult?.data || [];
+  const pinnedIds = new Set((myPins || []).map(p => p.video_id));
+  const myPlan = plans.find(p => p.id === currentProfile.plan_id);
+  const canPin = myPlan && myPlan.max_pinned_videos > 0;
+  const pinsUsed = pinnedIds.size;
+  const followersCount = followersResult?.count || 0;
+  const badges = badgesResult?.data || [];
+  const sessions = sessionsResult?.data || [];
+  const likes = likesResult?.data || [];
+  const referralConfig = referralResult?.data || [];
+  window.__myProfileTitle = equippedTitle;
+
+  let socialClicksHtml = "";
+  if (myPlan && myPlan.id !== "standard") {
+    const { data: clicks } = await sb.rpc("get_my_social_clicks", { p_user_id: currentUser.id });
+    if (clicks && clicks.length) {
+      socialClicksHtml = `
+        <div class="profile-section">
+          <div class="profile-section-head">
+            <div class="ico">📊</div>
+            <h3>Clics a tus redes</h3>
+            <div class="sub">Beneficio ${escapeHtml(myPlan.name)}</div>
+          </div>
+          <div class="form-card">
+            <div style="display:flex; gap:16px; flex-wrap:wrap;">
+              ${clicks.map(c => `<div style="text-align:center;"><div class="mono" style="font-size:20px; color:var(--gold);">${c.total}</div><div style="font-size:11px; color:var(--text-dim);">${escapeHtml(c.platform)}</div></div>`).join("")}
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
+  const viewsByVideo = {};
+  (sessions || []).forEach(s => {
+    viewsByVideo[s.video_id] = viewsByVideo[s.video_id] || new Set();
+    viewsByVideo[s.video_id].add(s.viewer_id);
+  });
+  const likesByVideo = {};
+  (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
+
+  const referrerPts = referralConfig?.find(c => c.key === "referral_referrer_pts")?.value || 150;
+  const referredPts = referralConfig?.find(c => c.key === "referral_referred_pts")?.value || 100;
+
+  const streakSectionHtml = "";
+
+
+  const collectionSummaryHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">💎</div>
+        <h3>Mi colección</h3>
+        <div class="sub">
+          <button
+            onclick="openMyMedalsPanel('all')"
+            style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;font-size:12px;"
+          >Explorar →</button>
+        </div>
+      </div>
+
+      <div
+        class="form-card ls-profile-collection-hub"
+        style="
+          border:1px solid var(--border);
+          border-radius:16px;
+          overflow:hidden;
+          padding:0;
+        "
+      >
+        <div style="
+          display:flex;
+          align-items:center;
+          justify-content:space-between;
+          gap:12px;
+          padding:14px;
+          border-bottom:1px solid var(--border);
+          background:linear-gradient(135deg,rgba(250,204,21,.055),rgba(255,255,255,.012));
+          flex-wrap:wrap;
+        ">
+          <div>
+            <div style="font-size:10px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.08em;">
+              En tu perfil
+            </div>
+            <div style="font-size:13px;font-weight:800;margin-top:3px;">
+              Tus 3 medallas destacadas
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${renderEquippedMedalsInline(equippedBadges, true)}
+            <button
+              class="btn-outline"
+              onclick="openEquipMedalsPanel()"
+              style="padding:7px 10px;font-size:10px;white-space:nowrap;"
+            >Editar</button>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onclick="openMyMedalsPanel('all')"
+          style="
+            width:100%;
+            border:0;
+            background:transparent;
+            color:var(--text);
+            cursor:pointer;
+            display:grid;
+            grid-template-columns:repeat(4,1fr);
+            gap:0;
+            padding:10px;
+          "
+        >
+          <div style="text-align:center;padding:10px 5px;">
+            <div style="font-size:20px;margin-bottom:4px;">💎</div>
+            <div class="mono" style="font-size:19px;font-weight:900;color:var(--gold);">
+              ${(badges || []).length + (collectionSummary.emojis || 0) + (collectionSummary.titles || 0)}
+            </div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Objetos</div>
+          </div>
+
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">🏅</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${(badges || []).length}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Medallas</div>
+          </div>
+
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">😎</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.emojis || 0}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Emojis</div>
+          </div>
+
+          <div style="text-align:center;padding:10px 5px;border-left:1px solid var(--border);">
+            <div style="font-size:20px;margin-bottom:4px;">🏷️</div>
+            <div class="mono" style="font-size:19px;font-weight:900;">${collectionSummary.titles || 0}</div>
+            <div style="font-size:9px;color:var(--text-dim);text-transform:uppercase;">Títulos</div>
+          </div>
+        </button>
+
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(3,1fr);
+          border-top:1px solid var(--border);
+        ">
+          <button
+            onclick="openMyMedalsPanel('badge')"
+            style="padding:10px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >🏅 Medallas</button>
+          <button
+            onclick="openMyMedalsPanel('emoji')"
+            style="padding:10px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >😎 Emojis</button>
+          <button
+            onclick="openMyMedalsPanel('title')"
+            style="padding:10px;border:0;background:transparent;color:var(--text);cursor:pointer;font-family:inherit;font-size:10px;"
+          >🏷️ Títulos</button>
+        </div>
+      </div>
+    </div>`;
+
+  const recentActivity = lsBuildRecentActivity(videos, badges || []);
+  const latestVideo = videos?.[0] || null;
+  const hasFreshActivity = !!(
+    (latestVideo && lsIsWithinHours(latestVideo.created_at, 24)) ||
+    isProfileLive(currentProfile)
+  );
+
+  const recentActivityHtml = recentActivity.length ? `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">⚡</div>
+        <h3>Actividad reciente</h3>
+        <div class="sub">Lo último en tu perfil</div>
+      </div>
+      <div class="form-card ls-recent-activity">
+        ${recentActivity.map(a => `
+          <div class="ls-activity-item">
+            <div class="ls-activity-icon">${a.icon}</div>
+            <div class="ls-activity-copy">
+              <div class="ls-activity-title">${escapeHtml(a.title)}</div>
+              <div class="ls-activity-time">${lsTimeAgo(a.date)}</div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+
+  window.__myProfileBadges = badges || [];
+
+  const referralSectionHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎁</div>
+        <h3>Invitá y ganá</h3>
+        <div class="sub">+${referrerPts} pts por invitado</div>
+      </div>
+      <div class="form-card">
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0; margin-bottom:12px;">
+          Compartí tu link. Cuando la persona invitada suba o mire algo por primera vez, ganás ${referrerPts} pts y ella gana ${referredPts} pts.
+          Tope: 3 invitaciones premiadas por mes.
+        </p>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <input readonly id="referralLinkInput" value="${window.location.origin}${window.location.pathname}?ref=${encodeURIComponent(currentProfile.username)}"
+            style="flex:1; min-width:200px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'JetBrains Mono', monospace; font-size:12px;">
+          <button class="btn" onclick="copyReferralLink()">Copiar link</button>
+        </div>
+      </div>
+    </div>`;
+
+  window.__profileFeedVideos = videos;
+  window.__profileFeedAuthor = { username: currentProfile.username, plan_id: currentProfile.plan_id };
+  window.__profilePinContext = {
+    canPin,
+    pinsUsed,
+    maxPinned: myPlan?.max_pinned_videos || 0,
+    pinnedIds: Array.from(pinnedIds)
+  };
+
+  const videosSectionHtml = `
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎬</div>
+        <h3>Mis videos</h3>
+        <div class="sub">${videos.length} en total${canPin ? ` · 📌 ${pinsUsed}/${myPlan.max_pinned_videos} anclados` : ""}</div>
+      </div>
+      ${videos.length ? `
+        <div class="video-grid">
+          ${videos.map(v => `
+            <div class="video-grid-tile" id="tile-${v.id}">
+              ${getGridCoverHtml(v)}
+              ${lsIsWithinHours(v.created_at, 24) ? `<div class="ls-new-video-badge">🔥 NUEVO</div>` : ""}
+              ${pinnedIds.has(v.id) ? `<div class="pinned-badge">📌</div>` : ""}
+              <button class="grid-menu-btn" aria-label="Opciones del video" title="Opciones" onclick="event.stopPropagation(); toggleVideoTileMenu('${v.id}')">⋮</button>
+              <div class="grid-overlay" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
+                <div class="grid-stats">
+                  <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
+                  <span>❤️ ${likesByVideo[v.id] || 0}</span>
+                </div>
+              </div>
+              <div class="video-grid-menu hidden" id="menu-${v.id}">
+                <div style="padding:6px 10px 4px; font-size:11px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(v.title)}</div>
+                ${canPin ? (pinnedIds.has(v.id)
+                    ? `<div style="padding:8px 10px; font-size:12px; color:var(--green);">📌 Anclado en "Para Ti"</div>`
+                    : `<button ${pinsUsed >= myPlan.max_pinned_videos ? "disabled" : ""} onclick="handlePinVideo('${v.id}')">📌 Anclar 24hs</button>`) : ""}
+                ${v.platform === "upload" ? `<button onclick="openVideoReeditor('${v.id}')">✂️ Reeditar video</button>` : ""}
+                ${isSafeUrl(v.video_url) ? `<button onclick="window.open('${escapeHtml(v.video_url)}', '_blank', 'noopener,noreferrer')">🔗 Abrir link</button>` : ""}
+                <button class="danger" onclick="handleDeleteOwnVideo('${v.id}')">🗑 Eliminar</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : `<p style="color:var(--text-dim)">Todavía no subiste ningún video. <button onclick="switchTab('upload')" style="background:none;border:none;color:var(--gold);cursor:pointer;font-family:inherit;">Subí el primero →</button></p>`}
+      </div>
+    </div>`;
+
+  const livingProfileHtml = renderLiveScroll7LivingProfile({
+    profile:currentProfile,
+    videos,
+    followersCount,
+    totalViews:totalFromViews,
+    own:true
+  });
+
+  const manualLiveControlHtml = currentProfile.is_creator ? renderManualLiveControl() : "";
+  const creatorProgramCardHtml = renderCreatorProgramCard();
+
+  main.innerHTML = `
+    <div class="profile-hero ls-profile-nova${isLiveScroll7App() ? " ls7-electric-profile" : ""}" id="lsProfileNovaHero" style="position:relative; overflow:hidden;">
+      <div class="profile-cover${currentProfile.cover_url ? " has-image" : ""}" id="profileCoverBanner"
+        style="position:relative; z-index:4; ${currentProfile.cover_url ? `background-image:url('${escapeHtml(currentProfile.cover_url)}'); background-position:center ${Number(currentProfile.cover_position_y ?? 50)}%;` : ""}">
+        <button class="profile-cover-edit-btn" onclick="openEditProfile()">🖼️ Editar portada</button>
+      </div>
+
+      ${currentProfile.profile_side_image_url ? `
+        <div aria-hidden="true" style="
+          position:absolute;
+          left:0;
+          right:0;
+          top:150px;
+          bottom:0;
+          z-index:1;
+          overflow:hidden;
+          pointer-events:none;
+        ">
+          <img
+            src="${escapeHtml(currentProfile.profile_side_image_url)}"
+            alt=""
+            style="
+              position:absolute;
+              inset:0;
+              width:100%;
+              height:100%;
+              object-fit:cover;
+              object-position:center center;
+              opacity:0.42;
+              filter:saturate(0.95) contrast(1.06);
+            "
+          >
+          <div style="
+            position:absolute;
+            inset:0;
+            background:
+              linear-gradient(180deg,
+                rgba(13,16,20,0.16) 0%,
+                rgba(13,16,20,0.28) 48%,
+                rgba(13,16,20,0.72) 100%),
+              linear-gradient(90deg,
+                rgba(13,16,20,0.40) 0%,
+                rgba(13,16,20,0.18) 50%,
+                rgba(13,16,20,0.30) 100%);
+          "></div>
+        </div>
+      ` : ""}
+
+      <div class="ls-profile-nova-inner" id="lsProfileNovaInner" style="position:relative; z-index:2;">
+        <div class="profile-hero-top">
+          <div class="profile-avatar-ring ${getAvatarRingClass(currentProfile.plan_id)}${isProfileLive(currentProfile) ? " avatar-live-ring" : ""}${hasFreshActivity ? " ls-activity-aura" : ""}" title="${hasFreshActivity ? "Actividad reciente" : ""}">${renderAvatarHtml(currentProfile, 60)}</div>
+          <div class="profile-name-block">
+            <h1>@${escapeHtml(currentProfile.username)} ${getPlanBadgeHtml(currentProfile.plan_id)} ${renderCreatorVerifiedBadge(currentProfile)}</h1>
+            <div class="handle profile-role-badge ${currentProfile.is_creator ? "creator" : "user"}">${currentProfile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
+            ${renderProfileTitleInline(equippedTitle, true)}
+            ${renderEquippedMedalsInline(equippedBadges, true)}
+          </div>
+        </div>
+        ${currentProfile.bio ? `<p class="profile-bio">${escapeHtml(currentProfile.bio)}</p>` : ""}
+        ${renderSocialIcons(currentProfile)}
+        <div class="profile-stats-row">
+          <div class="stat-pill"><div class="num">${videos.length}</div><div class="lbl">Videos</div></div>
+          <div class="stat-pill"><div class="num">${totalFromViews}</div><div class="lbl">Pts. por vistas</div></div>
+          <div class="stat-pill"><div class="num">${followersCount || 0}</div><div class="lbl">Seguidores</div></div>
+        </div>
+        <div class="profile-hero-actions">
+          <button class="btn-outline" onclick="openEditProfile()">✏️ Editar perfil</button>
+        </div>
+      </div>
+    </div>
+
+    ${manualLiveControlHtml}
+    ${creatorProgramCardHtml}
+    ${renderGenerationIdentityCard(videos, true)}
+    ${livingProfileHtml}
+
+    ${collectionSummaryHtml}
+    ${recentActivityHtml}
+    ${socialClicksHtml}
+    ${streakSectionHtml}
+    ${referralSectionHtml}
+    ${videosSectionHtml}`;
+
+  initProfileNovaTilt();
+  initLazyProfilePreviews();
+}
+
+async function handleLike(videoId) {
+  const btn = document.getElementById(`like-${videoId}`);
+  if (!btn) return;
+  if (btn.classList.contains("liked")) return;
+
+  const { data, error } = await sb.rpc("give_like", { p_video_id: videoId, p_user_id: currentUser.id });
+  if (error || !data.ok) {
+    if (data?.error === "tope_diario") showToast("Alcanzaste tu tope diario de likes");
+    if (data?.error === "no_self_like") showToast("No podés darle like a tu propio video");
+    return;
+  }
+
+  btn.classList.add("liked");
+  btn.dataset.label = "Te gusta";
+  btn.title = "Te gusta";
+  btn.setAttribute("aria-label", "Te gusta");
+  btn.setAttribute("aria-pressed", "true");
+  const icon = btn.querySelector("span");
+  const label = btn.querySelector("i");
+  if (icon) icon.textContent = "♥";
+  if (label) label.textContent = "TU LIKE";
+  safePulseElement(btn, "ls-like-pop-safe");
+  currentProfile.points_balance += data.points;
+  updateBalanceUI();
+  showFloatingPointsSafe(data.points, btn);
+  showToast(`+${data.points} pt por el like`);
+  recordDailyChallengeEvent("like_video", videoId);
+}
+
+async function handleShare(videoId, url) {
+  const shareUrl = `${window.location.origin}${window.location.pathname}?video=${videoId}`;
+  let shared = false;
+  if (navigator.share) {
+    try {
+      const { data:video } = await sb.from("videos")
+        .select("title,thumbnail_url,profiles!videos_user_id_fkey(username)")
+        .eq("id",videoId).maybeSingle();
+      const title = video?.title || "Mirá este video en LiveScroll";
+      const creator = video?.profiles?.username ? ` de @${video.profiles.username}` : "";
+      const shareData = { title, text:`Mirá “${title}”${creator} en LiveScroll`, url:shareUrl };
+
+      if (video?.thumbnail_url && isSafeUrl(video.thumbnail_url) && window.File && navigator.canShare) {
+        try {
+          const response = await fetch(video.thumbnail_url, { cache:"no-store" });
+          if (response.ok) {
+            const blob = await response.blob();
+            const extension = blob.type.includes("png") ? "png" : "jpg";
+            const cover = new File([blob], `livescroll-portada-${videoId}.${extension}`, { type:blob.type || "image/jpeg" });
+            if (navigator.canShare({ files:[cover] })) shareData.files = [cover];
+          }
+        } catch (_) {}
+      }
+
+      try {
+        await navigator.share(shareData);
+      } catch (shareError) {
+        if (shareError?.name === "AbortError" || !shareData.files) throw shareError;
+        delete shareData.files;
+        await navigator.share(shareData);
+      }
+      shared = true;
+    } catch (e) {
+      if (e?.name !== "AbortError") showToast("No pudimos abrir el menú para compartir.", "error");
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast("Link copiado para compartir");
+      shared = true;
+    } catch (e) { /* nada */ }
+  }
+
+  if (!shared) return;
+  const { data, error } = await sb.rpc("give_share", { p_video_id: videoId, p_user_id: currentUser.id });
+  if (error || !data.ok) return; // ya compartido antes, o tope diario: no molestamos con error
+  currentProfile.points_balance += data.points;
+  updateBalanceUI();
+  showFloatingPointsSafe(data.points);
+  showToast(`+${data.points} pts por compartir`);
+}
+
+async function openComments(videoId, focusCommentId = null) {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="ls-comments-overlay-611" onclick="if(event.target===this) closeComments()">
+      <div class="ls-comments-panel-611">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-shrink:0;">
+          <h3 style="margin:0;">💬 Comentarios</h3>
+          <button onclick="closeComments()" style="background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+        <div id="commentsList" style="overflow-y:auto; -webkit-overflow-scrolling:touch; flex:1 1 auto; min-height:0; margin-bottom:14px;">Cargando...</div>
+        <div class="ls-comment-compose-611">
+          <input id="newCommentInput" placeholder="Escribí un comentario..." maxlength="500" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment('${videoId}');}">
+          <button class="btn" onclick="submitComment('${videoId}')">Enviar ➜</button>
+        </div>
+      </div>
+    </div>`;
+
+  await loadComments(videoId, focusCommentId);
+}
+
+async function loadComments(videoId, focusCommentId = null) {
+  const { data: comments } = await sb
+    .from("video_comments")
+    .select("*, profiles!video_comments_user_id_fkey(username, plan_id)")
+    .eq("video_id", videoId)
+    .order("created_at", { ascending: false });
+
+  const list = document.getElementById("commentsList");
+  if (!list) return;
+
+  list.innerHTML = comments && comments.length
+    ? comments.map(c => `
+        <div id="comment-${c.id}" style="margin-bottom:10px; padding:10px; font-size:13px; border-radius:10px; transition:background 0.3s ease, border-color 0.3s ease; ${focusCommentId === c.id ? "background:rgba(255,255,255,0.05); border:1px solid var(--gold-dim);" : "border:1px solid transparent;"}">
+          <div>
+            <strong style="color:var(--gold); cursor:pointer;" onclick="closeComments(); viewPublicProfile('${escapeHtml(c.profiles?.username || "")}')">@${escapeHtml(c.profiles?.username || "usuario")}</strong>
+            ${getPlanBadgeHtml(c.profiles?.plan_id)}
+            ${renderClientOriginBadge(c.client_origin, true)}
+            <span style="color:var(--text-dim); font-size:11px;"> · ${new Date(c.created_at).toLocaleDateString("es-AR")}</span>
+          </div>
+          <div style="margin-top:4px; line-height:1.4;">${escapeHtml(c.content)}</div>
+        </div>`).join("")
+    : `<p style="color:var(--text-dim); font-size:13px;">Sé el primero en comentar.</p>`;
+
+  if (focusCommentId) {
+    setTimeout(() => {
+      const commentEl = document.getElementById(`comment-${focusCommentId}`);
+      if (!commentEl) return;
+      commentEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        commentEl.style.background = "";
+        commentEl.style.borderColor = "transparent";
+      }, 2500);
+    }, 150);
+  }
+}
+
+async function submitComment(videoId) {
+  const input = document.getElementById("newCommentInput");
+  const content = input.value.trim();
+  if (content.length < 3) { showToast("Escribí al menos 3 caracteres"); return; }
+
+  const { data, error } = await sb.rpc("add_comment", { p_video_id: videoId, p_user_id: currentUser.id, p_content: content });
+  if (error || !data.ok) { showToast("No se pudo comentar"); return; }
+
+  const { error: originError } = await sb.rpc("mark_latest_comment_origin", {
+    p_video_id: videoId,
+    p_origin: getLiveScrollClientOrigin()
+  });
+  if (originError) console.warn("No se pudo registrar el origen del comentario:", originError.message);
+
+  input.value = "";
+  await loadComments(videoId);
+  await loadProfile(); // por si sumó puntos por primer comentario
+  updateBalanceUI();
+}
+
+function closeComments() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+function renderAvatarHtml(profile, size) {
+  size = size || 32;
+  if (profile.avatar_url) {
+    return `<img src="${escapeHtml(profile.avatar_url)}" alt="avatar" loading="lazy" decoding="async" style="width:${size}px; height:${size}px; border-radius:50%; object-fit:cover; vertical-align:middle;">`;
+  }
+  return `<span style="font-size:${Math.round(size * 0.85)}px; vertical-align:middle;">${profile.avatar_emoji || "🎬"}</span>`;
+}
+
+function getPlanBadgeHtml(planId) {
+  if (planId === "plus") return `<span style="color:var(--gold); font-size:11px;">⭐ Plus</span>`;
+  if (planId === "diamante") return `<span style="color:#7dd3fc; font-size:11px;">💎 Diamante</span>`;
+  return "";
+}
+
+function getAvatarRingClass(planId) {
+  if (planId === "plus") return "plan-plus";
+  if (planId === "diamante") return "plan-diamante";
+  return "";
+}
+
+function getSocialBrandIconUrl(brand, color) {
+  const safeBrand = ["kick","twitch","youtube","tiktok","instagram"].includes(brand) ? brand : "youtube";
+  // 6.2.2: LiveScroll 6 lleva los SVG dentro de la aplicación para que los
+  // logos sigan visibles con conexión inestable. LS7 conserva su entrega actual.
+  return isLiveScroll7App()
+    ? `https://cdn.simpleicons.org/${safeBrand}/${color}`
+    : `brand-${safeBrand}.svg?v=6.2.2`;
+}
+
+function renderSocialIcons(profile) {
+  const ownConnectedUrls = profile?.id === currentUser?.id ? {
+    social_kick:lsGetConnectedStreamProfileUrl("kick"),
+    social_twitch:lsGetConnectedStreamProfileUrl("twitch")
+  } : {};
+  const socials = [
+    { key: "social_kick", brand: "kick", color: "53FC18", label: "Kick" },
+    { key: "social_twitch", brand: "twitch", color: "9146FF", label: "Twitch" },
+    { key: "social_youtube", brand: "youtube", color: "FF0000", label: "YouTube" },
+    { key: "social_tiktok", brand: "tiktok", color: "FFFFFF", label: "TikTok" },
+    { key: "social_instagram", brand: "instagram", color: "E4405F", label: "Instagram" }
+  ];
+  const active = socials.map(s => {
+    const rawUrl = ownConnectedUrls[s.key] || profile[s.key] || "";
+    const kickChannel = s.key === "social_kick" ? getKickChannelFromUrl(rawUrl) : "";
+    const twitchChannel = s.key === "social_twitch" ? getTwitchChannelFromUrl(rawUrl) : "";
+    const url = kickChannel
+      ? `https://kick.com/${encodeURIComponent(kickChannel)}`
+      : twitchChannel
+        ? `https://www.twitch.tv/${encodeURIComponent(twitchChannel)}`
+        : rawUrl;
+    return { ...s, url };
+  }).filter(s => {
+    if (s.key === "social_kick") return !!getKickChannelFromUrl(s.url);
+    if (s.key === "social_twitch") return !!getTwitchChannelFromUrl(s.url);
+    return isSafeUrl(s.url);
+  });
+  if (!active.length) return "";
+  return `<div class="ls-profile-socials">
+    ${active.map(s => `<a class="ls-profile-social-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener" title="${s.label}" onclick="logSocialClick('${profile.id}', '${s.label}')"><img class="ls-profile-social-logo" src="${getSocialBrandIconUrl(s.brand,s.color)}" alt="" loading="lazy" decoding="async"><span>${s.label}</span></a>`).join("")}
+  </div>`;
+}
+
+function logSocialClick(ownerId, platform) {
+  if (!ownerId || ownerId === currentUser?.id) return; // no contamos clics a tus propias redes
+  sb.rpc("log_social_click", { p_owner_id: ownerId, p_platform: platform }).catch(() => {});
+}
+
+// ============================================================
+// PARA TI — videos destacados/anclados por Plus y Diamante
+// ============================================================
+async function renderForYou(renderToken = lsTabRenderToken) {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<div id="foryouList">Cargando destacados...</div>`;
+
+  const { data: featured, error } = await sb.rpc("get_featured_videos");
+  if (renderToken !== lsTabRenderToken || currentTab !== "foryou") return;
+  const list = document.getElementById("foryouList");
+
+  if (error) { list.textContent = "Error cargando destacados: " + error.message; return; }
+  if (!featured || !featured.length) {
+    list.innerHTML = `<div style="padding:40px 0; text-align:center;">
+      <h1 class="page-title">✨ Para Ti</h1>
+      <p style="color:var(--text-dim)">Todavía no hay videos destacados. Los usuarios Plus y Diamante pueden anclar los suyos acá desde Mi Perfil.</p>
+    </div>`;
+    return;
+  }
+
+  const videos = featured.map(f => ({
+    id: f.video_id, title: f.title, video_url: f.video_url, platform: f.platform,
+    user_id: f.owner_id, profiles: { username: f.username, plan_id: f.plan_id }
+  }));
+
+  const { data: myLikes } = await sb.from("video_likes").select("video_id").eq("user_id", currentUser.id).in("video_id", videos.map(v => v.id));
+  if (renderToken !== lsTabRenderToken || currentTab !== "foryou") return;
+  const likedSet = new Set((myLikes || []).map(l => l.video_id));
+
+  list.innerHTML = `
+    <div class="feed-vertical" id="feedVertical">
+      ${videos.map((v, i) => `
+        <div class="feed-item${v.platform === "upload" ? " ls-upload-feed-item" : ""}" data-video-id="${v.id}">
+          <div class="feed-phone">
+            <div style="position:absolute; top:14px; left:14px; background:rgba(0,0,0,0.6); color:var(--gold); font-size:11px; padding:4px 10px; border-radius:20px; z-index:6;">📌 Destacado</div>
+            <div class="feed-embed-frame" id="embed-${v.id}">${getEmbedPlaceholderHtml(v)}</div>
+            <div class="feed-actions">
+              <button class="feed-action-btn ls-like-action-611 ${likedSet.has(v.id) ? "liked" : ""}" id="like-${v.id}" data-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-label="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" aria-pressed="${likedSet.has(v.id)}" title="${likedSet.has(v.id) ? "Te gusta" : "Me gusta"}" onclick="handleLike('${v.id}')"><span>${likedSet.has(v.id) ? "♥" : "♡"}</span><i>${likedSet.has(v.id) ? "TU LIKE" : "LIKE"}</i></button>
+              <button class="feed-action-btn ls-comment-action-611" data-label="Comentar" aria-label="Abrir comentarios" title="Comentarios" onclick="openComments('${v.id}')"><span>💬</span><i>COMENTAR</i></button>
+              ${renderRuntimeShareButton(v)}
+            </div>
+            <div class="feed-overlay">
+              <div>
+                <div class="title">${escapeHtml(v.title)}</div>
+                <div class="author" style="cursor:pointer;" onclick="viewPublicProfile('${escapeHtml(v.profiles.username)}')"><span>@${escapeHtml(v.profiles.username)}</span> ${getPlanBadgeHtml(v.profiles.plan_id)} ${renderClientOriginBadge(v.client_origin)} <span class="feed-platform-chip">${escapeHtml(v.platform)}</span></div>
+              </div>
+              <div class="live-pts" id="pts-${v.id}"><span class="mono" id="secs-${v.id}">0s</span></div>
+            </div>
+            ${i === 0 ? `<div class="feed-nudge">Deslizá hacia arriba para el siguiente ↑</div>` : ""}
+          </div>
+        </div>
+      `).join("")}
+    </div>`;
+
+  setupFeedObserver(videos);
+  fitMobileFeedViewport("feedVertical");
+  setupDoubleTapLike();
+  setupPullToRefresh(renderForYou);
+  setupSwipeNavigation("foryou", { right: "feed" });
+}
+
+
+let previousTabBeforeProfile = "feed";
+
+// ============================================================
+// DIRECTORIO DE USUARIOS
+// ============================================================
+let usersDirectorySearchTimeout = null;
+let usersDirectoryRequestToken = 0;
+
+// ============================================================
+// DIRECTOS (usuarios en vivo ahora)
+// ============================================================
+let lsConnectedLiveRefreshTimer = null;
+
+function stopConnectedLiveRefresh() {
+  if (lsConnectedLiveRefreshTimer) {
+    clearInterval(lsConnectedLiveRefreshTimer);
+    lsConnectedLiveRefreshTimer = null;
+  }
+}
+
+function startConnectedLiveRefresh() {
+  stopConnectedLiveRefresh();
+  lsConnectedLiveRefreshTimer = setInterval(() => {
+    if (document.hidden || currentTab !== "directos") return;
+    lsPerfCache.directos = { data:null, at:0 };
+    renderDirectos(lsTabRenderToken);
+  }, 30000);
+}
+
+function getTwitchChannelFromUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)twitch\.tv$/i.test(parsed.hostname)) return "";
+    const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[a-z0-9_]{3,25}$/i.test(channel) ? channel.toLowerCase() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function getKickChannelFromUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)kick\.com$/i.test(parsed.hostname)) return "";
+    const channel = parsed.pathname.split("/").filter(Boolean)[0] || "";
+    return /^[a-z0-9_.-]{2,50}$/i.test(channel) ? channel.toLowerCase() : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function getYouTubeChannelUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)youtube\.com$/i.test(parsed.hostname) && !/(^|\.)youtu\.be$/i.test(parsed.hostname)) return "";
+    return parsed.href;
+  } catch (_) { return ""; }
+}
+
+function getTikTokProfileUrl(value) {
+  try {
+    const parsed = new URL(String(value || "").trim());
+    if (!/(^|\.)tiktok\.com$/i.test(parsed.hostname)) return "";
+    return parsed.href;
+  } catch (_) { return ""; }
+}
+
+function livePlatformSet(profile) {
+  const values = String(profile?.live_platform || "").toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  if (values.includes("both")) values.push("kick", "twitch");
+  if (profile?.kick_is_live) values.push("kick");
+  if (profile?.twitch_is_live) values.push("twitch");
+  if (profile?.youtube_is_live) values.push("youtube");
+  if (profile?.tiktok_is_live) values.push("tiktok");
+  return new Set(values.filter(value => ["kick","twitch","youtube","tiktok"].includes(value)));
+}
+
+function isProfileLive(profile) {
+  return profile?.is_live === true || profile?.kick_is_live === true || profile?.twitch_is_live === true || profile?.youtube_is_live === true || profile?.tiktok_is_live === true;
+}
+
+function renderCreatorVerifiedBadge(profile) {
+  if (profile?.is_creator_verified !== true) return "";
+  return `<span title="Creador verificado por LiveScroll" style="display:inline-flex;align-items:center;gap:4px;margin-left:5px;padding:3px 7px;border:1px solid rgba(57,231,255,.55);border-radius:999px;background:linear-gradient(135deg,rgba(57,231,255,.16),rgba(145,70,255,.16));color:#75efff;font:900 8px 'JetBrains Mono',monospace;letter-spacing:.06em;vertical-align:middle;box-shadow:0 0 15px rgba(57,231,255,.14);">◆ VERIFICADO</span>`;
+}
+
+function ensureLiveStartAlertStyles() {
+  if (document.getElementById("lsLiveStartAlertStyles")) return;
+  const style = document.createElement("style");
+  style.id = "lsLiveStartAlertStyles";
+  style.textContent = `
+    .ls-watch-inside{border-color:rgba(145,70,255,.58)!important;background:linear-gradient(135deg,#6d2ee8,#9146ff)!important;color:#fff!important}
+    .ls-live-start-alert{position:fixed;z-index:2147482500;top:max(72px,calc(env(safe-area-inset-top) + 58px));left:50%;width:min(440px,calc(100% - 24px));transform:translateX(-50%);display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:11px;padding:11px 12px;border-radius:17px;color:#fff;text-align:left;box-shadow:0 18px 55px rgba(0,0,0,.55);animation:lsLiveAlertIn .5s cubic-bezier(.16,1,.3,1) both;overflow:hidden}
+    .ls-live-start-alert.ls6{border:1px solid rgba(255,62,92,.48);background:linear-gradient(135deg,rgba(20,26,38,.98),rgba(50,12,25,.98))}.ls-live-start-alert.ls7{border:1px solid rgba(57,231,255,.48);background:radial-gradient(circle at 0 0,rgba(57,231,255,.20),transparent 42%),linear-gradient(135deg,#06162b,#160a32);box-shadow:0 18px 60px rgba(0,0,0,.62),0 0 35px rgba(57,231,255,.16)}
+    .ls-live-start-alert.ls7::after{content:"";position:absolute;inset:-80% -20%;background:linear-gradient(110deg,transparent 42%,rgba(57,231,255,.22) 49%,transparent 56%);animation:lsLiveAlertScan 2.2s linear infinite;pointer-events:none}.ls-live-start-avatar{position:relative;z-index:1;width:48px;height:48px;display:grid;place-items:center;border:2px solid #ff315c;border-radius:50%;background:#101522;font-size:24px;overflow:hidden;box-shadow:0 0 18px rgba(255,49,92,.34)}.ls-live-start-alert.ls7 .ls-live-start-avatar{border-color:#39e7ff;box-shadow:0 0 22px rgba(57,231,255,.45)}.ls-live-start-avatar img{width:100%;height:100%;object-fit:cover}.ls-live-start-copy{position:relative;z-index:1;min-width:0;display:flex;flex-direction:column;gap:2px}.ls-live-start-copy small{color:#ff718d;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.14em}.ls-live-start-alert.ls7 small{color:#58efff}.ls-live-start-copy strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ls-live-start-copy em{color:#aeb7c8;font-size:8px;font-style:normal}.ls-live-start-alert>i{position:relative;z-index:1;padding:6px 7px;border-radius:8px;background:#ff315c;color:#fff;font:900 7px 'JetBrains Mono',monospace;letter-spacing:.08em;font-style:normal;animation:lsLivePulse 1.1s infinite}
+    .ls-live-start-alert.platform-twitch>i{background:#9146ff}.ls-live-start-alert.platform-twitch .ls-live-start-avatar{border-color:#a970ff}
+    .ls-live-start-alert.platform-kick>i{background:#53fc18;color:#071006}.ls-live-start-alert.platform-kick .ls-live-start-avatar{border-color:#53fc18;box-shadow:0 0 22px rgba(83,252,24,.34)}
+    .ls-live-start-alert.platform-youtube>i{background:#ff0033}.ls-live-start-alert.platform-youtube .ls-live-start-avatar{border-color:#ff0033}
+    .ls-live-start-alert.platform-tiktok>i{background:#111;border:1px solid #35f1e5}.ls-live-start-alert.platform-tiktok .ls-live-start-avatar{border-color:#35f1e5}
+    .ls-live-start-alert.platform-both>i{background:linear-gradient(100deg,#53fc18 0 48%,#9146ff 52%);color:#fff}.ls-live-start-alert.platform-both .ls-live-start-avatar{border-color:#c88cff}
+    .ls-live-start-alert.platform-multi>i{background:linear-gradient(100deg,#53fc18,#9146ff 34%,#ff0033 67%,#35f1e5);color:#fff}.ls-live-start-alert.platform-multi .ls-live-start-avatar{border-color:#fff;box-shadow:0 0 24px rgba(103,232,249,.38)}
+    @keyframes lsLivePulse{50%{opacity:.35;transform:scale(.75)}}
+    @keyframes lsLiveAlertIn{from{opacity:0;transform:translate(-50%,-24px) scale(.94)}to{opacity:1;transform:translate(-50%,0) scale(1)}}@keyframes lsLiveAlertScan{to{transform:translateX(70%)}}
+    html.ls6-app-runtime nav{top:max(30px,calc(env(safe-area-inset-top) + 6px))!important;margin-top:max(30px,calc(env(safe-area-inset-top) + 6px))!important}
+  `;
+  document.head.appendChild(style);
+}
+
+document.addEventListener("DOMContentLoaded", ensureLiveStartAlertStyles);
+
+
+
+async function renderDirectos(renderToken = lsTabRenderToken) {
+  startConnectedLiveRefresh();
+  const main = document.getElementById("appView");
+  main.innerHTML = `
+    <h1 class="page-title" style="margin-bottom:0;">🔴 Directos</h1>
+    <p class="page-sub">Descubrí quién está en vivo en Kick, Twitch, YouTube o TikTok.</p>
+    <div id="directosList">Cargando...</div>`;
+
+  // Conservamos exclusivamente la integración existente de Kick y Twitch.
+  const { data:liveUsersData } = await sb.from("profiles")
+    .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch,social_youtube,social_tiktok,kick_is_live,twitch_is_live,youtube_is_live,youtube_live_video_id,tiktok_is_live")
+    .or("is_live.eq.true,kick_is_live.eq.true,twitch_is_live.eq.true,youtube_is_live.eq.true,tiktok_is_live.eq.true")
+    .is("ban_reason",null)
+    .order("live_started_at",{ascending:false});
+
+  const liveUsers = liveUsersData || [];
+
+  if (renderToken !== lsTabRenderToken || currentTab !== "directos") return;
+  const list = document.getElementById("directosList");
+  if (!list) return;
+
+  let html = "";
+
+  if (liveUsers.length) {
+    html += `<section>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;">
+        <h3 style="margin:0;font-size:12px;letter-spacing:.04em;">📺 DIRECTOS EN LIVESCROLL</h3>
+        <span style="font-size:9px;color:var(--text-dim);">KICK · TWITCH · YOUTUBE · TIKTOK</span>
+      </div>
+      ${liveUsers.map(u => {
+        const platforms = livePlatformSet(u);
+        const platformLabel = [["kick","🟢 Kick"],["twitch","🟣 Twitch"],["youtube","🔴 YouTube"],["tiktok","⚫ TikTok"]].filter(([key]) => platforms.has(key)).map(([,label]) => label).join(" + ") || "🔴 En vivo";
+        const kickChannel = getKickChannelFromUrl(u.social_kick);
+        const twitchChannel = getTwitchChannelFromUrl(u.social_twitch);
+        const youtubeUrl = u.youtube_live_video_id ? `https://www.youtube.com/watch?v=${encodeURIComponent(u.youtube_live_video_id)}` : getYouTubeChannelUrl(u.social_youtube);
+        const tiktokUrl = getTikTokProfileUrl(u.social_tiktok);
+        const watchButtons = [
+          platforms.has("kick") && kickChannel
+            ? `<a href="https://kick.com/${encodeURIComponent(kickChannel)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;">Ver en Kick</a>` : "",
+          platforms.has("twitch") && twitchChannel
+            ? `<a href="https://www.twitch.tv/${encodeURIComponent(twitchChannel)}" target="_blank" rel="noopener" class="watch-btn ls-watch-inside" style="text-decoration:none;">Ver en Twitch</a>` : "",
+          platforms.has("youtube") && youtubeUrl
+            ? `<a href="${escapeHtml(youtubeUrl)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;background:#ff0033;color:#fff;">Ver en YouTube</a>` : "",
+          platforms.has("tiktok") && tiktokUrl
+            ? `<a href="${escapeHtml(tiktokUrl)}" target="_blank" rel="noopener" class="watch-btn" style="text-decoration:none;background:#111;color:#fff;border-color:#35f1e5;">Ver en TikTok</a>` : ""
+        ].join("");
+        return `<div class="directo-card">
+          <div class="avatar-lg" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">${renderAvatarHtml(u,52)}</div>
+          <div class="info" onclick="viewPublicProfile('${escapeHtml(u.username)}')" style="cursor:pointer;">
+            <div class="uname">@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)}</div>
+            <div class="plat">${platformLabel} · en vivo</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;">${watchButtons}</div>
+        </div>`;
+      }).join("")}
+    </section>`;
+  }
+
+  if (!liveUsers.length) {
+    html = `
+      <div style="
+        margin-top:12px;
+        padding:22px 16px;
+        border:1px solid var(--border);
+        border-radius:16px;
+        background:var(--panel);
+        text-align:center;
+      ">
+        <div style="font-size:28px;margin-bottom:8px;">📡</div>
+        <div style="font-size:13px;font-weight:900;">No hay directos públicos ahora</div>
+        <div style="font-size:10px;color:var(--text-dim);margin-top:5px;">
+          Cuando un creador inicie una transmisión, va a aparecer acá.
+        </div>
+      </div>`;
+  }
+
+  list.innerHTML = html;
+}
+
+async function renderUsersDirectory() {
+  ensureIdentityExperience593Styles();
+  const main = document.getElementById("appView");
+  main.innerHTML = `
+    <h1 class="page-title">👥 Usuarios</h1>
+    <p class="page-sub">Buscá personas y descubrí a los creadores de LiveScroll.</p>
+    <div class="users-directory-tabs">
+      <button id="usersFilterAll" class="btn" onclick="setUsersDirectoryType('users')" style="flex:1;font-size:13px;padding:11px 14px;">👥 Usuarios</button>
+      <button id="usersFilterCreators" class="btn-outline" onclick="setUsersDirectoryType('creators')" style="flex:1;font-size:13px;padding:11px 14px;">🎬 Creadores</button>
+    </div>
+    <input type="text" id="userSearchInput" class="user-directory-search" placeholder="Buscar por nombre de usuario..." oninput="handleUserSearchInput()">
+    <div id="usersDirectoryList">Cargando...</div>`;
+
+  window.__usersDirectoryType = "users";
+  await loadUsersDirectory("");
+}
+
+function setUsersDirectoryType(type) {
+  window.__usersDirectoryType = type === "creators" ? "creators" : "users";
+  document.getElementById("usersFilterAll")?.classList.toggle("btn", window.__usersDirectoryType === "users");
+  document.getElementById("usersFilterAll")?.classList.toggle("btn-outline", window.__usersDirectoryType !== "users");
+  document.getElementById("usersFilterCreators")?.classList.toggle("btn", window.__usersDirectoryType === "creators");
+  document.getElementById("usersFilterCreators")?.classList.toggle("btn-outline", window.__usersDirectoryType !== "creators");
+  loadUsersDirectory(document.getElementById("userSearchInput")?.value.trim() || "");
+}
+
+function handleUserSearchInput() {
+  clearTimeout(usersDirectorySearchTimeout);
+  const input = document.getElementById("userSearchInput");
+  if (!input) return;
+  const term = input.value.trim();
+  usersDirectorySearchTimeout = setTimeout(() => loadUsersDirectory(term), 350);
+}
+
+async function loadUsersDirectory(term) {
+  const requestToken = ++usersDirectoryRequestToken;
+  const list = document.getElementById("usersDirectoryList");
+  if (!list) return;
+  list.innerHTML = "Buscando...";
+
+  let query = sb.from("profiles")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, is_creator_verified, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live")
+    .is("ban_reason", null)
+    .order("is_live", { ascending: false })
+    .order("username")
+    .limit(40);
+
+  if (term) query = query.ilike("username", `%${term}%`);
+  if (window.__usersDirectoryType === "creators") query = query.eq("is_creator", true);
+  else query = query.eq("is_creator", false).neq("id",currentUser.id);
+
+  let { data:users, error } = await query;
+  if (error) {
+    console.warn("Directorio avanzado no disponible; usando columnas compatibles", error);
+    let fallbackQuery = sb.from("profiles")
+      .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator")
+      .is("ban_reason",null)
+      .order("is_live",{ ascending:false })
+      .order("username")
+      .limit(40);
+    if (term) fallbackQuery=fallbackQuery.ilike("username",`%${term}%`);
+    fallbackQuery=window.__usersDirectoryType === "creators" ? fallbackQuery.eq("is_creator",true) : fallbackQuery.eq("is_creator",false).neq("id",currentUser.id);
+    const fallbackResult=await fallbackQuery;
+    users=fallbackResult.data;
+    error=fallbackResult.error;
+  }
+  if (requestToken !== usersDirectoryRequestToken) return;
+  if (!document.getElementById("usersDirectoryList")) return; // el usuario ya cambió de pestaña
+  if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar la lista de usuarios.</p>`; return; }
+  if (!users || !users.length) {
+    list.innerHTML = `<p style="color:var(--text-dim); font-size:13px;">No encontramos usuarios${term ? ` para "${escapeHtml(term)}"` : ""}.</p>`;
+    return;
+  }
+
+  list.innerHTML = users.map(u => `
+    <div class="user-directory-row" onclick="viewPublicProfile('${escapeHtml(u.username)}')">
+      <div class="avatar-sm${isProfileLive(u) ? " avatar-live-ring" : ""}">${renderAvatarHtml(u, 40)}</div>
+      <div class="info">
+        <div class="uname" style="font-size:14px;">${isProfileLive(u) ? `<span class="live-dot-badge"></span>` : ""}@${escapeHtml(u.username)} ${getPlanBadgeHtml(u.plan_id)} ${renderCreatorVerifiedBadge(u)}</div>
+        <div class="ls-directory-role ${u.is_creator ? "creator" : "user"}">${u.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
+      </div>
+      <div style="color:var(--text-dim); font-size:16px;">›</div>
+    </div>`).join("");
+}
+
+
+
+function openEmojiDetail(name, emoji, rarity = "", obtainedAt = "", serialNumber = "", stockTotal = "") {
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const rarityLabel = rarity ? getProfileMedalRarityLabel(rarity) : "Emoji";
+  const rarityClass = rarity ? getProfileMedalRarityClass(rarity) : "";
+
+  const rarityColor =
+    rarity === "rara" ? "#7dd3fc" :
+    rarity === "epica" ? "#c084fc" :
+    rarity === "legendaria" ? "#fbbf24" :
+    rarity === "exclusiva" ? "#fb7185" :
+    rarity === "comun" ? "#cbd5e1" :
+    "var(--text-dim)";
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" style="z-index:240;" data-modal-locked="1">
+      <div class="modal-box" style="max-width:390px;text-align:center;overflow:hidden;">
+        <div style="position:relative;padding:28px 22px 20px;background:
+          radial-gradient(circle at 50% 15%, ${rarityColor}18, transparent 48%),
+          var(--panel);">
+
+          <button type="button" onclick="openMyMedalsPanel()"
+            style="position:absolute;right:14px;top:14px;width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:17px;cursor:pointer;">✕</button>
+
+          <div style="font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:900;letter-spacing:.14em;color:var(--text-dim);margin-bottom:17px;">
+            LIVESCROLL · COLLECTION
+          </div>
+
+          <div class="ls-equipped-medal ${rarityClass}"
+            style="width:92px;height:92px;margin:0 auto 15px;font-size:52px;pointer-events:none;">
+            ${emoji}
+          </div>
+
+          <h2 style="margin:0;font-size:22px;">${escapeHtml(name || "Emoji")}</h2>
+
+          <div style="font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:${rarityColor};margin-top:7px;">
+            ${escapeHtml(rarityLabel)}
+          </div>
+
+          ${serialNumber && stockTotal ? `
+            <div style="display:inline-flex;margin-top:13px;padding:6px 10px;border-radius:999px;border:1px solid rgba(250,204,21,.25);background:rgba(250,204,21,.05);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:900;color:var(--gold);">
+              LIMITED #${serialNumber}/${stockTotal}
+            </div>` : ""}
+
+          <div style="margin:18px auto 0;max-width:290px;padding:12px;border-radius:12px;background:var(--panel-2);border:1px solid var(--border);">
+            <div style="font-size:11px;color:var(--text-dim);line-height:1.55;">
+              Emoji desbloqueado para usar en tu perfil de LiveScroll.
+            </div>
+            ${obtainedAt ? `
+              <div style="font-size:10px;color:var(--text-dim);margin-top:8px;">
+                Obtenido el ${new Date(obtainedAt).toLocaleDateString("es-AR")}
+              </div>` : ""}
+          </div>
+        </div>
+
+        <div style="padding:0 22px 22px;">
+          <button class="btn-outline" style="width:100%;" onclick="openMyMedalsPanel()">Volver a Mi colección</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function openMyMedalsPanel(initialFilter = "all") {
+  const badges = window.__myProfileBadges || [];
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  const [
+    { data: storeBadges },
+    equipped,
+    { data: badgeClaims },
+    { data: unlockedEmojis },
+    { data: storeEmojis },
+    { data: emojiClaims },
+    { data: unlockedItems },
+    { data: titleItems },
+    equippedTitle
+  ] = await Promise.all([
+    sb.from("store_badges").select("id,badge_name,rarity,description,is_limited,stock_total"),
+    getEquippedProfileMedals(currentUser.id),
+    sb.from("user_store_badge_claims").select("badge_id,serial_number,claimed_at").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id),
+    sb.from("store_emojis").select("id,emoji,name,rarity,is_limited,stock_total"),
+    sb.from("user_store_emoji_claims").select("emoji_id,serial_number,claimed_at").eq("user_id", currentUser.id),
+    sb.from("user_unlocked_items").select("item_id,unlocked_at").eq("user_id", currentUser.id),
+    sb.from("store_items").select("id,category,icon,name,rarity").eq("category", "title"),
+    getMyProfileTitle()
+  ]);
+
+  const storeBadgeByName = {};
+  (storeBadges || []).forEach(b => {
+    storeBadgeByName[String(b.badge_name || "").toLowerCase()] = b;
+  });
+
+  const badgeClaimById = {};
+  (badgeClaims || []).forEach(c => { badgeClaimById[c.badge_id] = c; });
+
+  const equippedSet = new Set((equipped || []).map(b => b.badge_name));
+
+  const normalizedBadges = badges.map(b => {
+    const meta = storeBadgeByName[String(b.badge_name || "").toLowerCase()] || {};
+    const launchMeta = getLiveScroll6LaunchBadgeMeta(b.badge_name) || {};
+    const claim = badgeClaimById[meta.id] || {};
+    return {
+      type:"badge",
+      icon:b.badge_icon || "🏅",
+      name:b.badge_name || "Medalla",
+      rarity:meta.rarity || launchMeta.rarity || null,
+      description:meta.description || launchMeta.description || "",
+      is_limited:!!meta.is_limited || !!launchMeta.is_limited,
+      stock_total:meta.stock_total || null,
+      serial_number:claim.serial_number || null,
+      obtained_at:claim.claimed_at || b.earned_at || null,
+      equipped:equippedSet.has(b.badge_name)
+    };
+  });
+
+  const emojiMetaByChar = {};
+  (storeEmojis || []).forEach(e => { emojiMetaByChar[e.emoji] = e; });
+
+  const emojiClaimById = {};
+  (emojiClaims || []).forEach(c => { emojiClaimById[c.emoji_id] = c; });
+
+  const normalizedEmojis = (unlockedEmojis || []).map(e => {
+    const meta = emojiMetaByChar[e.emoji] || {};
+    const claim = emojiClaimById[meta.id] || {};
+    return {
+      type:"emoji",
+      icon:e.emoji,
+      name:meta.name || "Emoji",
+      rarity:meta.rarity || null,
+      description:"Emoji desbloqueado para usar en tu perfil.",
+      is_limited:!!meta.is_limited,
+      stock_total:meta.stock_total || null,
+      serial_number:claim.serial_number || null,
+      obtained_at:claim.claimed_at || null,
+      equipped:false
+    };
+  });
+
+  const unlockedItemById = {};
+  (unlockedItems || []).forEach(i => { unlockedItemById[i.item_id] = i; });
+
+  const normalizedTitles = (titleItems || [])
+    .filter(t => unlockedItemById[t.id])
+    .map(t => ({
+      type:"title",
+      item_id:t.id,
+      icon:t.icon || "🏷️",
+      name:t.name || "Título",
+      rarity:t.rarity || "comun",
+      description:"Título equipable para mostrar debajo de tu nombre.",
+      is_limited:false,
+      stock_total:null,
+      serial_number:null,
+      obtained_at:unlockedItemById[t.id]?.unlocked_at || null,
+      equipped:equippedTitle?.item_id === t.id
+    }));
+
+  window.__collection568Items = [...normalizedBadges, ...normalizedEmojis, ...normalizedTitles];
+  // La colección se reconstruye desde Supabase cada vez que se abre,
+  // evitando mostrar stock/seriales viejos después de una compra.
+  window.__collection568Filter = initialFilter || "all";
+  window.__collection568RarityFilter = "all";
+  window.__collection568Sort = "rarity";
+
+  const allItems = window.__collection568Items;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" style="z-index:210;" data-modal-locked="1">
+      <div class="modal-box" style="max-width:520px;max-height:90dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <h2 style="margin:0;font-size:19px;">💎 Mi colección</h2>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:3px;">
+              ${allItems.length} objeto${allItems.length===1?"":"s"} · ${normalizedBadges.length} medallas · ${normalizedEmojis.length} emojis · ${normalizedTitles.length} títulos
+            </div>
+          </div>
+          <button type="button" onclick="closeManagedModal()"
+            style="width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+
+        <div class="modal-box-body" style="overflow-y:auto;">
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="btn-outline ls-collection-filter active" data-filter="all" onclick="setCollection568Filter('all',this)" style="padding:6px 9px;font-size:10px;">Todos</button>
+            <button class="btn-outline ls-collection-filter" data-filter="badge" onclick="setCollection568Filter('badge',this)" style="padding:6px 9px;font-size:10px;">Medallas</button>
+            <button class="btn-outline ls-collection-filter" data-filter="emoji" onclick="setCollection568Filter('emoji',this)" style="padding:6px 9px;font-size:10px;">Emojis</button>
+            <button class="btn-outline ls-collection-filter" data-filter="title" onclick="setCollection568Filter('title',this)" style="padding:6px 9px;font-size:10px;">Títulos</button>
+            <button class="btn-outline ls-collection-filter" data-filter="limited" onclick="setCollection568Filter('limited',this)" style="padding:6px 9px;font-size:10px;">Limitados</button>
+            <button class="btn-outline ls-collection-filter" data-filter="top" onclick="setCollection568Filter('top',this)" style="padding:6px 9px;font-size:10px;">Legendarios+</button>
+          </div>
+          <div style="margin:4px 0 12px;padding-top:10px;border-top:1px solid var(--border);">
+            <div style="font-size:9px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;">
+              Rareza
+            </div>
+            <div id="collection568RarityFilters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px;flex-wrap:wrap;">
+            <select id="collection568Sort" onchange="setCollection568Sort(this.value)"
+              style="padding:8px 10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:10px;">
+              <option value="rarity">Más raros</option>
+              <option value="newest">Más nuevos</option>
+              <option value="serial">Nº de edición</option>
+              <option value="name">Nombre A-Z</option>
+            </select>
+
+            <button class="btn-outline" style="padding:6px 10px;font-size:10px;" onclick="openEquipMedalsPanel()">Editar mis 3 medallas</button>
+          </div>
+
+          <div id="collection568Summary" style="font-size:10px;color:var(--text-dim);margin-bottom:10px;"></div>
+          <div id="collection568Grid"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const initialBtn = document.querySelector(`.ls-collection-filter[data-filter="${window.__collection568Filter}"]`);
+  document.querySelectorAll(".ls-collection-filter").forEach(btn => {
+    const active = btn === initialBtn;
+    btn.classList.toggle("active", active);
+    btn.style.borderColor = active ? "var(--gold)" : "";
+    btn.style.color = active ? "var(--gold)" : "";
+  });
+
+  renderCollection568RarityFilters(window.__collection568Filter);
+  renderCollection568Grid();
+}
+
+function setCollection568Filter(filter, button) {
+  window.__collection568Filter = filter || "all";
+  window.__collection568RarityFilter = "all";
+
+  document.querySelectorAll(".ls-collection-filter").forEach(btn => {
+    btn.classList.toggle("active", btn === button);
+    btn.style.borderColor = btn === button ? "var(--gold)" : "";
+    btn.style.color = btn === button ? "var(--gold)" : "";
+  });
+
+  renderCollection568RarityFilters(window.__collection568Filter);
+  renderCollection568Grid();
+}
+
+function setCollection568RarityFilter(filter, button) {
+  window.__collection568RarityFilter = filter || "all";
+
+  document.querySelectorAll(".ls-collection-rarity-filter").forEach(btn => {
+    btn.classList.toggle("active", btn === button);
+    btn.style.borderColor = btn === button ? "var(--gold)" : "";
+    btn.style.color = btn === button ? "var(--gold)" : "";
+  });
+
+  renderCollection568Grid();
+}
+
+function renderCollection568RarityFilters(activeType) {
+  const wrap = document.getElementById("collection568RarityFilters");
+  if (!wrap) return;
+
+  const all = window.__collection568Items || [];
+  const scoped = ["badge","emoji","title"].includes(activeType)
+    ? all.filter(i => i.type === activeType)
+    : all;
+
+  const available = new Set();
+  scoped.forEach(item => {
+    const rarity = String(item.rarity || "").toLowerCase();
+    if (rarity) available.add(rarity);
+    if (item.is_limited) available.add("limited");
+  });
+
+  const options = [
+    ["all","Todos"],
+    ["comun","Común"],
+    ["rara","Rara"],
+    ["epica","Épica"],
+    ["legendaria","Legendaria"],
+    ["exclusiva","Exclusiva"],
+    ["mitica","Mítica"],
+    ["limited","Limitada"]
+  ].filter(([key]) => key === "all" || available.has(key));
+
+  if (!options.some(([key]) => key === window.__collection568RarityFilter)) {
+    window.__collection568RarityFilter = "all";
+  }
+
+  wrap.innerHTML = options.map(([key,label]) => `
+    <button
+      class="btn-outline ls-collection-rarity-filter ${window.__collection568RarityFilter === key ? "active" : ""}"
+      onclick="setCollection568RarityFilter('${key}',this)"
+      style="
+        padding:5px 8px;
+        font-size:9px;
+        ${window.__collection568RarityFilter === key ? "border-color:var(--gold);color:var(--gold);" : ""}
+      "
+    >${label}</button>
+  `).join("");
+}
+
+function setCollection568Sort(sort) {
+  window.__collection568Sort = sort || "rarity";
+  renderCollection568Grid();
+}
+
+function renderCollection568Grid() {
+  const grid = document.getElementById("collection568Grid");
+  const summary = document.getElementById("collection568Summary");
+  if (!grid) return;
+
+  const rarityRank = { mitica:6, exclusiva:5, legendaria:4, epica:3, rara:2, comun:1 };
+  const filter = window.__collection568Filter || "all";
+  const sort = window.__collection568Sort || "rarity";
+
+  let items = [...(window.__collection568Items || [])];
+
+  if (filter === "badge") items = items.filter(i => i.type === "badge");
+  if (filter === "emoji") items = items.filter(i => i.type === "emoji");
+  if (filter === "title") items = items.filter(i => i.type === "title");
+  if (filter === "limited") items = items.filter(i => i.is_limited);
+  if (filter === "top") items = items.filter(i => ["legendaria","exclusiva","mitica"].includes(i.rarity));
+
+  const rarityFilter = window.__collection568RarityFilter || "all";
+  if (rarityFilter === "limited") {
+    items = items.filter(i => i.is_limited);
+  } else if (rarityFilter !== "all") {
+    items = items.filter(i => String(i.rarity || "").toLowerCase() === rarityFilter);
+  }
+
+  if (sort === "rarity") {
+    items.sort((a,b) => {
+      const rarityDiff=(rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
+      if (rarityDiff) return rarityDiff;
+      return new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0);
+    });
+  }
+
+  if (sort === "newest") {
+    items.sort((a,b) => new Date(b.obtained_at || 0)-new Date(a.obtained_at || 0));
+  }
+
+  if (sort === "serial") {
+    items.sort((a,b) => {
+      const aHas = Number.isFinite(Number(a.serial_number)) && Number(a.serial_number) > 0;
+      const bHas = Number.isFinite(Number(b.serial_number)) && Number(b.serial_number) > 0;
+      if (aHas && !bHas) return -1;
+      if (!aHas && bHas) return 1;
+      if (aHas && bHas) return Number(a.serial_number)-Number(b.serial_number);
+      return (rarityRank[b.rarity]||0)-(rarityRank[a.rarity]||0);
+    });
+  }
+
+  if (sort === "name") {
+    items.sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "es"));
+  }
+
+  if (summary) {
+    const labels = {
+      all:"Todos",
+      badge:"Medallas",
+      emoji:"Emojis",
+      title:"Títulos",
+      limited:"Limitados",
+      top:"Legendarios, exclusivos y míticos"
+    };
+    const rarityLabels = {
+      all:"Todos",
+      comun:"Común",
+      rara:"Rara",
+      epica:"Épica",
+      legendaria:"Legendaria",
+      exclusiva:"Exclusiva",
+      mitica:"Mítica",
+      limited:"Limitada"
+    };
+    const rarityText = rarityFilter === "all"
+      ? ""
+      : ` · ${rarityLabels[rarityFilter] || rarityFilter}`;
+    summary.textContent = `${labels[filter] || "Todos"}${rarityText} · ${items.length} resultado${items.length===1?"":"s"}`;
+  }
+
+  if (!items.length) {
+    grid.innerHTML = `
+      <div style="text-align:center;padding:28px 10px;color:var(--text-dim);font-size:12px;">
+        <div style="font-size:36px;margin-bottom:8px;">💎</div>
+        No hay objetos que coincidan con este filtro.
+      </div>`;
+    return;
+  }
+
+  const renderItem = (item) => {
+    const rarityClass=item.rarity ? getProfileMedalRarityClass(item.rarity) : "";
+    const rarityLabel=item.rarity
+      ? getProfileMedalRarityLabel(item.rarity)
+      : item.type==="emoji"
+        ? "Emoji"
+        : item.type==="title"
+          ? "Título"
+          : "Logro";
+    const rarityColor =
+      item.rarity === "rara" ? "#7dd3fc" :
+      item.rarity === "epica" ? "#c084fc" :
+      item.rarity === "legendaria" ? "#fbbf24" :
+      item.rarity === "exclusiva" ? "#fb7185" :
+      item.rarity === "mitica" ? "#ff365d" :
+      item.rarity === "comun" ? "#cbd5e1" :
+      "var(--text-dim)";
+
+    const onclick = item.type === "badge"
+      ? `openMedalDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.description || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`
+      : item.type === "title"
+        ? `openTitleDetail('${item.item_id}','${escapeHtml(item.name)}','${escapeHtml(item.icon)}',${item.equipped ? "true" : "false"},'${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.rarity || "comun")}')`
+        : `openEmojiDetail('${escapeHtml(item.name)}','${escapeHtml(item.icon)}','${escapeHtml(item.rarity || "")}','${escapeHtml(item.obtained_at || "")}','${escapeHtml(item.serial_number || "")}','${escapeHtml(item.stock_total || "")}')`;
+
+    return `
+      <button type="button" onclick="${onclick}"
+        style="position:relative;background:var(--panel-2);border:1px solid ${item.rarity ? rarityColor : "var(--border)"};border-radius:14px;padding:14px;text-align:center;color:var(--text);font-family:inherit;cursor:pointer;overflow:hidden;">
+        ${item.equipped ? `<div style="position:absolute;top:7px;right:7px;font-size:8px;font-weight:900;color:var(--green);background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:999px;padding:2px 6px;">${item.type === "title" ? "EQUIPADO" : "EQUIPADA"}</div>` : ""}
+        <div class="ls-equipped-medal ${rarityClass}" style="width:52px;height:52px;margin:2px auto 10px;font-size:28px;pointer-events:none;">
+          ${item.icon}
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text);">${escapeHtml(item.name)}</div>
+        <div style="font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${rarityColor};margin-top:5px;">
+          ${escapeHtml(rarityLabel)}
+        </div>
+        ${item.serial_number && item.stock_total ? `<div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--gold);font-weight:900;margin-top:5px;">LIMITED #${item.serial_number}/${item.stock_total}</div>` : ""}
+        ${item.obtained_at ? `<div style="font-size:9px;color:var(--text-dim);margin-top:5px;">${new Date(item.obtained_at).toLocaleDateString("es-AR")}</div>` : ""}
+      </button>`;
+  };
+
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;">
+      ${items.map(renderItem).join("")}
+    </div>`;
+}
+
+async function viewPublicProfile(username) {
+  ensureIdentityExperience593Styles();
+  if (!username) return;
+  if (username === currentProfile.username) { switchTab("profile"); return; }
+
+  clearAllWatchIntervals();
+  previousTabBeforeProfile = currentTab;
+
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando perfil...</p>`;
+  document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
+
+  let { data: profile, error: profileError } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, is_creator_verified, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live").eq("username", username).maybeSingle();
+
+  // Compatibilidad con proyectos que todavía no aplicaron todas las columnas
+  // sociales/de verificación. Una columna ausente no debe ocultar al usuario.
+  if (profileError) {
+    console.warn("Perfil público: usando consulta compatible", profileError.message);
+    const fallbackResult = await sb.from("profiles")
+      .select("id, username, avatar_emoji, avatar_url, cover_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator")
+      .eq("username", username)
+      .maybeSingle();
+    profile = fallbackResult.data;
+    profileError = fallbackResult.error;
+  }
+
+  if (profileError) console.error("No se pudo cargar el perfil público", profileError);
+  if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
+  recordDailyChallengeEvent("profile_view", profile.id);
+
+  const [
+    videosResult,
+    followersResult,
+    followingResult,
+    badgesResult,
+    theirEquippedBadges,
+    theirTitle
+  ] = await Promise.all([
+    sb.from("videos").select(isLiveScroll7App() ? "*" : LS6_PROFILE_VIDEO_COLUMNS).eq("user_id", profile.id).order("created_at", { ascending:false }),
+    sb.from("follows").select("follower_id").eq("followed_id", profile.id),
+    sb.from("follows").select("follower_id").eq("followed_id", profile.id).eq("follower_id", currentUser.id).maybeSingle(),
+    sb.from("user_badges").select("*").eq("user_id", profile.id).order("earned_at", { ascending:false }),
+    getEquippedProfileMedals(profile.id),
+    getPublicProfileTitle(profile.id)
+  ]);
+
+  const videos = videosResult?.data || [];
+  const followers = followersResult?.data || [];
+  const amIFollowing = followingResult?.data || null;
+  const theirBadges = badgesResult?.data || [];
+
+  const videoIds = (videos || []).map(v => v.id);
+
+  const [sessionsResult, likesResult] = await Promise.all([
+    videoIds.length ? sb.from("watch_sessions").select("video_id, viewer_id").in("video_id", videoIds) : Promise.resolve({ data:[] }),
+    videoIds.length ? sb.from("video_likes").select("video_id").in("video_id", videoIds) : Promise.resolve({ data:[] })
+  ]);
+  const sessions = sessionsResult?.data || [];
+  const likes = likesResult?.data || [];
+
+  const viewsByVideo = {};
+  (sessions || []).forEach(s => {
+    viewsByVideo[s.video_id] = viewsByVideo[s.video_id] || new Set();
+    viewsByVideo[s.video_id].add(s.viewer_id);
+  });
+  const likesByVideo = {};
+  (likes || []).forEach(l => { likesByVideo[l.video_id] = (likesByVideo[l.video_id] || 0) + 1; });
+
+  const isFollowing = !!amIFollowing;
+  window.__profileFeedVideos = videos;
+  window.__profileFeedAuthor = { username:profile.username, plan_id:profile.plan_id };
+  const livingProfileHtml = renderLiveScroll7LivingProfile({
+    profile,
+    videos,
+    followersCount:(followers || []).length,
+    totalViews:Object.values(viewsByVideo).reduce((sum, viewers) => sum + viewers.size, 0),
+    own:false
+  });
+
+  main.innerHTML = `
+    <button class="btn-outline" style="margin-bottom:18px;" onclick="switchTab('${previousTabBeforeProfile}')">← Volver</button>
+
+    <div class="profile-hero${isLiveScroll7App() ? " ls7-electric-profile" : ""}" style="position:relative; overflow:hidden;">
+      <div class="profile-cover${profile.cover_url ? " has-image" : ""}"
+        style="position:relative; z-index:4; ${profile.cover_url ? `background-image:url('${escapeHtml(profile.cover_url)}'); background-position:center ${Number(profile.cover_position_y ?? 50)}%;` : ""}">
+      </div>
+
+      ${profile.profile_side_image_url ? `
+        <div aria-hidden="true" style="position:absolute;left:0;right:0;top:150px;bottom:0;z-index:1;overflow:hidden;pointer-events:none;">
+          <img src="${escapeHtml(profile.profile_side_image_url)}" alt=""
+            style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center center;opacity:.42;filter:saturate(.95) contrast(1.06);">
+          <div style="position:absolute;inset:0;background:
+            linear-gradient(180deg,rgba(13,16,20,.16) 0%,rgba(13,16,20,.28) 48%,rgba(13,16,20,.72) 100%),
+            linear-gradient(90deg,rgba(13,16,20,.40) 0%,rgba(13,16,20,.18) 50%,rgba(13,16,20,.30) 100%);"></div>
+        </div>` : ""}
+
+      <div style="position:relative;z-index:2;">
+        <div class="profile-hero-top">
+          <div class="profile-avatar-ring ${getAvatarRingClass(profile.plan_id)}${isProfileLive(profile) ? " avatar-live-ring" : ""}">${renderAvatarHtml(profile, 60)}</div>
+          <div class="profile-name-block">
+            <h1>@${escapeHtml(profile.username)} ${getPlanBadgeHtml(profile.plan_id)} ${renderCreatorVerifiedBadge(profile)}</h1>
+            <div class="handle profile-role-badge ${profile.is_creator ? "creator" : "user"}">${profile.is_creator ? "🎬 Creador" : "👤 Usuario"}</div>
+            ${renderProfileTitleInline(theirTitle, false)}
+            ${theirEquippedBadges.length ? `<div class="ls-public-medals-wrap">${renderEquippedMedalsInline(theirEquippedBadges, false)}</div>` : ""}
+          </div>
+        </div>
+        ${profile.bio ? `<p class="profile-bio">${escapeHtml(profile.bio)}</p>` : ""}
+        ${renderSocialIcons(profile)}
+        <div class="profile-stats-row">
+          <div class="stat-pill"><div class="num">${videos?.length || 0}</div><div class="lbl">Videos</div></div>
+          <div class="stat-pill"><div class="num">${(followers || []).length}</div><div class="lbl">Seguidores</div></div>
+        </div>
+        <div class="profile-hero-actions">
+          <button class="btn${isFollowing ? "-outline" : ""}" id="followBtn" onclick="handleToggleFollow('${profile.id}')">${isFollowing ? "Siguiendo ✓" : "+ Seguir"}</button>
+        </div>
+      </div>
+    </div>
+
+    ${renderGenerationIdentityCard(videos, false)}
+    ${livingProfileHtml}
+
+    ${theirBadges && theirBadges.length ? `
+      <div class="profile-section">
+        <div class="profile-section-head">
+          <div class="ico">🏅</div>
+          <h3>Medallas</h3>
+          <div class="sub">${theirBadges.length}</div>
+        </div>
+        <div class="form-card">
+          <div class="streak-badges">
+            ${theirBadges.map(b => `<div class="badge-icon" title="${escapeHtml(b.badge_name)}">${b.badge_icon || "🏅"}</div>`).join("")}
+          </div>
+        </div>
+      </div>` : ""}
+
+    <div class="profile-section">
+      <div class="profile-section-head">
+        <div class="ico">🎬</div>
+        <h3>Videos</h3>
+        <div class="sub">${videos?.length || 0} en total</div>
+      </div>
+      ${videos && videos.length ? (() => {
+        window.__profileFeedVideos = videos;
+        window.__profileFeedAuthor = { username: profile.username, plan_id: profile.plan_id };
+        return `
+        <div class="video-grid">
+          ${videos.map(v => `
+            <div class="video-grid-tile" id="public-tile-${v.id}" onclick="openProfileVideoFeed(window.__profileFeedVideos, '${v.id}', window.__profileFeedAuthor)">
+              ${getGridCoverHtml(v)}
+              ${currentProfile.is_admin ? `<button class="ls-admin-profile-delete-611" title="Eliminar como administrador" aria-label="Eliminar video como administrador" onclick="event.stopPropagation();handleAdminDeleteProfileVideo('${v.id}','${escapeHtml(profile.username)}')">🗑</button>` : ""}
+              <div class="grid-overlay">
+                <div class="grid-stats">
+                  <span>👁 ${(viewsByVideo[v.id]?.size || 0)}</span>
+                  <span>❤️ ${likesByVideo[v.id] || 0}</span>
+                </div>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+      })() : `<p style="color:var(--text-dim)">Todavía no subió videos.</p>`}
+    </div>`;
+}
+
+async function handleToggleFollow(followedId) {
+  const { data, error } = await sb.rpc("toggle_follow", { p_follower_id: currentUser.id, p_followed_id: followedId });
+  if (error || !data.ok) return;
+  const btn = document.getElementById("followBtn");
+  if (data.following) {
+    btn.textContent = "Siguiendo ✓";
+    btn.className = "btn-outline";
+    showToast("Ahora seguís a este creador");
+  } else {
+    btn.textContent = "+ Seguir";
+    btn.className = "btn";
+  }
+}
+
+function openReportModal(videoId) {
+  const wrap = document.getElementById("globalModalWrap");
+  const reasons = ["Contenido violento", "Spam o engañoso", "Derechos de autor", "Contenido sexual", "Otro"];
+  wrap.innerHTML = `
+    <div class="ls-modal-locked" data-modal-locked="1" style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:100; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div style="background:var(--panel); width:100%; max-width:340px; border-radius:16px; padding:22px;">
+        <h3 style="margin-top:0;">🚩 Reportar video</h3>
+        <p style="font-size:13px; color:var(--text-dim); margin-bottom:14px;">¿Por qué querés reportarlo?</p>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${reasons.map(r => `<button class="btn-outline" style="text-align:left;" onclick="submitReport('${videoId}', '${r}')">${r}</button>`).join("")}
+        </div>
+        <button class="btn-outline" style="width:100%;margin-top:12px;" onclick="closeManagedModal()">Cancelar</button>
+      </div>
+    </div>`;
+}
+
+async function submitReport(videoId, reason) {
+  const { data, error } = await sb.rpc("report_video", { p_video_id: videoId, p_reporter_id: currentUser.id, p_reason: reason });
+  document.getElementById("globalModalWrap").innerHTML = "";
+  if (error || !data.ok) {
+    showToast(data?.error === "ya_reportado" ? "Ya habías reportado este video" : "No se pudo reportar");
+    return;
+  }
+  showToast("Reportado. Gracias por avisarnos.");
+}
+
+let notifCache = [];
+let notifRealtimeChannel = null;
+let notifRealtimeUserId = null;
+let notifUiRefreshFrame = null;
+let notifVisibleCount = 18;
+let notifSoundContext = null;
+let notifRealtimeConnected = false;
+let notifFallbackTimer = null;
+const LS_NOTIFICATION_SOUND_KEY = "livescroll_notification_sound_v598";
+
+function stopNotificationFallback() {
+  if (notifFallbackTimer) clearInterval(notifFallbackTimer);
+  notifFallbackTimer = null;
+  notifRealtimeConnected = false;
+}
+
+async function pollNotificationsFallback() {
+  if (!currentUser?.id || document.hidden || notifRealtimeConnected) return;
+  const newestAt = notifCache[0]?.created_at || new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  const { data, error } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .gt("created_at", newestAt)
+    .order("created_at", { ascending:false })
+    .limit(20);
+  if (error || !data?.length) return;
+  const known = new Set(notifCache.map(n => n.id));
+  const fresh = data.filter(n => !known.has(n.id));
+  if (!fresh.length) return;
+  notifCache = [...fresh, ...notifCache].slice(0, 60);
+  scheduleNotificationUIRefresh();
+  playLiveScrollNotificationSound();
+  const latest = fresh[0];
+  showToast(`${getNotificationIcon(latest.type)} ${latest.message || "Nueva notificación"}`);
+  if (latest.type === "live") showLiveStartAnimation(latest);
+}
+
+function startNotificationFallback() {
+  if (notifFallbackTimer) return;
+  notifFallbackTimer = setInterval(pollNotificationsFallback, 8000);
+}
+
+function isNotificationSoundEnabled() {
+  try { return localStorage.getItem(LS_NOTIFICATION_SOUND_KEY) === "1"; }
+  catch (_) { return false; }
+}
+
+function playLiveScrollNotificationSound() {
+  if (!isNotificationSoundEnabled() || document.hidden) return;
+  try {
+    const AudioEngine = window.AudioContext || window.webkitAudioContext;
+    if (!AudioEngine) return;
+    notifSoundContext = notifSoundContext || new AudioEngine();
+    const ctx = notifSoundContext;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(620, now);
+    osc.frequency.exponentialRampToValueAtTime(940, now + .12);
+    gain.gain.setValueAtTime(.0001, now);
+    gain.gain.exponentialRampToValueAtTime(.085, now + .018);
+    gain.gain.exponentialRampToValueAtTime(.0001, now + .20);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(now); osc.stop(now + .22);
+  } catch (_) {}
+}
+
+function toggleLiveScrollNotificationSound() {
+  const enabled = !isNotificationSoundEnabled();
+  try { localStorage.setItem(LS_NOTIFICATION_SOUND_KEY, enabled ? "1" : "0"); } catch (_) {}
+  if (enabled) playLiveScrollNotificationSound();
+  renderNotificationPanelContent();
+  showToast(enabled ? "🔊 Sonido de notificaciones activado" : "🔇 Sonido de notificaciones desactivado");
+}
+
+function scheduleNotificationUIRefresh() {
+  if (notifUiRefreshFrame) return;
+  notifUiRefreshFrame = requestAnimationFrame(() => {
+    notifUiRefreshFrame = null;
+    updateNotificationBadge();
+    if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+  });
+}
+
+function getNotificationIcon(type) {
+  const icons = { like: "❤️", comment: "💬", follow: "👤", live: "🔴", admin: "🛠️", system: "🔔", points: "🪙", streak: "🔥", plan: "💎" };
+  return icons[type] || "🔔";
+}
+
+const LS_LIVE_ALERT_HISTORY_KEY = "livescroll_live_alert_sessions_v1";
+
+function hasShownLiveSessionAlert(key) {
+  try {
+    const history = JSON.parse(sessionStorage.getItem(LS_LIVE_ALERT_HISTORY_KEY) || "{}");
+    const now = Date.now();
+    Object.keys(history).forEach(item => {
+      if (now - Number(history[item] || 0) > 24 * 60 * 60 * 1000) delete history[item];
+    });
+    if (history[key]) return true;
+    history[key] = now;
+    const trimmed = Object.fromEntries(Object.entries(history).slice(-40));
+    sessionStorage.setItem(LS_LIVE_ALERT_HISTORY_KEY, JSON.stringify(trimmed));
+    return false;
+  } catch (_) {
+    window.__lsLiveAlertFallbackHistory = window.__lsLiveAlertFallbackHistory || new Set();
+    if (window.__lsLiveAlertFallbackHistory.has(key)) return true;
+    window.__lsLiveAlertFallbackHistory.add(key);
+    return false;
+  }
+}
+
+async function showLiveStartAnimation(notification) {
+  if (!notification?.actor_id) return;
+  const { data:creator } = await sb.from("profiles")
+    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at,kick_is_live,twitch_is_live,youtube_is_live,tiktok_is_live")
+    .eq("id",notification.actor_id).maybeSingle();
+  if (!creator) return;
+
+  const platforms = Array.from(livePlatformSet(creator));
+  if (!platforms.length) return;
+  const platform = platforms.length > 1 ? "multi" : platforms[0];
+  const sessionStarted = creator.live_started_at || notification.created_at || "active";
+  const sessionKey = `${notification.actor_id}:${platforms.sort().join("+")}:${sessionStarted}`;
+  if (hasShownLiveSessionAlert(sessionKey)) return;
+
+  document.getElementById("lsLiveStartedAlert")?.remove();
+
+  const platformNames = { kick:"KICK", twitch:"TWITCH", youtube:"YOUTUBE", tiktok:"TIKTOK" };
+  const platformLabel = platforms.map(value => platformNames[value]).filter(Boolean).join(" + ");
+  const isLs7 = isLiveScroll7App();
+  const alert = document.createElement("button");
+  alert.id = "lsLiveStartedAlert";
+  alert.type = "button";
+  alert.className = `ls-live-start-alert ${isLs7 ? "ls7" : "ls6"} platform-${platform}`;
+  alert.onclick = () => { alert.remove(); switchTab("directos"); };
+  alert.innerHTML = `
+    <span class="ls-live-start-avatar">${creator.avatar_url ? `<img src="${escapeHtml(creator.avatar_url)}" alt="">` : escapeHtml(creator.avatar_emoji || "🎬")}</span>
+    <span class="ls-live-start-copy"><small>${isLs7 ? "SEÑAL DETECTADA" : "NUEVO DIRECTO"} · ${platformLabel}</small><strong>@${escapeHtml(creator.username)} está en vivo</strong><em>Tocá para ver las opciones del directo</em></span>
+    <i>${platformLabel}</i>`;
+  document.body.appendChild(alert);
+  setTimeout(() => alert.remove(), 12000);
+}
+
+function updateNotificationBadge() {
+  const unread = notifCache.filter(n => !n.read).length;
+  const badge = document.getElementById("notifBadge");
+  if (!badge) return;
+  if (unread > 0) {
+    badge.textContent = unread > 99 ? "99+" : unread;
+    badge.classList.remove("hidden");
+  } else {
+    badge.textContent = "";
+    badge.classList.add("hidden");
+  }
+}
+
+async function loadNotifications() {
+  if (!currentUser) return;
+  const { data, error } = await sb
+    .from("notifications")
+    .select("*")
+    .eq("user_id", currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    console.error("Error cargando notificaciones:", error);
+    return;
+  }
+
+  notifCache = data || [];
+  updateNotificationBadge();
+  if (document.getElementById("notifPanel")) renderNotificationPanelContent();
+  if (!window.__lsLiveStartupAlertShown) {
+    const recentLive = notifCache.find(n => n.type === "live" && !n.read && Date.now() - new Date(n.created_at).getTime() < 3 * 60 * 1000);
+    if (recentLive) {
+      window.__lsLiveStartupAlertShown = true;
+      showLiveStartAnimation(recentLive);
+    }
+  }
+}
+
+function subscribeToNotifications() {
+  if (!currentUser) return;
+  if (notifRealtimeChannel && notifRealtimeUserId === currentUser.id) return;
+  if (notifRealtimeChannel) {
+    sb.removeChannel(notifRealtimeChannel);
+    notifRealtimeChannel = null;
+    notifRealtimeUserId = null;
+  }
+
+  notifRealtimeUserId = currentUser.id;
+  notifRealtimeConnected = false;
+  startNotificationFallback();
+  notifRealtimeChannel = sb
+    .channel(`notifications-${currentUser.id}`)
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "notifications",
+      filter: `user_id=eq.${currentUser.id}`
+    }, payload => {
+      const notification = payload.new;
+      // El sondeo de respaldo puede haber incorporado exactamente este aviso
+      // unos milisegundos antes. En ese caso no repetimos sonido, toast ni cartel.
+      if (notifCache.some(n => n.id === notification.id)) return;
+      notifCache.unshift(notification);
+      notifCache = notifCache.slice(0, 60);
+      scheduleNotificationUIRefresh();
+      playLiveScrollNotificationSound();
+      showToast(`${getNotificationIcon(notification.type)} ${notification.message || "Nueva notificación"}`);
+      if (notification.type === "live") showLiveStartAnimation(notification);
+    })
+    .subscribe(status => {
+      if (status === "SUBSCRIBED") {
+        notifRealtimeConnected = true;
+        console.log("Notificaciones Realtime conectadas");
+      }
+      if (status === "CHANNEL_ERROR" || status === "CLOSED") {
+        notifRealtimeConnected = false;
+        notifRealtimeChannel = null;
+        notifRealtimeUserId = null;
+        setTimeout(() => {
+          if (currentUser?.id && !document.hidden) subscribeToNotifications();
+        }, 1800);
+      }
+    });
+}
+
+function renderNotificationPanelContent() {
+  const list = document.getElementById("notifPanelList");
+  if (!list) return;
+  if (!notifCache.length) {
+    list.innerHTML = `<div class="ls-notif-empty"><span>🔔</span><strong>Todo tranquilo por acá</strong><small>Las novedades de tu cuenta aparecerán en este lugar.</small></div>`;
+    return;
+  }
+
+  const grouped = [];
+  const groupsByKey = new Map();
+  notifCache.forEach(n => {
+    const key = n.type === "like"
+      ? `like:${n.video_id || n.message || "general"}`
+      : n.type === "follow"
+        ? `follow:${n.actor_id || n.message || n.id}`
+        : n.type === "comment"
+          ? `comment:${n.video_id || ""}:${n.actor_id || n.id}`
+          : n.type === "live"
+            ? `live:${n.actor_id || n.message || n.id}`
+            : `${n.type || "system"}:${n.message || n.id}`;
+    let group = groupsByKey.get(key);
+    if (!group) {
+      group = { ...n, members:[], groupUnread:false };
+      groupsByKey.set(key, group);
+      grouped.push(group);
+    }
+    group.members.push(n.id);
+    if (!n.read) group.groupUnread = true;
+  });
+
+  window.__notifGroupMembers = {};
+  grouped.forEach(group => { window.__notifGroupMembers[group.id] = group.members; });
+  const visible = grouped.slice(0, notifVisibleCount);
+  const newItems = visible.filter(n => n.groupUnread);
+  const previousItems = visible.filter(n => !n.groupUnread);
+
+  const renderGroup = (items, title) => items.length ? `
+    <section class="ls-notif-section">
+      <div class="ls-notif-section-title">${title}<span>${items.length}</span></div>
+      ${items.map(n => {
+        const clickable = n.video_id || n.actor_id || n.comment_id;
+        return `<button class="ls-notif-item${n.groupUnread ? " is-unread" : ""}" onclick="${clickable ? `handleNotificationClick('${n.id}')` : "void(0)"}">
+          <span class="ls-notif-icon">${getNotificationIcon(n.type)}</span>
+          <span class="ls-notif-copy">
+            <strong>${escapeHtml(n.message || "Nueva notificación")}${n.members.length > 1 ? ` <em>+${n.members.length - 1}</em>` : ""}</strong>
+            <small>${formatNotificationTime(n.created_at)}${clickable ? " · Tocá para abrir" : ""}</small>
+          </span>
+          ${n.groupUnread ? `<i aria-label="Nueva"></i>` : ""}
+        </button>`;
+      }).join("")}
+    </section>` : "";
+
+  list.innerHTML = `
+    <div class="ls-notif-tools">
+      <button onclick="toggleLiveScrollNotificationSound()">${isNotificationSoundEnabled() ? "🔊 Sonido activo" : "🔇 Activar sonido"}</button>
+      ${notifCache.some(n => !n.read) ? `<button onclick="markAllNotificationsRead()">✓ Leer todas</button>` : `<span>Todo leído</span>`}
+    </div>
+    ${renderGroup(newItems, "Nuevas")}
+    ${renderGroup(previousItems, "Anteriores")}
+    ${grouped.length > visible.length ? `<button class="ls-notif-more" onclick="notifVisibleCount += 18; renderNotificationPanelContent()">Ver anteriores (${grouped.length - visible.length})</button>` : ""}`;
+}
+
+async function markAllNotificationsRead() {
+  if (!currentUser) return;
+  const result = await sb.rpc("mark_notifications_read", { p_user_id:currentUser.id });
+  if (result?.error) {
+    showToast("No se pudieron marcar las notificaciones");
+    return;
+  }
+  notifCache = notifCache.map(n => ({ ...n, read:true }));
+  updateNotificationBadge();
+  renderNotificationPanelContent();
+}
+
+async function markNotificationGroupRead(notificationId) {
+  const ids = window.__notifGroupMembers?.[notificationId] || [notificationId];
+  const idSet = new Set(ids);
+  notifCache = notifCache.map(n => idSet.has(n.id) ? ({ ...n, read:true }) : n);
+  updateNotificationBadge();
+  try {
+    await sb.from("notifications").update({ read:true }).eq("user_id", currentUser.id).in("id", ids);
+  } catch (_) {}
+}
+
+function formatNotificationTime(dateString) {
+  const date = new Date(dateString);
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (diffSeconds < 60) return "Ahora";
+  const minutes = Math.floor(diffSeconds / 60);
+  if (minutes < 60) return `Hace ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days <= 7) return `Hace ${days} d`;
+  return date.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function toggleNotifPanel() {
+  const existing = document.getElementById("notifPanel");
+  if (existing) { existing.remove(); return; }
+
+  notifVisibleCount = 18;
+  const panel = document.createElement("div");
+  panel.id = "notifPanel";
+  panel.className = "ls-social-pulse-panel";
+  panel.innerHTML = `
+    <div class="ls-notif-head">
+      <div><span>SOCIAL PULSE</span><strong>Notificaciones</strong><small>Tu actividad en tiempo real</small></div>
+      <button onclick="document.getElementById('notifPanel')?.remove()" aria-label="Cerrar">✕</button>
+    </div>
+    <div id="notifPanelList" class="ls-notif-list"></div>`;
+  document.body.appendChild(panel);
+  renderNotificationPanelContent();
+
+  setTimeout(() => {
+    document.addEventListener("click", function closeOnOutsideClick(e) {
+      const panelEl = document.getElementById("notifPanel");
+      if (!panelEl) { document.removeEventListener("click", closeOnOutsideClick); return; }
+      if (!panelEl.contains(e.target) && e.target.id !== "notifBell" && !e.target.closest("#notifBell")) {
+        panelEl.remove();
+        document.removeEventListener("click", closeOnOutsideClick);
+      }
+    });
+  }, 0);
+}
+
+async function handleNotificationClick(notificationId) {
+  const notification = notifCache.find(n => n.id === notificationId);
+  if (!notification) return;
+  document.getElementById("notifPanel")?.remove();
+  markNotificationGroupRead(notificationId);
+
+  if (notification.type === "comment" && notification.video_id) {
+    await openComments(notification.video_id, notification.comment_id || null);
+    return;
+  }
+  if (notification.type === "like" && notification.video_id) {
+    await openSharedVideo(notification.video_id);
+    return;
+  }
+  if (notification.type === "live") {
+    switchTab("directos");
+    return;
+  }
+  if (notification.type === "follow" && notification.actor_id) {
+    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
+    if (!actor?.username) { showToast("Ese perfil ya no está disponible"); return; }
+    await viewPublicProfile(actor.username);
+    return;
+  }
+  if (notification.video_id) { await openSharedVideo(notification.video_id); return; }
+  if (notification.actor_id) {
+    const { data: actor } = await sb.from("profiles").select("username").eq("id", notification.actor_id).maybeSingle();
+    if (actor?.username) await viewPublicProfile(actor.username);
+  }
+}
+
+function copyReferralLink() {
+  const input = document.getElementById("referralLinkInput");
+  input.select();
+  navigator.clipboard.writeText(input.value).then(() => {
+    showToast("¡Link copiado!");
+  }).catch(() => {
+    showToast("No se pudo copiar, seleccionalo a mano");
+  });
+}
+
+async function openEditProfile() {
+  const baseEmojis = ["🎬","⚡","🔥","🎮","🎧","🐐","🚀","💎","😎","🎯"];
+  const { data: unlocked } = await sb.from("user_unlocked_emojis").select("emoji").eq("user_id", currentUser.id);
+  const emojis = [...baseEmojis, ...(unlocked || []).map(u => u.emoji).filter(e => !baseEmojis.includes(e))];
+  const isCreator = currentProfile.is_creator === true;
+  const creatorStatus = currentProfile.creator_application_status;
+  const creatorRequirementsMet = currentProfile.creator_video_count >= 5 && currentProfile.creator_account_days >= 7 && !currentProfile.is_blocked;
+
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:100;">
+      <div class="modal-box ls-profile-edit-modal" style="max-width:420px;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column;">
+        <div class="modal-box-header ls-profile-edit-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;background:var(--panel);">
+          <h2 style="font-size:19px;margin:0;">Editar perfil</h2>
+          <button type="button" onclick="closeManagedModal()"
+            aria-label="Cerrar"
+            style="width:40px;height:40px;min-width:40px;border-radius:50%;border:1px solid var(--border);background:var(--panel-2);color:var(--text);font-size:18px;cursor:pointer;">✕</button>
+        </div>
+        <div class="modal-box-body ls-profile-edit-body" style="overflow-y:auto;min-height:0;">
+        <div class="field" style="text-align:center;">
+          <label>Foto de perfil</label>
+          <div style="margin-bottom:10px;">
+            ${currentProfile.avatar_url
+              ? `<img src="${escapeHtml(currentProfile.avatar_url)}" alt="avatar" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid var(--gold-dim);">`
+              : `<div style="width:80px; height:80px; border-radius:50%; background:var(--panel-2); display:flex; align-items:center; justify-content:center; font-size:36px; margin:0 auto;">${currentProfile.avatar_emoji || "🎬"}</div>`}
+          </div>
+          <input type="file" id="avatarPhotoInput" accept="image/*" onchange="handleAvatarPhotoUpload()" style="display:none;">
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','avatarPhotoInput','elegir una foto para tu perfil','files')">📁 Elegir foto</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','avatarPhotoInput','tomar una foto para tu perfil','camera')">📷 Usar cámara</button>
+          </div>
+          <div id="avatarUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 3MB. Si subís una foto, tapa al emoji.</div>
+          ${currentProfile.avatar_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveAvatarPhoto()">🗑️ Quitar foto y volver al emoji</button>` : ""}
+        </div>
+        <div class="field">
+          <label>Portada del perfil</label>
+          <div id="coverPositionPreview"
+            style="border-radius:10px;overflow:hidden;height:105px;background:${currentProfile.cover_url ? `url('${escapeHtml(currentProfile.cover_url)}') center ${Number(currentProfile.cover_position_y ?? 50)}%/cover no-repeat` : "var(--panel-2)"};margin-bottom:10px;border:1px solid var(--border);">
+          </div>
+
+          ${currentProfile.cover_url ? `
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:5px;">
+                <span style="font-size:11px;color:var(--text-dim);">Acomodar imagen</span>
+                <span id="coverPositionValue" class="mono" style="font-size:10px;color:var(--gold);">${Number(currentProfile.cover_position_y ?? 50)}%</span>
+              </div>
+              <input type="range" id="coverPositionRange" min="0" max="100" step="1"
+                value="${Number(currentProfile.cover_position_y ?? 50)}"
+                oninput="previewCoverPosition(this.value)"
+                style="width:100%;">
+              <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-top:2px;"><span>Arriba</span><span>Abajo</span></div>
+            </div>` : ""}
+
+          <input type="file" id="coverPhotoInput" accept="image/*" onchange="handleCoverPhotoUpload()" style="display:none;">
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','coverPhotoInput','elegir la portada de tu perfil','files')">📁 Elegir portada</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','coverPhotoInput','tomar una foto para tu portada','camera')">📷 Usar cámara</button>
+          </div>
+          <div id="coverUploadStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">Máximo 5MB. Después podés elegir qué parte de la foto se ve.</div>
+          ${currentProfile.cover_url ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveCoverPhoto()">🗑️ Quitar portada</button>` : ""}
+        </div>
+        <div class="field">
+          <label>Imagen de fondo del perfil</label>
+          <div style="
+            position:relative;
+            height:150px;
+            border-radius:12px;
+            overflow:hidden;
+            background:var(--panel-2);
+            margin-bottom:10px;
+            border:1px solid var(--border);
+          ">
+            ${currentProfile.profile_side_image_url
+              ? `
+                <img
+                  src="${escapeHtml(currentProfile.profile_side_image_url)}"
+                  alt="Fondo decorativo"
+                  style="
+                    width:100%;
+                    height:100%;
+                    object-fit:cover;
+                    object-position:center top;
+                    opacity:0.55;
+                  "
+                >
+                <div style="position:absolute; inset:0; background:linear-gradient(90deg, rgba(13,16,20,.9), rgba(13,16,20,.2));"></div>
+                <div style="position:absolute; left:12px; bottom:10px; font-size:12px; color:#fff; font-weight:600;">Vista previa · queda detrás del contenido</div>
+              `
+              : `
+                <div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--text-dim); font-size:12px; text-align:center; padding:16px;">
+                  Subí una imagen vertical o temática.<br>Se mostrará detrás del contenido, no reemplaza la portada.
+                </div>
+              `}
+          </div>
+          <input
+            type="file"
+            id="profileSideImageInput"
+            accept="image/*"
+            onchange="handleProfileSideImageUpload()"
+            style="display:none;"
+          >
+          <div class="ls-android-media-actions">
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('files','profileSideImageInput','elegir la imagen de fondo de tu perfil','files')">📁 Elegir imagen</button>
+            <button type="button" class="btn-outline" onclick="openLiveScrollAndroidMedia('camera','profileSideImageInput','tomar una foto para el fondo de tu perfil','camera')">📷 Usar cámara</button>
+          </div>
+          <div id="profileSideImageStatus" style="font-size:11px; color:var(--text-dim); margin-top:6px;">
+            Máximo 5MB. Recomendado: imagen vertical. Se usa como fondo decorativo en segundo plano.
+          </div>
+          ${currentProfile.profile_side_image_url
+            ? `<button type="button" class="btn-outline" style="margin-top:10px; padding:9px 14px; font-size:13px; width:100%; color:var(--red); border-color:var(--red); font-weight:600;" onclick="handleRemoveProfileSideImage()">🗑️ Quitar imagen de fondo</button>`
+            : ""}
+        </div>
+
+        <div class="field">
+          <label>Avatar (si no tenés foto)</label>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${emojis.map(e => `<button onclick="selectAvatarEmoji('${e}')" id="emoji-${e}" style="font-size:20px; padding:8px; background:${e === currentProfile.avatar_emoji ? "var(--panel-2)" : "transparent"}; border:1px solid var(--border); border-radius:8px; cursor:pointer;">${e}</button>`).join("")}
+          </div>
+        </div>
+        <div class="field">
+          <label>Nombre de usuario</label>
+          <input type="text" id="editUsername" value="${escapeHtml(currentProfile.username)}">
+        </div>
+        <div class="field">
+          <label>Bio (opcional)</label>
+          <input type="text" id="editBio" value="${escapeHtml(currentProfile.bio || "")}" placeholder="Contá algo sobre vos" maxlength="120">
+        </div>
+        <div class="field">
+          <label>Mis redes (opcional)</label>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span>🩷</span><input type="text" id="socialInstagram" value="${escapeHtml(currentProfile.social_instagram || "")}" placeholder="Link de tu Instagram" style="flex:1;"></div>
+            ${isCreator ? `
+              <div class="ls-connected-social-primary"><span>🟢</span><div id="streamConnectionKick" style="flex:1;"></div></div>
+              <details class="ls-social-secondary-link"><summary>Enlace alternativo de Kick (opcional)</summary><input type="text" id="socialKick" value="${escapeHtml(currentProfile.social_kick || "")}" placeholder="Solo si querés usar otro enlace"></details>
+              <div class="ls-connected-social-primary"><span>🟣</span><div id="streamConnectionTwitch" style="flex:1;"></div></div>
+              <details class="ls-social-secondary-link"><summary>Enlace alternativo de Twitch (opcional)</summary><input type="text" id="socialTwitch" value="${escapeHtml(currentProfile.social_twitch || "")}" placeholder="Solo si querés usar otro enlace"></details>
+              <div style="display:flex; align-items:center; gap:8px;"><span>🔴</span><input type="text" id="socialYoutube" value="${escapeHtml(currentProfile.social_youtube || "")}" placeholder="Link de tu YouTube" style="flex:1;"></div>
+              <div style="display:flex; align-items:center; gap:8px;"><span>⚫</span><input type="text" id="socialTiktok" value="${escapeHtml(currentProfile.social_tiktok || "")}" placeholder="Link de tu TikTok" style="flex:1;"></div>
+              <div style="font-size:10px;color:var(--text-dim);">Los controles para iniciar o finalizar directos están visibles en tu perfil principal.</div>
+            ` : `
+              <div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--panel-2);">
+                <div style="font-size:14px;font-weight:800;margin-bottom:8px;">🔒 Kick, Twitch, YouTube y TikTok</div>
+                <div style="font-size:12px;color:var(--text-dim);line-height:1.55;margin-bottom:10px;">
+                  Para habilitar estas redes necesitás ser Creador: 5 videos, una cuenta de 7 días y no tener sanciones.
+                </div>
+                ${creatorStatus === "pending"
+                  ? `<button type="button" class="btn-outline" disabled style="width:100%;">⏳ Solicitud en revisión</button>`
+                  : `<button type="button" class="btn-outline" onclick="openCreatorProgramTerms()" ${creatorRequirementsMet ? "" : "disabled"} style="width:100%;">🎬 Solicitar acceso como creador</button>`}
+                <div style="font-size:11px;color:${creatorRequirementsMet ? "var(--green)" : "var(--text-dim)"};margin-top:8px;">
+                  Videos: ${currentProfile.creator_video_count}/5 · Antigüedad: ${currentProfile.creator_account_days}/7 días
+                </div>
+              </div>
+            `}
+          </div>
+        </div>
+        <div id="editProfileError" class="error-msg"></div>
+        <div style="border-top:1px solid var(--border); margin-top:16px; padding-top:16px;">
+          <button class="btn-outline" style="width:100%;" onclick="openChangePassword()">🔒 Cambiar contraseña</button>
+        </div>
+        </div>
+        <div class="modal-box-footer ls-profile-edit-footer" style="display:flex;gap:10px;position:sticky;bottom:0;z-index:6;background:var(--panel);border-top:1px solid var(--border);">
+          <button class="btn-outline" style="flex:1;min-height:48px;" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn" style="flex:1;min-height:48px;" onclick="saveProfileEdits()">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+  window.selectedAvatarEmoji = currentProfile.avatar_emoji || "🎬";
+  if (isCreator) setTimeout(loadStreamAccountConnectionStatus, 0);
+}
+
+function streamConnectionEntry(payload, provider) {
+  const direct = payload?.[provider];
+  if (direct && typeof direct === "object") return direct;
+  const list = payload?.connections || payload?.data || [];
+  if (Array.isArray(list)) return list.find(item => String(item?.provider || "").toLowerCase() === provider) || null;
+  return null;
+}
+
+const lsStreamConnections = { kick:null, twitch:null };
+
+function lsConnectionProfileUrl(connection, provider) {
+  const directUrl = connection?.profile_url || connection?.channel_url || connection?.url || "";
+  if (isSafeUrl(directUrl)) return directUrl;
+  const username = String(connection?.provider_username || connection?.username || connection?.display_name || "")
+    .trim()
+    .replace(/^@/, "");
+  if (!/^[a-zA-Z0-9_.-]{2,50}$/.test(username)) return "";
+  return provider === "twitch"
+    ? `https://www.twitch.tv/${encodeURIComponent(username)}`
+    : `https://kick.com/${encodeURIComponent(username)}`;
+}
+
+function lsGetConnectedStreamProfileUrl(provider) {
+  const connection = lsStreamConnections[provider];
+  if (!connection || connection.connected === false || connection.is_connected === false) return "";
+  const url = lsConnectionProfileUrl(connection, provider);
+  return isSafeUrl(url) ? url : "";
+}
+
+async function syncConnectedStreamProfileUrls() {
+  if (!currentUser?.id || !currentProfile) return;
+  const updates = {};
+  const kickUrl = lsGetConnectedStreamProfileUrl("kick");
+  const twitchUrl = lsGetConnectedStreamProfileUrl("twitch");
+  if (kickUrl && kickUrl !== currentProfile.social_kick) updates.social_kick = kickUrl;
+  if (twitchUrl && twitchUrl !== currentProfile.social_twitch) updates.social_twitch = twitchUrl;
+  if (!Object.keys(updates).length) return;
+
+  const { error } = await sb.from("profiles").update(updates).eq("id", currentUser.id);
+  if (error) {
+    console.warn("No se pudo sincronizar el enlace de la cuenta conectada:", error.message);
+    return;
+  }
+  Object.assign(currentProfile, updates);
+  Object.entries(updates).forEach(([key, value]) => {
+    const input = document.getElementById(key === "social_kick" ? "socialKick" : "socialTwitch");
+    if (input && !input.value) input.value = value;
+  });
+}
+
+function renderStreamConnectionControl(provider, connection) {
+  const host = document.getElementById(`streamConnection${provider === "twitch" ? "Twitch" : "Kick"}`);
+  if (!host) return;
+  const label = provider === "twitch" ? "Twitch" : "Kick";
+  const connected = !!connection && connection.connected !== false && connection.is_connected !== false;
+  const username = connection?.provider_username || connection?.username || connection?.display_name || "";
+  host.innerHTML = connected
+    ? `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:9px;background:var(--panel-2);">
+         <span style="font-size:11px;color:var(--green);font-weight:800;">✓ ${label} conectado${username ? ` · @${escapeHtml(username)}` : ""}</span>
+         <button type="button" class="btn-outline" style="padding:6px 9px;font-size:11px;" onclick="disconnectStreamAccount('${provider}')">Desconectar</button>
+       </div>`
+    : `<button type="button" class="btn-outline" style="width:100%;padding:8px 10px;font-size:12px;" onclick="connectStreamAccount('${provider}')">Conectar cuenta de ${label}</button>`;
+}
+
+async function loadStreamAccountConnectionStatus() {
+  ["kick", "twitch"].forEach(provider => {
+    const host = document.getElementById(`streamConnection${provider === "twitch" ? "Twitch" : "Kick"}`);
+    if (host) host.innerHTML = `<span style="font-size:11px;color:var(--text-dim);">Comprobando conexión…</span>`;
+  });
+  const { data, error } = await sb.functions.invoke("stream-account-connect", { body:{ action:"status" } });
+  if (error || data?.ok === false) {
+    lsStreamConnections.kick = null;
+    lsStreamConnections.twitch = null;
+    ["kick", "twitch"].forEach(provider => renderStreamConnectionControl(provider, null));
+    return;
+  }
+  lsStreamConnections.kick = streamConnectionEntry(data, "kick");
+  lsStreamConnections.twitch = streamConnectionEntry(data, "twitch");
+  renderStreamConnectionControl("kick", lsStreamConnections.kick);
+  renderStreamConnectionControl("twitch", lsStreamConnections.twitch);
+  await syncConnectedStreamProfileUrls();
+}
+
+async function connectStreamAccount(provider) {
+  if (!currentUser) { showToast("Primero iniciá sesión en LiveScroll"); return; }
+  showToast(`Abriendo ${provider === "twitch" ? "Twitch" : "Kick"}…`);
+  const { data, error } = await sb.functions.invoke("stream-account-connect", {
+    body:{ action:"start", provider }
+  });
+  const authorizationUrl = data?.authorization_url || data?.url;
+  if (error || data?.ok === false || !authorizationUrl) {
+    showToast(data?.error || "No se pudo iniciar la conexión");
+    return;
+  }
+  localStorage.setItem("ls_stream_oauth_pending", provider);
+  window.location.assign(authorizationUrl);
+}
+
+async function disconnectStreamAccount(provider) {
+  const label = provider === "twitch" ? "Twitch" : "Kick";
+  if (!confirm(`¿Desconectar tu cuenta de ${label}?`)) return;
+  const { data, error } = await sb.functions.invoke("stream-account-connect", {
+    body:{ action:"disconnect", provider }
+  });
+  if (error || data?.ok === false) {
+    showToast(data?.error || "No se pudo desconectar la cuenta");
+    return;
+  }
+  showToast(`${label} desconectado`);
+  lsStreamConnections[provider] = null;
+  loadStreamAccountConnectionStatus();
+}
+
+async function finishPendingStreamOAuth() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state");
+  const provider = localStorage.getItem("ls_stream_oauth_pending");
+  if (!code || !state || !provider) return;
+
+  let attempts = 0;
+  const waitForSession = setInterval(async () => {
+    attempts++;
+    if (!currentUser && attempts < 40) return;
+    clearInterval(waitForSession);
+    if (!currentUser) {
+      showToast("Iniciá sesión en LiveScroll para completar la conexión");
+      return;
+    }
+    const { data, error } = await sb.functions.invoke("stream-account-connect", {
+      body:{ action:"callback", provider, code, state }
+    });
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("code");
+    cleanUrl.searchParams.delete("state");
+    cleanUrl.searchParams.delete("scope");
+    history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+    localStorage.removeItem("ls_stream_oauth_pending");
+    if (error || data?.ok === false) {
+      showToast(data?.error || "No se pudo conectar la cuenta");
+      return;
+    }
+    showToast(`✓ Cuenta de ${provider === "twitch" ? "Twitch" : "Kick"} conectada`);
+    if (data?.profile_url && currentProfile) {
+      const profileKey = provider === "twitch" ? "social_twitch" : "social_kick";
+      currentProfile[profileKey] = data.profile_url;
+      await sb.from("profiles").update({ [profileKey]:data.profile_url }).eq("id", currentUser.id);
+    }
+    await loadStreamAccountConnectionStatus();
+  }, 250);
+}
+
+window.connectStreamAccount = connectStreamAccount;
+window.disconnectStreamAccount = disconnectStreamAccount;
+window.loadStreamAccountConnectionStatus = loadStreamAccountConnectionStatus;
+setTimeout(finishPendingStreamOAuth, 0);
+
+function openChangePassword() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `
+    <div class="ls-modal-locked" data-modal-locked="1" style="position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:110; display:flex; align-items:center; justify-content:center; padding:20px;">
+      <div class="auth-box" style="margin:0;">
+        <h2>Cambiar contraseña</h2>
+        <div class="field">
+          <label>Nueva contraseña</label>
+          <div class="password-field-wrap">
+            <input type="password" id="changePasswordInput" placeholder="••••••••">
+            <button type="button" class="password-toggle-btn" onclick="togglePasswordVisibility('changePasswordInput', this)">👁</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;">
+          <button class="btn-outline" style="flex:1;" onclick="closeManagedModal()">Cancelar</button>
+          <button class="btn" style="flex:1;" onclick="submitChangePassword()">Guardar</button>
+        </div>
+        <div id="changePasswordError" class="error-msg"></div>
+      </div>
+    </div>`;
+}
+
+async function submitChangePassword() {
+  const password = document.getElementById("changePasswordInput").value;
+  const errEl = document.getElementById("changePasswordError");
+  if (!password || password.length < 8) {
+    errEl.textContent = "La contraseña tiene que tener al menos 8 caracteres.";
+    return;
+  }
+
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) { errEl.textContent = error.message; return; }
+
+  openEditProfile();
+  showToast("Contraseña actualizada");
+}
+
+async function optimizeProfileImage(file, { maxWidth, maxHeight, quality = .78 } = {}) {
+  if (!(file instanceof Blob) || !file.size) throw new Error("Imagen vacía");
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("No pudimos leer esta imagen"));
+      img.src = objectUrl;
+    });
+
+    const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha:false });
+    if (!context) throw new Error("Este dispositivo no pudo optimizar la imagen");
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(resolve, "image/webp", quality);
+    });
+    if (!blob) throw new Error("No pudimos comprimir esta imagen");
+    return blob.size < file.size ? blob : file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function getSupabasePublicObjectPath(publicUrl, bucket = "avatars") {
+  try {
+    const parsed = new URL(String(publicUrl || ""));
+    if (parsed.hostname !== new URL(SUPABASE_URL).hostname) return "";
+    const marker = "/storage/v1/object/public/" + bucket + "/";
+    const index = parsed.pathname.indexOf(marker);
+    if (index < 0) return "";
+    const objectPath = decodeURIComponent(parsed.pathname.slice(index + marker.length));
+    return objectPath && !objectPath.includes("..") ? objectPath : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+async function removePreviousProfileAsset(publicUrl) {
+  const objectPath = getSupabasePublicObjectPath(publicUrl);
+  if (!objectPath) return;
+  const { error } = await sb.storage.from("avatars").remove([objectPath]);
+  if (error) console.warn("Quedó una imagen anterior pendiente de limpieza:", error.message);
+}
+
+async function handleAvatarPhotoUpload() {
+  const fileInput = document.getElementById("avatarPhotoInput");
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById("avatarUploadStatus");
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
+  if (file.size > 3 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 3MB."; statusEl.style.color = "var(--red)"; return; }
+
+  statusEl.textContent = "Optimizando y subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:512, maxHeight:512, quality:.78 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/avatar-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.avatar_url;
+
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
+  if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl;
+
+  const { error: updateError } = await sb.from("profiles").update({ avatar_url: freshUrl }).eq("id", currentUser.id);
+  if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
+
+  currentProfile.avatar_url = freshUrl;
+  removePreviousProfileAsset(previousUrl);
+  showToast("¡Foto de perfil actualizada!");
+  openEditProfile();
+}
+
+async function handleRemoveAvatarPhoto() {
+  const previousUrl = currentProfile.avatar_url;
+  const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("id", currentUser.id);
+  if (error) { showToast("No se pudo quitar la foto"); return; }
+  currentProfile.avatar_url = null;
+  removePreviousProfileAsset(previousUrl);
+  showToast("Foto quitada, volviste al emoji");
+  openEditProfile();
+}
+
+
+function previewCoverPosition(value) {
+  const y = Math.max(0, Math.min(100, Number(value) || 50));
+  const preview = document.getElementById("coverPositionPreview");
+  const label = document.getElementById("coverPositionValue");
+
+  if (preview && currentProfile.cover_url) {
+    preview.style.backgroundPosition = `center ${y}%`;
+  }
+  if (label) label.textContent = `${y}%`;
+}
+
+async function handleCoverPhotoUpload() {
+  const fileInput = document.getElementById("coverPhotoInput");
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById("coverUploadStatus");
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
+  if (file.size > 5 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 5MB."; statusEl.style.color = "var(--red)"; return; }
+
+  statusEl.textContent = "Optimizando y subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:1600, maxHeight:900, quality:.76 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/cover-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.cover_url;
+
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
+  if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl;
+
+  const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl, cover_position_y: 50 }).eq("id", currentUser.id);
+  if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
+
+  currentProfile.cover_url = freshUrl;
+  currentProfile.cover_position_y = 50;
+  removePreviousProfileAsset(previousUrl);
+  showToast("¡Portada actualizada! Ahora podés acomodarla.");
+  openEditProfile();
+}
+
+async function handleRemoveCoverPhoto() {
+  const previousUrl = currentProfile.cover_url;
+  const { error } = await sb.from("profiles").update({ cover_url: null }).eq("id", currentUser.id);
+  if (error) { showToast("No se pudo quitar la portada"); return; }
+  currentProfile.cover_url = null;
+  removePreviousProfileAsset(previousUrl);
+  showToast("Portada quitada");
+  openEditProfile();
+}
+
+
+async function handleProfileSideImageUpload() {
+  const fileInput = document.getElementById("profileSideImageInput");
+  const file = fileInput?.files?.[0];
+  const statusEl = document.getElementById("profileSideImageStatus");
+  if (!file || !statusEl) return;
+
+  if (!file.type.startsWith("image/")) {
+    statusEl.textContent = "Tiene que ser una imagen.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    statusEl.textContent = "El archivo supera los 5MB.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  statusEl.textContent = "Optimizando y subiendo...";
+  statusEl.style.color = "var(--text-dim)";
+
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:1080, maxHeight:1920, quality:.74 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/profile-background-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.profile_side_image_url;
+
+  const { error: uploadError } = await sb.storage
+    .from("avatars")
+    .upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
+
+  if (uploadError) {
+    statusEl.textContent = "Error al subir: " + uploadError.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
+  const freshUrl = publicUrlData.publicUrl;
+
+  const { error: updateError } = await sb
+    .from("profiles")
+    .update({ profile_side_image_url: freshUrl })
+    .eq("id", currentUser.id);
+
+  if (updateError) {
+    statusEl.textContent = "No se pudo guardar.";
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+
+  currentProfile.profile_side_image_url = freshUrl;
+  removePreviousProfileAsset(previousUrl);
+  showToast("¡Fondo del perfil actualizado!");
+  openEditProfile();
+}
+
+async function handleRemoveProfileSideImage() {
+  const previousUrl = currentProfile.profile_side_image_url;
+  const { error } = await sb
+    .from("profiles")
+    .update({ profile_side_image_url: null })
+    .eq("id", currentUser.id);
+
+  if (error) {
+    showToast("No se pudo quitar la imagen de fondo");
+    return;
+  }
+
+  currentProfile.profile_side_image_url = null;
+  removePreviousProfileAsset(previousUrl);
+  showToast("Imagen de fondo quitada");
+  openEditProfile();
+}
+
+function selectAvatarEmoji(emoji) {
+  window.selectedAvatarEmoji = emoji;
+  document.querySelectorAll("[id^='emoji-']").forEach(b => b.style.background = "transparent");
+  document.getElementById(`emoji-${emoji}`).style.background = "var(--panel-2)";
+}
+
+const CREATOR_PROGRAM_TERMS_VERSION = "1.0";
+
+function creatorProgramTermsHtml() {
+  return `<ol style="padding-left:20px;margin:0;color:var(--text-dim);font-size:12px;line-height:1.65;">
+    <li><strong style="color:var(--text);">Contenido propio y permitido.</strong> El creador declara tener autorización para publicar su contenido y no infringir derechos de terceros.</li>
+    <li><strong style="color:var(--text);">Conducta responsable.</strong> No se permite contenido ilegal, engañoso, discriminatorio, violento, sexual no permitido, spam ni manipulación de métricas.</li>
+    <li><strong style="color:var(--text);">Enlaces reales.</strong> Las cuentas de Kick, Twitch, YouTube, TikTok e Instagram deben pertenecer al creador o estar autorizadas.</li>
+    <li><strong style="color:var(--text);">Moderación.</strong> LiveScroll puede revisar contenido, retirar la verificación o suspender el acceso ante incumplimientos.</li>
+    <li><strong style="color:var(--text);">Sin ingresos garantizados.</strong> Participar del programa no garantiza pagos, alcance, seguidores ni resultados comerciales.</li>
+    <li><strong style="color:var(--text);">Datos y seguridad.</strong> El creador es responsable de proteger su cuenta y acepta el tratamiento necesario de datos para operar el programa.</li>
+    <li><strong style="color:var(--text);">Cambios futuros.</strong> Si estos términos cambian de forma importante, LiveScroll podrá solicitar una nueva aceptación.</li>
+  </ol>`;
+}
+
+function openCreatorProgramTerms() {
+  const wrap = document.getElementById("globalModalWrap");
+  wrap.innerHTML = `<div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:180;">
+    <div class="modal-box" style="max-width:520px;max-height:90dvh;display:flex;flex-direction:column;">
+      <div class="modal-box-header"><div><h2 style="font-size:18px;margin:0;">Programa de Creadores</h2><div style="font-size:9px;color:var(--gold);margin-top:4px;">TÉRMINOS Y CONDICIONES · VERSIÓN ${CREATOR_PROGRAM_TERMS_VERSION}</div></div></div>
+      <div class="modal-box-body" style="overflow-y:auto;">
+        <p style="font-size:12px;line-height:1.55;">Para solicitar el acceso o ingresar formalmente al programa, leé y aceptá estas condiciones:</p>
+        <div class="form-card" style="padding:14px;">${creatorProgramTermsHtml()}</div>
+        <label style="display:flex;align-items:flex-start;gap:10px;margin-top:14px;font-size:12px;line-height:1.45;cursor:pointer;"><input type="checkbox" id="creatorTermsAccept" style="margin-top:3px;"> <span>Leí y acepto los Términos y Condiciones del Programa de Creadores ${CREATOR_PROGRAM_TERMS_VERSION}.</span></label>
+        <div id="creatorTermsError" class="error-msg"></div>
+      </div>
+      <div class="modal-box-footer" style="display:flex;gap:9px;"><button class="btn-outline" style="flex:1;" onclick="closeManagedModal()">Cancelar</button><button class="btn" style="flex:1;" onclick="acceptCreatorProgramTerms()">Aceptar y continuar</button></div>
+    </div></div>`;
+}
+
+async function acceptCreatorProgramTerms() {
+  if (!document.getElementById("creatorTermsAccept")?.checked) {
+    document.getElementById("creatorTermsError").textContent = "Tenés que aceptar las condiciones para continuar.";
+    return;
+  }
+  const { data, error } = await sb.rpc("accept_creator_program_terms", { p_version:CREATOR_PROGRAM_TERMS_VERSION });
+  if (error || !data?.ok) { showToast("No se pudo registrar la aceptación"); return; }
+  currentProfile.creator_terms_version = CREATOR_PROGRAM_TERMS_VERSION;
+  currentProfile.creator_terms_accepted_at = data.accepted_at || new Date().toISOString();
+  if (!currentProfile.is_creator) await requestCreatorAccess();
+  else {
+    closeManagedModal();
+    showToast("✓ Términos aceptados. El administrador ya puede verificar tu ingreso.");
+    renderProfile();
+  }
+}
+
+async function requestCreatorAccess() {
+  const { data, error } = await sb.rpc("request_creator_access");
+  if (error || !data?.ok) {
+    const messages = {
+      videos_insuficientes:"Necesitás publicar al menos 5 videos.",
+      cuenta_muy_nueva:"Tu cuenta debe tener al menos 7 días.",
+      cuenta_sancionada:"No podés postularte mientras tengas una sanción.",
+      solicitud_pendiente:"Tu solicitud ya está en revisión.",
+      ya_es_creador:"Tu cuenta ya es Creador."
+    };
+    showToast(messages[data?.error] || "No se pudo enviar la solicitud");
+    return;
+  }
+  currentProfile.creator_application_status = "pending";
+  showToast("🎬 Solicitud enviada al administrador");
+  openEditProfile();
+}
+
+function renderCreatorProgramCard() {
+  if (!currentProfile?.is_creator || currentProfile?.is_creator_verified) return "";
+  const accepted = currentProfile.creator_terms_version === CREATOR_PROGRAM_TERMS_VERSION;
+  return `<section class="profile-section"><div class="profile-section-head"><div class="ico">◆</div><h3>Programa de Creadores</h3><div class="sub">Verificación oficial</div></div>
+    <div class="form-card" style="border-color:rgba(57,231,255,.28);background:linear-gradient(135deg,rgba(57,231,255,.07),rgba(145,70,255,.06));">
+      <strong style="font-size:13px;">${accepted ? "Solicitud lista para revisión" : "Obtené la insignia VERIFICADO"}</strong>
+      <p style="font-size:11px;color:var(--text-dim);line-height:1.5;">${accepted ? "Ya aceptaste los términos. El administrador puede aprobar tu ingreso formal al programa." : "Aceptá los términos del programa. Luego un administrador revisará y verificará tu perfil."}</p>
+      ${accepted ? `<button class="btn-outline" disabled style="width:100%;">⏳ Esperando verificación</button>` : `<button class="btn" onclick="openCreatorProgramTerms()" style="width:100%;">Leer términos y solicitar ingreso</button>`}
+    </div></section>`;
+}
+
+function renderManualLiveControl() {
+  const platforms = [
+    { key:"kick", label:"Kick", icon:"K", active:currentProfile?.kick_is_live === true, color:"#53fc18", text:"#071006", bg:"rgba(83,252,24,.12)" },
+    { key:"twitch", label:"Twitch", icon:"T", active:currentProfile?.twitch_is_live === true, color:"#a970ff", text:"#fff", bg:"rgba(145,70,255,.16)" },
+    { key:"youtube", label:"YouTube", icon:"▶", active:currentProfile?.youtube_is_live === true, color:"#ff315c", text:"#fff", bg:"rgba(255,0,51,.14)" },
+    { key:"tiktok", label:"TikTok", icon:"♪", active:currentProfile?.tiktok_is_live === true, color:"#35f1e5", text:"#fff", bg:"rgba(53,241,229,.10)" }
+  ];
+  const anyLive = platforms.some(item => item.active);
+  return `<section class="profile-section ls-manual-live-control">
+    <div class="profile-section-head"><div class="ico">📡</div><h3>Control de Directo</h3><div class="sub">Visible solo para vos</div></div>
+    <div class="form-card" style="padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(83,252,24,.035),rgba(145,70,255,.045),rgba(255,0,51,.035),rgba(53,241,229,.035));">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
+        <div><strong style="font-size:13px;">Activación manual</strong><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Se apaga automáticamente después de 15 horas.</div></div>
+        <span style="font:900 8px 'JetBrains Mono',monospace;color:${anyLive ? 'var(--green)' : 'var(--text-dim)'};">${anyLive ? '● EN DIRECTO' : '○ SIN DIRECTO'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;">
+        ${platforms.map(item => `<button id="manualLive${item.key[0].toUpperCase()+item.key.slice(1)}" onclick="toggleManualSocialLive('${item.key}')" style="min-height:68px;padding:10px;border-radius:14px;border:1px solid ${item.color};background:${item.active ? item.color : item.bg};color:${item.active ? item.text : item.color};font-family:inherit;font-weight:900;cursor:pointer;box-shadow:${item.active ? `0 0 22px ${item.bg}` : 'none'};transition:.2s ease;"><span style="display:block;font-size:18px;margin-bottom:4px;">${item.icon}</span>${item.active ? `■ Finalizar ${item.label}` : `Iniciar ${item.label}`}</button>`).join("")}
+      </div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:10px;line-height:1.5;">Podés activar varias plataformas al mismo tiempo. Cada botón utiliza el enlace guardado en tu perfil y no consulta APIs externas.</div>
+    </div>
+  </section>`;
+}
+
+async function toggleManualSocialLive(platform) {
+  if (!currentProfile?.is_creator) { showToast("Esta opción es solo para Creadores"); return; }
+  const config = {
+    kick:{ label:"Kick", url:currentProfile.social_kick || "", validate:value => !!getKickChannelFromUrl(value) },
+    twitch:{ label:"Twitch", url:currentProfile.social_twitch || "", validate:value => !!getTwitchChannelFromUrl(value) },
+    youtube:{ label:"YouTube", url:currentProfile.social_youtube || "", validate:value => !!getYouTubeChannelUrl(value) },
+    tiktok:{ label:"TikTok", url:currentProfile.social_tiktok || "", validate:value => !!getTikTokProfileUrl(value) }
+  }[platform];
+  if (!config) return;
+  const url = config.url;
+  const validUrl = config.validate(url);
+  const active = currentProfile?.[`${platform}_is_live`] === true;
+  if (!active && !validUrl) {
+    showToast(`Primero agregá el enlace de ${config.label} desde Editar perfil`);
+    return;
+  }
+  const button = document.getElementById(`manualLive${platform[0].toUpperCase()+platform.slice(1)}`);
+  if (button) button.disabled = true;
+  const { data, error } = await sb.rpc("set_my_social_live", {
+    p_platform:platform,
+    p_live:!active,
+    p_profile_url:url || null
+  });
+  if (error || data?.ok === false) {
+    if (button) button.disabled = false;
+    const messages = {
+      invalid_kick_url:"El enlace de Kick no es válido",
+      invalid_twitch_url:"El enlace de Twitch no es válido",
+      invalid_youtube_url:"El enlace de YouTube no es válido",
+      invalid_tiktok_url:"El enlace de TikTok no es válido",
+      creator_required:"Esta opción es solo para Creadores"
+    };
+    showToast(messages[data?.error] || "No se pudo actualizar el directo");
+    return;
+  }
+  currentProfile[`${platform}_is_live`] = !active;
+  currentProfile.is_live = currentProfile.kick_is_live === true || currentProfile.twitch_is_live === true;
+  if (data?.live_platform !== undefined) currentProfile.live_platform = data.live_platform;
+  lsPerfCache.directos = { data:null, at:0 };
+  showToast(!active ? `🔴 Tu directo de ${config.label} ya aparece en Directos` : `Directo de ${config.label} finalizado`);
+  renderProfile();
+}
+
+async function toggleTikTokLive() { return toggleManualSocialLive("tiktok"); }
+
+async function saveProfileEdits() {
+  const newUsername = document.getElementById("editUsername").value.trim();
+  const bio = document.getElementById("editBio").value.trim();
+  const errEl = document.getElementById("editProfileError");
+
+  if (newUsername !== currentProfile.username) {
+    const { data, error } = await sb.rpc("update_username", { p_user_id: currentUser.id, p_new_username: newUsername });
+    if (error || !data.ok) {
+      errEl.textContent = data?.error === "nombre_ocupado" ? "Ese nombre de usuario ya está en uso." : "El nombre tiene que tener al menos 3 caracteres.";
+      return;
+    }
+    currentProfile.username = newUsername;
+  }
+
+  const coverPositionEl = document.getElementById("coverPositionRange");
+  const coverPositionY = coverPositionEl ? Math.max(0, Math.min(100, Number(coverPositionEl.value) || 50)) : Number(currentProfile.cover_position_y ?? 50);
+
+  const kickEl = document.getElementById("socialKick");
+  const twitchEl = document.getElementById("socialTwitch");
+  const youtubeEl = document.getElementById("socialYoutube");
+  const tiktokEl = document.getElementById("socialTiktok");
+  const socialPayload = {
+    social_instagram:document.getElementById("socialInstagram").value.trim() || null
+  };
+  if (currentProfile.is_creator) {
+    socialPayload.social_kick = lsGetConnectedStreamProfileUrl("kick") || kickEl?.value.trim() || null;
+    socialPayload.social_twitch = lsGetConnectedStreamProfileUrl("twitch") || twitchEl?.value.trim() || null;
+    socialPayload.social_youtube = youtubeEl?.value.trim() || null;
+    socialPayload.social_tiktok = tiktokEl?.value.trim() || null;
+  }
+
+  const invalidSocial = Object.entries(socialPayload).find(([, value]) => value && !isSafeUrl(value));
+  if (invalidSocial) {
+    errEl.textContent = "Los enlaces de redes deben comenzar con https:// o http://";
+    return;
+  }
+  if (socialPayload.social_kick && !getKickChannelFromUrl(socialPayload.social_kick)) {
+    errEl.textContent = "El enlace alternativo de Kick debe pertenecer a kick.com.";
+    return;
+  }
+  if (socialPayload.social_twitch && !getTwitchChannelFromUrl(socialPayload.social_twitch)) {
+    errEl.textContent = "El enlace alternativo de Twitch debe pertenecer a twitch.tv.";
+    return;
+  }
+
+  const { error: updateError } = await sb.from("profiles").update({
+    bio,
+    avatar_emoji: window.selectedAvatarEmoji,
+    cover_position_y: coverPositionY,
+    ...socialPayload
+  }).eq("id", currentUser.id);
+
+  if (updateError) { errEl.textContent = "No se pudo guardar."; return; }
+
+  currentProfile.bio = bio;
+  currentProfile.avatar_emoji = window.selectedAvatarEmoji;
+  currentProfile.cover_position_y = coverPositionY;
+  if (currentProfile.is_creator) {
+    currentProfile.social_kick = socialPayload.social_kick || "";
+    currentProfile.social_twitch = socialPayload.social_twitch || "";
+    currentProfile.social_youtube = youtubeEl?.value.trim() || "";
+    currentProfile.social_tiktok = tiktokEl?.value.trim() || "";
+  }
+  currentProfile.social_instagram = document.getElementById("socialInstagram").value.trim();
+  closeManagedModal();
+  showToast("Perfil actualizado");
+  renderProfile();
+}
+
+function openLiveScroll590AdminPreview() {
+  if (!currentProfile?.is_admin) {
+    showToast("Esta prueba está disponible solo para administradores");
+    return;
+  }
+
+  const wrap = document.getElementById("globalModalWrap");
+  if (!wrap) return;
+
+  wrap.innerHTML = `
+    <div class="modal-overlay ls-modal-locked" data-modal-locked="1" style="z-index:9998;padding:0;background:#000;">
+      <button
+        type="button"
+        aria-label="Cerrar previsualización"
+        onclick="closeLiveScroll590AdminPreview()"
+        style="position:fixed;z-index:10002;top:max(14px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));width:42px;height:42px;border:1px solid rgba(255,255,255,.24);border-radius:50%;background:rgba(5,6,8,.82);color:#fff;font-size:20px;cursor:pointer;backdrop-filter:blur(10px);"
+      >✕</button>
+      <iframe
+        title="Prueba privada ROAD TO 5.9"
+        src="PREVIEW-INTRO-LIVESCROLL-6.html?v=5.8.9-road-to-59"
+        allow="autoplay"
+        style="display:block;width:100%;height:100%;height:100dvh;border:0;background:#050608;"
+      ></iframe>
+    </div>`;
+}
+
+function closeLiveScroll590AdminPreview() {
+  const wrap = document.getElementById("globalModalWrap");
+  if (wrap) wrap.innerHTML = "";
+}
+
+window.openLiveScroll590AdminPreview = openLiveScroll590AdminPreview;
+window.closeLiveScroll590AdminPreview = closeLiveScroll590AdminPreview;
+
+async function loadAdminPendingVideoReports() {
+  const rpcResult = await sb.rpc("admin_get_pending_video_reports");
+  if (!rpcResult?.error && rpcResult?.data?.ok) {
+    const reports = Array.isArray(rpcResult.data.reports) ? rpcResult.data.reports : [];
+    return {
+      data:reports.map(r => ({
+        ...r,
+        videos:{ title:r.video_title || null, video_url:r.video_url || null },
+        profiles:{ username:r.reporter_username || null }
+      })),
+      error:null
+    };
+  }
+
+  // Respaldo compatible con instalaciones donde la función nueva todavía no
+  // fue ejecutada. Evita depender del nombre interno de una clave foránea.
+  const rawResult = await sb.from("video_reports")
+    .select("*")
+    .order("created_at", { ascending:true });
+
+  if (rawResult.error) return { data:[], error:rawResult.error };
+
+  const closedStatuses = new Set(["dismissed", "resolved", "closed", "rejected", "descartado", "resuelto", "cerrado"]);
+  const rawReports = (rawResult.data || []).filter(r =>
+    !closedStatuses.has(String(r.status || "pending").toLowerCase())
+  );
+  const videoIds = [...new Set(rawReports.map(r => r.video_id).filter(Boolean))];
+  const reporterIds = [...new Set(rawReports.map(r => r.reporter_id).filter(Boolean))];
+
+  const [videosResult, profilesResult] = await Promise.all([
+    videoIds.length
+      ? sb.from("videos").select("id,title,video_url").in("id", videoIds)
+      : Promise.resolve({ data:[], error:null }),
+    reporterIds.length
+      ? sb.from("profiles").select("id,username").in("id", reporterIds)
+      : Promise.resolve({ data:[], error:null })
+  ]);
+
+  const videosById = Object.fromEntries((videosResult.data || []).map(v => [v.id, v]));
+  const profilesById = Object.fromEntries((profilesResult.data || []).map(p => [p.id, p]));
+
+  return {
+    data:rawReports.map(r => ({
+      ...r,
+      videos:videosById[r.video_id] || null,
+      profiles:profilesById[r.reporter_id] || null
+    })),
+    error:null
+  };
+}
+
+const LS_FINANCE_LAB_KEY = "livescroll6_finance_lab_v1";
+
+function getFinanceLabState() {
+  const empty = {
+    userCoins:0,
+    creatorPending:0,
+    creatorAvailable:0,
+    liveScrollGross:0,
+    collectedArs:0,
+    movements:[]
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_FINANCE_LAB_KEY) || "null");
+    return saved && typeof saved === "object" ? { ...empty, ...saved } : empty;
+  } catch (_) {
+    return empty;
+  }
+}
+
+function saveFinanceLabState(state) {
+  localStorage.setItem(LS_FINANCE_LAB_KEY, JSON.stringify(state));
+}
+
+function addFinanceLabMovement(state, type, detail, amount, tone="normal") {
+  state.movements.unshift({
+    id:`lab-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    type,
+    detail,
+    amount,
+    tone,
+    createdAt:new Date().toISOString()
+  });
+  state.movements = state.movements.slice(0, 20);
+}
+
+function simulateFinanceLabPurchase() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  state.collectedArs += 10000;
+  state.userCoins += 10000;
+  addFinanceLabMovement(state, "COMPRA SIMULADA", "Usuario de prueba compró 10.000 monedas", 10000, "green");
+  saveFinanceLabState(state);
+  showToast("Compra ficticia agregada: 10.000 monedas");
+  renderAdmin();
+}
+
+function simulateFinanceLabGift() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  if (state.userCoins < 5000) {
+    showToast("Primero simulá una compra de monedas");
+    return;
+  }
+  state.userCoins -= 5000;
+  state.creatorPending += 3500;
+  state.liveScrollGross += 1500;
+  addFinanceLabMovement(state, "REGALO SIMULADO", "Regalo de 5.000 monedas · 70% creador / 30% LiveScroll", 5000, "gold");
+  saveFinanceLabState(state);
+  showToast("Regalo ficticio enviado: $3.500 quedaron pendientes para el creador");
+  renderAdmin();
+}
+
+function simulateFinanceLabRelease() {
+  if (!currentProfile?.is_admin) return;
+  const state = getFinanceLabState();
+  if (state.creatorPending <= 0) {
+    showToast("No hay saldo pendiente para liberar");
+    return;
+  }
+  const released = state.creatorPending;
+  state.creatorPending = 0;
+  state.creatorAvailable += released;
+  addFinanceLabMovement(state, "SALDO LIBERADO", "Terminó el plazo ficticio de seguridad", released, "blue");
+  saveFinanceLabState(state);
+  showToast("Saldo ficticio disponible para el creador");
+  renderAdmin();
+}
+
+function resetFinanceLab() {
+  if (!currentProfile?.is_admin) return;
+  if (!confirm("¿Reiniciar completamente el laboratorio financiero?")) return;
+  localStorage.removeItem(LS_FINANCE_LAB_KEY);
+  showToast("Laboratorio financiero reiniciado");
+  renderAdmin();
+}
+
+function renderAdminFinancialLab() {
+  if (!currentProfile?.is_admin || isLiveScroll7App()) return "";
+  const state = getFinanceLabState();
+  const money = value => Number(value || 0).toLocaleString("es-AR");
+  return `
+    <h3 style="margin-top:24px;">🧪 Centro Financiero Experimental</h3>
+    <div class="form-card ls-finance-lab" style="margin-bottom:14px;border-color:rgba(250,204,21,.34);background:linear-gradient(145deg,rgba(250,204,21,.07),rgba(59,130,246,.045));">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <div>
+          <div style="font-weight:900;color:var(--gold);letter-spacing:.02em;">LABORATORIO PRIVADO · SOLO ADMIN</div>
+          <div style="font-size:12px;color:var(--text-dim);line-height:1.5;margin-top:5px;max-width:680px;">
+            Sistema experimental. Los saldos son ficticios, no poseen valor monetario y no pueden canjearse por dinero.
+          </div>
+        </div>
+        <span style="padding:5px 9px;border:1px solid rgba(250,204,21,.32);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;">MODO PRUEBA</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:9px;margin-bottom:14px;">
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Cobrado ficticio</div><strong class="mono" style="font-size:18px;">$${money(state.collectedArs)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Monedas del usuario</div><strong class="mono" style="font-size:18px;color:var(--gold);">${money(state.userCoins)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Creador pendiente</div><strong class="mono" style="font-size:18px;color:#fbbf24;">$${money(state.creatorPending)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">Creador disponible</div><strong class="mono" style="font-size:18px;color:#60a5fa;">$${money(state.creatorAvailable)}</strong></div>
+        <div class="form-card" style="margin:0;padding:12px;"><div style="font-size:10px;color:var(--text-dim);">LiveScroll bruto</div><strong class="mono" style="font-size:18px;color:var(--green);">$${money(state.liveScrollGross)}</strong></div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px;">
+        <button class="btn" onclick="simulateFinanceLabPurchase()">1 · Simular compra $10.000</button>
+        <button class="btn-outline" onclick="simulateFinanceLabGift()">2 · Enviar regalo 5.000</button>
+        <button class="btn-outline" onclick="simulateFinanceLabRelease()">3 · Liberar saldo pendiente</button>
+        <button class="btn-outline" style="color:var(--red);margin-left:auto;" onclick="resetFinanceLab()">Reiniciar</button>
+      </div>
+
+      <div style="font-size:11px;font-weight:850;margin-bottom:8px;">Últimos movimientos ficticios</div>
+      ${state.movements.length ? state.movements.map(m => `
+        <div class="ledger-row" style="gap:10px;align-items:center;">
+          <span style="min-width:0;"><strong style="font-size:10px;">${escapeHtml(m.type)}</strong><br><span style="font-size:10px;color:var(--text-dim);">${escapeHtml(m.detail)} · ${new Date(m.createdAt).toLocaleString("es-AR")}</span></span>
+          <strong class="mono" style="color:${m.tone === "green" ? "var(--green)" : m.tone === "gold" ? "var(--gold)" : m.tone === "blue" ? "#60a5fa" : "var(--text)"};">${money(m.amount)}</strong>
+        </div>
+      `).join("") : `<div style="font-size:11px;color:var(--text-dim);padding:10px 0;">Todavía no realizaste movimientos de prueba.</div>`}
+    </div>`;
+}
+
+
+async function renderAdmin() {
+  const main = document.getElementById("appView");
+  main.innerHTML = `<p>Cargando panel de Admin...</p>`;
+
+  // Estas consultas no dependen entre sí. Las ejecutamos juntas para conservar
+  // toda la información del panel sin esperar cada respuesta en cadena.
+  const [
+    redemptionsResult,
+    profilesOverviewResult,
+    pendingUsersResult,
+    subscriptionsResult,
+    plans,
+    reportsResult,
+    statsResult,
+    creatorApplicationsResult,
+    securityReportsResult,
+    autoVerificationResult
+  ] = await Promise.all([
+    sb.from("redemptions")
+      .select("*, profiles!redemptions_user_id_fkey(username)")
+      .order("created_at", { ascending:true }),
+    sb.rpc("admin_get_profiles_overview"),
+    sb.rpc("admin_get_pending_users"),
+    sb.from("subscription_requests")
+      .select("*, profiles!subscription_requests_user_id_fkey(username)")
+      .order("created_at", { ascending:true }),
+    loadPlans(),
+    loadAdminPendingVideoReports(),
+    sb.rpc("admin_get_stats"),
+    sb.rpc("admin_get_creator_applications"),
+    sb.rpc("admin_get_security_incident_reports"),
+    sb.rpc("admin_get_auto_verification_log", { p_limit:30 })
+  ]);
+
+  const { data:redemptions, error } = redemptionsResult;
+
+  if (error) { main.innerHTML = `<p class="error-msg">Error: ${escapeHtml(error.message || "Error desconocido")}</p>`; return; }
+
+  // Vista completa solo para admins: IP y estado de bloqueo de cada cuenta
+  const profilesOverview = profilesOverviewResult?.data || [];
+  const profileById = {};
+  (profilesOverview || []).forEach(p => { profileById[p.id] = p; });
+
+  const ipCounts = {};
+  (profilesOverview || []).forEach(p => {
+    if (p.signup_ip) ipCounts[p.signup_ip] = (ipCounts[p.signup_ip] || 0) + 1;
+  });
+
+  const pending = (redemptions || []).filter(r => r.status === "pending");
+  const resolved = (redemptions || []).filter(r => r.status !== "pending").slice(0, 15);
+
+  const pendingUsersFull = pendingUsersResult?.data || [];
+  let blockedUsers = (pendingUsersFull && pendingUsersFull.length) ? pendingUsersFull : (profilesOverview || []).filter(p => p.is_blocked);
+
+  const subRequests = subscriptionsResult?.data || [];
+  const pendingSubs = (subRequests || []).filter(s => s.status === "pending");
+
+  const reports = reportsResult?.data || [];
+  const reportsError = reportsResult?.error || null;
+  const stats = statsResult?.data;
+  const creatorApplications = creatorApplicationsResult?.data || [];
+  const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending" && a.user_id !== currentUser?.id);
+  const autoVerificationLog = autoVerificationResult?.data || [];
+
+  // Reportes de seguridad separados del sistema de reportes de videos.
+  const securityReports = securityReportsResult?.data || [];
+  const pendingSecurityReports = (securityReports || []).filter(r =>
+    ["pending", "reviewing", "recovery_authorized"].includes(r.status)
+  );
+
+  main.innerHTML = `
+    <h1 class="page-title">🛠 Panel de Admin</h1>
+
+    <div class="form-card" style="margin-bottom:18px;border-color:rgba(250,204,21,.32);background:linear-gradient(135deg,rgba(250,204,21,.09),rgba(59,130,246,.055));overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
+        <div style="min-width:0;flex:1;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
+            <strong style="color:var(--gold);">${isLiveScroll7App() ? `◈ Bienvenida oficial LiveScroll ${getLiveScrollRuntimeGeneration()}` : "✨ Presentación ROAD TO 6"}</strong>
+            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">${isLiveScroll7App() ? `${getLiveScrollRuntimeGeneration()}.0.0` : "5.9.0"}</span>
+          </div>
+          <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">${isLiveScroll7App() ? "Reproducí nuevamente la entrada visual de esta primera etapa para Android." : "Volvé a reproducir la presentación oficial que reciben los usuarios."}</div>
+        </div>
+        <button class="btn" type="button" onclick="${isLiveScroll8App() ? "replayLiveScroll7LoginWelcome()" : isLiveScroll7App() ? "replayLiveScroll7Pulse()" : "replayLiveScrollRoadTo6Intro()"}">▶ Volver a verla</button>
+      </div>
+    </div>
+
+    ${stats && !stats.error ? `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:24px;">
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Usuarios totales</div><div class="mono" style="font-size:20px;">${stats.total_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Verificados</div><div class="mono" style="font-size:20px;color:var(--green);">${stats.verified_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Pendientes</div><div class="mono" style="font-size:20px;color:var(--gold);">${stats.pending_users}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Activos (7 días)</div><div class="mono" style="font-size:20px;">${stats.active_last_7d}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Videos subidos</div><div class="mono" style="font-size:20px;">${stats.total_videos}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Puntos totales (deuda)</div><div class="mono" style="font-size:20px;color:var(--red);">$${Number(stats.total_points_balance).toLocaleString("es-AR")}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Ya pagado</div><div class="mono" style="font-size:20px;">$${Number(stats.total_paid_ars).toLocaleString("es-AR")}</div></div>
+      <div class="form-card"><div style="font-size:11px;color:var(--text-dim);">Por pagar (pendiente)</div><div class="mono" style="font-size:20px;color:var(--gold);">$${Number(stats.total_pending_ars).toLocaleString("es-AR")}</div></div>
+    </div>` : ""}
+    <p class="page-sub">${pending.length} canje${pending.length === 1 ? "" : "s"} · ${pendingSubs.length} pago${pendingSubs.length === 1 ? "" : "s"} de plan · ${pendingCreatorApplications.length} solicitud${pendingCreatorApplications.length === 1 ? "" : "es"} de creador · ${pendingSecurityReports.length} caso${pendingSecurityReports.length === 1 ? "" : "s"} de seguridad</p>
+
+    <h3 style="margin-top:24px;">🎬 Solicitudes de creadores (${pendingCreatorApplications.length})</h3>
+    ${pendingCreatorApplications.length ? pendingCreatorApplications.map(a => `
+      <div class="form-card" style="margin-bottom:12px;border-color:rgba(250,204,21,.28);">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:800;">@${escapeHtml(a.username)}</div>
+            <div style="font-size:13px;color:var(--text-dim);margin-top:5px;line-height:1.45;">
+              ${a.video_count} videos · ${a.account_days} días de antigüedad<br>Solicitó: ${formatAdminRegistrationDate(a.requested_at)}
+            </div>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;">
+            <button class="btn-outline" onclick="viewPublicProfile('${escapeHtml(a.username)}')">Ver perfil</button>
+            <button class="btn" onclick="handleCreatorApplication('${a.application_id}','approve','${a.user_id || ""}')">✓ Aprobar programa</button>
+            <button class="btn-outline" style="color:var(--red);" onclick="handleCreatorApplication('${a.application_id}','reject','${a.user_id || ""}')">✕ Rechazar</button>
+          </div>
+        </div>
+      </div>
+    `).join("") : `<div class="form-card" style="font-size:12px;color:var(--text-dim);">No hay solicitudes pendientes.</div>`}
+
+    ${pendingSecurityReports.length ? `
+      <h3>🚨 Reportes de seguridad</h3>
+      <p style="color:var(--text-dim);font-size:12px;margin:-4px 0 12px;">
+        Casos relacionados con acceso, contraseña o actividad sospechosa.
+      </p>
+
+      ${pendingSecurityReports.map(r => `
+        <div class="form-card" style="
+          margin-bottom:12px;
+          border-color:${r.status === "pending" ? "rgba(248,113,113,.30)" : "rgba(250,204,21,.24)"};
+          background:linear-gradient(135deg,rgba(248,113,113,.035),rgba(255,255,255,.012));
+        ">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+            <div style="min-width:0;flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px;">
+                <strong class="mono" style="color:#fb7185;">${escapeHtml(r.case_code || "SIN-CÓDIGO")}</strong>
+                <span style="
+                  font-size:9px;
+                  font-weight:900;
+                  padding:3px 7px;
+                  border-radius:999px;
+                  border:1px solid var(--border);
+                  color:${r.status === "pending" ? "#fca5a5" : "var(--gold)"};
+                ">${escapeHtml(getAdminSecurityStatusLabel(r.status))}</span>
+              </div>
+
+              <div style="font-size:12px;color:var(--text);font-weight:700;">
+                ${escapeHtml(r.email || "Cuenta sin correo")}
+              </div>
+
+              <div style="font-size:11px;color:var(--text-dim);margin-top:4px;">
+                ${escapeHtml(getAdminSecurityReasonLabel(r.reason))}
+              </div>
+
+              <div style="
+                font-size:11px;
+                color:var(--text-dim);
+                margin-top:7px;
+                line-height:1.45;
+                max-width:720px;
+              ">${escapeHtml(r.details || "Sin descripción")}</div>
+
+              <div style="font-size:9px;color:var(--text-dim);margin-top:8px;">
+                ${r.created_at ? new Date(r.created_at).toLocaleString("es-AR") : ""}
+              </div>
+            </div>
+
+            <button class="btn-outline"
+              onclick="openAdminSecurityIncidentDetail('${escapeHtml(r.case_code || "")}')">
+              Revisar caso
+            </button>
+          </div>
+        </div>
+      `).join("")}
+    ` : `
+      <h3>🚨 Reportes de seguridad</h3>
+      <div class="form-card" style="color:var(--text-dim);font-size:12px;">
+        No hay reportes de seguridad pendientes. ✓
+      </div>
+    `}
+
+    <h3>🚩 Videos reportados (${reports.length})</h3>
+    ${reportsError ? `
+      <div class="form-card" style="margin-bottom:14px;border-color:rgba(248,113,113,.28);color:var(--red);font-size:12px;line-height:1.5;">
+        No se pudieron consultar los reportes. Ejecutá el SQL de reparación de reportes Admin y volvé a abrir el panel.
+      </div>
+    ` : reports && reports.length ? `
+      ${reports.map(r => `
+        <div class="form-card" style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-weight:600;">${escapeHtml(r.videos?.title || "video eliminado")}</div>
+              <div style="color:var(--text-dim); font-size:12px;">Reportado por @${escapeHtml(r.profiles?.username || "usuario")} · ${new Date(r.created_at).toLocaleString("es-AR")}</div>
+              <div style="margin-top:6px; font-size:13px; color:var(--gold);">Motivo: ${escapeHtml(r.reason)}</div>
+              ${r.videos?.video_url ? (isSafeUrl(r.videos.video_url) ? `<a href="${escapeHtml(r.videos.video_url)}" target="_blank" rel="noopener" style="font-size:12px; color:var(--text-dim);">Ver video →</a>` : `<span style="font-size:12px; color:var(--red);">⚠️ Link sospechoso, no se abre</span>`) : ""}
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn" style="background:var(--red); color:#fff;" onclick="handleDeleteVideo('${r.video_id}')">🗑 Eliminar video</button>
+              <button class="btn-outline" onclick="handleDismissReport('${r.id}')">Descartar</button>
+            </div>
+          </div>
+        </div>
+      `).join("")}` : `
+      <div class="form-card" style="margin-bottom:14px;color:var(--text-dim);font-size:12px;">
+        No hay videos reportados pendientes. ✓
+      </div>
+    `}
+
+    ${renderAdminFinancialLab()}
+
+    ${pendingSubs.length ? `
+    <h3 style="margin-top:24px;">💳 Pagos de suscripción a confirmar</h3>
+      ${pendingSubs.map(s => `
+        <div class="form-card" style="margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-weight:600;">@${escapeHtml(s.profiles?.username || "usuario")} → ${plans.find(p => p.id === s.plan_id)?.name || s.plan_id}</div>
+              <div style="color:var(--text-dim); font-size:12px;">${new Date(s.created_at).toLocaleString("es-AR")}</div>
+              <div style="margin-top:8px; font-size:13px;">
+                <div>Monto: <span class="mono" style="color:var(--green)">$${s.amount_ars}</span></div>
+                <div>Código a buscar en tu banco: <strong class="mono" style="color:var(--gold)">${escapeHtml(s.reference)}</strong></div>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn" onclick="handleApproveSubscription('${s.id}')">✓ Confirmar pago</button>
+              <button class="btn-outline" onclick="handleRejectSubscription('${s.id}')">✕ Rechazar</button>
+            </div>
+          </div>
+        </div>
+      `).join("")}` : ""}
+
+    <h3 style="margin-top:24px;">💸 Canjes pendientes</h3>
+
+    <div id="pendingList">
+      ${pending.length ? pending.map(r => {
+        const userIp = profileById[r.user_id]?.signup_ip;
+        const sharedIp = userIp && ipCounts[userIp] > 1;
+        return `
+        <div class="form-card" style="margin-bottom:14px; ${sharedIp ? "border-color:var(--gold-dim);" : ""}">
+          ${sharedIp ? `<div style="color:var(--gold); font-size:12px; margin-bottom:8px;">⚠️ Esta cuenta comparte red (wifi) con otra(s) ${ipCounts[userIp] - 1} cuenta(s) — revisá antes de aprobar</div>` : ""}
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <div style="font-weight:600;">@${escapeHtml(r.profiles?.username || "usuario")}</div>
+              <div style="color:var(--text-dim); font-size:12px;">${new Date(r.created_at).toLocaleString("es-AR")}</div>
+              <div style="margin-top:8px; font-size:13px;">
+                <div>Puntos usados: <span class="mono">${r.points_used}</span></div>
+                <div>Comisión: <span class="mono" style="color:var(--text-dim)">$${r.commission_ars}</span></div>
+                <div>A transferir: <span class="mono" style="color:var(--green)">$${r.amount_ars}</span></div>
+                <div>Alias MP: <strong class="mono">${escapeHtml(r.mercadopago_alias)}</strong></div>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn" onclick="handleApproveRedemption('${r.id}')">✓ Aprobar (ya pagué)</button>
+              <button class="btn-outline" onclick="handleRejectRedemption('${r.id}')">✕ Rechazar</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("") : `<p style="color:var(--text-dim)">No hay canjes pendientes por ahora. 🎉</p>`}
+    </div>
+
+    ${blockedUsers && blockedUsers.length ? `
+      <h3 style="margin-top:32px;">🆕 Cuentas nuevas pendientes de verificar (${blockedUsers.length})</h3>
+      <p style="color:var(--text-dim); font-size:12px; margin-bottom:12px;">SMART VERIFICATION sólo deja acá las cuentas que necesitan una revisión humana.</p>
+      ${blockedUsers.map(u => `
+        <div class="ledger-row">
+          <span>@${escapeHtml(u.username)} · <span id="email-pending-${u.id}" data-masked="true">${escapeHtml(maskEmail(u.email))}</span> <button onclick="toggleEmailVisibility('email-pending-${u.id}', '${escapeHtml(u.email || "")}')" style="background:none;border:none;cursor:pointer;font-size:12px;">👁</button> · ${new Date(u.created_at).toLocaleDateString("es-AR")}</span>
+          <button class="btn-outline" style="padding:4px 12px; font-size:12px;" onclick="handleUnblockUser('${u.id}')">✓ Verificar</button>
+        </div>
+      `).join("")}` : ""}
+
+    <h3 style="margin-top:32px;">🛡️ Verificación automática</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px;">Últimos controles de Usuarios nuevos. Las solicitudes de Creadores funcionan por separado.</div>
+      ${autoVerificationLog.length ? autoVerificationLog.slice(0,12).map(entry => `<div class="ledger-row" style="gap:10px;"><span>@${escapeHtml(entry.username || "usuario")} · ${escapeHtml(entry.reason || "control")}</span><span class="mono" style="color:${entry.decision === "verified" ? "var(--green)" : "var(--gold)"};">${entry.decision === "verified" ? "VERIFICADO" : "REVISIÓN"}</span></div>`).join("") : `<div style="font-size:12px;color:var(--text-dim);">Todavía no hay verificaciones automáticas registradas.</div>`}
+    </div>
+
+    <h3 style="margin-top:32px;">🎨 Eventos visuales</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="font-size:13px;font-weight:800;">Seasonal LiveScroll</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px;line-height:1.5;">
+            En Automático, LiveScroll cambia solo según la fecha de Argentina.
+            Lo que publiques acá se aplica a todos los Usuarios en PC y celular.
+          </div>
+          <div id="seasonalAdminStatus" style="font-size:10px;color:var(--gold);margin-top:7px;"></div>
+        </div>
+
+        <select
+          id="seasonalThemeAdminSelect"
+          onchange="setSeasonalAdminPreview(this.value)"
+          style="
+            min-width:190px;
+            padding:10px 12px;
+            background:var(--ink);
+            border:1px solid var(--border);
+            border-radius:10px;
+            color:var(--text);
+          "
+        >
+          <option value="auto">🗓️ Automático</option>
+          <option value="normal">⚫ Normal</option>
+          <option value="spring">🌸 Primavera</option>
+          <option value="halloween">🎃 Halloween</option>
+          <option value="christmas">🎄 Navidad</option>
+          <option value="newyear">🎆 Año Nuevo</option>
+          <option value="reyes">👑 Reyes</option>
+          <option value="valentines">💗 San Valentín</option>
+          <option value="patria">🇦🇷 Fecha patria</option>
+          <option value="father">👨 Día del Padre</option>
+          <option value="childhood">🧒 Día de las Infancias</option>
+          <option value="mother">🌷 Día de la Madre</option>
+          <option value="easter">🐰 Pascuas</option>
+        </select>
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">🔒 Acceso a Billetera</h3>
+    <div class="form-card" style="margin-bottom:14px;padding:0;overflow:hidden;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;">
+        <div style="flex:1;min-width:190px;">
+          <div style="font-size:13px;font-weight:700;">👛 Billetera</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Pausá o habilitá el acceso a canjes.</div>
+        </div>
+        <button class="btn" id="walletLockBtn" onclick="handleToggleWalletLock()">Cargando...</button>
+      </div>
+
+      <div style="padding:0 14px 12px;color:var(--text-dim);font-size:10px;">
+        Tu cuenta de administrador mantiene acceso a la Billetera aunque esté pausada para los demás usuarios.
+      </div>
+    </div>
+
+    <h3 style="margin-top:32px;">💵 Precios de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <p style="font-size:12px; color:var(--text-dim); margin-top:0;">Estos precios se aplican al toque, no hace falta publicar ninguna versión.</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Boost extra — plan Plus</label>
+          <input type="number" id="priceBoostPlus" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Boost extra — plan Diamante</label>
+          <input type="number" id="priceBoostDiamante" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Cambiar a Plus con puntos</label>
+          <input type="number" id="pricePlanPlus" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Cambiar a Diamante con puntos</label>
+          <input type="number" id="pricePlanDiamante" style="width:100%; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        </div>
+      </div>
+      <button class="btn" onclick="handleSaveStorePrices()">Guardar precios</button>
+    </div>
+
+    <h3 style="margin-top:32px;">🎨 Emojis de la tienda</h3>
+    <div class="form-card" style="margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+        <input type="text" id="newEmojiChar" placeholder="🐐" maxlength="4" style="width:60px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text); text-align:center;">
+        <button type="button" class="btn-outline" onclick="openEmojiPicker('newEmojiChar', FACE_EMOJIS)">Elegir</button>
+        <input type="text" id="newEmojiName" placeholder="Nombre (ej: GOAT)" style="flex:1; min-width:140px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+        <input type="number" id="newEmojiPrice" min="0" placeholder="0 = GRATIS" style="width:120px; padding:10px; background:var(--ink); border:1px solid var(--border); border-radius:8px; color:var(--text);">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;margin-bottom:10px;">
+        <select id="newEmojiRarity" style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="comun">Común</option>
+          <option value="rara">Rara</option>
+          <option value="epica">Épica</option>
+          <option value="legendaria">Legendaria</option>
+          <option value="exclusiva">Exclusiva</option>
+        </select>
+
+        <select id="newEmojiEdition"
+          onchange="document.getElementById('newEmojiStock').disabled=this.value!=='limited';"
+          style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
+          <option value="standard">Edición normal</option>
+          <option value="limited">Edición limitada</option>
+        </select>
+
+        <input type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
           style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
       </div>
 
@@ -7055,11 +17583,9 @@ async function renderRanking() {
 // ============================================================
 // TIENDA DE PUNTOS
 // ============================================================
-async function renderStore(preservePosition = false) {
+async function renderStore() {
   const main = document.getElementById("appView");
-  const savedWindowY = window.scrollY;
-  const savedMainY = main?.scrollTop || 0;
-  if (!preservePosition) main.innerHTML = `<p>Cargando tienda...</p>`;
+  main.innerHTML = `<p>Cargando tienda...</p>`;
 
   let emojis, myEmojis, plans, storeItems, myItems, pricesData, storeBadges, myBadges;
   try {
@@ -7276,89 +17802,15 @@ async function renderStore(preservePosition = false) {
         `}).join("")}
       </div>
     `).join("") : ""}`;
-
-  if (preservePosition) {
-    requestAnimationFrame(() => {
-      main.scrollTop = savedMainY;
-      window.scrollTo({ top: savedWindowY, behavior: "auto" });
-      requestAnimationFrame(() => {
-        main.scrollTop = savedMainY;
-        window.scrollTo({ top: savedWindowY, behavior: "auto" });
-      });
-    });
-  }
-}
-
-// Confirmación de compra unificada para LS6/LS7 y reutilizable en LS8.
-// Evita el confirm() nativo y mantiene al usuario dentro de la tienda.
-function confirmLiveScrollPurchase({
-  title = "Confirmar compra",
-  message = "El artículo se agregará a tu colección.",
-  confirmLabel = "Comprar",
-  icon = "🛍️"
-} = {}) {
-  const wrap = document.getElementById("globalModalWrap");
-  if (!wrap) return Promise.resolve(false);
-
-  return new Promise(resolve => {
-    let settled = false;
-    const onKeyDown = event => {
-      if (event.key === "Escape") finish(false);
-    };
-    const finish = accepted => {
-      if (settled) return;
-      settled = true;
-      document.removeEventListener("keydown", onKeyDown);
-      wrap.innerHTML = "";
-      resolve(Boolean(accepted));
-    };
-
-    wrap.innerHTML = `
-      <div class="ls-purchase-confirm" role="dialog" aria-modal="true" aria-labelledby="lsPurchaseTitle">
-        <div class="ls-purchase-confirm-card">
-          <div class="ls-purchase-confirm-icon" aria-hidden="true">${escapeHtml(icon)}</div>
-          <small>TIENDA LIVESCROLL</small>
-          <h3 id="lsPurchaseTitle">${escapeHtml(title)}</h3>
-          <p>${escapeHtml(message)}</p>
-          <div class="ls-purchase-confirm-actions">
-            <button class="btn-outline" id="lsPurchaseCancel" type="button">Cancelar</button>
-            <button class="btn" id="lsPurchaseAccept" type="button">${escapeHtml(confirmLabel)}</button>
-          </div>
-        </div>
-      </div>`;
-
-    const overlay = wrap.querySelector(".ls-purchase-confirm");
-    const cancel = wrap.querySelector("#lsPurchaseCancel");
-    const accept = wrap.querySelector("#lsPurchaseAccept");
-    cancel?.addEventListener("click", () => finish(false));
-    accept?.addEventListener("click", () => finish(true));
-    overlay?.addEventListener("click", event => {
-      if (event.target === overlay) finish(false);
-    });
-    document.addEventListener("keydown", onKeyDown);
-    accept?.focus();
-  });
-}
-
-async function refreshStoreWithoutJump() {
-  await renderStore(true);
 }
 
 async function handleBuyEmoji(emojiId) {
   const btn = document.querySelector(`[onclick="handleBuyEmoji('${emojiId}')"]`);
   const isFree = btn?.textContent?.trim() === "GRATIS";
-  const originalLabel = btn?.textContent || "Comprar";
 
-  const accepted = await confirmLiveScrollPurchase({
-    title: isFree ? "Reclamar emoji" : "Comprar emoji",
-    message: isFree
-      ? "Se agregará gratis y quedará guardado en tu colección."
-      : "Se descontarán los puntos y quedará guardado en tu colección.",
-    confirmLabel: isFree ? "Reclamar" : "Comprar",
-    icon: "😎"
-  });
-  if (!accepted) return;
-  if (btn) { btn.disabled = true; btn.textContent = isFree ? "Reclamando…" : "Comprando…"; }
+  if (!confirm(isFree
+    ? "¿Reclamar este emoji gratis? Quedará en tu colección."
+    : "¿Comprar este emoji? Quedará en tu colección.")) return;
 
   const { data, error } = await sb.rpc("buy_emoji", {
     p_user_id: currentUser.id,
@@ -7366,7 +17818,6 @@ async function handleBuyEmoji(emojiId) {
   });
 
   if (error || !data?.ok) {
-    if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
     const msgs = {
       saldo_insuficiente:"No tenés suficientes puntos.",
       ya_lo_tenes:"Ya tenés este emoji.",
@@ -7385,23 +17836,12 @@ async function handleBuyEmoji(emojiId) {
     : "";
 
   showToast(`¡Desbloqueaste ${data.emoji}!${serialText}`);
-  refreshStoreWithoutJump();
+  renderStore();
 }
 
 async function handleBuyBoost() {
-  const btn = document.querySelector(`[onclick="handleBuyBoost()"]`);
-  const originalLabel = btn?.textContent || "Comprar boost";
-  const accepted = await confirmLiveScrollPurchase({
-    title: "Activar boost",
-    message: "Se descontarán los puntos y el boost quedará activo durante 24 horas.",
-    confirmLabel: "Activar boost",
-    icon: "⚡"
-  });
-  if (!accepted) return;
-  if (btn) { btn.disabled = true; btn.textContent = "Activando…"; }
   const { data, error } = await sb.rpc("buy_extra_boost", { p_user_id: currentUser.id });
   if (error || !data.ok) {
-    if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
     const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", boost_ya_activo: "Ya tenés un boost activo." };
     showToast(msgs[data?.error] || "No se pudo comprar");
     return;
@@ -7409,32 +17849,23 @@ async function handleBuyBoost() {
   await loadProfile();
   updateBalanceUI();
   showToast("¡Boost activado por 24hs!");
-  refreshStoreWithoutJump();
+  renderStore();
 }
 
 
 async function handleBuyStoreBadge(badgeId) {
   const badgeCard = document.querySelector(`[onclick="handleBuyStoreBadge('${badgeId}')"]`);
   const isFree = badgeCard?.textContent?.trim() === "GRATIS";
-  const originalLabel = badgeCard?.textContent || "Comprar";
 
-  const accepted = await confirmLiveScrollPurchase({
-    title: isFree ? "Reclamar medalla" : "Comprar medalla",
-    message: isFree
-      ? "Se agregará gratis y quedará para siempre en tu colección."
-      : "Se descontarán los puntos y la medalla quedará para siempre en tu colección.",
-    confirmLabel: isFree ? "Reclamar" : "Comprar",
-    icon: "🏅"
-  });
-  if (!accepted) return;
-  if (badgeCard) { badgeCard.disabled = true; badgeCard.textContent = isFree ? "Reclamando…" : "Comprando…"; }
+  if (!confirm(isFree
+    ? "¿Reclamar esta medalla gratis? Quedará permanentemente en tu colección."
+    : "¿Comprar esta medalla? Quedará permanentemente en tu colección.")) return;
 
   const { data, error } = await sb.rpc("buy_store_badge", {
     p_badge_id: badgeId
   });
 
   if (error || !data?.ok) {
-    if (badgeCard) { badgeCard.disabled = false; badgeCard.textContent = originalLabel; }
     console.error("Compra de medalla falló:", error || data);
     const code = data?.error || "";
     const messages = {
@@ -7456,23 +17887,12 @@ async function handleBuyStoreBadge(badgeId) {
   lsPerfCache.profileVideos.at = 0;
 
   showToast(`🏅 ¡${data.badge_name || "Medalla"} agregada a tu colección!`);
-  refreshStoreWithoutJump();
+  renderStore();
 }
 
 async function handleBuyStoreItem(itemId) {
-  const btn = document.querySelector(`[onclick="handleBuyStoreItem('${itemId}')"]`);
-  const originalLabel = btn?.textContent || "Comprar";
-  const accepted = await confirmLiveScrollPurchase({
-    title: "Comprar artículo",
-    message: "Se descontarán los puntos y el artículo quedará guardado en tu colección.",
-    confirmLabel: "Comprar",
-    icon: "✨"
-  });
-  if (!accepted) return;
-  if (btn) { btn.disabled = true; btn.textContent = "Comprando…"; }
   const { data, error } = await sb.rpc("buy_store_item", { p_item_id: itemId });
   if (error || !data.ok) {
-    if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
     const msgs = { saldo_insuficiente: "No tenés suficientes puntos.", ya_lo_tenes: "Ya tenés este artículo.", no_disponible: "Este artículo ya no está disponible." };
     showToast(msgs[data?.error] || "No se pudo comprar");
     return;
@@ -7480,30 +17900,20 @@ async function handleBuyStoreItem(itemId) {
   await loadProfile();
   updateBalanceUI();
   showToast("¡Compra realizada! Revisá Mi colección para equiparlo.");
-  refreshStoreWithoutJump();
+  renderStore();
 }
 
 async function handleBuyPlan(planId) {
-  const btn = document.querySelector(`[onclick="handleBuyPlan('${planId}')"]`);
-  const originalLabel = btn?.textContent || "Mejorar plan";
-  const accepted = await confirmLiveScrollPurchase({
-    title: "Mejorar mi plan",
-    message: "Se descontarán los puntos correspondientes y el nuevo plan se activará al instante.",
-    confirmLabel: "Mejorar plan",
-    icon: "💎"
-  });
-  if (!accepted) return;
-  if (btn) { btn.disabled = true; btn.textContent = "Actualizando…"; }
+  if (!confirm(`¿Cambiar tu plan usando puntos? Esto te va a descontar el saldo correspondiente.`)) return;
   const { data, error } = await sb.rpc("buy_plan_with_points", { p_user_id: currentUser.id, p_plan_id: planId });
   if (error || !data.ok) {
-    if (btn) { btn.disabled = false; btn.textContent = originalLabel; }
     showToast(data?.error === "saldo_insuficiente" ? "No tenés suficientes puntos." : "No se pudo cambiar");
     return;
   }
   await loadProfile();
   updateBalanceUI();
   showToast("¡Plan actualizado!");
-  refreshStoreWithoutJump();
+  renderStore();
 }
 
 let plansCache = null;

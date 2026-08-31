@@ -5,9 +5,12 @@ BEGIN;
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS kick_is_live boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS twitch_is_live boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS youtube_is_live boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS tiktok_is_live boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS kick_live_until timestamptz,
   ADD COLUMN IF NOT EXISTS twitch_live_until timestamptz,
-  ADD COLUMN IF NOT EXISTS youtube_live_until timestamptz;
+  ADD COLUMN IF NOT EXISTS youtube_live_until timestamptz,
+  ADD COLUMN IF NOT EXISTS tiktok_live_until timestamptz;
 
 UPDATE public.profiles
 SET kick_is_live = kick_is_live OR (is_live=true AND lower(coalesce(live_platform,'')) IN ('kick','both')),
@@ -61,13 +64,17 @@ BEGIN
     social_youtube=CASE WHEN v_platform='youtube' THEN coalesce(v_url,social_youtube) ELSE social_youtube END,
     social_tiktok=CASE WHEN v_platform='tiktok' THEN coalesce(v_url,social_tiktok) ELSE social_tiktok END,
     kick_is_live=v_kick,twitch_is_live=v_twitch,youtube_is_live=v_youtube,tiktok_is_live=v_tiktok,
-    is_live=v_kick OR v_twitch,live_platform=v_live_platform,
+    is_live=v_kick OR v_twitch OR v_youtube OR v_tiktok,live_platform=v_live_platform,
     kick_live_until=CASE WHEN v_platform='kick' AND p_live THEN now()+interval '15 hours' WHEN v_platform='kick' THEN NULL ELSE kick_live_until END,
     twitch_live_until=CASE WHEN v_platform='twitch' AND p_live THEN now()+interval '15 hours' WHEN v_platform='twitch' THEN NULL ELSE twitch_live_until END,
     youtube_live_until=CASE WHEN v_platform='youtube' AND p_live THEN now()+interval '15 hours' WHEN v_platform='youtube' THEN NULL ELSE youtube_live_until END,
     tiktok_live_until=CASE WHEN v_platform='tiktok' AND p_live THEN now()+interval '15 hours' WHEN v_platform='tiktok' THEN NULL ELSE tiktok_live_until END,
     youtube_live_video_id=CASE WHEN v_platform='youtube' THEN NULL ELSE youtube_live_video_id END,
-    live_started_at=CASE WHEN p_live THEN now() ELSE live_started_at END
+    live_started_at=CASE
+      WHEN p_live AND live_started_at IS NULL THEN now()
+      WHEN NOT (v_kick OR v_twitch OR v_youtube OR v_tiktok) THEN NULL
+      ELSE live_started_at
+    END
   WHERE id=v_id;
   RETURN jsonb_build_object('ok',true,'platform',v_platform,'live',p_live,'live_platform',v_live_platform);
 END;
@@ -92,12 +99,13 @@ BEGIN
   )
   UPDATE public.profiles p SET
     kick_is_live=c.k,twitch_is_live=c.tw,youtube_is_live=c.yt,tiktok_is_live=c.tt,
-    is_live=c.k OR c.tw,
+    is_live=c.k OR c.tw OR c.yt OR c.tt,
     live_platform=nullif(concat_ws('+',CASE WHEN c.k THEN 'kick' END,CASE WHEN c.tw THEN 'twitch' END,CASE WHEN c.yt THEN 'youtube' END,CASE WHEN c.tt THEN 'tiktok' END),''),
     kick_live_until=CASE WHEN NOT c.k THEN NULL ELSE kick_live_until END,
     twitch_live_until=CASE WHEN NOT c.tw THEN NULL ELSE twitch_live_until END,
     youtube_live_until=CASE WHEN NOT c.yt THEN NULL ELSE youtube_live_until END,
-    tiktok_live_until=CASE WHEN NOT c.tt THEN NULL ELSE tiktok_live_until END
+    tiktok_live_until=CASE WHEN NOT c.tt THEN NULL ELSE tiktok_live_until END,
+    live_started_at=CASE WHEN c.k OR c.tw OR c.yt OR c.tt THEN live_started_at ELSE NULL END
   FROM calculated c WHERE p.id=c.id;
   GET DIAGNOSTICS v_count=ROW_COUNT;
   RETURN v_count;

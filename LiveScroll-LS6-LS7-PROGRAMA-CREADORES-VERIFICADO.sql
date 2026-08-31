@@ -28,6 +28,24 @@ VALUES (
 ON CONFLICT (version) DO UPDATE SET
   title=EXCLUDED.title,content=EXCLUDED.content,active=true;
 
+-- La cuenta administradora fundadora ya pertenece al programa.
+UPDATE public.profiles SET
+  is_creator=true,
+  is_creator_verified=true,
+  creator_verified_at=coalesce(creator_verified_at,now()),
+  creator_verified_by=id,
+  creator_terms_version='1.0',
+  creator_terms_accepted_at=coalesce(creator_terms_accepted_at,now())
+WHERE is_admin=true;
+
+DO $$
+BEGIN
+  IF to_regclass('public.creator_applications') IS NOT NULL THEN
+    EXECUTE 'UPDATE public.creator_applications SET status=''approved'' WHERE status=''pending'' AND user_id IN (SELECT id FROM public.profiles WHERE is_admin=true)';
+  END IF;
+END;
+$$;
+
 ALTER TABLE public.creator_program_terms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS creator_program_terms_read ON public.creator_program_terms;
 CREATE POLICY creator_program_terms_read ON public.creator_program_terms
@@ -81,6 +99,27 @@ BEGIN
 END;
 $$;
 
+CREATE OR REPLACE FUNCTION public.admin_get_users_v2(p_query text DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
+DECLARE v_result jsonb;
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM public.profiles WHERE id=auth.uid() AND is_admin=true) THEN
+    RETURN jsonb_build_object('ok',false,'error','no_autorizado','users','[]'::jsonb);
+  END IF;
+  SELECT coalesce(jsonb_agg(to_jsonb(q) ORDER BY q.created_at DESC),'[]'::jsonb) INTO v_result
+  FROM (
+    SELECT p.id,p.username,u.email,p.points_balance,p.plan_id,p.created_at,p.ban_reason,p.is_blocked,
+      p.is_creator,p.is_creator_verified,p.creator_terms_version,p.creator_terms_accepted_at,p.creator_verified_at
+    FROM public.profiles p LEFT JOIN auth.users u ON u.id=p.id
+    WHERE nullif(btrim(coalesce(p_query,'')),'') IS NULL
+       OR p.username ILIKE '%'||btrim(p_query)||'%'
+       OR coalesce(u.email,'') ILIKE '%'||btrim(p_query)||'%'
+    ORDER BY p.created_at DESC LIMIT 250
+  ) q;
+  RETURN jsonb_build_object('ok',true,'users',v_result);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION public.admin_set_creator_program_verified(p_user_id uuid,p_verified boolean)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $$
 DECLARE v_creator boolean; v_terms text;
@@ -108,10 +147,12 @@ $$;
 REVOKE ALL ON FUNCTION public.get_my_creator_program_status() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.accept_creator_program_terms(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.admin_set_creator_access(uuid,boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.admin_get_users_v2(text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.admin_set_creator_program_verified(uuid,boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_my_creator_program_status() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.accept_creator_program_terms(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_set_creator_access(uuid,boolean) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_get_users_v2(text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.admin_set_creator_program_verified(uuid,boolean) TO authenticated;
 
 COMMIT;

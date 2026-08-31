@@ -33,8 +33,8 @@
   // instante la pantalla compartida de LiveScroll 6 mientras recupera sesión.
   (function () {
     if (/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get('ls8preview') === '1') {
-      document.documentElement.classList.add('ls8-app-runtime');
-      document.title = 'LiveScroll 8 · Worlds';
+      document.documentElement.classList.add('ls7-app-runtime','ls7-boot-pending','ls8-app-runtime');
+      document.title = 'LiveScroll 8';
       return;
     }
     if (/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)) {
@@ -82,6 +82,18 @@
     <div class="ls7-boot-copy" id="ls7BootCopy">Tu espacio. Tu contenido. Tu próxima etapa.</div>
   </div>
 </div>
+<script>
+  if (document.documentElement.classList.contains('ls8-app-runtime')) {
+    const boot=document.getElementById('ls7BootScreen');
+    if (boot) {
+      boot.setAttribute('aria-label','Iniciando LiveScroll 8');
+      const symbol=boot.querySelector('.ls7-boot-symbol');
+      const title=boot.querySelector('.ls7-boot-title');
+      if (symbol) symbol.textContent='8';
+      if (title) title.innerHTML='Bienvenido a<br>LiveScroll <span>8</span>';
+    }
+  }
+</script>
 
 <div id="introOverlay" class="ls6-cinematic" data-scene="0" role="dialog" aria-label="Presentación de LiveScroll 6">
   <div class="ls6-stars"></div>
@@ -794,7 +806,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=6.2.2-creator-program-test-4"></script>
+<script src="app.js?v=8.0.0-ls7-baseline-1"></script>
 <script src="ls8-teaser.js?v=6"></script>
 </body>
 </html>

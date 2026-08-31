@@ -1,4 +1,5 @@
 (()=>{
+  if(/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent)||new URLSearchParams(location.search).get("ls8preview")==="1")return;
   const preview=new URLSearchParams(location.search).get("ls8teaser")==="1";
   try{if(!preview&&localStorage.getItem("ls8_teaser_2027_seen")==="1")return}catch(_){}
   function launchTeaser(){

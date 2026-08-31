@@ -151,6 +151,18 @@ nav {
   border-radius: 8px; border-bottom: 1px solid var(--border);
 }
 .mobile-menu-panel button.active { color: var(--gold); }
+
+/* Android WebView: keep controls below the system notification/status bar.
+   The small fallback covers WebViews that report a zero safe-area inset. */
+html.ls6-app-runtime nav,
+html.ls7-app-runtime nav {
+  padding-top: calc(18px + max(env(safe-area-inset-top, 0px), 8px));
+}
+
+html.ls6-app-runtime .mobile-menu-panel,
+html.ls7-app-runtime .mobile-menu-panel {
+  padding-top: calc(24px + max(env(safe-area-inset-top, 0px), 8px));
+}
 .mobile-menu-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 89;
 }

@@ -3800,7 +3800,7 @@ async function renderApp() {
 // 6.1.2 · NUBE LIVESCROLL
 // Desde esta versión, una publicación futura puede avisar a quienes todavía
 // tengan LiveScroll 6 abierto y ofrecerles recargar sin cerrar su sesión.
-const LIVESCROLL6_CLIENT_BUILD = 60202;
+const LIVESCROLL6_CLIENT_BUILD = 60203;
 let ls6UpdateWatchTimer = null;
 let ls6UpdateCheckRunning = false;
 

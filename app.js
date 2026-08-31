@@ -26,7 +26,7 @@ if (LIVESCROLL_RUNTIME.isAndroid6) document.documentElement.classList.add("ls6-a
 if (LIVESCROLL_RUNTIME.isAndroid8) document.documentElement.classList.add("ls8-app-runtime");
 
 function isLiveScroll7App() {
-  return LIVESCROLL_RUNTIME.isAndroid7 === true;
+  return LIVESCROLL_RUNTIME.isAndroid7 === true || LIVESCROLL_RUNTIME.isAndroid8 === true;
 }
 window.isLiveScroll7App = isLiveScroll7App;
 
@@ -34,6 +34,10 @@ function isLiveScroll8App() {
   return LIVESCROLL_RUNTIME.isAndroid8 === true;
 }
 window.isLiveScroll8App = isLiveScroll8App;
+
+function getLiveScrollRuntimeGeneration() {
+  return isLiveScroll8App() ? 8 : (LIVESCROLL_RUNTIME.isAndroid7 ? 7 : 6);
+}
 
 function getLiveScrollClientOrigin() {
   if (LIVESCROLL_RUNTIME.isAndroid8) return "ls8";
@@ -165,12 +169,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function applyLiveScrollRuntimeBranding() {
   if (isLiveScroll8App()) {
-    document.documentElement.classList.add("ls8-app-runtime");
+    document.documentElement.classList.add("ls7-app-runtime","ls8-app-runtime");
     document.querySelectorAll(".nav-brand").forEach(node => {
       node.innerHTML = '<span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>8</b>';
       node.setAttribute("aria-label", "LiveScroll 8");
     });
-    document.title = "LiveScroll 8 — Worlds";
+    document.title = "LiveScroll 8";
     return;
   }
   if (!isLiveScroll7App()) return;
@@ -926,6 +930,7 @@ function showPostLoginIntro() {
 
     const username = currentProfile?.username || currentUser?.email?.split("@")[0] || "";
     const isLs7 = isLiveScroll7App();
+    const modernGeneration = getLiveScrollRuntimeGeneration();
     const seasonalKey = typeof getSeasonalThemeKey === "function"
       ? getSeasonalThemeKey()
       : "normal";
@@ -935,10 +940,10 @@ function showPostLoginIntro() {
       : null;
 
     const accent = isLs7 ? "#58d8ff" : (seasonal?.accent || "var(--gold)");
-    const seasonEmoji = isLs7 ? "7" : (seasonal?.emoji || "✦");
-    const introKicker = isLs7 ? "LIVESCROLL 7 · ANDROID" : "LiveScroll";
+    const seasonEmoji = isLs7 ? String(modernGeneration) : (seasonal?.emoji || "✦");
+    const introKicker = isLs7 ? `LIVESCROLL ${modernGeneration} · ANDROID` : "LiveScroll";
     const introTitle = isLs7
-      ? (username ? `Cargando tu mundo, @${escapeHtml(username)}` : "Cargando LiveScroll 7")
+      ? (username ? `Cargando tu mundo, @${escapeHtml(username)}` : `Cargando LiveScroll ${modernGeneration}`)
       : (username ? `Hola, @${escapeHtml(username)}` : "Bienvenido");
     const introSubtitle = isLs7
       ? "Preparando tu feed y sincronizando tu cuenta…"
@@ -1153,7 +1158,7 @@ function saveRememberedLoginEmail() {
 function renderAuthForm(mode) {
   const wrap = document.getElementById("globalModalWrap");
   const isSignup = mode === "signup";
-  const runtimeGeneration = isLiveScroll7App() ? 7 : 6;
+  const runtimeGeneration = getLiveScrollRuntimeGeneration();
   wrap.innerHTML = `
     <div class="ls-access-evolution" onclick="if(event.target===this) closeAuthModal()">
       <div class="ls-access-orb ls-access-orb-a" aria-hidden="true"></div>
@@ -2362,7 +2367,7 @@ function openLiveScrollSettings() {
 
             ${isLiveScroll7App() ? `
               <div class="ls7-runtime-settings-card">
-                <div class="ls7-runtime-settings-head"><span>7</span><div><strong>Experiencia LiveScroll 7</strong><small>Entrada exclusiva de la aplicación Android</small></div></div>
+                <div class="ls7-runtime-settings-head"><span>${getLiveScrollRuntimeGeneration()}</span><div><strong>Experiencia LiveScroll ${getLiveScrollRuntimeGeneration()}</strong><small>Entrada exclusiva de la aplicación Android</small></div></div>
                 <p>Esta versión reemplaza el antiguo Portal 6 por una bienvenida propia, más directa y preparada para la nueva generación.</p>
                 <button type="button" class="btn-outline" style="width:100%;min-height:46px;" onclick="replayLiveScroll7LoginWelcome()">▶ Volver a ver la bienvenida</button>
               </div>` : `
@@ -2386,8 +2391,8 @@ function openLiveScrollSettings() {
 
             ${isLiveScroll7App() ? `
               <div class="ls7-runtime-status-card">
-                <div class="ls7-runtime-status-head"><span></span><strong>LiveScroll 7 · Desarrollo activo</strong></div>
-                <p>Estás dentro de la primera etapa real de LiveScroll 7 para Android. La cuenta y el contenido siguen sincronizados mientras renovamos cada apartado.</p>
+                <div class="ls7-runtime-status-head"><span></span><strong>LiveScroll ${getLiveScrollRuntimeGeneration()} · Desarrollo activo</strong></div>
+                <p>Estás dentro de LiveScroll ${getLiveScrollRuntimeGeneration()} para Android. La cuenta, el contenido y las funciones actuales siguen sincronizados.</p>
                 <button type="button" class="btn-outline" onclick="showLiveScroll7AppNotice()">Conocer esta etapa</button>
               </div>` : `
               <div class="ls6-active-support-card">
@@ -2703,7 +2708,7 @@ document.addEventListener("DOMContentLoaded", installLiveScrollLockedModalUX);
 function getLiveScroll6ModeMenuMarkup() {
   const mode = window.__liveScrollExperienceMode || "nova";
   const isLegacy = mode === "legacy";
-  const generation = isLiveScroll7App() ? 7 : 6;
+  const generation = getLiveScrollRuntimeGeneration();
   const modeName = isLiveScroll7App()
     ? (isLegacy ? "Fluido" : "Inmersivo")
     : (isLegacy ? "Legacy" : "Nova");
@@ -2731,10 +2736,10 @@ function toggleMobileMenu() {
   const activeTab = currentTab || "feed";
   panel.innerHTML = `
     <div class="ls-mobile-menu-head">
-      <div><strong>LiveScroll <em>${isLiveScroll7App() ? "7" : "6"}</em></strong><small>${isLiveScroll7App() ? "Centro de control" : "Explorá la aplicación"}</small></div>
+      <div><strong>LiveScroll <em>${getLiveScrollRuntimeGeneration()}</em></strong><small>${isLiveScroll7App() ? "Centro de control" : "Explorá la aplicación"}</small></div>
       <button class="ls-mobile-menu-close" onclick="closeMobileMenu()" aria-label="Cerrar">✕</button>
     </div>
-    ${isLiveScroll7App() ? `<div class="ls7-menu-runtime-line"><i></i><span>SESIÓN ACTIVA</span><b>${window.__liveScrollExperienceMode === "legacy" ? "FLUIDO" : "INMERSIVO"} 7</b></div>` : ""}
+    ${isLiveScroll7App() ? `<div class="ls7-menu-runtime-line"><i></i><span>SESIÓN ACTIVA</span><b>${window.__liveScrollExperienceMode === "legacy" ? "FLUIDO" : "INMERSIVO"} ${getLiveScrollRuntimeGeneration()}</b></div>` : ""}
     <div class="ls-mobile-menu-scroll">
       <div class="ls-mobile-menu-label">Principal</div>
       <button class="${activeTab === 'feed' ? 'active' : ''}" onclick="switchTab('feed'); closeMobileMenu();"><span>▶️</span><b>Mirar</b></button>
@@ -2901,18 +2906,19 @@ window.replayLiveScroll7LoginWelcome = replayLiveScroll7LoginWelcome;
 function showLiveScroll7AppNotice() {
   const wrap = document.getElementById("globalModalWrap");
   if (!wrap) return;
+  const generation = getLiveScrollRuntimeGeneration();
   wrap.innerHTML = `
     <div class="modal-overlay ls-modal-locked ls7-runtime-notice-overlay" data-modal-locked="1" style="z-index:310;">
-      <section class="modal-box ls7-runtime-notice" role="dialog" aria-modal="true" aria-label="Primera etapa de LiveScroll 7">
+      <section class="modal-box ls7-runtime-notice" role="dialog" aria-modal="true" aria-label="Primera etapa de LiveScroll ${generation}">
         <div class="modal-box-body">
-          <div class="ls7-runtime-notice-mark">7</div>
+          <div class="ls7-runtime-notice-mark">${generation}</div>
           <small>PRIMERA ETAPA · ANDROID</small>
           <h2>Bienvenido a la evolución</h2>
-          <p>LiveScroll 7 ya comenzó. Esta primera versión conserva tus cuentas, videos y funciones esenciales mientras construimos una experiencia Android cada vez más nativa.</p>
+          <p>LiveScroll ${generation} ya comenzó. Esta primera base conserva tus cuentas, videos y todas las funciones actuales mientras construimos su próxima etapa.</p>
           <div class="ls7-runtime-roadmap"><span>AHORA</span><b>Nueva identidad y entrada</b><span>PRÓXIMO</span><b>Interfaz y rendimiento nativos</b></div>
           <blockquote>Tu contenido continúa.<br><strong>La experiencia evoluciona.</strong></blockquote>
         </div>
-        <div class="modal-box-footer"><button class="btn" style="width:100%;min-height:48px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Entrar a LiveScroll 7</button></div>
+        <div class="modal-box-footer"><button class="btn" style="width:100%;min-height:48px;" onclick="document.getElementById('globalModalWrap').innerHTML=''">Entrar a LiveScroll ${generation}</button></div>
       </section>
     </div>`;
 }
@@ -3196,7 +3202,7 @@ function closeLiveScrollModeInfo() {
 
 function openLiveScrollModeInfo() {
   const mode = window.__liveScrollExperienceMode || "nova";
-  const generation = isLiveScroll7App() ? 7 : 6;
+  const generation = getLiveScrollRuntimeGeneration();
   closeLiveScrollModeInfo();
 
   const overlay = document.createElement("div");
@@ -3828,7 +3834,7 @@ let ls7UpdateWatchTimer = null;
 let ls7UpdateCheckRunning = false;
 
 async function checkLiveScroll7Update() {
-  if (!isLiveScroll7App() || !currentUser || ls7UpdateCheckRunning) return;
+  if (!isLiveScroll7App() || isLiveScroll8App() || !currentUser || ls7UpdateCheckRunning) return;
   if (document.getElementById("ls7LiveUpdatePrompt")) return;
   ls7UpdateCheckRunning = true;
   try {
@@ -3887,13 +3893,13 @@ function showLiveScroll7UpdatePrompt(requiredBuild, requiredBuildCode) {
 }
 
 function startLiveScroll7UpdateWatcher() {
-  if (!isLiveScroll7App() || ls7UpdateWatchTimer) return;
+  if (!isLiveScroll7App() || isLiveScroll8App() || ls7UpdateWatchTimer) return;
   checkLiveScroll7Update();
   ls7UpdateWatchTimer = setInterval(checkLiveScroll7Update, 60000);
 }
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") checkLiveScroll7Update();
+  if (document.visibilityState === "visible" && !isLiveScroll8App()) checkLiveScroll7Update();
 });
 window.addEventListener("online", checkLiveScroll7Update, { passive:true });
 
@@ -12209,7 +12215,7 @@ function renderLiveScroll7LivingProfile({ profile, videos = [], followersCount =
   const latestLabel = featured?.created_at ? lsTimeAgo(featured.created_at) : "Sin publicaciones";
   const statusLabel = isProfileLive(profile) ? "EN DIRECTO" : (featured ? "NUEVA SEÑAL" : "PERFIL EN ESPERA");
   return `
-    <section class="ls7-living-profile ls7-profile-style-${visualStyle}" aria-label="Perfil Vivo LiveScroll 7">
+    <section class="ls7-living-profile ls7-profile-style-${visualStyle}" aria-label="Perfil Vivo LiveScroll ${getLiveScrollRuntimeGeneration()}">
       <div class="ls7-living-head">
         <div><small>◈ PERFIL VIVO 7</small><h2>Ahora mismo</h2></div>
         <div class="ls7-living-head-actions">
@@ -15345,12 +15351,12 @@ async function renderAdmin() {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
         <div style="min-width:0;flex:1;">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px;">
-            <strong style="color:var(--gold);">${isLiveScroll7App() ? "◈ Bienvenida oficial LiveScroll 7" : "✨ Presentación ROAD TO 6"}</strong>
-            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">${isLiveScroll7App() ? "7.0.0v" : "5.9.0"}</span>
+            <strong style="color:var(--gold);">${isLiveScroll7App() ? `◈ Bienvenida oficial LiveScroll ${getLiveScrollRuntimeGeneration()}` : "✨ Presentación ROAD TO 6"}</strong>
+            <span style="padding:3px 7px;border:1px solid rgba(250,204,21,.3);border-radius:999px;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.08em;">${isLiveScroll7App() ? `${getLiveScrollRuntimeGeneration()}.0.0` : "5.9.0"}</span>
           </div>
           <div style="color:var(--text-dim);font-size:12px;line-height:1.5;">${isLiveScroll7App() ? "Reproducí nuevamente la entrada visual de esta primera etapa para Android." : "Volvé a reproducir la presentación oficial que reciben los usuarios."}</div>
         </div>
-        <button class="btn" type="button" onclick="${isLiveScroll7App() ? "replayLiveScroll7Pulse()" : "replayLiveScrollRoadTo6Intro()"}">▶ Volver a verla</button>
+        <button class="btn" type="button" onclick="${isLiveScroll8App() ? "replayLiveScroll7LoginWelcome()" : isLiveScroll7App() ? "replayLiveScroll7Pulse()" : "replayLiveScrollRoadTo6Intro()"}">▶ Volver a verla</button>
       </div>
     </div>
 
@@ -19549,9 +19555,7 @@ function showLiveScroll8WorldsGate() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  ensureLiveScroll8Prototype();
   applyLiveScrollRuntimeBranding();
-  showLiveScroll8WorldsGate();
 }, { once:true });
 
 

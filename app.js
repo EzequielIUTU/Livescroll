@@ -270,8 +270,9 @@ let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mism
 let lsAuthActivationPromise = null;
 let lsAuthActivationUserId = null;
 let lsAuthenticatedAppReadyUserId = null;
+let lsExplicitLoginInProgress = false;
 
-async function activateAuthenticatedSession(session, { openShared = false } = {}) {
+async function activateAuthenticatedSession(session, { openShared = false, explicitLogin = false } = {}) {
   const user = session?.user;
   if (!user?.id) return false;
 
@@ -294,6 +295,10 @@ async function activateAuthenticatedSession(session, { openShared = false } = {}
   lsAuthActivationUserId = user.id;
   const activation = (async () => {
     await loadProfile();
+    if (explicitLogin) {
+      closeAuthModal();
+      await showPostLoginIntro();
+    }
     await renderApp();
     lsAuthenticatedAppReadyUserId = user.id;
   })();
@@ -926,6 +931,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (event === "SIGNED_IN") {
+      // handleLogin conserva la transición visual y completará esta misma
+      // sesión mediante activateAuthenticatedSession.
+      if (lsExplicitLoginInProgress) return;
       await activateAuthenticatedSession(session);
     } else if (event === "SIGNED_OUT") {
       currentUser = null;
@@ -1549,18 +1557,20 @@ async function handleLogin() {
   const errEl = document.getElementById("authError");
   errEl.textContent = "";
 
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { errEl.textContent = error.message; return; }
-
-  currentUser = data.user;
-  await loadProfile();
-  closeAuthModal();
-
-  // Intro breve SOLO después de un inicio de sesión explícito.
-  await showPostLoginIntro();
-
-  renderApp();
-  if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+  lsExplicitLoginInProgress = true;
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      errEl.textContent = error.message;
+      return;
+    }
+    await activateAuthenticatedSession(data.session || { user:data.user }, {
+      openShared:true,
+      explicitLogin:true
+    });
+  } finally {
+    lsExplicitLoginInProgress = false;
+  }
 }
 
 async function handleLogout() {

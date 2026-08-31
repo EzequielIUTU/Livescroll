@@ -13078,13 +13078,15 @@ function getTikTokProfileUrl(value) {
 function livePlatformSet(profile) {
   const values = String(profile?.live_platform || "").toLowerCase().split(/[^a-z]+/).filter(Boolean);
   if (values.includes("both")) values.push("kick", "twitch");
+  if (profile?.kick_is_live) values.push("kick");
+  if (profile?.twitch_is_live) values.push("twitch");
   if (profile?.youtube_is_live) values.push("youtube");
   if (profile?.tiktok_is_live) values.push("tiktok");
   return new Set(values.filter(value => ["kick","twitch","youtube","tiktok"].includes(value)));
 }
 
 function isProfileLive(profile) {
-  return profile?.is_live === true || profile?.youtube_is_live === true || profile?.tiktok_is_live === true;
+  return profile?.is_live === true || profile?.kick_is_live === true || profile?.twitch_is_live === true || profile?.youtube_is_live === true || profile?.tiktok_is_live === true;
 }
 
 function ensureLiveStartAlertStyles() {
@@ -13123,8 +13125,8 @@ async function renderDirectos(renderToken = lsTabRenderToken) {
 
   // Conservamos exclusivamente la integración existente de Kick y Twitch.
   const { data:liveUsersData } = await sb.from("profiles")
-    .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch,social_youtube,social_tiktok,youtube_is_live,youtube_live_video_id,tiktok_is_live")
-    .or("is_live.eq.true,youtube_is_live.eq.true,tiktok_is_live.eq.true")
+    .select("id,username,avatar_emoji,avatar_url,plan_id,live_platform,live_started_at,social_kick,social_twitch,social_youtube,social_tiktok,kick_is_live,twitch_is_live,youtube_is_live,youtube_live_video_id,tiktok_is_live")
+    .or("is_live.eq.true,kick_is_live.eq.true,twitch_is_live.eq.true,youtube_is_live.eq.true,tiktok_is_live.eq.true")
     .is("ban_reason",null)
     .order("live_started_at",{ascending:false});
 
@@ -13233,7 +13235,7 @@ async function loadUsersDirectory(term) {
   list.innerHTML = "Buscando...";
 
   let query = sb.from("profiles")
-    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, youtube_is_live, tiktok_is_live")
+    .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live")
     .is("ban_reason", null)
     .neq("id", currentUser.id)
     .order("is_live", { ascending: false })
@@ -13713,7 +13715,7 @@ async function viewPublicProfile(username) {
   main.innerHTML = `<p>Cargando perfil...</p>`;
   document.querySelectorAll(".nav-links button").forEach(b => b.classList.remove("active"));
 
-  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, youtube_is_live, tiktok_is_live").eq("username", username).single();
+  const { data: profile } = await sb.from("profiles").select("id, username, avatar_emoji, avatar_url, cover_url, cover_position_y, profile_side_image_url, bio, social_kick, social_twitch, social_youtube, social_tiktok, social_instagram, plan_id, is_live, live_platform, is_creator, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live").eq("username", username).single();
   if (!profile) { main.innerHTML = `<p class="error-msg">Usuario no encontrado.</p>`; return; }
   recordDailyChallengeEvent("profile_view", profile.id);
 
@@ -14008,7 +14010,7 @@ function hasShownLiveSessionAlert(key) {
 async function showLiveStartAnimation(notification) {
   if (!notification?.actor_id) return;
   const { data:creator } = await sb.from("profiles")
-    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at,youtube_is_live,tiktok_is_live")
+    .select("username,avatar_url,avatar_emoji,live_platform,live_started_at,kick_is_live,twitch_is_live,youtube_is_live,tiktok_is_live")
     .eq("id",notification.actor_id).maybeSingle();
   if (!creator) return;
 
@@ -14836,35 +14838,45 @@ async function requestCreatorAccess() {
 }
 
 function renderManualLiveControl() {
-  const youtubeLive = currentProfile?.youtube_is_live === true;
-  const tiktokLive = currentProfile?.tiktok_is_live === true;
+  const platforms = [
+    { key:"kick", label:"Kick", icon:"K", active:currentProfile?.kick_is_live === true, color:"#53fc18", text:"#071006", bg:"rgba(83,252,24,.12)" },
+    { key:"twitch", label:"Twitch", icon:"T", active:currentProfile?.twitch_is_live === true, color:"#a970ff", text:"#fff", bg:"rgba(145,70,255,.16)" },
+    { key:"youtube", label:"YouTube", icon:"▶", active:currentProfile?.youtube_is_live === true, color:"#ff315c", text:"#fff", bg:"rgba(255,0,51,.14)" },
+    { key:"tiktok", label:"TikTok", icon:"♪", active:currentProfile?.tiktok_is_live === true, color:"#35f1e5", text:"#fff", bg:"rgba(53,241,229,.10)" }
+  ];
+  const anyLive = platforms.some(item => item.active);
   return `<section class="profile-section ls-manual-live-control">
     <div class="profile-section-head"><div class="ico">📡</div><h3>Control de Directo</h3><div class="sub">Visible solo para vos</div></div>
-    <div class="form-card" style="padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(255,0,51,.055),rgba(53,241,229,.035));">
+    <div class="form-card" style="padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(83,252,24,.035),rgba(145,70,255,.045),rgba(255,0,51,.035),rgba(53,241,229,.035));">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
         <div><strong style="font-size:13px;">Activación manual</strong><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Se apaga automáticamente después de 4 horas.</div></div>
-        <span style="font:900 8px 'JetBrains Mono',monospace;color:${youtubeLive || tiktokLive ? 'var(--green)' : 'var(--text-dim)'};">${youtubeLive || tiktokLive ? '● EN DIRECTO' : '○ SIN DIRECTO'}</span>
+        <span style="font:900 8px 'JetBrains Mono',monospace;color:${anyLive ? 'var(--green)' : 'var(--text-dim)'};">${anyLive ? '● EN DIRECTO' : '○ SIN DIRECTO'}</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;">
-        <button id="manualLiveYoutube" class="${youtubeLive ? 'btn' : 'btn-outline'}" onclick="toggleManualSocialLive('youtube')" style="min-height:48px;${youtubeLive ? 'background:#ff0033;color:#fff;border-color:#ff315c;' : ''}">${youtubeLive ? '■ Finalizar YouTube' : '▶ Iniciar YouTube'}</button>
-        <button id="manualLiveTiktok" class="${tiktokLive ? 'btn' : 'btn-outline'}" onclick="toggleManualSocialLive('tiktok')" style="min-height:48px;${tiktokLive ? 'background:#101114;color:#fff;border-color:#35f1e5;' : ''}">${tiktokLive ? '■ Finalizar TikTok' : '♪ Iniciar TikTok'}</button>
+        ${platforms.map(item => `<button id="manualLive${item.key[0].toUpperCase()+item.key.slice(1)}" onclick="toggleManualSocialLive('${item.key}')" style="min-height:68px;padding:10px;border-radius:14px;border:1px solid ${item.color};background:${item.active ? item.color : item.bg};color:${item.active ? item.text : item.color};font-family:inherit;font-weight:900;cursor:pointer;box-shadow:${item.active ? `0 0 22px ${item.bg}` : 'none'};transition:.2s ease;"><span style="display:block;font-size:18px;margin-bottom:4px;">${item.icon}</span>${item.active ? `■ Finalizar ${item.label}` : `Iniciar ${item.label}`}</button>`).join("")}
       </div>
-      <div style="font-size:9px;color:var(--text-dim);margin-top:10px;line-height:1.5;">Kick y Twitch continúan con detección automática. Para YouTube y TikTok se utiliza el enlace guardado en tu perfil.</div>
+      <div style="font-size:9px;color:var(--text-dim);margin-top:10px;line-height:1.5;">Podés activar varias plataformas al mismo tiempo. Cada botón utiliza el enlace guardado en tu perfil y no consulta APIs externas.</div>
     </div>
   </section>`;
 }
 
 async function toggleManualSocialLive(platform) {
   if (!currentProfile?.is_creator) { showToast("Esta opción es solo para Creadores"); return; }
-  const isYoutube = platform === "youtube";
-  const url = isYoutube ? currentProfile.social_youtube || "" : currentProfile.social_tiktok || "";
-  const validUrl = isYoutube ? getYouTubeChannelUrl(url) : getTikTokProfileUrl(url);
-  const active = isYoutube ? currentProfile.youtube_is_live === true : currentProfile.tiktok_is_live === true;
+  const config = {
+    kick:{ label:"Kick", url:currentProfile.social_kick || "", validate:value => !!getKickChannelFromUrl(value) },
+    twitch:{ label:"Twitch", url:currentProfile.social_twitch || "", validate:value => !!getTwitchChannelFromUrl(value) },
+    youtube:{ label:"YouTube", url:currentProfile.social_youtube || "", validate:value => !!getYouTubeChannelUrl(value) },
+    tiktok:{ label:"TikTok", url:currentProfile.social_tiktok || "", validate:value => !!getTikTokProfileUrl(value) }
+  }[platform];
+  if (!config) return;
+  const url = config.url;
+  const validUrl = config.validate(url);
+  const active = currentProfile?.[`${platform}_is_live`] === true;
   if (!active && !validUrl) {
-    showToast(`Primero agregá el enlace de ${isYoutube ? "YouTube" : "TikTok"} desde Editar perfil`);
+    showToast(`Primero agregá el enlace de ${config.label} desde Editar perfil`);
     return;
   }
-  const button = document.getElementById(isYoutube ? "manualLiveYoutube" : "manualLiveTiktok");
+  const button = document.getElementById(`manualLive${platform[0].toUpperCase()+platform.slice(1)}`);
   if (button) button.disabled = true;
   const { data, error } = await sb.rpc("set_my_social_live", {
     p_platform:platform,
@@ -14874,6 +14886,8 @@ async function toggleManualSocialLive(platform) {
   if (error || data?.ok === false) {
     if (button) button.disabled = false;
     const messages = {
+      invalid_kick_url:"El enlace de Kick no es válido",
+      invalid_twitch_url:"El enlace de Twitch no es válido",
       invalid_youtube_url:"El enlace de YouTube no es válido",
       invalid_tiktok_url:"El enlace de TikTok no es válido",
       creator_required:"Esta opción es solo para Creadores"
@@ -14881,10 +14895,11 @@ async function toggleManualSocialLive(platform) {
     showToast(messages[data?.error] || "No se pudo actualizar el directo");
     return;
   }
-  if (isYoutube) currentProfile.youtube_is_live = !active;
-  else currentProfile.tiktok_is_live = !active;
+  currentProfile[`${platform}_is_live`] = !active;
+  currentProfile.is_live = currentProfile.kick_is_live === true || currentProfile.twitch_is_live === true;
+  if (data?.live_platform !== undefined) currentProfile.live_platform = data.live_platform;
   lsPerfCache.directos = { data:null, at:0 };
-  showToast(!active ? `🔴 Tu directo de ${isYoutube ? "YouTube" : "TikTok"} ya aparece en Directos` : `Directo de ${isYoutube ? "YouTube" : "TikTok"} finalizado`);
+  showToast(!active ? `🔴 Tu directo de ${config.label} ya aparece en Directos` : `Directo de ${config.label} finalizado`);
   renderProfile();
 }
 

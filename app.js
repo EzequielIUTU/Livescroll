@@ -1,5 +1,5 @@
-Warning: truncated output (original token count: 210657)
-Total output lines: 19872
+Warning: truncated output (original token count: 211075)
+Total output lines: 19903
 
 // ============================================================
 // LIVESCROLL · FIRMA OFICIAL DEL PROYECTO
@@ -222,6 +222,7 @@ function finishLiveScroll7Boot({ authenticated = false } = {}) {
   if (!isLiveScroll7App()) return;
   const screen = document.getElementById("ls7BootScreen");
   if (!screen || screen.dataset.finished === "1") return;
+  if (!authenticated) ensurePublicAccessVisible();
   screen.dataset.finished = "1";
   screen.classList.toggle("is-welcome", authenticated);
   const hold = authenticated ? 720 : 180;
@@ -275,6 +276,33 @@ let lsAuthActivationUserId = null;
 let lsAuthenticatedAppReadyUserId = null;
 let lsExplicitLoginInProgress = false;
 
+function withStartupDeadline(promise, timeoutMs, label = "operación") {
+  let timer = null;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = window.setTimeout(() => reject(new Error(`${label} superó el tiempo de espera`)), timeoutMs);
+    })
+  ]);
+}
+
+function ensurePublicAccessVisible() {
+  if (currentUser && lsAuthenticatedAppReadyUserId === currentUser.id) return false;
+  const landing = document.getElementById("landingView");
+  const app = document.getElementById("appView");
+  const navLinks = document.getElementById("navLinks");
+  const navRight = document.getElementById("navRight");
+  landing?.classList.remove("hidden");
+  app?.classList.add("hidden");
+  if (navLinks) navLinks.innerHTML = "";
+  if (navRight && !navRight.querySelector("[data-ls-login-entry]")) {
+    navRight.innerHTML = `<button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button>`;
+  }
+  document.body.classList.remove("ls-navigation-ready");
+  return true;
+}
+window.ensurePublicAccessVisible = ensurePublicAccessVisible;
+
 async function activateAuthenticatedSession(session, { openShared = false, explicitLogin = false } = {}) {
   const user = session?.user;
   if (!user?.id) return false;
@@ -297,12 +325,12 @@ async function activateAuthenticatedSession(session, { openShared = false, expli
   currentUser = user;
   lsAuthActivationUserId = user.id;
   const activation = (async () => {
-    await loadProfile();
+    await withStartupDeadline(loadProfile(), 8000, "La carga del perfil");
     if (explicitLogin) {
       closeAuthModal();
       await showPostLoginIntro();
     }
-    await renderApp();
+    await withStartupDeadline(renderApp(), 9000, "El inicio de LiveScroll");
     lsAuthenticatedAppReadyUserId = user.id;
   })();
   lsAuthActivationPromise = activation;
@@ -911,6 +939,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // El acceso público existe desde el primer instante. La recuperación de
+  // sesión puede reemplazarlo después, pero nunca dejar la pantalla vacía.
+  ensurePublicAccessVisible();
+
   // Suscribimos primero para capturar PASSWORD_RECOVERY antes de tratar
   // la sesión temporal del enlace como un inicio de sesión normal.
   let lsRecoveryMode = false;
@@ -954,7 +986,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let session = null;
   try {
-    const sessionResult = await sb.auth.getSession();
+    const sessionResult = await withStartupDeadline(sb.auth.getSession(), 5000, "La recuperación de sesión");
     session = sessionResult?.data?.session || null;
     if (sessionResult?.error) console.warn("No se pudo recuperar la sesión:", sessionResult.error.message);
   } catch (error) {
@@ -1715,7 +1747,7 @@ function renderLanding() {
   document.getElementById("appView").classList.add("hidden");
   document.getElementById("navLinks").innerHTML = "";
   document.getElementById("navRight").innerHTML = `
-    <button class="btn-outline" onclick="showAuth('login')">Iniciar sesión</button>`;
+    <button class="btn-outline" data-ls-login-entry type="button" onclick="showAuth('login')">Iniciar sesión</button>`;
 
   if (window.sharedVideoId) {
     const hero = document.querySelector(".hero");
@@ -3709,22 +3741,21 @@ async function renderApp() {
   setTimeout(applySeasonalTheme, 0);
   ensureModernMobileStyles();
 
-  document.getElementById("landingView").classList.add("hidden");
-  document.getElementById("appView").classList.remove("hidden");
-
-  // 5.4.6: mostramos respuesta inmediata mientras resolvemos
-  // las pocas cosas necesarias para construir la navegación.
-  const appView = document.getElementById("appView");
-  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
-
   // Empezamos a preparar el Feed mientras resolvemos navegación y planes.
   // renderFeed reutiliza esta misma promesa, por lo que nunca duplica la consulta.
   loadFeedVideosCached().catch(() => {});
 
-  const [visibilityResult, plans] = await Promise.all([
+  const [visibilityResult, plans] = await withStartupDeadline(Promise.all([
     sb.rpc("get_app_visibility"),
     loadPlans()
-  ]);
+  ]), 7000, "La configuración inicial");
+
+  // Ocultamos el acceso recién cuando las dependencias mínimas respondieron.
+  // Si alguna falla o vence el tiempo, el landing y su botón siguen visibles.
+  document.getElementById("landingView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  const appView = document.getElementById("appView");
+  if (appView) appView.innerHTML = renderFastSkeleton(7, "feed");
 
   const visibilityData = visibilityResult?.data || {};
   const walletLocked =
@@ -5262,47 +5293,7 @@ async function handleAcceptTutorial() {
   }
 
   const wrap = document.getElementById("globalModalWrap");
-  if (wrap) wrap.innerHTML = "";
-
-  if (currentUser?.id) {
-    await sb.rpc("acknowledge_content", {
-      p_user_id: currentUser.id,
-      p_content_key: "tutorial"
-    });
-  }
-
-  if (typeof switchTab === "function") {
-    switchTab("feed");
-  }
-
-  checkPendingContent();
-}
-
-function showTermsUpdateModal() {
-  const wrap = document.getElementById("globalModalWrap");
-  wrap.innerHTML = `
-    <div class="modal-overlay" style="z-index:130;">
-      <div class="modal-box">
-        <div class="modal-box-header"><h2>📋 Actualizamos los Términos</h2></div>
-        <div class="modal-box-body">
-        <p style="color:var(--text-dim); font-size:13px;">Cambiamos nuestros Términos y Condiciones. Por favor, revisalos antes de seguir usando LiveScroll.</p>
-        <a href="terminos.html" target="_blank" rel="noopener noreferrer" class="btn-outline" style="display:block; text-align:center; text-decoration:none; margin-bottom:14px;">Leer Términos y Condiciones</a>
-        <div class="field" style="display:flex; align-items:flex-start; gap:8px;">
-          <input type="checkbox" id="acceptNewTerms" style="margin-top:3px;">
-          <label for="acceptNewTerms" style="font-size:12px; color:var(--text-dim); cursor:pointer;">Leí y acepto los Términos y Condiciones actualizados.</label>
-        </div>
-        <div id="acceptTermsError" class="error-msg"></div>
-        </div>
-        <div class="modal-box-footer">
-          <button class="btn" style="width:100%;" onclick="handleAcceptNewTerms()">Continuar</button>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function handleAcceptNewTerms() {
-  const errEl = document.getElementById("acceptTermsError");
-  if (!documen…110657 tokens truncated… type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
+  if (wra…111075 tokens truncated… type="number" id="newEmojiStock" min="1" placeholder="Stock" disabled
           style="padding:10px;background:var(--ink);border:1px solid var(--border);border-radius:8px;color:var(--text);">
       </div>
 

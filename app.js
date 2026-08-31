@@ -56,12 +56,12 @@ function renderClientOriginBadge(origin, compact = false) {
   return `<span class="ls-client-origin ls-origin-${value}${compact ? " is-compact" : ""}" title="${title}" aria-label="${title}">${labels[value]}</span>`;
 }
 
-let lsGenerationFeedFilter = ["all","ls6","ls7","ls8"].includes(localStorage.getItem("ls-generation-filter"))
+let lsGenerationFeedFilter = ["all","ls6","ls7"].includes(localStorage.getItem("ls-generation-filter"))
   ? localStorage.getItem("ls-generation-filter")
   : "all";
 
 function setGenerationFeedFilter(filter) {
-  if (!["all","ls6","ls7","ls8"].includes(filter) || filter === lsGenerationFeedFilter) return;
+  if (!["all","ls6","ls7"].includes(filter) || filter === lsGenerationFeedFilter) return;
   lsGenerationFeedFilter = filter;
   localStorage.setItem("ls-generation-filter", filter);
   renderFeed(++lsTabRenderToken);
@@ -71,8 +71,7 @@ function renderGenerationFeedFilter() {
   const options = [
     ["all", "Todos"],
     ["ls6", "LS6"],
-    ["ls7", "LS7"],
-    ["ls8", "LS8"]
+    ["ls7", "LS7"]
   ];
   return `<div class="ls-generation-filter-shell">
     <div class="ls-generation-filter" aria-label="Filtrar por generación">${options.map(([value,label]) =>
@@ -13248,14 +13247,13 @@ async function loadUsersDirectory(term) {
   let query = sb.from("profiles")
     .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator, is_creator_verified, kick_is_live, twitch_is_live, youtube_is_live, tiktok_is_live")
     .is("ban_reason", null)
-    .neq("id", currentUser.id)
     .order("is_live", { ascending: false })
     .order("username")
     .limit(40);
 
   if (term) query = query.ilike("username", `%${term}%`);
   if (window.__usersDirectoryType === "creators") query = query.eq("is_creator", true);
-  else query = query.eq("is_creator", false);
+  else query = query.eq("is_creator", false).neq("id",currentUser.id);
 
   let { data:users, error } = await query;
   if (error) {
@@ -13263,12 +13261,11 @@ async function loadUsersDirectory(term) {
     let fallbackQuery = sb.from("profiles")
       .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator")
       .is("ban_reason",null)
-      .neq("id",currentUser.id)
       .order("is_live",{ ascending:false })
       .order("username")
       .limit(40);
     if (term) fallbackQuery=fallbackQuery.ilike("username",`%${term}%`);
-    fallbackQuery=window.__usersDirectoryType === "creators" ? fallbackQuery.eq("is_creator",true) : fallbackQuery.eq("is_creator",false);
+    fallbackQuery=window.__usersDirectoryType === "creators" ? fallbackQuery.eq("is_creator",true) : fallbackQuery.eq("is_creator",false).neq("id",currentUser.id);
     const fallbackResult=await fallbackQuery;
     users=fallbackResult.data;
     error=fallbackResult.error;

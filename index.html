@@ -93,6 +93,14 @@
       if (title) title.innerHTML='Bienvenido a<br>LiveScroll <span>8</span>';
     }
   }
+  // Red de seguridad: un problema de conexión nunca debe dejar la APK
+  // atrapada detrás de la bienvenida.
+  window.setTimeout(function () {
+    var boot=document.getElementById('ls7BootScreen');
+    if (!boot || boot.dataset.finished === '1') return;
+    document.documentElement.classList.remove('ls7-boot-pending');
+    boot.remove();
+  }, 12000);
 </script>
 
 <div id="introOverlay" class="ls6-cinematic" data-scene="0" role="dialog" aria-label="Presentación de LiveScroll 6">
@@ -806,7 +814,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=8.0.0-worlds-foundation-2"></script>
+<script src="app.js?v=8.0.0-startup-repair-3"></script>
 <script src="ls8-teaser.js?v=6"></script>
 </body>
 </html>

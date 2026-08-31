@@ -14849,7 +14849,7 @@ function renderManualLiveControl() {
     <div class="profile-section-head"><div class="ico">📡</div><h3>Control de Directo</h3><div class="sub">Visible solo para vos</div></div>
     <div class="form-card" style="padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,rgba(83,252,24,.035),rgba(145,70,255,.045),rgba(255,0,51,.035),rgba(53,241,229,.035));">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;">
-        <div><strong style="font-size:13px;">Activación manual</strong><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Se apaga automáticamente después de 4 horas.</div></div>
+        <div><strong style="font-size:13px;">Activación manual</strong><div style="font-size:10px;color:var(--text-dim);margin-top:3px;">Se apaga automáticamente después de 15 horas.</div></div>
         <span style="font:900 8px 'JetBrains Mono',monospace;color:${anyLive ? 'var(--green)' : 'var(--text-dim)'};">${anyLive ? '● EN DIRECTO' : '○ SIN DIRECTO'}</span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;">

@@ -1805,3 +1805,98 @@ html.ls-legacy nav {
 @media (prefers-reduced-motion:reduce) {
   .ls7-pulse-update-overlay *, .ls7-pulse-archive-box { animation:none !important;transition:none !important; }
 }
+/* LiveScroll · confirmación moderna de compras LS6/LS7 (base para LS8) */
+.ls-purchase-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 5, 12, .78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: lsPurchaseFadeIn .18s ease both;
+}
+
+.ls-purchase-confirm-card {
+  width: min(100%, 410px);
+  padding: 26px;
+  border: 1px solid rgba(250, 204, 21, .24);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 85% 0, rgba(250, 204, 21, .12), transparent 32%),
+    linear-gradient(145deg, rgba(17, 24, 39, .98), rgba(7, 10, 18, .99));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, .62);
+  text-align: center;
+  animation: lsPurchaseCardIn .22s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.ls-purchase-confirm-icon {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 14px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(250, 204, 21, .25);
+  border-radius: 19px;
+  background: rgba(250, 204, 21, .08);
+  box-shadow: 0 0 34px rgba(250, 204, 21, .08);
+  font-size: 29px;
+}
+
+.ls-purchase-confirm-card small {
+  color: var(--gold);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.ls-purchase-confirm-card h3 {
+  margin: 9px 0 8px;
+  color: var(--text);
+  font-size: 23px;
+}
+
+.ls-purchase-confirm-card p {
+  margin: 0 auto;
+  max-width: 330px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ls-purchase-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 9px;
+  margin-top: 23px;
+}
+
+.ls-purchase-confirm-actions button {
+  min-height: 48px;
+  border-radius: 12px;
+}
+
+@keyframes lsPurchaseFadeIn {
+  from { opacity: 0; }
+}
+
+@keyframes lsPurchaseCardIn {
+  from { opacity: 0; transform: translateY(12px) scale(.97); }
+}
+
+@media (max-width: 520px) {
+  .ls-purchase-confirm { align-items: end; padding: 12px; }
+  .ls-purchase-confirm-card {
+    width: 100%;
+    padding: 24px 18px max(18px, env(safe-area-inset-bottom));
+    border-radius: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ls-purchase-confirm,
+  .ls-purchase-confirm-card { animation: none; }
+}

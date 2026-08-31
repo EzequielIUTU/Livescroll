@@ -1,5 +1,8 @@
 // LiveScroll Service Worker — compatibilidad / red fresca
-// No cacheamos la app ni Supabase: LiveScroll sigue trabajando siempre contra la red.
+// La app y los datos siguen contra la red. Sólo conservamos hasta 32 imágenes
+// públicas de perfil para evitar descargas repetidas desde Storage.
+const LS_PROFILE_IMAGE_CACHE = "livescroll-profile-images-v1";
+const LS_PROFILE_IMAGE_CACHE_LIMIT = 32;
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -16,10 +19,41 @@ self.addEventListener("activate", (event) => {
     }
 
     await self.clients.claim();
+
+    const cacheKeys = await caches.keys();
+    await Promise.all(cacheKeys
+      .filter(key => key.startsWith("livescroll-profile-images-") && key !== LS_PROFILE_IMAGE_CACHE)
+      .map(key => caches.delete(key)));
   })());
 });
 
 self.addEventListener("fetch", (event) => {
+  const requestUrl = new URL(event.request.url);
+  const isSupabaseProfileImage =
+    event.request.method === "GET" &&
+    event.request.destination === "image" &&
+    requestUrl.hostname === "lxpjqvlphvjyygifedeb.supabase.co" &&
+    requestUrl.pathname.includes("/storage/v1/object/public/avatars/");
+
+  if (isSupabaseProfileImage) {
+    event.respondWith((async () => {
+      const cache = await caches.open(LS_PROFILE_IMAGE_CACHE);
+      const cached = await cache.match(event.request);
+      if (cached) return cached;
+
+      const response = await fetch(event.request);
+      if (response.ok || response.type === "opaque") {
+        await cache.put(event.request, response.clone());
+        const keys = await cache.keys();
+        if (keys.length > LS_PROFILE_IMAGE_CACHE_LIMIT) {
+          await Promise.all(keys.slice(0, keys.length - LS_PROFILE_IMAGE_CACHE_LIMIT).map(key => cache.delete(key)));
+        }
+      }
+      return response;
+    })());
+    return;
+  }
+
   // Solo intervenimos en navegaciones HTML.
   if (event.request.mode !== "navigate") return;
 

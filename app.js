@@ -7101,7 +7101,7 @@ async function loadFeedVideosCached() {
     .from("videos")
     .select("*, profiles!videos_user_id_fkey(username, plan_id), video_hashtags(hashtags(slug, display_name))")
     .order("created_at", { ascending:false })
-    .limit(20)
+    .limit(12)
     .then(result => {
       if (!result.error && result.data) {
         lsPerfCache.feed = { data:result.data, at:Date.now() };
@@ -8239,7 +8239,7 @@ function getEmbedHtml(video) {
   if (video.platform === "upload") {
     const isLegacyMode = document.documentElement.classList.contains("ls-legacy");
     return `<div class="dbltap-like-zone" data-video-id="${video.id}" style="width:100%; height:100%; position:relative;">
-      <video src="${escapeHtml(url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="${isLegacyMode ? "metadata" : "auto"}" style="width:100%;height:100%;object-fit:contain;"></video>
+      <video src="${escapeHtml(url)}" ${video.thumbnail_url && isSafeUrl(video.thumbnail_url) ? `poster="${escapeHtml(video.thumbnail_url)}"` : ""} controls muted loop playsinline preload="metadata" style="width:100%;height:100%;object-fit:contain;"></video>
       <button type="button" class="ls-mp4-sound" onclick="event.stopPropagation();toggleFeedVideoSound(this)"><span>🔇</span><b>ACTIVAR SONIDO</b></button>
     </div>`;
   }
@@ -14762,6 +14762,61 @@ async function submitChangePassword() {
   showToast("Contraseña actualizada");
 }
 
+async function optimizeProfileImage(file, { maxWidth, maxHeight, quality = .78 } = {}) {
+  if (!(file instanceof Blob) || !file.size) throw new Error("Imagen vacía");
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("No pudimos leer esta imagen"));
+      img.src = objectUrl;
+    });
+
+    const scale = Math.min(1, maxWidth / image.naturalWidth, maxHeight / image.naturalHeight);
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { alpha:false });
+    if (!context) throw new Error("Este dispositivo no pudo optimizar la imagen");
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.drawImage(image, 0, 0, width, height);
+
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(resolve, "image/webp", quality);
+    });
+    if (!blob) throw new Error("No pudimos comprimir esta imagen");
+    return blob.size < file.size ? blob : file;
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function getSupabasePublicObjectPath(publicUrl, bucket = "avatars") {
+  try {
+    const parsed = new URL(String(publicUrl || ""));
+    if (parsed.hostname !== new URL(SUPABASE_URL).hostname) return "";
+    const marker = "/storage/v1/object/public/" + bucket + "/";
+    const index = parsed.pathname.indexOf(marker);
+    if (index < 0) return "";
+    const objectPath = decodeURIComponent(parsed.pathname.slice(index + marker.length));
+    return objectPath && !objectPath.includes("..") ? objectPath : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+async function removePreviousProfileAsset(publicUrl) {
+  const objectPath = getSupabasePublicObjectPath(publicUrl);
+  if (!objectPath) return;
+  const { error } = await sb.storage.from("avatars").remove([objectPath]);
+  if (error) console.warn("Quedó una imagen anterior pendiente de limpieza:", error.message);
+}
+
 async function handleAvatarPhotoUpload() {
   const fileInput = document.getElementById("avatarPhotoInput");
   const file = fileInput.files[0];
@@ -14771,30 +14826,42 @@ async function handleAvatarPhotoUpload() {
   if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
   if (file.size > 3 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 3MB."; statusEl.style.color = "var(--red)"; return; }
 
-  statusEl.textContent = "Subiendo...";
+  statusEl.textContent = "Optimizando y subiendo...";
   statusEl.style.color = "var(--text-dim)";
 
-  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "");
-  const path = `${currentUser.id}/avatar.${ext}`;
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:512, maxHeight:512, quality:.78 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/avatar-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.avatar_url;
 
-  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: true });
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
   if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
 
   const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
-  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now(); // evita que quede una versión vieja en caché
+  const freshUrl = publicUrlData.publicUrl;
 
   const { error: updateError } = await sb.from("profiles").update({ avatar_url: freshUrl }).eq("id", currentUser.id);
   if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
 
   currentProfile.avatar_url = freshUrl;
+  removePreviousProfileAsset(previousUrl);
   showToast("¡Foto de perfil actualizada!");
   openEditProfile();
 }
 
 async function handleRemoveAvatarPhoto() {
+  const previousUrl = currentProfile.avatar_url;
   const { error } = await sb.from("profiles").update({ avatar_url: null }).eq("id", currentUser.id);
   if (error) { showToast("No se pudo quitar la foto"); return; }
   currentProfile.avatar_url = null;
+  removePreviousProfileAsset(previousUrl);
   showToast("Foto quitada, volviste al emoji");
   openEditProfile();
 }
@@ -14820,31 +14887,43 @@ async function handleCoverPhotoUpload() {
   if (!file.type.startsWith("image/")) { statusEl.textContent = "Tiene que ser una imagen."; statusEl.style.color = "var(--red)"; return; }
   if (file.size > 5 * 1024 * 1024) { statusEl.textContent = "El archivo supera los 5MB."; statusEl.style.color = "var(--red)"; return; }
 
-  statusEl.textContent = "Subiendo...";
+  statusEl.textContent = "Optimizando y subiendo...";
   statusEl.style.color = "var(--text-dim)";
 
-  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "");
-  const path = `${currentUser.id}/cover.${ext}`;
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:1600, maxHeight:900, quality:.76 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/cover-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.cover_url;
 
-  const { error: uploadError } = await sb.storage.from("avatars").upload(path, file, { cacheControl: "3600", upsert: true });
+  const { error: uploadError } = await sb.storage.from("avatars").upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
   if (uploadError) { statusEl.textContent = "Error al subir: " + uploadError.message; statusEl.style.color = "var(--red)"; return; }
 
   const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
-  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
+  const freshUrl = publicUrlData.publicUrl;
 
   const { error: updateError } = await sb.from("profiles").update({ cover_url: freshUrl, cover_position_y: 50 }).eq("id", currentUser.id);
   if (updateError) { statusEl.textContent = "No se pudo guardar."; statusEl.style.color = "var(--red)"; return; }
 
   currentProfile.cover_url = freshUrl;
   currentProfile.cover_position_y = 50;
+  removePreviousProfileAsset(previousUrl);
   showToast("¡Portada actualizada! Ahora podés acomodarla.");
   openEditProfile();
 }
 
 async function handleRemoveCoverPhoto() {
+  const previousUrl = currentProfile.cover_url;
   const { error } = await sb.from("profiles").update({ cover_url: null }).eq("id", currentUser.id);
   if (error) { showToast("No se pudo quitar la portada"); return; }
   currentProfile.cover_url = null;
+  removePreviousProfileAsset(previousUrl);
   showToast("Portada quitada");
   openEditProfile();
 }
@@ -14868,15 +14947,24 @@ async function handleProfileSideImageUpload() {
     return;
   }
 
-  statusEl.textContent = "Subiendo...";
+  statusEl.textContent = "Optimizando y subiendo...";
   statusEl.style.color = "var(--text-dim)";
 
-  const ext = file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg";
-  const path = `${currentUser.id}/profile-background.${ext}`;
+  let optimized;
+  try {
+    optimized = await optimizeProfileImage(file, { maxWidth:1080, maxHeight:1920, quality:.74 });
+  } catch (error) {
+    statusEl.textContent = error.message;
+    statusEl.style.color = "var(--red)";
+    return;
+  }
+  const extension = optimized.type === "image/webp" ? "webp" : (file.name.split(".").pop().replace(/[^a-zA-Z0-9]/g, "") || "jpg");
+  const path = currentUser.id + "/profile-background-" + Date.now() + "." + extension;
+  const previousUrl = currentProfile.profile_side_image_url;
 
   const { error: uploadError } = await sb.storage
     .from("avatars")
-    .upload(path, file, { cacheControl: "3600", upsert: true });
+    .upload(path, optimized, { cacheControl:"31536000", contentType:optimized.type || file.type, upsert:false });
 
   if (uploadError) {
     statusEl.textContent = "Error al subir: " + uploadError.message;
@@ -14885,7 +14973,7 @@ async function handleProfileSideImageUpload() {
   }
 
   const { data: publicUrlData } = sb.storage.from("avatars").getPublicUrl(path);
-  const freshUrl = publicUrlData.publicUrl + "?t=" + Date.now();
+  const freshUrl = publicUrlData.publicUrl;
 
   const { error: updateError } = await sb
     .from("profiles")
@@ -14899,11 +14987,13 @@ async function handleProfileSideImageUpload() {
   }
 
   currentProfile.profile_side_image_url = freshUrl;
+  removePreviousProfileAsset(previousUrl);
   showToast("¡Fondo del perfil actualizado!");
   openEditProfile();
 }
 
 async function handleRemoveProfileSideImage() {
+  const previousUrl = currentProfile.profile_side_image_url;
   const { error } = await sb
     .from("profiles")
     .update({ profile_side_image_url: null })
@@ -14915,6 +15005,7 @@ async function handleRemoveProfileSideImage() {
   }
 
   currentProfile.profile_side_image_url = null;
+  removePreviousProfileAsset(previousUrl);
   showToast("Imagen de fondo quitada");
   openEditProfile();
 }

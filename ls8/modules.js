@@ -56,8 +56,6 @@ async function ls8RenderView(view){
   else await ls8LoadProfile();
 }
 async function ls8Start(){await ls8Identity();await ls8RenderView(ls8ActiveView)}
+window.ls8Start=ls8Start;
 document.querySelectorAll("[data-view]").forEach(function(btn){btn.onclick=function(){ls8RenderView(btn.dataset.view)}});
 document.querySelector("#refreshBtn").onclick=function(){ls8RenderView(ls8ActiveView)};
-sb.auth.onAuthStateChange(function(event,session){if(event==="SIGNED_IN"&&session)setTimeout(ls8Start,0)});
-sb.auth.getSession().then(function(r){if(r.data.session)ls8Start()});
-

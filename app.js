@@ -13257,7 +13257,22 @@ async function loadUsersDirectory(term) {
   if (window.__usersDirectoryType === "creators") query = query.eq("is_creator", true);
   else query = query.eq("is_creator", false);
 
-  const { data: users, error } = await query;
+  let { data:users, error } = await query;
+  if (error) {
+    console.warn("Directorio avanzado no disponible; usando columnas compatibles", error);
+    let fallbackQuery = sb.from("profiles")
+      .select("id, username, avatar_emoji, avatar_url, plan_id, is_live, live_platform, is_creator")
+      .is("ban_reason",null)
+      .neq("id",currentUser.id)
+      .order("is_live",{ ascending:false })
+      .order("username")
+      .limit(40);
+    if (term) fallbackQuery=fallbackQuery.ilike("username",`%${term}%`);
+    fallbackQuery=window.__usersDirectoryType === "creators" ? fallbackQuery.eq("is_creator",true) : fallbackQuery.eq("is_creator",false);
+    const fallbackResult=await fallbackQuery;
+    users=fallbackResult.data;
+    error=fallbackResult.error;
+  }
   if (requestToken !== usersDirectoryRequestToken) return;
   if (!document.getElementById("usersDirectoryList")) return; // el usuario ya cambió de pestaña
   if (error) { list.innerHTML = `<p class="error-msg">No se pudo cargar la lista de usuarios.</p>`; return; }
@@ -15317,7 +15332,7 @@ async function renderAdmin() {
   const reportsError = reportsResult?.error || null;
   const stats = statsResult?.data;
   const creatorApplications = creatorApplicationsResult?.data || [];
-  const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending");
+  const pendingCreatorApplications = (creatorApplications || []).filter(a => a.status === "pending" && a.user_id !== currentUser?.id);
   const autoVerificationLog = autoVerificationResult?.data || [];
 
   // Reportes de seguridad separados del sistema de reportes de videos.
@@ -17107,8 +17122,14 @@ async function handleUserSearch() {
 
   resultsEl.innerHTML = "Buscando...";
   window.__adminUsersMode = { type:"search",query };
-  const { data, error } = await sb.rpc("admin_get_users_v2", { p_query:query });
-  renderUserCards(data?.users || [], error || (data?.ok === false ? new Error(data?.error) : null), resultsEl);
+  const primary = await sb.rpc("admin_get_users_v2", { p_query:query });
+  if (!primary.error && primary.data?.ok) {
+    renderUserCards(primary.data.users || [], null, resultsEl);
+    return;
+  }
+  console.warn("admin_get_users_v2 no disponible; usando consulta compatible", primary.error || primary.data);
+  const fallback = await sb.rpc("admin_search_users", { p_query:query });
+  renderUserCards(fallback.data || [], fallback.error, resultsEl);
 }
 
 async function handleCreatorApplication(applicationId, decision, userId = "") {
@@ -17140,8 +17161,14 @@ async function handleListAllUsers() {
   const resultsEl = document.getElementById("userSearchResults");
   resultsEl.innerHTML = "Cargando todos los usuarios...";
   window.__adminUsersMode = { type:"all",query:"" };
-  const { data, error } = await sb.rpc("admin_get_users_v2", { p_query:null });
-  renderUserCards(data?.users || [], error || (data?.ok === false ? new Error(data?.error) : null), resultsEl, true);
+  const primary = await sb.rpc("admin_get_users_v2", { p_query:null });
+  if (!primary.error && primary.data?.ok) {
+    renderUserCards(primary.data.users || [], null, resultsEl, true);
+    return;
+  }
+  console.warn("admin_get_users_v2 no disponible; usando listado compatible", primary.error || primary.data);
+  const fallback = await sb.rpc("admin_list_all_users");
+  renderUserCards(fallback.data || [], fallback.error, resultsEl, true);
 }
 
 async function refreshAdminUsersResults() {

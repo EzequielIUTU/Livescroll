@@ -5,7 +5,7 @@ const signal=document.querySelector(".signal-stage"),access=document.querySelect
 let mode="login";
 function showAccess(open){signal.classList.toggle("hidden",open);access.classList.toggle("open",open);access.setAttribute("aria-hidden",String(!open));if(open)setTimeout(()=>document.querySelector("#email").focus(),400)}
 function escapeHtml(value){return String(value??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
-function showApp(open){signal.classList.add("hidden");access.classList.remove("open");access.setAttribute("aria-hidden","true");appStage.classList.toggle("open",open);appStage.setAttribute("aria-hidden",String(!open));if(open)loadWorld()}
+function showApp(open){signal.classList.add("hidden");access.classList.remove("open");access.setAttribute("aria-hidden","true");appStage.classList.toggle("open",open);appStage.setAttribute("aria-hidden",String(!open));if(open)(window.ls8Start||loadWorld)()}
 function mediaUrl(video){return video.thumbnail_url||((video.platform==="upload"||/\.(mp4|webm)(\?|$)/i.test(video.video_url||""))?video.video_url:"")}
 async function loadWorld(){
   const [{data:{user}},{data:videos,error}]=await Promise.all([sb.auth.getUser(),sb.from("videos").select("id,title,video_url,thumbnail_url,platform,client_origin,created_at,profiles!videos_user_id_fkey(username,avatar_url,avatar_emoji)").order("created_at",{ascending:false}).limit(12)]);

@@ -267,6 +267,57 @@ let watchIntervals = {}; // video_id -> intervalId
 let watchSeconds = {};   // video_id -> segundos acumulados sin enviar aún
 let feedObserverInstance = null;
 let loadedEmbeds = new Set(); // video_id -> reproductor real cargado ahora mismo
+let lsAuthActivationPromise = null;
+let lsAuthActivationUserId = null;
+let lsAuthenticatedAppReadyUserId = null;
+
+async function activateAuthenticatedSession(session, { openShared = false } = {}) {
+  const user = session?.user;
+  if (!user?.id) return false;
+
+  // onAuthStateChange y getSession pueden informar la misma sesión casi al
+  // mismo tiempo. Reutilizamos una sola carga para no duplicar perfil, Feed,
+  // novedades, listeners ni consultas.
+  if (lsAuthActivationPromise && lsAuthActivationUserId === user.id) {
+    await lsAuthActivationPromise;
+    if (openShared && window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+    return true;
+  }
+
+  if (lsAuthenticatedAppReadyUserId === user.id && currentUser?.id === user.id) {
+    finishLiveScroll7Boot({ authenticated:true });
+    if (openShared && window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+    return true;
+  }
+
+  currentUser = user;
+  lsAuthActivationUserId = user.id;
+  const activation = (async () => {
+    await loadProfile();
+    await renderApp();
+    lsAuthenticatedAppReadyUserId = user.id;
+  })();
+  lsAuthActivationPromise = activation;
+
+  try {
+    await activation;
+    finishLiveScroll7Boot({ authenticated:true });
+    if (openShared && window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+    return true;
+  } catch (error) {
+    console.error("No se pudo iniciar la experiencia autenticada:", error);
+    lsAuthenticatedAppReadyUserId = null;
+    renderLanding();
+    finishLiveScroll7Boot({ authenticated:false });
+    showToast?.("No pudimos cargar tu cuenta. Revisá tu conexión e intentá nuevamente.");
+    return false;
+  } finally {
+    if (lsAuthActivationPromise === activation) {
+      lsAuthActivationPromise = null;
+      lsAuthActivationUserId = null;
+    }
+  }
+}
 
 async function uploadMediaToR2(file) {
   if (!(file instanceof Blob) || !file.size) throw new Error("El archivo está vacío");
@@ -856,7 +907,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // la sesión temporal del enlace como un inicio de sesión normal.
   let lsRecoveryMode = false;
 
-  const { data: authListenerData } = sb.auth.onAuthStateChange(async (event, session) => {
+  sb.auth.onAuthStateChange(async (event, session) => {
     if (event === "PASSWORD_RECOVERY") {
       lsRecoveryMode = true;
       currentUser = session?.user || null;
@@ -875,14 +926,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     if (event === "SIGNED_IN") {
-      if (currentUser && currentUser.id === session.user.id) return;
-      currentUser = session.user;
-      await loadProfile();
-      await renderApp();
-      finishLiveScroll7Boot({ authenticated:true });
+      await activateAuthenticatedSession(session);
     } else if (event === "SIGNED_OUT") {
       currentUser = null;
       currentProfile = null;
+      lsAuthenticatedAppReadyUserId = null;
+      lsAuthActivationPromise = null;
+      lsAuthActivationUserId = null;
       clearAllWatchIntervals();
       renderLanding();
     }
@@ -891,15 +941,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Damos un instante a Supabase para procesar el enlace de recuperación.
   await new Promise(resolve => setTimeout(resolve, 80));
 
-  const { data: { session } } = await sb.auth.getSession();
+  let session = null;
+  try {
+    const sessionResult = await sb.auth.getSession();
+    session = sessionResult?.data?.session || null;
+    if (sessionResult?.error) console.warn("No se pudo recuperar la sesión:", sessionResult.error.message);
+  } catch (error) {
+    console.warn("La recuperación de sesión falló:", error);
+  }
 
   if (!lsRecoveryMode) {
     if (session) {
-      currentUser = session.user;
-      await loadProfile();
-      await renderApp();
-      finishLiveScroll7Boot({ authenticated:true });
-      if (window.sharedVideoId) openSharedVideo(window.sharedVideoId);
+      await activateAuthenticatedSession(session, { openShared:true });
     } else {
       renderLanding();
       finishLiveScroll7Boot({ authenticated:false });
@@ -13045,7 +13098,7 @@ function startConnectedLiveRefresh() {
     if (document.hidden || currentTab !== "directos") return;
     lsPerfCache.directos = { data:null, at:0 };
     renderDirectos(lsTabRenderToken);
-  }, 20000);
+  }, 30000);
 }
 
 function getTwitchChannelFromUrl(value) {

@@ -38,14 +38,6 @@ UPDATE public.profiles SET
   creator_terms_accepted_at=coalesce(creator_terms_accepted_at,now())
 WHERE is_admin=true;
 
-DO $$
-BEGIN
-  IF to_regclass('public.creator_applications') IS NOT NULL THEN
-    EXECUTE 'UPDATE public.creator_applications SET status=''approved'' WHERE status=''pending'' AND user_id IN (SELECT id FROM public.profiles WHERE is_admin=true)';
-  END IF;
-END;
-$$;
-
 ALTER TABLE public.creator_program_terms ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS creator_program_terms_read ON public.creator_program_terms;
 CREATE POLICY creator_program_terms_read ON public.creator_program_terms

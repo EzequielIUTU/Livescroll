@@ -10,7 +10,9 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS kick_live_until timestamptz,
   ADD COLUMN IF NOT EXISTS twitch_live_until timestamptz,
   ADD COLUMN IF NOT EXISTS youtube_live_until timestamptz,
-  ADD COLUMN IF NOT EXISTS tiktok_live_until timestamptz;
+  ADD COLUMN IF NOT EXISTS tiktok_live_until timestamptz,
+  ADD COLUMN IF NOT EXISTS youtube_live_video_id text,
+  ADD COLUMN IF NOT EXISTS live_started_at timestamptz;
 
 UPDATE public.profiles
 SET kick_is_live = kick_is_live OR (is_live=true AND lower(coalesce(live_platform,'')) IN ('kick','both')),

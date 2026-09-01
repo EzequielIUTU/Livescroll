@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>LiveScroll 8</title>
   <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=8.0.0-compatible-lists-1">
+  <link rel="stylesheet" href="./style.css?v=8.0.0-economy-admin-1">
 </head>
 <body>
   <main class="app-shell">
@@ -37,6 +37,10 @@
         <section class="view panel-view" id="view-alertas"><header><small>ACTIVIDAD</small><h2>Alertas</h2></header><div class="panel-grid" id="alertsList"><div class="state">Cargando alertas…</div></div></section>
         <section class="view panel-view" id="view-usuarios"><header><small>COMUNIDAD LIVESCROLL</small><h2>Usuarios</h2><p class="view-subtitle">Descubrí Usuarios y Creadores de todas las generaciones.</p></header><div class="directory-tabs"><button class="active" data-directory="all" type="button">Todos</button><button data-directory="creators" type="button">Creadores</button></div><input class="search" id="usersSearch" type="search" autocomplete="off" placeholder="Buscar por nombre"><div class="users-grid" id="usersGrid"><div class="state">Cargando usuarios…</div></div></section>
         <section class="view panel-view" id="view-admin"><header><small>CENTRO DE CONTROL</small><h2>Admin LS8</h2><p class="view-subtitle">Usuarios, Creadores y estado general de la plataforma.</p></header><div id="adminView"><div class="state">Verificando acceso…</div></div></section>
+        <section class="view panel-view" id="view-mas"><header><small>TODO LIVESCROLL</small><h2>Más</h2><p class="view-subtitle">Tu economía, progreso y herramientas en un solo lugar.</p></header><div class="more-grid"><button data-open-extra="tienda"><i>◇</i><span><b>Tienda</b><small>Medallas, emojis y mejoras</small></span></button><button data-open-extra="billetera"><i>◆</i><span><b>Puntos</b><small>Balance, movimientos y canjes</small></span></button><button data-open-extra="ranking"><i>♛</i><span><b>Ranking</b><small>La competencia semanal</small></span></button><button data-open-extra="usuarios"><i>◎</i><span><b>Comunidad</b><small>Usuarios y Creadores</small></span></button></div></section>
+        <section class="view panel-view" id="view-tienda"><header class="extra-header"><button data-back-more type="button">←</button><div><small>ECONOMÍA LS8</small><h2>Tienda</h2></div></header><div id="storeView"><div class="state">Cargando tienda…</div></div></section>
+        <section class="view panel-view" id="view-billetera"><header class="extra-header"><button data-back-more type="button">←</button><div><small>TUS PUNTOS</small><h2>Billetera</h2></div></header><div id="walletView"><div class="state">Cargando movimientos…</div></div></section>
+        <section class="view panel-view" id="view-ranking"><header class="extra-header"><button data-back-more type="button">←</button><div><small>ÚLTIMOS 7 DÍAS</small><h2>Ranking</h2></div></header><div id="rankingView"><div class="state">Calculando posiciones…</div></div></section>
         <section class="view panel-view" id="view-perfil"><div id="profileView"><div class="state">Cargando tu perfil…</div></div></section>
       </div>
 
@@ -47,6 +51,7 @@
         <button class="create-button" data-view="crear" type="button"><i>＋</i><span>Crear</span></button>
         <button data-view="alertas" type="button"><i>♡</i><span>Alertas</span></button>
         <button data-view="usuarios" type="button"><i>◎</i><span>Usuarios</span></button>
+        <button data-view="mas" type="button"><i>•••</i><span>Más</span></button>
         <button data-view="perfil" type="button"><i>○</i><span>Perfil</span></button>
       </nav>
     </section>
@@ -55,6 +60,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="connection-banner" id="connectionBanner" role="status">Sin conexión · LS8 continuará cuando vuelva internet</div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=8.0.0-compatible-lists-1"></script>
+  <script src="./app.js?v=8.0.0-economy-admin-1"></script>
 </body>
 </html>

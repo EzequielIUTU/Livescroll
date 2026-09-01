@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#05060a">
   <title>LiveScroll 8</title>
   <link rel="preconnect" href="https://lxpjqvlphvjyygifedeb.supabase.co" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=8.0.0-full-profile-1">
+  <link rel="stylesheet" href="./style.css?v=8.0.0-community-admin-1">
 </head>
 <body>
   <main class="app-shell">
@@ -35,6 +35,8 @@
         <section class="view panel-view live-view" id="view-directos"><header class="live-header"><div><small>SEÑALES EN TIEMPO REAL</small><h2>Directos</h2><p>Kick, Twitch, YouTube y TikTok reunidos en un solo pulso.</p></div><button class="live-refresh" id="liveRefresh" type="button" aria-label="Actualizar directos">↻</button></header><div class="live-summary" id="liveSummary"><i></i><span>Buscando transmisiones activas…</span></div><div class="live-grid" id="liveGrid"><div class="state">Localizando directos…</div></div></section>
         <section class="view panel-view" id="view-crear"><header><small>PUBLICAR EN LS8</small><h2>Crear</h2></header><div class="publish-tabs"><button class="active" data-publish-tab="file" type="button">Subir video</button><button data-publish-tab="link" type="button">Compartir enlace</button></div><form class="publish-card" id="filePublishForm"><label>Título<input name="title" maxlength="120" placeholder="¿Qué querés compartir?" required></label><label class="file-picker">Archivo de video<input name="file" id="videoFile" type="file" accept="video/mp4,video/webm,video/quicktime" required><span id="fileLabel">Elegir video · máximo 50 MB</span></label><video class="upload-preview hidden" id="uploadPreview" controls playsinline></video><div class="upload-progress hidden" id="uploadProgress"><i></i><span>Subiendo de forma segura…</span></div><button class="primary" type="submit">SUBIR Y PUBLICAR</button><small>El video también aparecerá en LiveScroll 6 y 7.</small></form><form class="publish-card hidden" id="publishForm"><label>Plataforma<select name="platform" required><option value="youtube">YouTube</option><option value="tiktok">TikTok</option><option value="twitch">Twitch</option><option value="kick">Kick</option></select></label><label>Título<input name="title" maxlength="120" placeholder="¿Qué querés compartir?" required></label><label>Enlace<input name="url" type="url" inputmode="url" placeholder="https://…" required></label><button class="primary" type="submit">PUBLICAR SEÑAL</button><small>La publicación también aparecerá en LiveScroll 6 y 7.</small></form></section>
         <section class="view panel-view" id="view-alertas"><header><small>ACTIVIDAD</small><h2>Alertas</h2></header><div class="panel-grid" id="alertsList"><div class="state">Cargando alertas…</div></div></section>
+        <section class="view panel-view" id="view-usuarios"><header><small>COMUNIDAD LIVESCROLL</small><h2>Usuarios</h2><p class="view-subtitle">Descubrí Usuarios y Creadores de todas las generaciones.</p></header><div class="directory-tabs"><button class="active" data-directory="all" type="button">Todos</button><button data-directory="creators" type="button">Creadores</button></div><input class="search" id="usersSearch" type="search" autocomplete="off" placeholder="Buscar por nombre"><div class="users-grid" id="usersGrid"><div class="state">Cargando usuarios…</div></div></section>
+        <section class="view panel-view" id="view-admin"><header><small>CENTRO DE CONTROL</small><h2>Admin LS8</h2><p class="view-subtitle">Usuarios, Creadores y estado general de la plataforma.</p></header><div id="adminView"><div class="state">Verificando acceso…</div></div></section>
         <section class="view panel-view" id="view-perfil"><div id="profileView"><div class="state">Cargando tu perfil…</div></div></section>
       </div>
 
@@ -44,6 +46,7 @@
         <button data-view="directos" type="button"><i class="live-dot">●</i><span>Vivos</span></button>
         <button class="create-button" data-view="crear" type="button"><i>＋</i><span>Crear</span></button>
         <button data-view="alertas" type="button"><i>♡</i><span>Alertas</span></button>
+        <button data-view="usuarios" type="button"><i>◎</i><span>Usuarios</span></button>
         <button data-view="perfil" type="button"><i>○</i><span>Perfil</span></button>
       </nav>
     </section>
@@ -52,6 +55,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <div class="connection-banner" id="connectionBanner" role="status">Sin conexión · LS8 continuará cuando vuelva internet</div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=8.0.0-full-profile-1"></script>
+  <script src="./app.js?v=8.0.0-community-admin-1"></script>
 </body>
 </html>

@@ -389,6 +389,47 @@ async function deleteMediaFromR2(publicUrl) {
   }
 }
 
+function getSupabaseClipObjectPath(publicUrl) {
+  if (!publicUrl) return null;
+  try {
+    const parsed = new URL(publicUrl);
+    const supabaseOrigin = new URL(SUPABASE_URL).origin;
+    if (parsed.origin !== supabaseOrigin) return null;
+
+    const markers = [
+      "/storage/v1/object/public/clip-videos/",
+      "/storage/v1/object/sign/clip-videos/"
+    ];
+    const marker = markers.find(value => parsed.pathname.includes(value));
+    if (!marker) return null;
+
+    const key = decodeURIComponent(parsed.pathname.slice(parsed.pathname.indexOf(marker) + marker.length));
+    return key && !key.includes("..") ? key : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function deleteMediaFromSupabaseStorage(publicUrl) {
+  const path = getSupabaseClipObjectPath(publicUrl);
+  if (!path) return { ok:true, skipped:true };
+
+  try {
+    const { data, error } = await sb.storage.from("clip-videos").remove([path]);
+    if (error) return { ok:false, error:error.message || "delete_failed" };
+    return { ok:true, data };
+  } catch (_) {
+    return { ok:false, error:"network_error" };
+  }
+}
+
+async function deleteStoredVideoMedia(publicUrl) {
+  if (!publicUrl) return { ok:true, skipped:true };
+  if (getR2ObjectKey(publicUrl)) return deleteMediaFromR2(publicUrl);
+  if (getSupabaseClipObjectPath(publicUrl)) return deleteMediaFromSupabaseStorage(publicUrl);
+  return { ok:true, skipped:true };
+}
+
 async function getVideoMediaForCleanup(videoId) {
   const { data } = await sb.from("videos")
     .select("video_url,thumbnail_url")
@@ -398,14 +439,16 @@ async function getVideoMediaForCleanup(videoId) {
 }
 
 async function cleanupR2VideoMedia(media) {
-  if (!media) return;
+  if (!media) return { ok:true, skipped:true };
   const results = await Promise.allSettled([
-    deleteMediaFromR2(media.video_url),
-    deleteMediaFromR2(media.thumbnail_url)
+    deleteStoredVideoMedia(media.video_url),
+    deleteStoredVideoMedia(media.thumbnail_url)
   ]);
-  if (results.some(item => item.status === "rejected" || item.value?.ok === false)) {
-    console.warn("El registro se eliminó, pero quedó un archivo pendiente de limpieza en R2.");
+  const failed = results.some(item => item.status === "rejected" || item.value?.ok === false);
+  if (failed) {
+    console.warn("El registro se eliminó, pero quedó un archivo pendiente de limpieza en el almacenamiento.");
   }
+  return { ok:!failed };
 }
 
 // ============================================================
@@ -6499,9 +6542,11 @@ async function handleDeleteOwnVideo(videoId) {
     showToast(messages[data?.error] || "No se pudo eliminar el video");
     return;
   }
-  await cleanupR2VideoMedia(mediaToDelete);
+  const mediaCleanup = await cleanupR2VideoMedia(mediaToDelete);
   document.getElementById(`tile-${videoId}`)?.remove();
-  showToast("Video eliminado definitivamente ✓");
+  showToast(mediaCleanup.ok
+    ? "Video eliminado definitivamente ✓"
+    : "Video eliminado, pero quedó un archivo pendiente de limpieza");
   lsPerfCache.profileVideos.at = 0;
   lsPerfCache.feed.at = 0;
   renderProfile();
@@ -6517,11 +6562,13 @@ async function handleAdminDeleteProfileVideo(videoId, username) {
     showToast(`No se pudo eliminar: ${data?.detail || data?.error || error?.message || "error desconocido"}`);
     return;
   }
-  await cleanupR2VideoMedia(mediaToDelete);
+  const mediaCleanup = await cleanupR2VideoMedia(mediaToDelete);
   document.getElementById(`public-tile-${videoId}`)?.remove();
   lsPerfCache.profileVideos.at = 0;
   lsPerfCache.feed.at = 0;
-  showToast("Video eliminado por administración ✓");
+  showToast(mediaCleanup.ok
+    ? "Video eliminado por administración ✓"
+    : "Video eliminado; quedó un archivo pendiente de limpieza");
   await viewPublicProfile(username);
 }
 window.handleAdminDeleteProfileVideo = handleAdminDeleteProfileVideo;
@@ -16390,8 +16437,10 @@ async function handleDeleteVideo(videoId) {
     showToast(`No se pudo eliminar: ${detail}`);
     return;
   }
-  await cleanupR2VideoMedia(mediaToDelete);
-  showToast("Video eliminado");
+  const mediaCleanup = await cleanupR2VideoMedia(mediaToDelete);
+  showToast(mediaCleanup.ok
+    ? "Video eliminado definitivamente ✓"
+    : "Video eliminado; quedó un archivo pendiente de limpieza");
   renderAdmin();
 }
 

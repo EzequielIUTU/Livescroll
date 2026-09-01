@@ -73,3 +73,7 @@
 
 /* Reliable YouTube previews */
 .youtube-preview{position:absolute;inset:0;width:100%;height:100%;display:grid;place-content:center;justify-items:center;gap:10px;padding:0;border:0;background:#000;color:#fff;overflow:hidden}.youtube-preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.78}.youtube-preview::after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 45%,#000b)}.youtube-preview i,.youtube-preview span{position:relative;z-index:1}.youtube-preview i{width:66px;height:48px;display:grid;place-items:center;border-radius:15px;background:#ff0033;color:#fff;font-size:25px;font-style:normal;box-shadow:0 8px 30px #0009}.youtube-preview span{padding:7px 10px;border-radius:99px;background:#000b;font-size:8px;font-weight:950;letter-spacing:.12em}.youtube-preview:active i{transform:scale(.94)}
+
+/* Stable profile imagery */
+.profile-showcase{isolation:isolate}.profile-side-backdrop{z-index:0;pointer-events:none;opacity:.22}.profile-showcase>.profile-cover,.profile-showcase>.profile-social-row{position:relative;z-index:1}.profile-cover.has-cover{background-color:#090d14;background-repeat:no-repeat;background-size:cover}.profile-media-preview.has-image{border-style:solid;border-color:#b5ff4255;box-shadow:inset 0 0 0 1px #0008}
+@media(max-width:700px){.profile-side-backdrop{inset:-65px -20px -220px;opacity:.18;filter:blur(24px)}.profile-cover{min-height:170px;border-radius:19px}}

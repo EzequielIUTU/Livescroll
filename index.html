@@ -29,6 +29,20 @@
 <meta name="twitter:description" content="Compartí y mirá clips de Kick, Twitch, YouTube y TikTok, y sumá puntos por cada cosa que hacés.">
 <meta name="twitter:image" content="https://livescroll-mocha.vercel.app/livescroll6-icon-512.png">
 <script>
+  // Puerta de generaciones: se resuelve antes de dibujar cualquier intro.
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var selected = Number(params.get('lsversion'));
+    if (params.get('lsentry') === '1' && (selected === 6 || selected === 7)) {
+      sessionStorage.setItem('livescroll_version_gate_seen', '1');
+      sessionStorage.setItem('livescroll_version_entry', String(selected));
+      return;
+    }
+    if (!sessionStorage.getItem('livescroll_version_gate_seen')) {
+      location.replace('/versiones.html?entry=app');
+    }
+  })();
+
   // Se ejecuta antes del primer dibujo: evita que la APK 7 muestre por un
   // instante la pantalla compartida de LiveScroll 6 mientras recupera sesión.
   (function () {

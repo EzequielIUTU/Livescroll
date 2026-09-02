@@ -86,7 +86,7 @@
 <link rel="stylesheet" href="ls8-teaser.css?v=5">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=safe-area-20260831-1">
+<link rel="stylesheet" href="style.css?v=shared-identity-1">
 </head>
 <body>
 
@@ -745,7 +745,7 @@
 </script>
 
 <nav>
-  <div class="nav-brand" aria-label="LiveScroll 6"><span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span><b>6</b></div>
+  <div class="nav-brand shared-nav-brand" aria-label="LiveScroll 6"><img src="livescroll-app-icon.png?v=brand-1" alt=""><span><span class="nav-brand-live">Live</span><span class="nav-brand-scroll">Scroll</span></span><b>6</b></div>
   <div class="nav-links" id="navLinks"></div>
   <div id="navRight"></div>
   <button class="nav-hamburger" id="navHamburger" onclick="toggleMobileMenu()">☰</button>
@@ -754,6 +754,7 @@
 <!-- ================= LANDING (logged out) ================= -->
 <div id="landingView">
   <div class="hero">
+    <img class="shared-hero-logo" src="livescroll-brand-logo.png?v=brand-1" alt="LiveScroll">
     <div class="odometer-wrap">
       <span class="live-dot"></span>
       <div class="odometer mono" id="landingOdometer">0</div>

@@ -13,11 +13,22 @@
     document.getElementById("ls6LiveUpdatePrompt")?.remove();
     document.getElementById("ls7LiveUpdatePrompt")?.remove();
   }
+  function retireInternalNews(entries=[]){
+    document.getElementById("changelogOverlay")?.remove();
+    const userId=typeof currentUser!=="undefined"?currentUser?.id:null;
+    if(!userId)return;
+    const shownVersion=Math.max(0,...(Array.isArray(entries)?entries:[]).map(entry=>Number(entry?.version||0)));
+    try{if(shownVersion)localStorage.setItem(`livescroll_changelog_seen_${userId}`,String(shownVersion))}catch(_){}
+    if(shownVersion&&typeof sb!=="undefined")Promise.resolve(sb.rpc("set_my_changelog_seen_version",{p_version:shownVersion})).catch(()=>{});
+    if(typeof sb!=="undefined")Promise.resolve(sb.rpc("acknowledge_content",{p_user_id:userId,p_content_key:"changelog"})).catch(()=>{});
+  }
   try{
     showLiveScroll6UpdatePrompt=function(){};
     showLiveScroll7UpdatePrompt=function(){};
     startLiveScroll6UpdateWatcher=function(){stopLegacyUpdateFlow()};
     startLiveScroll7UpdateWatcher=function(){stopLegacyUpdateFlow()};
+    showChangelogModal=function(entries){retireInternalNews(entries)};
+    openChangelogHistory=function(){};
   }catch(_){}
 
   function releaseMedia(){
@@ -45,7 +56,7 @@
   function boot(){
     document.documentElement.dataset.sharedCore="1";document.documentElement.dataset.sharedRelease=RELEASE[generation()]||RELEASE[6];
     stopLegacyUpdateFlow();hardenExternalLinks();
-    const observer=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType===1)hardenExternalLinks(node)})));observer.observe(document.body,{childList:true,subtree:true});
+    const observer=new MutationObserver(records=>records.forEach(record=>record.addedNodes.forEach(node=>{if(node.nodeType!==1)return;hardenExternalLinks(node);if(node.id==="changelogOverlay"||node.querySelector?.("#changelogOverlay"))retireInternalNews()})));observer.observe(document.body,{childList:true,subtree:true});
     let attempts=0;const timer=setInterval(()=>{attempts++;stopLegacyUpdateFlow();checkAccountAccess();if(accessCheckedUser||attempts>90)clearInterval(timer)},1000);
     window.addEventListener("pagehide",()=>{releaseMedia();stopLegacyUpdateFlow();observer.disconnect();clearInterval(timer)},{once:true});
     document.addEventListener("visibilitychange",()=>{if(document.hidden)releaseMedia();else checkAccountAccess()});

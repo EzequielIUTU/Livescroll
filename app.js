@@ -15,11 +15,14 @@ const LIVESCROLL_PROJECT_IDENTITY = Object.freeze({
 
 // La WebApp es compartida, pero la APK 7 anuncia su identidad en el User-Agent.
 // Así LiveScroll 6 conserva su experiencia y LiveScroll 7 recibe la propia.
+const LIVESCROLL_VERSION_QUERY=Number(new URLSearchParams(location.search).get("lsversion"));
+if([6,7].includes(LIVESCROLL_VERSION_QUERY))localStorage.setItem("livescroll_selected_generation",String(LIVESCROLL_VERSION_QUERY));
+const LIVESCROLL_SELECTED_GENERATION=[6,7].includes(LIVESCROLL_VERSION_QUERY)?LIVESCROLL_VERSION_QUERY:Number(localStorage.getItem("livescroll_selected_generation"))||0;
 const LIVESCROLL_RUNTIME = Object.freeze({
   isAndroid8:/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get("ls8preview") === "1",
-  isAndroid7:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent),
-  isAndroid6:/LiveScrollAndroid\/6(?:\.|\/|\s)/i.test(navigator.userAgent),
-  generation:(/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get("ls8preview") === "1") ? 8 : /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent) ? 7 : 6
+  isAndroid7:LIVESCROLL_SELECTED_GENERATION?LIVESCROLL_SELECTED_GENERATION===7:/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent),
+  isAndroid6:LIVESCROLL_SELECTED_GENERATION?LIVESCROLL_SELECTED_GENERATION===6:/LiveScrollAndroid\/6(?:\.|\/|\s)/i.test(navigator.userAgent),
+  generation:(/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get("ls8preview") === "1") ? 8 : LIVESCROLL_SELECTED_GENERATION||(/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)?7:6)
 });
 
 if (LIVESCROLL_RUNTIME.isAndroid6) document.documentElement.classList.add("ls6-app-runtime");
@@ -2820,6 +2823,7 @@ function toggleMobileMenu() {
       <button onclick="openChangelogHistory(); closeMobileMenu();"><span>📢</span><b>Novedades</b></button>
       <button onclick="showTutorialModal(); closeMobileMenu();"><span>❓</span><b>Cómo funciona</b></button>
       <button onclick="openLiveScrollSettings(); closeMobileMenu();"><span>⚙️</span><b>Configuración</b></button>
+      <button onclick="openLiveScrollVersionHub(); closeMobileMenu();"><span>◈</span><b>Cambiar versión</b></button>
       ${currentProfile.is_admin ? `<button class="${activeTab === 'admin' ? 'active' : ''}" onclick="switchTab('admin'); closeMobileMenu();"><span>🛠</span><b>Admin</b></button>` : ""}
       <div class="ls-mobile-menu-exit">
         ${getLiveScroll6ModeMenuMarkup()}
@@ -19778,3 +19782,7 @@ function installLS8DemoAnnouncementStyles(){if(document.getElementById("ls8DemoA
 function closeLS8DemoAnnouncement(){document.getElementById("ls8DemoAnnouncement")?.remove()}
 function showLS8DemoAnnouncement(){const generation=getLiveScrollRuntimeGeneration();if(generation===8)return;const key=`ls8_demo_announcement_seen_ls${generation}`;if(localStorage.getItem(key)||localStorage.getItem(`ls8_demo_seen_ls${generation}`))return;localStorage.setItem(key,"1");installLS8DemoAnnouncementStyles();const layer=document.createElement("section");layer.id="ls8DemoAnnouncement";layer.className="ls8-demo-announcement";layer.innerHTML=`<article class="ls8-demo-announcement-card"><small>UNA NUEVA GENERACIÓN ESTÁ EN CAMINO</small><div class="ls8-demo-announcement-logo">LS<b>8</b></div><h2>Descubrí el futuro de LiveScroll.</h2><p>Probá una experiencia breve con el nuevo feed, perfiles y rendimiento de LiveScroll 8.</p><div class="ls8-demo-announcement-actions"><button class="ls8-demo-announcement-open" type="button">PROBAR DEMO</button><button class="ls8-demo-announcement-later" type="button">Ahora no</button></div><div class="ls8-demo-announcement-date"><span>PRÓXIMAMENTE</span><b>2027</b></div></article>`;document.body.appendChild(layer);layer.querySelector(".ls8-demo-announcement-open").onclick=openLS8OneTimeDemo;layer.querySelector(".ls8-demo-announcement-later").onclick=closeLS8DemoAnnouncement}
 (function scheduleLS8DemoAnnouncement(){if(isLiveScroll8App())return;let attempts=0;const timer=setInterval(()=>{attempts++;const ready=typeof currentProfile!=="undefined"&&currentProfile?.id&&!document.documentElement.classList.contains("ls7-boot-pending")&&!document.querySelector(".modal-overlay,.mobile-menu-overlay");if(ready){clearInterval(timer);setTimeout(showLS8DemoAnnouncement,1400)}else if(attempts>90)clearInterval(timer)},1000)})();
+
+function openLiveScrollVersionHub(){location.href="/versiones.html"}
+async function enforceCurrentVersionAccess(){if(isLiveScroll8App()||typeof sb==="undefined")return;const generation=getLiveScrollRuntimeGeneration(),[control,status]=await Promise.all([sb.rpc("get_version_control"),sb.rpc("get_my_status")]);if(status.data?.is_admin===true)return;const version=(control.data?.versions||[]).find(item=>Number(item.generation)===generation);if(!version||version.status==="open")return;document.getElementById("lsVersionLocked")?.remove();const layer=document.createElement("section");layer.id="lsVersionLocked";layer.className="ls8-demo-announcement";installLS8DemoAnnouncementStyles();layer.innerHTML=`<article class="ls8-demo-announcement-card"><small>VERSIÓN BLOQUEADA</small><div class="ls8-demo-announcement-logo">LS<b>${generation}</b></div><h2>${version.status==="maintenance"?"Estamos haciendo mantenimiento.":"Esta generación todavía no está disponible."}</h2><p>${version.message||"Elegí otra experiencia para continuar."}</p><div class="ls8-demo-announcement-actions"><button class="ls8-demo-announcement-open" onclick="openLiveScrollVersionHub()">CAMBIAR VERSIÓN</button></div><div class="ls8-demo-announcement-date"><span>LANZAMIENTO</span><b>${version.release_label||"PRÓXIMAMENTE"}</b></div></article>`;document.body.appendChild(layer)}
+(function scheduleVersionAccessCheck(){let attempts=0;const timer=setInterval(()=>{attempts++;if(typeof currentProfile!=="undefined"&&currentProfile?.id){clearInterval(timer);enforceCurrentVersionAccess()}else if(attempts>90)clearInterval(timer)},1000)})();

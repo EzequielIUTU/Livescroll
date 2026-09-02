@@ -5,11 +5,15 @@ const SUPABASE_URL = "https://lxpjqvlphvjyygifedeb.supabase.co",
   grid = document.getElementById("versionGrid"),
   news = document.getElementById("evolutionNews"),
   NEWS_KEY = "livescroll_multi_version_news_seen_1";
-if (localStorage.getItem(NEWS_KEY)) news.classList.add("closed");
-document.getElementById("discoverVersions").onclick = () => {
-  localStorage.setItem(NEWS_KEY, "1");
+try {
+  if (localStorage.getItem(NEWS_KEY)) news.classList.add("closed");
+} catch (_) {}
+function closeEvolutionNews() {
   news.classList.add("closed");
-};
+  news.setAttribute("aria-hidden", "true");
+  try { localStorage.setItem(NEWS_KEY, "1"); } catch (_) {}
+}
+document.getElementById("discoverVersions").addEventListener("click", closeEvolutionNews);
 const labels = {
   6: {
     name: "Clásica",

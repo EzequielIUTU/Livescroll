@@ -2811,6 +2811,7 @@ function toggleMobileMenu() {
       <button class="${activeTab === 'profile' ? 'active' : ''}" onclick="switchTab('profile'); closeMobileMenu();"><span>👤</span><b>Mi Perfil</b></button>
       <button class="${activeTab === 'users' ? 'active' : ''}" onclick="switchTab('users'); closeMobileMenu();"><span>👥</span><b>Usuarios</b></button>
       <button class="${activeTab === 'directos' ? 'active' : ''}" onclick="switchTab('directos'); closeMobileMenu();"><span>🔴</span><b>Directos</b></button>
+      ${canOpenLS8OneTimeDemo() ? `<button class="ls8-demo-entry" onclick="openLS8OneTimeDemo(); closeMobileMenu();"><span>8</span><b>Probar LiveScroll 8</b></button>` : ""}
       <div class="ls-mobile-menu-label">Mi cuenta</div>
       ${!window.__navWalletLocked ? `<button class="${activeTab === 'wallet' ? 'active' : ''}" onclick="switchTab('wallet'); closeMobileMenu();"><span>💰</span><b>Billetera</b></button>` : ""}
       <button class="${activeTab === 'store' ? 'active' : ''}" onclick="switchTab('store'); closeMobileMenu();"><span>🛍️</span><b>Tienda</b></button>
@@ -19767,3 +19768,7 @@ document.addEventListener("DOMContentLoaded", () => {
   `;
   document.head.appendChild(style);
 });
+
+/* One-time isolated LS8 demo entry for LS6 and LS7 */
+function canOpenLS8OneTimeDemo(){const generation=getLiveScrollRuntimeGeneration();return generation!==8&&!localStorage.getItem(`ls8_demo_seen_ls${generation}`)}
+function openLS8OneTimeDemo(){const generation=getLiveScrollRuntimeGeneration();if(generation===8)return;localStorage.setItem(`ls8_demo_seen_ls${generation}`,"1");location.href=`/ls8/demo.html?from=ls${generation}`}

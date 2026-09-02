@@ -14,6 +14,9 @@
   --ls6-glow-blue: rgba(56,221,242,.13);
 }
 
+/* Shared Core · identidad institucional sin cambiar la generación */
+.shared-nav-brand{display:flex;align-items:center;gap:7px}.shared-nav-brand>img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(72,221,242,.22))}.shared-nav-brand>span{display:flex;align-items:baseline}.shared-hero-logo{display:block;width:min(190px,46vw);max-height:195px;object-fit:contain;margin:0 auto 18px;filter:drop-shadow(0 14px 30px rgba(0,0,0,.32))}@media(max-width:600px){.shared-nav-brand>img{width:29px;height:29px}.shared-hero-logo{width:145px;max-height:150px;margin-bottom:12px}}
+
 * { box-sizing: border-box; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

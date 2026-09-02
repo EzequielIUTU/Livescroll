@@ -38,4 +38,6 @@ commit;
 select display_version,category,content
 from public.changelog_entries
 where display_version in ('6.2.4','7.0.9')
-order by version,created_at;
+order by version,
+  case category when 'nuevo' then 1 when 'actualizado' then 2 when 'reparado' then 3 else 4 end,
+  content;

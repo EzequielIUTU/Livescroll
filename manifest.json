@@ -9,13 +9,13 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "livescroll6-icon-192.png",
+      "src": "livescroll-app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "livescroll6-icon-512.png",
+      "src": "livescroll-app-icon.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

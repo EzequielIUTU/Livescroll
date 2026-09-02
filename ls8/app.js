@@ -314,3 +314,25 @@ const loadWalletIndividualBase=loadWallet;
 loadWallet=async function(){if(!currentProfile.is_admin){const access=await sb.rpc("get_my_service_access");if(access.data?.wallet_blocked){$("#walletView").innerHTML='<div class="service-closed individual"><i>◆</i><b>Billetera restringida</b><span>Tu acceso fue pausado por administración. Tus puntos siguen seguros.</span></div>';return}}return loadWalletIndividualBase()};
 const loadPlansIndividualBase=loadPlansView;
 loadPlansView=async function(){if(!currentProfile.is_admin){const access=await sb.rpc("get_my_service_access");if(access.data?.plans_blocked){$("#plansView").innerHTML='<div class="service-closed individual"><i>⬡</i><b>Planes restringidos</b><span>Tu acceso fue pausado por administración.</span></div>';return}}return loadPlansIndividualBase()};
+
+/* Pasaporte de Generaciones: identidad de perfil y lectura administrativa. */
+const decorateProfilePassportBase=decorateProfileVisuals;
+decorateProfileVisuals=function(p){decorateProfilePassportBase(p);attachGenerationPassport(p)};
+async function attachGenerationPassport(p){
+  if(!p?.id)return;
+  const result=await sb.rpc("get_generation_passport",{p_user_id:p.id});
+  if(result.error||!result.data?.ok||profileOwnerId!==p.id)return;
+  const generation=Number(result.data.active_generation)||6,chips=$("#profileView .profile-cover-shade>div");
+  if(!chips||chips.querySelector(".generation-passport-chip"))return;
+  chips.insertAdjacentHTML("beforeend",'<b class="identity-chip generation-passport-chip generation-'+generation+'">LS'+generation+' ACTIVA</b>')
+}
+const loadAdminGenerationBase=loadAdmin;
+loadAdmin=async function(){
+  await loadAdminGenerationBase();
+  const target=$("#adminView");if(!target||!currentProfile.is_admin||$("#adminGenerationStats"))return;
+  const result=await sb.rpc("admin_get_generation_stats");if(result.error||!result.data?.ok)return;
+  const data=result.data,active=Object.fromEntries((data.active_by_generation||[]).map(row=>[Number(row.generation),Number(row.users||0)])),usage=Object.fromEntries((data.usage_by_generation||[]).map(row=>[Number(row.generation),row])),section=document.createElement("section");
+  section.id="adminGenerationStats";section.className="admin-generation-stats";
+  section.innerHTML='<header><span><small>PASAPORTE DE GENERACIONES</small><h3>Uso de LiveScroll</h3></span><b>'+Number(data.passports||0)+' PASAPORTES</b></header><div class="generation-stat-grid">'+[6,7,8].map(g=>'<article class="generation-stat generation-'+g+'"><small>GENERACIÓN</small><strong>LS'+g+'</strong><span><b>'+Number(active[g]||0)+'</b> usuarios activos</span><span><b>'+Number(usage[g]?.launches||0)+'</b> aperturas</span></article>').join('')+'</div><footer><span>Usuarios en varias generaciones</span><b>'+Number(data.multi_generation_users||0)+'</b></footer>';
+  target.prepend(section)
+};

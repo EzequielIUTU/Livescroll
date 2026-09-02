@@ -1,0 +1,2 @@
+/* Novedades vive en el selector de generaciones. Se conserva el historial interno, pero se ocultan sus accesos en LS6/LS7. */
+button[onclick*="openChangelogHistory"],.nav-changelog-btn{display:none!important}

@@ -16,6 +16,7 @@
 
 /* Shared Core · identidad institucional sin cambiar la generación */
 .shared-nav-brand{display:flex;align-items:center;gap:7px}.shared-nav-brand>img{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 0 10px rgba(72,221,242,.22))}.shared-nav-brand>span{display:flex;align-items:baseline}.shared-hero-logo{display:block;width:min(190px,46vw);max-height:195px;object-fit:contain;margin:0 auto 18px;filter:drop-shadow(0 14px 30px rgba(0,0,0,.32))}@media(max-width:600px){.shared-nav-brand>img{width:29px;height:29px}.shared-hero-logo{width:145px;max-height:150px;margin-bottom:12px}}
+.shared-boot-logo{width:58px;height:58px;object-fit:contain;margin:0 auto 9px;filter:drop-shadow(0 0 18px rgba(72,215,255,.28))}.shared-intro-mark{width:68px;height:68px;object-fit:contain;margin:0 auto 13px;filter:drop-shadow(0 0 18px rgba(244,211,94,.24))}.shared-portal-mark{width:72px;height:72px;object-fit:contain;margin:0 auto 5px;filter:drop-shadow(0 0 24px rgba(244,211,94,.25))}@media(max-width:600px){.shared-boot-logo{width:46px;height:46px}.shared-intro-mark,.shared-portal-mark{width:52px;height:52px;margin-bottom:6px}}
 
 * { box-sizing: border-box; }
 

@@ -46,12 +46,14 @@
   // Se ejecuta antes del primer dibujo: evita que la APK 7 muestre por un
   // instante la pantalla compartida de LiveScroll 6 mientras recupera sesión.
   (function () {
+    var params = new URLSearchParams(location.search);
+    var selectedGeneration = Number(params.get('lsversion')) || Number(sessionStorage.getItem('livescroll_version_entry')) || 0;
     if (/LiveScrollAndroid\/8(?:\.|\/|\s)/i.test(navigator.userAgent) || new URLSearchParams(location.search).get('ls8preview') === '1') {
       document.documentElement.classList.add('ls7-app-runtime','ls7-boot-pending','ls8-app-runtime');
       document.title = 'LiveScroll 8';
       return;
     }
-    if (/LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)) {
+    if (selectedGeneration === 7 || /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent)) {
       document.documentElement.classList.add('ls7-app-runtime','ls7-boot-pending');
       document.title = 'LiveScroll 7';
     }
@@ -441,7 +443,8 @@
 
     // La APK LiveScroll 7 comparte backend y WebApp, pero nunca reproduce
     // presentaciones de LiveScroll 6.
-    var isLiveScroll7App = /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent);
+    var selectedGeneration = Number(params.get('lsversion')) || Number(sessionStorage.getItem('livescroll_version_entry')) || 0;
+    var isLiveScroll7App = selectedGeneration === 7 || /LiveScrollAndroid\/7(?:\.|\/|\s)/i.test(navigator.userAgent);
     if (isLiveScroll7App) {
       portal.remove();
       var legacySixIntro = document.getElementById('introOverlay');

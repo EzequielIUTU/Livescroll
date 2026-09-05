@@ -67,6 +67,20 @@ function newsSeenKey(generation) {
 function latestNewsId(generation) {
   return Math.max(0, ...generationNews[generation].map((entry) => Number(entry.version || 0)));
 }
+function isLinkPublishingAnnouncement(version) {
+  return version === "6.2.5" || version === "7.0.10";
+}
+function linkPublishingAnnouncement(version, index) {
+  return `<section class="generation-news-release publication-change${index === 0 ? " latest" : ""}">
+    <div class="publication-change-top"><span>AVISO IMPORTANTE</span><b>${version}</b></div>
+    <div class="publication-change-date"><small>A PARTIR DEL</small><strong>28 · 09 · 2026</strong></div>
+    <h3>Nueva forma de publicar</h3>
+    <p>LiveScroll dejará de aceptar nuevos archivos <b>MP4 y MKV</b>. Publicar será más simple: pegás un enlace de <b>YouTube, Kick, Twitch o TikTok</b> y LiveScroll hará el resto.</p>
+    <aside><b>Tus videos actuales seguirán disponibles.</b><span>No serán eliminados por este cambio.</span></aside>
+    <p class="publication-apology">Queremos pedirte disculpas por las molestias que esta modificación pueda ocasionar. Es una decisión necesaria para mejorar la estabilidad, reducir errores de reproducción y seguir construyendo el futuro del proyecto.</p>
+    <footer>GRACIAS POR ACOMPAÑARNOS EN ESTA NUEVA ETAPA <i>◆</i></footer>
+  </section>`;
+}
 function renderNewsButtons() {
   [6, 7, 8].forEach((generation) => {
     const card = grid.querySelector(`.version-card.${labels[generation].className}`);
@@ -91,7 +105,8 @@ function openGenerationNews(generation) {
   grid.querySelector(`[data-open-news="${generation}"] .version-news-dot`)?.classList.remove("visible");
   const groups = new Map();
   entries.forEach((entry) => { const version = entry.display_version || `LS${generation}`; if (!groups.has(version)) groups.set(version, []); groups.get(version).push(entry); });
-  document.getElementById("generationNewsContent").innerHTML = `<header><span><small>EVOLUCIÓN DE LA GENERACIÓN</small><h2>Novedades LS${generation}</h2><p>${entries.length ? `${entries.length} cambios publicados` : "Todavía no hay actualizaciones publicadas."}</p></span><button data-close-generation-news>×</button></header><div class="generation-news-list">${[...groups].map(([version, rows], index) => `<section class="generation-news-release${index === 0 ? " latest" : ""}"><div><small>${index === 0 ? "ÚLTIMA ACTUALIZACIÓN" : "HISTORIAL"}</small><b>${version}</b></div>${rows.map((row) => `<article><i class="${String(row.category || "mejora").toLowerCase()}"></i><span><small>${String(row.category || "mejora").toUpperCase()}</small><p>${String(row.content || "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char])}</p></span></article>`).join("")}</section>`).join("") || '<div class="generation-news-empty">Esta generación todavía no publicó novedades.</div>'}</div>`;
+  const hasImportantAnnouncement = [...groups.keys()].some(isLinkPublishingAnnouncement);
+  document.getElementById("generationNewsContent").innerHTML = `<header><span><small>EVOLUCIÓN DE LA GENERACIÓN</small><h2>Novedades LS${generation}</h2><p>${hasImportantAnnouncement ? "Comunicado importante" : entries.length ? `${entries.length} cambios publicados` : "Todavía no hay actualizaciones publicadas."}</p></span><button data-close-generation-news>×</button></header><div class="generation-news-list">${[...groups].map(([version, rows], index) => isLinkPublishingAnnouncement(version) ? linkPublishingAnnouncement(version, index) : `<section class="generation-news-release${index === 0 ? " latest" : ""}"><div><small>${index === 0 ? "ÚLTIMA ACTUALIZACIÓN" : "HISTORIAL"}</small><b>${version}</b></div>${rows.map((row) => `<article><i class="${String(row.category || "mejora").toLowerCase()}"></i><span><small>${String(row.category || "mejora").toUpperCase()}</small><p>${String(row.content || "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char])}</p></span></article>`).join("")}</section>`).join("") || '<div class="generation-news-empty">Esta generación todavía no publicó novedades.</div>'}</div>`;
   newsModal.classList.add("open");
   newsModal.setAttribute("aria-hidden", "false");
   document.body.classList.add("news-modal-open");
